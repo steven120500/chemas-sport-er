@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FaPlus } from 'react-icons/fa';
 
 const tallaPorTipo = {
   Player: ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
@@ -24,9 +25,8 @@ export default function App() {
     stock: {},
   });
 
-  // Cargar desde localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('products');
+    const stored = localStorage.getItem('newProduct');
     if (stored) {
       setProducts(JSON.parse(stored));
     } else {
@@ -35,16 +35,42 @@ export default function App() {
           id: 1,
           name: 'CR7 2008 Manchester United',
           price: '₡20000',
-          imageSrc: 'https://i.pinimg.com/736x/fa/b1/e2/fab1e2eee915b1b1ee7c9ade32380040.jpg',
+          imageSrc: 'https://chemastorecr.myshopify.com/cdn/shop/files/4598837F-987F-4905-AAF7-F2508C501747.jpg?v=1737214808&width=823',
           imageAlt: 'CR7 2008 Manchester United.',
+          type: 'Retro',
+          stock: { S: 5, M: 3, L: 4 },
+        },
+        {
+          id: 2,
+          name: 'Neymar Brasil',
+          price: '₡20000',
+          imageSrc: 'https://chemastorecr.myshopify.com/cdn/shop/files/B6EFA54C-0FF6-4B96-8096-C5FC90E3814A.jpg?v=1738704926&width=823',
+          imageAlt: 'Neymar Brasil',
           type: 'Player',
+          stock: { S: 5, M: 3, L: 4 },
+        },
+        {
+          id: 3,
+          name: 'CR7 All Nassr',
+          price: '₡20000',
+          imageSrc: 'https://chemastorecr.myshopify.com/cdn/shop/files/18992C07-A4B6-4E6F-8492-3F5330AC4FF2.jpg?v=1738018760&width=823',
+          imageAlt: 'CR7 All Nassr',
+          type: 'Niño',
+          stock: { 20: 3},
+        },
+        {
+          id: 4,
+          name: 'Lisa Barcelona',
+          price: '₡20000',
+          imageSrc: 'https://chemastorecr.myshopify.com/cdn/shop/files/9A0EBE8B-A2BC-46A4-B820-6933209DD143.jpg?v=1750966766&width=360',
+          imageAlt: 'Lisa Barcelona',
+          type: 'Mujer',
           stock: { S: 5, M: 3, L: 4 },
         },
       ]);
     }
   }, []);
 
-  // Guardar en localStorage
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
@@ -75,16 +101,19 @@ export default function App() {
 
   return (
     <div className="bg-white px-4 py-12 sm:px-6 lg:px-8">
+      <header>
+        <h2 className="text-2xl font-bold text-gray-900 text-center w-full">Chemas Sport ER</h2>
+      </header>
+
       <div className="mx-auto max-w-7xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 text-center w-full">
-            Chemas Sport ER
-          </h2>
+        {/* Botón + */}
+        <div className="flex justify-end mb-6">
           <button
-            className="absolute right-6 top-6 bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+            className="bg-black text-white p-3 rounded-full hover:bg-gray-800 transition"
             onClick={() => setShowAddModal(true)}
+            title="Añadir producto"
           >
-            Añadir inventario
+            <FaPlus />
           </button>
         </div>
 
@@ -132,6 +161,7 @@ export default function App() {
                 </div>
                 <h3 className="mt-4 text-sm text-gray-700 font-medium">{product.name}</h3>
                 <p className="mt-1 text-sm text-gray-900">{product.price}</p>
+                <p className="text-xs text-gray-600">{product.type}</p>
               </div>
             ))}
           </div>
@@ -196,6 +226,7 @@ export default function App() {
               onChange={(e) => setNewProduct({ ...newProduct, imageSrc: e.target.value })}
               className="w-full mb-2 px-3 py-2 border border-gray-300 rounded"
             />
+
             <select
               value={newProduct.type}
               onChange={(e) => {
@@ -217,29 +248,34 @@ export default function App() {
 
             {/* Tallas dinámicas */}
             {newProduct.type && (
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {tallaPorTipo[newProduct.type].map((t) => (
-                  <div key={t} className="flex items-center gap-2">
-                    <label className="w-10">{t}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={newProduct.stock?.[t] || 0}
-                      onChange={(e) =>
-                        setNewProduct({
-                          ...newProduct,
-                          stock: {
-                            ...newProduct.stock,
-                            [t]: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                      className="flex-1 px-2 py-1 border rounded"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+  <div className="grid grid-cols-2 gap-4 mb-4">
+    {tallaPorTipo[newProduct.type].map((t) => (
+      <div key={t} className="flex items-center gap-2">
+        <label htmlFor={`stock-${t}`} className="w-12 font-medium text-gray-700">
+          {t}
+        </label>
+        <input
+          id={`stock-${t}`}
+          type="number"
+          min="0"
+          placeholder="0"
+          value={newProduct.stock?.[t] ?? ''}
+          onChange={(e) =>
+            setNewProduct({
+              ...newProduct,
+              stock: {
+                ...newProduct.stock,
+                [t]: parseInt(e.target.value) || '',
+              },
+            })
+          }
+          className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-black"
+        />
+      </div>
+    ))}
+  </div>
+)}
+
 
             <div className="flex justify-between">
               <button
