@@ -1,5 +1,5 @@
 {
-  "name": "droppingcr-app",
+  "name": "chemas-sport-er-app",
   "version": "1.0.0",
   "description": "A simple and customizable e-commerce web application built from scratch as a personal project. It includes product listings, cart functionality, order flow, and user authentication. The goal is to learn full-stack development while creating a functional and scalable online store.",
   "main": "index.js",
@@ -13,5 +13,10 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.11",
     "concurrently": "^9.2.0"
+  },
+  "dependencies": {
+    "framer-motion": "^12.23.9",
+    "lucide-react": "^0.525.0",
+    "react-toastify": "^11.0.5"
   }
 }
