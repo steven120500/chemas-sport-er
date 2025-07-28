@@ -1,68 +1,77 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function ProductModal({ product, onClose }) {
+const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
+const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
+
+export default function ProductModal({ product, onClose, onUpdate }) {
   const modalRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });
 
-  // Cierra el modal si se hace clic fuera de él
+  // Bloquear scroll del body cuando se muestra el modal
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        onClose();
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
 
-  // Guarda los cambios en localStorage
-  const handleSave = () => {
-    const stored = localStorage.getItem('products');
-    const products = stored ? JSON.parse(stored) : [];
-    const updated = products.map((p) =>
-      p.id === product.id ? { ...p, stock: editedStock } : p
-    );
-    localStorage.setItem('products', JSON.stringify(updated));
-    setIsEditing(false);
-    onClose();
+  const handleSave = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/products/${product._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock: editedStock }),
+      });
+
+      if (!response.ok) throw new Error('Error al actualizar en el servidor');
+
+      const updatedProduct = await response.json();
+      onUpdate(updatedProduct);
+      setIsEditing(false);
+      onClose();
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      alert('Hubo un problema al actualizar el stock');
+    }
   };
 
+  const tallasVisibles = product.type === 'Niño' ? tallasNino : tallasAdulto;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div ref={modalRef} className="bg-white p-6 rounded-lg shadow-md max-w-md w-full relative">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center overflow-y-auto">
+      <div
+        ref={modalRef}
+        className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+      >
         <img src={product.imageSrc} alt={product.imageAlt} className="rounded-lg mb-4" />
         <h2 className="text-lg font-bold mb-2 text-center">{product.name}</h2>
 
         <div className="mb-4">
-          <p className="text-center font-semibold mb-2">Selecciona tu talla:</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {Object.entries(editedStock).map(([talla, cantidad]) => (
-              <div key={talla} className="px-4 py-2 border rounded">
+          <p className="text-center font-semibold mb-2">Stock por talla:</p>
+          <div className="grid grid-cols-3 gap-2">
+            {tallasVisibles.map((talla) => (
+              <div key={talla} className="text-center border rounded p-2">
+                <label className="block text-sm font-medium">{talla}</label>
                 {isEditing ? (
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-sm font-medium">{talla}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-16 border border-gray-300 rounded px-1 text-center"
-                      value={cantidad}
-                      onChange={(e) =>
-                        setEditedStock({ ...editedStock, [talla]: Number(e.target.value) })
-                      }
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full border border-gray-300 rounded px-1 text-center"
+                    value={editedStock[talla] || 0}
+                    onChange={(e) =>
+                      setEditedStock({ ...editedStock, [talla]: Number(e.target.value) })
+                    }
+                  />
                 ) : (
-                  <span>
-                    {talla} ({cantidad} disponibles)
-                  </span>
+                  <p className="text-sm">{editedStock[talla] || 0} disponibles</p>
                 )}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mt-4">
           <button
             className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
             onClick={onClose}

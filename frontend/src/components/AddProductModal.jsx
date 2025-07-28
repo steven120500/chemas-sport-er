@@ -54,15 +54,23 @@ export default function AddProductModal({ onAdd, onCancel }) {
     setLoading(true);
 
     try {
-      await new Promise((res) => setTimeout(res, 1500));
-
-      onAdd({
-        name,
-        price,
-        type,
-        stock,
-        imageSrc: image.src,
+      const response = await fetch('http://localhost:5000/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          price,
+          type,
+          stock,
+          imageSrc: image.src,
+          imageAlt: name,
+        }),
       });
+
+      if (!response.ok) throw new Error('Fallo al guardar en el servidor');
+
+      const { product } = await response.json(); // ← destructuramos el producto desde el backend
+      onAdd(product);
 
       toast.success('Producto agregado correctamente');
       setTimeout(() => {
@@ -70,6 +78,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
         onCancel();
       }, 1000);
     } catch (err) {
+      console.error('Error al agregar el producto:', err);
       toast.error('Error al agregar el producto');
       setLoading(false);
     }
@@ -85,11 +94,11 @@ export default function AddProductModal({ onAdd, onCancel }) {
   const tallas = tallaPorTipo[type];
 
   return (
-         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 overflow-y-auto">
-        <div
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 overflow-y-auto">
+      <div
         ref={modalRef}
         className="bg-white rounded-lg max-w-md w-full shadow-lg h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
-        >
+      >
         <div className="relative p-6">
           <button
             onClick={onCancel}
