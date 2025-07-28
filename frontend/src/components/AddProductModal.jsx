@@ -85,10 +85,10 @@ export default function AddProductModal({ onAdd, onCancel }) {
   const tallas = tallaPorTipo[type];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div
+         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 overflow-y-auto">
+        <div
         ref={modalRef}
-        className="bg-white rounded-lg max-w-md w-full shadow-lg max-h-[90vh] flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+        className="bg-white rounded-lg max-w-md w-full shadow-lg h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
         >
         <div className="relative p-6">
           <button

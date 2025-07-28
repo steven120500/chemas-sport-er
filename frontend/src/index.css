@@ -2,21 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Scrollbar personalizada y visible */
-.scrollbar-thin {
+/* Scrollbar personalizada (compatible sin plugin) */
+.scroll-custom {
   scrollbar-width: thin;
+  scrollbar-color: #a0aec0 transparent;
 }
 
-.scrollbar-thumb-gray-400::-webkit-scrollbar {
-  width: 6px;
+.scroll-custom::-webkit-scrollbar {
+  width: 8px;
 }
 
-.scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
-  background-color: #a0aec0; /* Tailwind gray-400 */
+.scroll-custom::-webkit-scrollbar-thumb {
+  background-color: #a0aec0; /* gray-400 */
   border-radius: 9999px;
 }
 
-/* Root styles (ajustado para evitar interferencia con Tailwind) */
+.scroll-custom::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Estilos base */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -63,7 +68,7 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Claro */
+/* Modo claro */
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

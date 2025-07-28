@@ -9,6 +9,10 @@ import tallaPorTipo from './utils/tallaPorTipo';
 import { FaPlus } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './index.css';
+
+
+
 
 export default function App() {
   const [products, setProducts] = useState([]);
