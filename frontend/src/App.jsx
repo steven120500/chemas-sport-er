@@ -20,7 +20,7 @@ export default function App() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/products');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/products`);
       if (!res.ok) throw new Error('No se pudo obtener los productos');
       const data = await res.json();
       setProducts(data);
