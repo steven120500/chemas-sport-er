@@ -20,7 +20,7 @@ export default function App() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`https://chemas-backend.onrender/api/products`);
+      const res = await fetch(`https://chemas-backend.onrender.com/api/products`);
       if (!res.ok) throw new Error('No se pudo obtener los productos');
       const data = await res.json();
       setProducts(data);
