@@ -18,7 +18,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`https://chemas-backend.onrender/api/products/${product._id}`, {
+      const response = await fetch(`https://chemas-backend.onrender.com/api/products/${product._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock: editedStock }),

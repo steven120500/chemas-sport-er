@@ -54,7 +54,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
     setLoading(true);
 
     try {
-      const response = await fetch('https://chemas-backend.onrender/api/products', {
+      const response = await fetch('https://chemas-backend.onrender.com/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
