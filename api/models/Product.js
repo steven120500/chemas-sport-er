@@ -5,9 +5,10 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: String, required: true },
   type: { type: String, required: true },
-  imageSrc: { type: String, required: true },
+  imageSrc: { type: String, required: true },     // Imagen principal (requerida)
+  imageSrc2: { type: String },                    // Imagen secundaria (opcional)
   imageAlt: { type: String },
-  stock: { type: Object, required: true }, // Ej: { S: 3, M: 4 }
+  stock: { type: Object, required: true },        // Ejemplo: { S: 3, M: 4 }
 }, {
   timestamps: true,
 });

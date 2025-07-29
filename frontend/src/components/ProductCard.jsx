@@ -5,22 +5,29 @@ export default function ProductCard({ product, onClick }) {
     <motion.div
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden"
+      className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden group w-full max-w-[300px]"
       onClick={() => onClick(product)}
     >
+      {/* Etiqueta tipo flecha - visible solo sin hover */}
+      <div className="absolute top-5 left-0 z-10 group-hover:opacity-0 transition-opacity duration-300">
+        <div className="bg-black text-white text-sm font-semibold px-5 py-1 rounded-r-full shadow">
+          {product.type}
+        </div>
+      </div>
+
+      {/* Imagen cuadrada */}
       <div className="aspect-square w-full bg-gray-100">
         <img
           src={product.imageSrc}
           alt={product.imageAlt}
-          className="w-full h-full object-cover object-center transition-opacity duration-300 hover:opacity-80"
+          className="w-full h-full object-cover object-center transition-opacity duration-300"
         />
       </div>
+
+      {/* Nombre y precio */}
       <div className="p-4 text-center">
-        <h3 className="text-base font-semibold text-gray-800">{product.name}</h3>
-        <p className="text-sm text-gray-600 mt-1">{product.price}</p>
-        <span className="inline-block mt-1 text-xs px-2 py-1 rounded bg-black text-white">
-          {product.type}
-        </span>
+        <h3 className="text-lg font-bold text-gray-900 leading-tight">{product.name}</h3>
+        <p className="text-xl font-bold text-gray-800 mt-1">₡{product.price}</p>
       </div>
     </motion.div>
   );

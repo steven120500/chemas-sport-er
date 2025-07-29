@@ -5,7 +5,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function AddProductModal({ onAdd, onCancel }) {
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [type, setType] = useState('Player');
@@ -18,21 +18,30 @@ export default function AddProductModal({ onAdd, onCancel }) {
 
   const handleImageDrop = (e) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && acceptedTypes.includes(file.type)) {
-      const reader = new FileReader();
-      reader.onload = () => setImage({ src: reader.result, file });
-      reader.readAsDataURL(file);
-    } else {
+    const files = Array.from(e.dataTransfer.files).slice(0, 2 - images.length);
+    const validFiles = files.filter((file) => acceptedTypes.includes(file.type));
+
+    if (validFiles.length === 0) {
       toast.error('Formato de imagen no soportado');
+      return;
     }
+
+    validFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImages((prev) => [...prev, { src: reader.result, file }]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file && acceptedTypes.includes(file.type)) {
       const reader = new FileReader();
-      reader.onload = () => setImage({ src: reader.result, file });
+      reader.onload = () => {
+        setImages((prev) => [...prev, { src: reader.result, file }].slice(0, 2));
+      };
       reader.readAsDataURL(file);
     } else {
       toast.error('Formato de imagen no soportado');
@@ -46,7 +55,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
   };
 
   const handleSubmit = async () => {
-    if (!name || !price || !image) {
+    if (!name || !price || images.length === 0) {
       toast.error('Todos los campos son obligatorios.');
       return;
     }
@@ -62,14 +71,15 @@ export default function AddProductModal({ onAdd, onCancel }) {
           price,
           type,
           stock,
-          imageSrc: image.src,
+          imageSrc1: images[0]?.src,
+          imageSrc2: images[1]?.src || null,
           imageAlt: name,
         }),
       });
 
       if (!response.ok) throw new Error('Fallo al guardar en el servidor');
 
-      const { product } = await response.json(); // ← destructuramos el producto desde el backend
+      const { product } = await response.json();
       onAdd(product);
 
       toast.success('Producto agregado correctamente');
@@ -107,25 +117,29 @@ export default function AddProductModal({ onAdd, onCancel }) {
             <FaTimes />
           </button>
 
-          {/* Imagen */}
+          {/* Imagenes */}
           <div
             onDrop={handleImageDrop}
             onDragOver={handleDragOver}
             onClick={() => fileInputRef.current.click()}
             className="border-2 border-dashed border-gray-300 p-4 rounded-md cursor-pointer text-center mb-4"
           >
-            {image ? (
-              <div className="relative">
-                <img src={image.src} alt="preview" className="w-full rounded-md" />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImage(null);
-                  }}
-                  className="absolute top-1 right-1 bg-black text-white rounded-full p-1 text-xs"
-                >
-                  <FaTimes />
-                </button>
+            {images.length > 0 ? (
+              <div className="flex gap-2 justify-center flex-wrap">
+                {images.map((img, index) => (
+                  <div key={index} className="relative">
+                    <img src={img.src} alt={`preview-${index}`} className="w-24 h-24 object-cover rounded" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImages((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                      className="absolute top-0 right-0 bg-black text-white text-xs rounded-full px-1"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-gray-500">
