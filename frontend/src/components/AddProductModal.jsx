@@ -71,7 +71,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
           price,
           type,
           stock,
-          imageSrc1: images[0]?.src,
+          imageSrc: images[0]?.src,
           imageSrc2: images[1]?.src || null,
           imageAlt: name,
         }),
