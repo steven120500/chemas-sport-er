@@ -34,13 +34,17 @@ export default function App() {
     fetchProducts();
   }, []);
 
-  const handleProductUpdate = (updatedProduct) => {
-    setProducts((prevProducts) =>
-      prevProducts.map((p) =>
-        p._id === updatedProduct._id ? updatedProduct : p
-      )
-    );
+  const handleProductUpdate = (updatedProduct, deletedId = null) => {
+    if (deletedId) {
+      setProducts((prev) => prev.filter((p) => p._id !== deletedId));
+      setSelectedProduct(null); // cierra modal si eliminás
+    } else {
+      setProducts((prev) =>
+        prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p))
+      );
+    }
   };
+  
 
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());

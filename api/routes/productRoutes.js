@@ -38,6 +38,21 @@ router.put('/:id', async (req, res) => {
       res.status(500).json({ message: 'Error al actualizar producto' });
     }
   });
+
+  // Eliminar producto
+router.delete('/:id', async (req, res) => {
+    try {
+      const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+      if (!deletedProduct) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
+      }
+      res.json({ message: 'Producto eliminado con éxito' });
+    } catch (error) {
+      console.error('Error al eliminar producto:', error);
+      res.status(500).json({ message: 'Error al eliminar producto' });
+    }
+  });
+  
   
 
 export default router;
