@@ -141,14 +141,17 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           </button>
 
           <a
-  href={`https://wa.me/50688028216?text=Hola!%20Estoy%20interesado%20en%20la%20camiseta:%20${encodeURIComponent(product.name)}`}
+  href={`https://wa.me/50688028216?text=${encodeURIComponent(
+    `¡Hola! Me interesa la camiseta "${product.name}". ¿Está disponible todavía?`
+  )}`}
   target="_blank"
   rel="noopener noreferrer"
   className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full flex justify-center items-center text-xl"
-  title="Chatear por WhatsApp"
+  title="Enviar mensaje por WhatsApp"
 >
   <FaWhatsapp />
 </a>
+
 
         </div>
       </div>
