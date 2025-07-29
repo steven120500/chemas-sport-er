@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
+import { FaWhatsapp } from 'react-icons/fa';
+
 
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
@@ -129,12 +131,25 @@ export default function ProductModal({ product, onClose, onUpdate }) {
             </button>
           )}
 
+
+
           <button
             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full"
             onClick={handleDelete}
           >
             Eliminar
           </button>
+
+          <a
+  href={`https://wa.me/50688028216?text=Hola!%20Estoy%20interesado%20en%20la%20camiseta:%20${encodeURIComponent(product.name)}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full flex justify-center items-center text-xl"
+  title="Chatear por WhatsApp"
+>
+  <FaWhatsapp />
+</a>
+
         </div>
       </div>
     </div>
