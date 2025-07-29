@@ -141,7 +141,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           </button>
 
           <a
-  href={`https://wa.me/50688028216?text=${encodeURIComponent(
+  href={`https://wa.me/50660369857?text=${encodeURIComponent(
     `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC . ¿Está disponible todavía?`
   )}`}
   target="_blank"
