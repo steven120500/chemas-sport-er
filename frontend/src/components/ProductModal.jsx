@@ -39,19 +39,22 @@ export default function ProductModal({ product, onClose, onUpdate }) {
 
   const handleDelete = async () => {
     try {
+      console.log('ID que se enviará para eliminar:', product._id); // 👈 Agregado
+  
       const res = await fetch(`https://chemas-backend.onrender.com/api/products/${product._id}`, {
         method: 'DELETE',
       });
-
+  
       if (!res.ok) throw new Error('Error al eliminar');
-
+  
       toast.success('Producto eliminado con éxito');
-      onUpdate(null, product._id); // opcional: si querés actualizar lista tras borrar
+      onUpdate(null, product._id);
     } catch (error) {
       console.error('Error al eliminar:', error);
       toast.error('No se pudo eliminar el producto');
     }
   };
+  
 
   const tallasVisibles = product.type === 'Niño' ? tallasNino : tallasAdulto;
 
