@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaWhatsapp } from 'react-icons/fa';
 
-
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
 
@@ -11,6 +10,8 @@ export default function ProductModal({ product, onClose, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });
   const [editedName, setEditedName] = useState(product.name);
+  const [editedPrice, setEditedPrice] = useState(product.price);
+  const [showSecondImage, setShowSecondImage] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -24,7 +25,11 @@ export default function ProductModal({ product, onClose, onUpdate }) {
       const response = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock: editedStock, name: editedName }),
+        body: JSON.stringify({
+          stock: editedStock,
+          name: editedName,
+          price: editedPrice,
+        }),
       });
 
       if (!response.ok) throw new Error('Error al actualizar');
@@ -41,14 +46,12 @@ export default function ProductModal({ product, onClose, onUpdate }) {
 
   const handleDelete = async () => {
     try {
-      console.log('ID que se enviará para eliminar:', product._id); // 👈 Agregado
-  
       const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'DELETE',
       });
-  
+
       if (!res.ok) throw new Error('Error al eliminar');
-  
+
       toast.success('Producto eliminado con éxito');
       onUpdate(null, product._id);
     } catch (error) {
@@ -56,7 +59,6 @@ export default function ProductModal({ product, onClose, onUpdate }) {
       toast.error('No se pudo eliminar el producto');
     }
   };
-  
 
   const tallasVisibles = product.type === 'Niño' ? tallasNino : tallasAdulto;
 
@@ -66,6 +68,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
         ref={modalRef}
         className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
       >
+        {/* Nombre */}
         <h2 className="text-xl font-bold mb-2 text-center">
           {isEditing ? (
             <input
@@ -79,10 +82,48 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           )}
         </h2>
 
+        {/* Imagen y flechas */}
+        <div className="relative mb-4 flex items-center justify-center">
+          {product.imageSrc2 && (
+            <button
+              onClick={() => setShowSecondImage(prev => !prev)}
+              className="absolute left-0 z-10 bg-white bg-opacity-70 hover:bg-opacity-100 px-3 py-1 rounded-full shadow-md text-xl"
+            >
+              &#8592;
+            </button>
+          )}
 
-        <img src={product.imageSrc} alt={product.imageAlt} className="rounded-lg mb-4" />
-        <p className="text-center text-lg font-semibold mb-2">₡{product.price}</p>
+          <img
+            src={showSecondImage && product.imageSrc2 ? product.imageSrc2 : product.imageSrc}
+            alt={product.imageAlt || 'Producto'}
+            className="rounded-lg max-h-[400px] object-contain"
+          />
 
+          {product.imageSrc2 && (
+            <button
+              onClick={() => setShowSecondImage(prev => !prev)}
+              className="absolute right-0 z-10 bg-white bg-opacity-70 hover:bg-opacity-100 px-3 py-1 rounded-full shadow-md text-xl"
+            >
+              &#8594;
+            </button>
+          )}
+        </div>
+
+        {/* Precio */}
+        <div className="text-center text-lg font-semibold mb-2">
+          {isEditing ? (
+            <input
+              type="number"
+              className="text-center border-b-2 w-full font-semibold"
+              value={editedPrice}
+              onChange={(e) => setEditedPrice(e.target.value)}
+            />
+          ) : (
+            `₡${product.price}`
+          )}
+        </div>
+
+        {/* Tallas */}
         <div className="mb-4">
           <p className="text-center font-semibold mb-2">Stock por talla:</p>
           <div className="grid grid-cols-3 gap-2">
@@ -107,52 +148,37 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           </div>
         </div>
 
-        <div className="flex justify-between mt-4 gap-2">
-          <button
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition w-full"
-            onClick={onClose}
-          >
+        {/* Botones */}
+        <div className="flex justify-between mt-4 gap-2 wrap">
+          <button className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition w-full" onClick={onClose}>
             Cerrar
           </button>
 
           {isEditing ? (
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full"
-              onClick={handleSave}
-            >
+            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full" onClick={handleSave}>
               Guardar
             </button>
           ) : (
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full"
-              onClick={() => setIsEditing(true)}
-            >
+            <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full" onClick={() => setIsEditing(true)}>
               Editar
             </button>
           )}
 
-
-
-          <button
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full"
-            onClick={handleDelete}
-          >
+          <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full" onClick={handleDelete}>
             Eliminar
           </button>
 
           <a
-  href={`https://wa.me/50660369857?text=${encodeURIComponent(
-    `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC . ¿Está disponible todavía?`
-  )}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full flex justify-center items-center text-xl"
-  title="Enviar mensaje por WhatsApp"
->
-  <FaWhatsapp />
-</a>
-
-
+            href={`https://wa.me/50660369857?text=${encodeURIComponent(
+              `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC . ¿Está disponible todavía?`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full flex justify-center items-center text-xl"
+            title="Enviar mensaje por WhatsApp"
+          >
+            <FaWhatsapp />
+          </a>
         </div>
       </div>
     </div>

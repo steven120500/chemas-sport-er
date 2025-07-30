@@ -10,9 +10,12 @@ import { FaPlus } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
+import FloatingWhatsapp from './components/FloatingWhatsapp';
+import LoadingOverlay from './components/LoadingOverlay';
 
 export default function App() {
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -27,6 +30,8 @@ export default function App() {
     } catch (error) {
       console.error('Error al cargar productos:', error);
       toast.error('No se pudieron cargar los productos');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -37,14 +42,13 @@ export default function App() {
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => p._id !== deletedId));
-      setSelectedProduct(null); // cierra modal si eliminás
+      setSelectedProduct(null);
     } else {
       setProducts((prev) =>
         prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p))
       );
     }
   };
-  
 
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -53,53 +57,60 @@ export default function App() {
   });
 
   return (
-    <div className="px-4 py-12 sm:px-6 lg:px-8">
-      <Header />
+    <>
+      {loading && <LoadingOverlay />}
 
-      {/* Botón Añadir */}
-      <button
-        className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
-        onClick={() => setShowAddModal(true)}
-        title="Añadir producto"
-      >
-        <FaPlus />
-      </button>
+      <div className="px-4 py-12 sm:px-6 lg:px-8">
+        <Header />
 
-      <FilterBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filterType={filterType}
-        setFilterType={setFilterType}
-      />
+        {/* Botón Añadir */}
+        <button
+          className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
+          onClick={() => setShowAddModal(true)}
+          title="Añadir producto"
+        >
+          <FaPlus />
+        </button>
 
-      <div className="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
-        {filteredProducts.map((product) => (
-          <ProductCard key={product._id} product={product} onClick={() => setSelectedProduct(product)} />
-        ))}
+        <FilterBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterType={filterType}
+          setFilterType={setFilterType}
+        />
+
+        <div className="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product._id} product={product} onClick={() => setSelectedProduct(product)} />
+          ))}
+        </div>
+
+        {selectedProduct && (
+          <ProductModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
+            onUpdate={handleProductUpdate}
+          />
+        )}
+
+        {showAddModal && (
+          <AddProductModal
+            tallaPorTipo={tallaPorTipo}
+            onAdd={(newProduct) => {
+              setProducts((prev) => [...prev, newProduct]);
+              setShowAddModal(false);
+              toast.success('Producto agregado exitosamente');
+            }}
+            onCancel={() => setShowAddModal(false)}
+          />
+        )}
+
+        <FloatingWhatsapp />
+
+        <Footer />
+
+        <ToastContainer position="top-right" autoClose={3000} />
       </div>
-
-      {selectedProduct && (
-        <ProductModal
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onUpdate={handleProductUpdate}
-        />
-      )}
-
-      {showAddModal && (
-        <AddProductModal
-          tallaPorTipo={tallaPorTipo}
-          onAdd={(newProduct) => {
-            setProducts((prev) => [...prev, newProduct]);
-            setShowAddModal(false);
-            toast.success('Producto agregado exitosamente');
-          }}
-          onCancel={() => setShowAddModal(false)}
-        />
-      )}
-
-      <Footer />
-      <ToastContainer position="top-right" autoClose={3000} />
-    </div>
+    </>
   );
 }
