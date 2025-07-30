@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://chemas-backend.onrender.com/api',
+  baseURL: 'https://chemas-sport-er-backend.onrender.com/api',
 });
 
 export default api;

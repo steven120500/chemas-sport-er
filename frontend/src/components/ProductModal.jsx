@@ -21,7 +21,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`https://chemas-backend.onrender.com/api/products/${product._id}`, {
+      const response = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock: editedStock, name: editedName }),
@@ -43,7 +43,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
     try {
       console.log('ID que se enviará para eliminar:', product._id); // 👈 Agregado
   
-      const res = await fetch(`https://chemas-backend.onrender.com/api/products/${product._id}`, {
+      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'DELETE',
       });
   
