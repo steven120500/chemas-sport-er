@@ -23,7 +23,7 @@ export default function App() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products`);
+      const res = await fetch('https://chemas-sport-er-backend.onrender.com/api/products');
       if (!res.ok) throw new Error('No se pudo obtener los productos');
       const data = await res.json();
       setProducts(data);
@@ -43,10 +43,12 @@ export default function App() {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => p._id !== deletedId));
       setSelectedProduct(null);
+      toast.success('Producto eliminado correctamente');
     } else {
       setProducts((prev) =>
         prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p))
       );
+      toast.success('Producto actualizado correctamente');
     }
   };
 
@@ -58,7 +60,7 @@ export default function App() {
 
   return (
     <>
-      {loading && <LoadingOverlay />}
+      {loading && <LoadingOverlay message="Cargando productos..." />}
 
       <div className="px-4 py-12 sm:px-6 lg:px-8">
         <Header />
@@ -99,18 +101,29 @@ export default function App() {
             onAdd={(newProduct) => {
               setProducts((prev) => [...prev, newProduct]);
               setShowAddModal(false);
-              toast.success('Producto agregado exitosamente');
+              toast.success('Producto agregado correctamente');
             }}
             onCancel={() => setShowAddModal(false)}
           />
         )}
 
         <FloatingWhatsapp />
-
         <Footer />
-
-        <ToastContainer position="top-right" autoClose={3000} />
       </div>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={2000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        limit={1}
+      />
     </>
   );
 }

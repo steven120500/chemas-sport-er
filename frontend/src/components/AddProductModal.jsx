@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { tallaPorTipo } from '../utils/tallaPorTipo';
 import { FaTimes } from 'react-icons/fa';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import LoadingOverlay from './LoadingOverlay'; // Asegurate que exista y esté bien la ruta
+import LoadingOverlay from './LoadingOverlay';
 
 export default function AddProductModal({ onAdd, onCancel }) {
   const [images, setImages] = useState([]);
@@ -83,11 +83,11 @@ export default function AddProductModal({ onAdd, onCancel }) {
       const { product } = await response.json();
       onAdd(product);
 
-      toast.success('Producto agregado correctamente');
+      
 
       setTimeout(() => {
         setLoading(false);
-        onCancel();
+        onCancel(); // cerrar modal
       }, 1000);
     } catch (err) {
       console.error('Error al agregar el producto:', err);
@@ -133,7 +133,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
                 <div className="flex gap-2 justify-center flex-wrap">
                   {images.map((img, index) => (
                     <div key={index} className="relative">
-                      <img src={img.src} alt={`preview-${index}`} className="w-24 h-24 object-cover rounded" />
+                      <img src={img.src} alt={'preview-${index}'} className="w-24 h-24 object-cover rounded" />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -195,7 +195,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
                   <input
                     type="number"
                     min="0"
-                    value={stock[size] || 0}
+                    value={stock[size] === undefined ? '' : stock[size]}
                     onChange={(e) => handleStockChange(size, e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-center"
                   />
@@ -211,8 +211,6 @@ export default function AddProductModal({ onAdd, onCancel }) {
               {loading ? 'Agregando...' : 'Agregar producto'}
             </button>
           </div>
-
-          <ToastContainer position="bottom-center" autoClose={2000} />
         </div>
       </div>
     </>
