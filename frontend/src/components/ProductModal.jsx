@@ -107,11 +107,11 @@ export default function ProductModal({ product, onClose, onUpdate }) {
   const tallasVisibles = product.type === 'Niño' ? tallasNino : tallasAdulto;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center overflow-y-auto">
-      <div
-        ref={modalRef}
-        className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
-      >
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center py-6">
+    <div
+      ref={modalRef}
+      className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+    >
         {/* Título */}
         <h2 className="text-xl font-bold mb-2 text-center break-words">
           {isEditing ? (
