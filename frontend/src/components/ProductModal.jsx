@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
@@ -198,7 +199,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
                     type="number"
                     min="0"
                     className="w-full border border-gray-300 rounded px-1 text-center"
-                    value={editedStock[talla] || 0}
+                    value={editedStock[talla] === 0 ? '' : editedStock[talla]}
                     onChange={(e) => handleStockChange(talla, e.target.value)}
                   />
                 ) : (
