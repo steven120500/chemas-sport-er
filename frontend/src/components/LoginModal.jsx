@@ -4,6 +4,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -43,6 +44,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         <h2 className="text-xl font-bold mb-4 text-center">
           {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
         </h2>
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="text"
@@ -51,13 +53,24 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             onChange={(e) => setUsername(e.target.value)}
             className="border border-gray-300 px-3 py-2 rounded"
           />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border border-gray-300 px-3 py-2 rounded"
-          />
+
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="border border-gray-300 px-3 py-2 rounded w-full"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-gray-600"
+            >
+              {showPassword ? '' : '👁️'}
+            </button>
+          </div>
+
           <button
             type="submit"
             className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
@@ -75,8 +88,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
           <button
             type="button"
-            className="bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400 transition"
             onClick={onClose}
+            className="bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400 transition"
           >
             Cancelar
           </button>
