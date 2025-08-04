@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import productRoutes from './routes/productRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+
 
 dotenv.config();
 
@@ -10,8 +12,11 @@ const app = express();
 
 // Habilitar CORS con origen específico (o dejarlo abierto si preferís)
 app.use(cors({
-  origin: '*', // También podrías usar tu frontend: 'https://chemas-sport-er-w3rr.onrender.com'
+  origin: '*', 
 }));
+
+app.use('/api/auth', authRoutes);
+
 
 // Parseo de JSON
 app.use(express.json({ limit: '10mb' }));

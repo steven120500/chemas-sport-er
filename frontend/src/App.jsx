@@ -4,14 +4,16 @@ import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
 import ProductModal from './components/ProductModal';
 import AddProductModal from './components/AddProductModal';
+import LoginModal from './components/LoginModal';
+import RegisterUserModal from './components/RegisterUserModal';
 import Footer from './components/Footer';
+import FloatingWhatsapp from './components/FloatingWhatsapp';
+import LoadingOverlay from './components/LoadingOverlay';
 import tallaPorTipo from './utils/tallaPorTipo';
 import { FaPlus } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
-import FloatingWhatsapp from './components/FloatingWhatsapp';
-import LoadingOverlay from './components/LoadingOverlay';
 
 export default function App() {
   const [products, setProducts] = useState([]);
@@ -20,6 +22,9 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [user, setUser] = useState(null);
 
   const fetchProducts = async () => {
     try {
@@ -52,27 +57,49 @@ export default function App() {
     }
   };
 
+  const handleLoginClick = () => {
+    setShowLogin(true);
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setShowLogin(false);
+    toast.success('Bienvenido, ${loggedInUser.username}');
+  };
+
+  const handleRegisterClick = () => {
+    setShowRegister(true);
+  };
+
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchType = filterType ? product.type === filterType : true;
     return matchName && matchType;
   });
 
+  const isAdmin = user?.isSuperUser || user?.roles?.includes('admin');
+
   return (
     <>
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
       <div className="px-4 py-12 sm:px-6 lg:px-8">
-        <Header />
+        <Header 
+        onLoginClick={()=> setShowLogin(true)}
+        user={user}
+        isSuperUser={user?.isSuperUser}
+         />
 
-        {/* Botón Añadir */}
-        <button
-          className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
-          onClick={() => setShowAddModal(true)}
-          title="Añadir producto"
-        >
-          <FaPlus />
-        </button>
+        {/* Botón Añadir producto SOLO si es admin o superadmin */}
+        {isAdmin && (
+          <button
+            className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
+            onClick={() => setShowAddModal(true)}
+            title="Añadir producto"
+          >
+            <FaPlus />
+          </button>
+        )}
 
         <FilterBar
           searchTerm={searchTerm}
@@ -83,7 +110,11 @@ export default function App() {
 
         <div className="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
           {filteredProducts.map((product) => (
-            <ProductCard key={product._id} product={product} onClick={() => setSelectedProduct(product)} />
+            <ProductCard
+              key={product._id}
+              product={product}
+              onClick={() => setSelectedProduct(product)}
+            />
           ))}
         </div>
 
@@ -92,6 +123,7 @@ export default function App() {
             product={selectedProduct}
             onClose={() => setSelectedProduct(null)}
             onUpdate={handleProductUpdate}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -105,6 +137,23 @@ export default function App() {
             }}
             onCancel={() => setShowAddModal(false)}
           />
+        )}
+
+        {showLogin && (
+          <LoginModal
+            isOpen={showLogin}
+            onClose={() => setShowLogin(false)}
+            onLoginSuccess={(userData) =>{
+              setUser(userData);
+              setShowLogin(false);
+
+            }}
+            onRegisterClick={handleRegisterClick}
+          />
+        )}
+
+        {showRegister && (
+          <RegisterUserModal onClose={() => setShowRegister(false)} />
         )}
 
         <FloatingWhatsapp />

@@ -3,11 +3,12 @@ import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
+
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
 const acceptedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
 
-export default function ProductModal({ product, onClose, onUpdate }) {
+export default function ProductModal({ product, onClose, onUpdate, isAdmin }) {
   const modalRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });
@@ -114,7 +115,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
     >
         {/* Título */}
         <h2 className="text-xl font-bold mb-2 text-center break-words">
-          {isEditing ? (
+          {isEditing && isAdmin ? (
             <input
               type="text"
               className="text-center border-b-2 w-full font-semibold"
@@ -127,7 +128,7 @@ export default function ProductModal({ product, onClose, onUpdate }) {
         </h2>
 
         {/* Imagen o edición de imágenes */}
-        {isEditing ? (
+        {isEditing && isAdmin? (
           <div className="flex gap-4 justify-center flex-wrap mb-4">
             {images.map((img, i) => (
               <div key={i} className="relative">
@@ -219,6 +220,9 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           >
             Cerrar
           </button>
+          {isAdmin &&(
+            <>
+       
 
           {isEditing ? (
             <button
@@ -244,6 +248,8 @@ export default function ProductModal({ product, onClose, onUpdate }) {
           >
             {loading ? 'Eliminando...' : 'Eliminar'}
           </button>
+          </>
+          )}
 
           <a
             href={`https://wa.me/50660369857?text=${encodeURIComponent(
