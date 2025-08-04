@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Registro de usuario normal (cliente o usuario limitado)
 router.post('/register', async (req, res) => {
+  console.log('REQ.BODY', req.body);
   const { username, password } = req.body;
 
   try {
