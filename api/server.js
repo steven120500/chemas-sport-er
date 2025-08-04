@@ -4,16 +4,20 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import bodyParser from 'body-parser';
 
 
 dotenv.config();
 
 const app = express();
 
+
 // Habilitar CORS con origen específico (o dejarlo abierto si preferís)
 app.use(cors({
   origin: '*', 
 }));
+
+app.use(bodyParser.json());
 
 app.use('/api/auth', authRoutes);
 
