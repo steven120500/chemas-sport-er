@@ -27,11 +27,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         throw new Error(data.error || 'Error al autenticar');
       }
 
-      onLoginSuccess({
+      const userData = ({
         username: data.username,
         roles: data.roles,
         isSuperUser: data.isSuperUser,
       });
+
+      localStorage.setItem("user" , JSON.stringify(userData));
+      onLoginSuccess(userData);
       onClose();
     } catch (err) {
       alert(err.message);

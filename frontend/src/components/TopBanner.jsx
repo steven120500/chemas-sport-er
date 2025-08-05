@@ -3,8 +3,8 @@ import React, { useEffect, useState } from "react";
 function TopBanner() {
   const messages = [
     "STOCK DE +1000 CHEMAS",
-    "REGALAMOS CHEMAS TODOS LOS VIERNES EN NUESTRO CHEMAFEST",
-    "SOMOS CHEMAS SPORT ER",
+    "REGALAMOS CHEMAS LOS VIERNES EN NUESTRO CHEMAFEST",
+    "SOMOS CHEMASPORT ER",
   ];
   const [currentIndex, setCurrentIndex] = useState(0);
 

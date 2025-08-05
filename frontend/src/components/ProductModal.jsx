@@ -8,7 +8,7 @@ const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
 const acceptedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
 
-export default function ProductModal({ product, onClose, onUpdate, isAdmin }) {
+export default function ProductModal({ product, onClose, onUpdate, canEdit, canDelete }) {
   const modalRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });
@@ -115,7 +115,7 @@ export default function ProductModal({ product, onClose, onUpdate, isAdmin }) {
     >
         {/* Título */}
         <h2 className="text-xl font-bold mb-2 text-center break-words">
-          {isEditing && isAdmin ? (
+          {isEditing && canEdit ? (
             <input
               type="text"
               className="text-center border-b-2 w-full font-semibold"
@@ -128,7 +128,7 @@ export default function ProductModal({ product, onClose, onUpdate, isAdmin }) {
         </h2>
 
         {/* Imagen o edición de imágenes */}
-        {isEditing && isAdmin? (
+        {isEditing && canEdit? (
           <div className="flex gap-4 justify-center flex-wrap mb-4">
             {images.map((img, i) => (
               <div key={i} className="relative">
@@ -220,7 +220,7 @@ export default function ProductModal({ product, onClose, onUpdate, isAdmin }) {
           >
             Cerrar
           </button>
-          {isAdmin &&(
+          {canEdit &&(
             <>
        
 

@@ -2,7 +2,7 @@ import logo from "../assets/logo.png";
 import { FaUser } from "react-icons/fa";
 import UserDropDown from "./UserDropDown";
 
-export default function Header({ onLoginClick, user, isSuperUser, setShowRegisterUserModal,setShowUserListModal }) {
+export default function Header({ onLoginClick, user, isSuperUser, setShowRegisterUserModal,setShowUserListModal,onLogout }) {
   return (
     <header className="w-full bg-white shadow-md px-6 py-4 mb-6 relative">
       <div className="flex items-center justify-between flex-wrap">

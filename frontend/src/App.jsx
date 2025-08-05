@@ -30,9 +30,24 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
-  const [user, setUser] = useState(null);
+  
+
+  const [user, setUser] =useState (() => {
+    try{
+      const storedUser = localStorage.getItem("user");
+      return storedUser ? JSON.parse(storedUser) : null;
+    }catch(error){
+      console.error("Error parsing user from localStorage", error);
+      return null;
+    }
+  });
+
   const isSuperUser = user?.isSuperUser || false;
-  const isAdmin = user?.isSuperUser || user?.roles?.includes("admin");
+  const canAdd = user?.isSuperUser || user?.roles?.includes("add");
+  const canEdit = user?.isSuperUser || user?.roles?.includes("edit");
+  const canDelete = user?.isSuperUser || user?.roles?.includes("delete");
+ 
+
 
   const handleLogout = () => {
     setUser(null);
@@ -108,7 +123,9 @@ function App() {
       )}
       
       {showUserListModal && (
-        <UserListModal onClose={() => setShowUserListModal(false)}/>
+        <UserListModal 
+        open = {showUserListModal}
+        onClose={() => setShowUserListModal(false)}/>
       )}
 
       <TopBanner />
@@ -117,13 +134,14 @@ function App() {
 
       <Header
         onLoginClick={handleLoginClick}
+        onLogout={handleLogout}
         user={user}
         isSuperUser={user?.isSuperUser}
         setShowRegisterUserModal={setShowRegisterUserModal}
         setShowUserListModal={setShowUserListModal}
       />
 
-      {isAdmin && (
+      {canAdd && (
         <button
           className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
           onClick={() => setShowAddModal(true)}
@@ -155,7 +173,8 @@ function App() {
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onUpdate={handleProductUpdate}
-          isAdmin={isAdmin}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       )}
 

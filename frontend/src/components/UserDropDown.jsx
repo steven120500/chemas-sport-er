@@ -44,7 +44,10 @@ export default function UserDropdown({ isSuperUser, onLogout, onAddUser, onViewU
 
         <DropdownMenu.Item
           className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
-          onSelect={onLogout}
+          onClick ={(e) => {
+            e.preventDefault();
+            onLogout();
+          }}
         >
           <FiLogOut /> Cerrar sesión
         </DropdownMenu.Item>
