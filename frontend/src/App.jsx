@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
@@ -14,8 +14,13 @@ import { FaPlus } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
+import TopBanner from './components/TopBanner';
+import UserDropdown from './components/UserDropDown';
+import UserListModal from './components/UserListModal';
 
-export default function App() {
+
+
+function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -24,17 +29,27 @@ export default function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
+  const [showUserListModal, setShowUserListModal] = useState(false);
   const [user, setUser] = useState(null);
+  const isSuperUser = user?.isSuperUser || false;
+  const isAdmin = user?.isSuperUser || user?.roles?.includes("admin");
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+    toast.success("Sesión cerrada correctamente");
+  };
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('https://chemas-sport-er-backend.onrender.com/api/products');
-      if (!res.ok) throw new Error('No se pudo obtener los productos');
+      const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/products");
+      if (!res.ok) throw new Error("No se pudo obtener los productos");
+
       const data = await res.json();
       setProducts(data);
     } catch (error) {
-      console.error('Error al cargar productos:', error);
-      toast.error('No se pudieron cargar los productos');
+      console.error("Error al cargar productos:", error);
+      toast.error("No se pudieron cargar los productos");
     } finally {
       setLoading(false);
     }
@@ -48,12 +63,12 @@ export default function App() {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => p._id !== deletedId));
       setSelectedProduct(null);
-      toast.success('Producto eliminado correctamente');
+      toast.success("Producto eliminado correctamente");
     } else {
       setProducts((prev) =>
         prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p))
       );
-      toast.success('Producto actualizado correctamente');
+      toast.success("Producto actualizado correctamente");
     }
   };
 
@@ -64,7 +79,7 @@ export default function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setShowLogin(false);
-    toast.success('Bienvenido, ${loggedInUser.username}');
+    toast.success(`Bienvenido, ${userData.username}`);
   };
 
   const handleRegisterClick = () => {
@@ -77,103 +92,109 @@ export default function App() {
     return matchName && matchType;
   });
 
-  const isAdmin = user?.isSuperUser || user?.roles?.includes('admin');
-
   return (
     <>
+    {user && (
+      <UserDropdown
+        isSuperUser={isSuperUser}
+        onLogout={handleLogout}
+        onAddUser={() => setShowRegisterUserModal(true)}
+        onViewUsers={() => setShowUserListModal(true)}
+      />
+      )}
+
+      {showRegisterUserModal &&(
+        <RegisterUserModal onClose={()=> setShowRegisterUserModal(false)}/>
+      )}
+      
+      {showUserListModal && (
+        <UserListModal onClose={() => setShowUserListModal(false)}/>
+      )}
+
+      <TopBanner />
+
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
-      <div className="px-4 py-12 sm:px-6 lg:px-8">
-        <Header 
-        onLoginClick={()=> setShowLogin(true)}
+      <Header
+        onLoginClick={handleLoginClick}
         user={user}
         isSuperUser={user?.isSuperUser}
         setShowRegisterUserModal={setShowRegisterUserModal}
-         />
+        setShowUserListModal={setShowUserListModal}
+      />
 
-        {/* Botón Añadir producto SOLO si es admin o superadmin */}
-        {isAdmin && (
-          <button
-            className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
-            onClick={() => setShowAddModal(true)}
-            title="Añadir producto"
-          >
-            <FaPlus />
-          </button>
-        )}
+      {isAdmin && (
+        <button
+          className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
+          onClick={() => setShowAddModal(true)}
+          title="Añadir producto"
+        >
+          <FaPlus />
+        </button>
+      )}
 
-        <FilterBar
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          filterType={filterType}
-          setFilterType={setFilterType}
-        />
+      <FilterBar
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterType={filterType}
+        setFilterType={setFilterType}
+      />
 
-        <div className="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product._id}
-              product={product}
-              onClick={() => setSelectedProduct(product)}
-            />
-          ))}
-        </div>
-
-        {selectedProduct && (
-          <ProductModal
-            product={selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            onUpdate={handleProductUpdate}
-            isAdmin={isAdmin}
+      <div className="px-4 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+        {filteredProducts.map((product) => (
+          <ProductCard
+            key={product._id}
+            product={product}
+            onClick={() => setSelectedProduct(product)}
           />
-        )}
-
-        {showAddModal && (
-          <AddProductModal
-            tallaPorTipo={tallaPorTipo}
-            onAdd={(newProduct) => {
-              setProducts((prev) => [...prev, newProduct]);
-              setShowAddModal(false);
-              toast.success('Producto agregado correctamente');
-            }}
-            onCancel={() => setShowAddModal(false)}
-          />
-        )}
-
-        {showLogin && (
-          <LoginModal
-            isOpen={showLogin}
-            onClose={() => setShowLogin(false)}
-            onLoginSuccess={(userData) =>{
-              setUser(userData);
-              setShowLogin(false);
-
-            }}
-            onRegisterClick={handleRegisterClick}
-          />
-        )}
-
-        {showRegisterUserModal && (
-          <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
-        )}
-
-        <FloatingWhatsapp />
-        <Footer />
+        ))}
       </div>
 
-      <ToastContainer
-        position="top-right"
-        autoClose={2000}
-        hideProgressBar={false}
-        newestOnTop={true}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-        limit={1}
-      />
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onUpdate={handleProductUpdate}
+          isAdmin={isAdmin}
+        />
+      )}
+
+      {showAddModal && (
+        <AddProductModal
+          tallaPorTipo={tallaPorTipo}
+          onAdd={(newProduct) => {
+            setProducts((prev) => [...prev, newProduct]);
+            setShowAddModal(false);
+            toast.success("Producto agregado correctamente");
+          }}
+          onCancel={() => setShowAddModal(false)}
+        />
+      )}
+
+      {showLogin && (
+        <LoginModal
+          isOpen={showLogin}
+          onClose={() => setShowLogin(false)}
+          onLoginSuccess={(userData) => {
+            setUser(userData);
+            setShowLogin(false);
+            toast.success(`Bienvenido, ${userData.username}`);
+          }}
+          onRegisterClick={handleRegisterClick}
+        />
+      )}
+
+      {showRegisterUserModal && (
+        <RegisterUserModal
+          onClose={() => setShowRegisterUserModal(false)}
+        />
+      )}
+
+      <Footer />
+      <FloatingWhatsapp />
+      <ToastContainer />
     </>
   );
 }
+
+export default App;

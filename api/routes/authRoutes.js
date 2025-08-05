@@ -1,4 +1,3 @@
-// routes/authRoutes.js
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
@@ -9,10 +8,9 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   console.log('REQ.BODY', req.body);
   const { username, password, roles = [] } = req.body;
-  console.log('Roles recibidos:' , roles);
+  console.log('Roles recibidos:', roles);
   console.log('Username recibido:', username);
   console.log('Password recibido:', password);
-  
 
   try {
     const existingUser = await User.findOne({ username });
@@ -23,20 +21,19 @@ router.post('/register', async (req, res) => {
     const newUser = new User({
       username,
       password: hashedPassword,
-      roles, 
+      roles,
       isSuperUser: false
     });
 
     await newUser.save();
     res.status(201).json({ message: 'Usuario registrado correctamente' });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error al registrar usuario' });
   }
 });
 
-// Login
+// Login de usuario
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   console.log('REQ.BODY:', req.body);
@@ -53,12 +50,21 @@ router.post('/login', async (req, res) => {
       username: user.username,
       roles: user.roles,
       isSuperUser: user.isSuperUser,
-      
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error al iniciar sesión' });
+  }
+});
+
+// Obtener todos los usuarios (sin contraseñas)
+router.get('/users', async (req, res) => {
+  try {
+    const users = await User.find({}, 'username roles isSuperUser');
+    res.json(users);
+  } catch (error) {
+    console.error('Error al obtener usuarios:', error);
+    res.status(500).json({ message: 'Error al obtener usuarios' });
   }
 });
 
