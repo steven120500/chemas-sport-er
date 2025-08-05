@@ -67,7 +67,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-gray-600"
             >
-              {showPassword ? '' : '👁️'}
+              {showPassword ? 'No Mostrar' : 'Mostrar'}
             </button>
           </div>
 

@@ -8,7 +8,8 @@ const router = express.Router();
 // Registro de usuario normal (cliente o usuario limitado)
 router.post('/register', async (req, res) => {
   console.log('REQ.BODY', req.body);
-  const { username, password } = req.body;
+  const { username, password, roles = [] } = req.body;
+  console.log('Roles recibidos:' , roles);
   console.log('Username recibido:', username);
   console.log('Password recibido:', password);
   
@@ -22,7 +23,7 @@ router.post('/register', async (req, res) => {
     const newUser = new User({
       username,
       password: hashedPassword,
-      roles: ['ver_productos'], // por defecto solo puede ver productos
+      roles, 
       isSuperUser: false
     });
 

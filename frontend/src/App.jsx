@@ -23,7 +23,7 @@ export default function App() {
   const [filterType, setFilterType] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
+  const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [user, setUser] = useState(null);
 
   const fetchProducts = async () => {
@@ -68,7 +68,7 @@ export default function App() {
   };
 
   const handleRegisterClick = () => {
-    setShowRegister(true);
+    setShowRegisterUserModal(true);
   };
 
   const filteredProducts = products.filter((product) => {
@@ -88,6 +88,7 @@ export default function App() {
         onLoginClick={()=> setShowLogin(true)}
         user={user}
         isSuperUser={user?.isSuperUser}
+        setShowRegisterUserModal={setShowRegisterUserModal}
          />
 
         {/* Botón Añadir producto SOLO si es admin o superadmin */}
@@ -152,8 +153,8 @@ export default function App() {
           />
         )}
 
-        {showRegister && (
-          <RegisterUserModal onClose={() => setShowRegister(false)} />
+        {showRegisterUserModal && (
+          <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
         )}
 
         <FloatingWhatsapp />
