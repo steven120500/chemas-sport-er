@@ -6,7 +6,7 @@ export default function Footer() {
       {/* Íconos sociales */}
       <div className="flex justify-center gap-6 mb-6">
         <a
-          href="https://www.facebook.com/share/16Kx7RSw5/?mibextid=wxW1fK"
+          href="https://www.facebook.com/share/1Cjf3GgQmQ/?mibextid=wwXIfr"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
@@ -15,7 +15,7 @@ export default function Footer() {
         </a>
 
         <a
-          href="https://www.instagram.com/chemasport_er?igsh=a6l5enpHMjJ1OTcw"
+          href="https://www.instagram.com/chemasport___er?igsh=aGlsenphMjJlOTcw"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
