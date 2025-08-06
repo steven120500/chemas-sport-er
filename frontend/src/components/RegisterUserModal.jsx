@@ -14,8 +14,10 @@ export default function RegisterUserModal({ onClose }) {
   const validateEmail = (email) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const validatePassword = (password) =>
-    /^(?=.[A-Z])(?=.\d)(?=.*[\W_]).{8,}$/.test(password);
+  const validatePassword = (password) => {
+    const regex = /^(?=.[A-Z])(?=.\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    return regex.test(password);
+  };
 
   const handleSubmit = async () => {
     if (!email || !password) {
