@@ -6,38 +6,32 @@ import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import bodyParser from 'body-parser';
 
-
 dotenv.config();
 
 const app = express();
 
-
-// Habilitar CORS con origen específico (o dejarlo abierto si preferís)
+// Habilitar CORS
 app.use(cors({
-  origin: '*', 
+  origin: '*', // Cambia esto a tu frontend si querés más seguridad
 }));
 
 // Parseo de JSON
 app.use(express.json({ limit: '25mb' }));
-
-
-app.use('/api/auth', authRoutes);
-
-
-
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Conexión a MongoDB
 connectDB();
 
-// Rutas
-app.use('/api/products', productRoutes);
+// Rutas principales
+app.use('/api/auth', authRoutes);         // Login / Registro con email y password
+app.use('/api/products', productRoutes);  // Productos
 
-// Ruta raíz para evitar "Cannot GET /"
+// Ruta raíz
 app.get('/', (req, res) => {
   res.send('Chemas Sport ER API');
 });
 
-// Ruta de prueba para monitoreo
+// Ruta de prueba
 app.get('/api/ping', (req, res) => {
   res.json({ message: 'API funcionando con Mongo Atlas' });
 });
@@ -53,7 +47,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-// Arrancar servidor
+// Iniciar servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);

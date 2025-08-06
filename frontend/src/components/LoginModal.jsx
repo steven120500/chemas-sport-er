@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -13,19 +13,32 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!username || !password) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.[@$!%?&]).{8,}$/;
+
+    if (!email || !password) {
       toast.warn('Todos los campos son requeridos');
+      return;
+    }
+
+    if (!emailRegex.test(email)) {
+      toast.warn('Correo inválido');
+      return;
+    }
+
+    if (!passwordRegex.test(password)) {
+      toast.warn('La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un símbolo');
       return;
     }
 
     const endpoint = isRegister ? 'register' : 'login';
 
     try {
-      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`,{
+      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-    });
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await res.json();
 
@@ -34,7 +47,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       }
 
       const userData = {
-        username: data.username,
+        email: data.email,
         roles: data.roles,
         isSuperUser: data.isSuperUser,
       };
@@ -56,10 +69,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
-            type="text"
-            placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="Correo"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="border border-gray-300 px-3 py-2 rounded"
           />
 

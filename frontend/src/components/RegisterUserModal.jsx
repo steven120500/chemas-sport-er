@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 
 export default function RegisterUserModal({ onClose }) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [roles, setRoles] = useState({
@@ -11,14 +11,39 @@ export default function RegisterUserModal({ onClose }) {
     delete: false,
   });
 
+  const validateEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const validatePassword = (password) =>
+    /^(?=.[A-Z])(?=.\d)(?=.*[\W_]).{8,}$/.test(password);
+
   const handleSubmit = async () => {
+    if (!email || !password) {
+      toast.error("Todos los campos son requeridos");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast.error("Correo inválido");
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      toast.error("La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial");
+      return;
+    }
+
+    const selectedRoles = Object.entries(roles)
+      .filter(([_, value]) => value)
+      .map(([key]) => key);
+
+    const payload = {
+      email,
+      password,
+      roles: selectedRoles,
+    };
+
     try {
-      const selectedRoles = Object.entries(roles)
-        .filter(([_, value]) => value)
-        .map(([key]) => key);
-
-      const payload = { username, password, roles: selectedRoles };
-
       const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -44,13 +69,13 @@ export default function RegisterUserModal({ onClose }) {
       <div className="bg-white p-6 rounded w-[90%] max-w-[600px]">
         <h2 className="text-xl font-bold mb-4">Registrar nuevo usuario</h2>
 
-        {/* Usuario */}
+        {/* Correo */}
         <div className="border p-2 w-full mb-3">
           <input
-            type="text"
-            placeholder="Nombre de usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="Correo electrónico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full"
           />
         </div>
@@ -76,7 +101,7 @@ export default function RegisterUserModal({ onClose }) {
         {/* Permisos */}
         <label className="block font-semibold mb-1">Permisos:</label>
         <div className="mb-4 space-y-2">
-          {["add", "edit",].map((perm) => (
+          {["add", "edit"].map((perm) => (
             <label key={perm} className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -87,7 +112,6 @@ export default function RegisterUserModal({ onClose }) {
               />
               {perm === "add" && "Agregar productos"}
               {perm === "edit" && "Editar y eliminar productos"}
-
             </label>
           ))}
         </div>
