@@ -15,8 +15,8 @@ export default function RegisterUserModal({ onClose }) {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const validatePassword = (password) => {
-    const regex = /^(?=.[A-Z])(?=.\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-    return regex.test(password);
+    const regex = /^[^A-Za-z0-9]){8,}$/;
+    return regex.test(password.trim());
   };
 
   const handleSubmit = async () => {
@@ -31,7 +31,7 @@ export default function RegisterUserModal({ onClose }) {
     }
 
     if (!validatePassword(password)) {
-      toast.error("La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial");
+      toast.error("La contraseña debe tener al menos 8 caracteres, solo requiere numeros y letras");
       return;
     }
 

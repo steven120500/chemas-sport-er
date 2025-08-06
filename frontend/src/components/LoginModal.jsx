@@ -14,7 +14,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     e.preventDefault();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    const passwordRegex = /^[A-Za-z0-9]).{8,}$/; 
     
 
     if (!email || !password) {
@@ -28,7 +28,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     }
 
     if (!passwordRegex.test(password)) {
-      toast.warn('La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un símbolo');
+      toast.warn('La contraseña debe tener al menos 8 caracteres, solo requiere numeros y letras');
       return;
     }
 
