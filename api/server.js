@@ -17,13 +17,14 @@ app.use(cors({
   origin: '*', 
 }));
 
+// Parseo de JSON
+app.use(express.json({ limit: '25mb' }));
 
 
 app.use('/api/auth', authRoutes);
 
 
-// Parseo de JSON
-app.use(express.json({ limit: '25mb' }));
+
 
 // Conexión a MongoDB
 connectDB();
