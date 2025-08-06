@@ -2,32 +2,32 @@ import { FaFacebookF, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 
 export default function Footer() {
   return (
-    <footer className="pt-10 mt-10  bg-white text-center py-8 border-t">
-      {/* Íconos sociales centrados y grandes */}
-      <div className="flex justify-center gap-6 mb-0">
+    <footer className="pt-10 mt-10 bg-white text-center py-8 border-t border-gray-200 relative z-10">
+      {/* Íconos sociales */}
+      <div className="flex justify-center gap-6 mb-6">
         <a
-          href="https://www.facebook.com/share/16kK7RmSvS/?mibextid=wwXIfr"
+          href="https://www.facebook.com/share/16Kx7RSw5/?mibextid=wxW1fK"
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl"
+          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
         >
           <FaFacebookF />
         </a>
 
         <a
-          href="https://www.instagram.com/chemasport___er?igsh=aGlsenphMjJlOTcw"
+          href="https://www.instagram.com/chemasport_er?igsh=a6l5enpHMjJ1OTcw"
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl"
+          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
         >
           <FaInstagram />
         </a>
 
         <a
-          href="https://wa.me/50660369857"
+          href="https://wa.me/50660363957"
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl"
+          className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
         >
           <FaWhatsapp />
         </a>
@@ -35,7 +35,6 @@ export default function Footer() {
 
       {/* Texto inferior */}
       <div className="mt-4 text-sm text-gray-800 space-y-1">
-      <p></p>
         <p>© 2025 ChemaSport ER. Todos los derechos reservados.</p>
         <p>Diseñado con 🖥️ y pasión por el fútbol.</p>
       </div>
