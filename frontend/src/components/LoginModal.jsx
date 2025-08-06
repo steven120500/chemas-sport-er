@@ -14,8 +14,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     e.preventDefault();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const passwordRegex = /^[A-Za-z0-9]).{8,}$/; 
-    
 
     if (!email || !password) {
       toast.warn('Todos los campos son requeridos');
@@ -27,97 +25,84 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       return;
     }
 
-    if (!passwordRegex.test(password)) {
-      toast.warn('La contraseña debe tener al menos 8 caracteres, solo requiere numeros y letras');
-      return;
-    }
-
     const endpoint = isRegister ? 'register' : 'login';
 
     try {
-      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`, {
+      const response = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Error al autenticar');
+      if (!response.ok) {
+        toast.error(data.message || 'Error al iniciar sesión');
+        return;
       }
 
-      const userData = {
-        email: data.email,
-        roles: data.roles,
-        isSuperUser: data.isSuperUser,
-      };
-
-      localStorage.setItem('user', JSON.stringify(userData));
-      onLoginSuccess(userData);
+      toast.success(data.message || 'Autenticación exitosa');
+      onLoginSuccess(data.user); // Puedes ajustar según cómo manejes el usuario
       onClose();
-    } catch (err) {
-      toast.error(err.message || 'Error desconocido');
+    } catch (error) {
+      console.error('Error en login:', error);
+      toast.error('Ocurrió un error al iniciar sesión');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm">
-        <h2 className="text-xl font-bold mb-4 text-center">
-          {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center">
+      <div className="bg-white p-6 rounded shadow-md w-full max-w-sm">
+        <h2 className="text-lg font-bold mb-4">{isRegister ? 'Registrar usuario' : 'Iniciar sesión'}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="email"
-            placeholder="Correo"
+            placeholder="Correo electrónico"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border border-gray-300 px-3 py-2 rounded"
+            className="w-full border border-gray-300 p-2 rounded"
           />
-
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="border border-gray-300 px-3 py-2 rounded w-full"
-            />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-gray-300 p-2 rounded"
+          />
+          <div className="flex items-center justify-between">
+            <label className="text-sm">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={() => setShowPassword(!showPassword)}
+              />{' '}
+              Mostrar contraseña
+            </label>
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-600"
+              onClick={() => setIsRegister(!isRegister)}
+              className="text-blue-500 text-sm underline"
             >
-              {showPassword ? 'No Mostrar' : 'Mostrar'}
+              {isRegister ? 'Ya tengo cuenta' : 'Crear cuenta'}
             </button>
           </div>
-
-          <button
-            type="submit"
-            className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-          >
-            {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsRegister(!isRegister)}
-            className="text-sm underline text-center"
-          >
-            {isRegister
-              ? '¿Ya tienes cuenta? Iniciar sesión'
-              : '¿No tienes cuenta? Regístrate'}
-          </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400 transition"
-          >
-            Cancelar
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-400 text-white rounded"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded"
+            >
+              {isRegister ? 'Registrar' : 'Entrar'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
