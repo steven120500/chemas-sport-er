@@ -13,11 +13,10 @@ router.post('/register', async (req, res) => {
   console.log("Roles recibidos:", roles);
 
   // Validación básica de contraseña
-  const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.[@$!%?&]).{6,}$/;
+  const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.*[^A-Za-z0-9]).{8,}$/;
   if (!passwordRegex.test(password)) {
     return res.status(400).json({
-      message:
-        "La contraseña debe tener al menos 6 caracteres, una mayúscula, un número y un símbolo.",
+      message: "La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un símbolo.",
     });
   }
 

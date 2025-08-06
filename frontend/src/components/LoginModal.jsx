@@ -14,7 +14,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     e.preventDefault();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.[@$!%?&]).{8,}$/;
+    const passwordRegex = /^(?=.[A-Z])(?=.\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    
 
     if (!email || !password) {
       toast.warn('Todos los campos son requeridos');
