@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
+    console.log('Datos recibidos del frontend:', req.body);
     const newProduct = new Product(req.body);
     await newProduct.save();
     res.status(201).json({ message: 'Producto guardado', product: newProduct });
