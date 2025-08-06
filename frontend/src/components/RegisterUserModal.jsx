@@ -76,7 +76,7 @@ export default function RegisterUserModal({ onClose }) {
         {/* Permisos */}
         <label className="block font-semibold mb-1">Permisos:</label>
         <div className="mb-4 space-y-2">
-          {["add", "edit",].map((perm) => (
+          {["add", "edit", "delete"].map((perm) => (
             <label key={perm} className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -86,8 +86,8 @@ export default function RegisterUserModal({ onClose }) {
                 }
               />
               {perm === "add" && "Agregar productos"}
-              {perm === "edit" && "Editar y eliminar productos"}
-
+              {perm === "edit" && "Editar productos"}
+              {perm === "delete" && "Eliminar productos"}
             </label>
           ))}
         </div>

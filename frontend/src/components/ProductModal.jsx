@@ -212,58 +212,65 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         </div>
 
         {/* Botones */}
-        <div className="flex justify-between mt-4 gap-2 flex-wrap">
-          <button
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition w-full sm:w-auto flex-1 font-bold"
-            onClick={onClose}
-            disabled={loading}
-          >
-            Cerrar
-          </button>
-          {canEdit &&(
-            <>
-       
+<div className="flex justify-between mt-4 gap-2 flex-wrap">
 
-          {isEditing ? (
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex-1 font-bold"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              {loading ? 'Guardando...' : 'Guardar'}
-            </button>
-          ) : (
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full sm:w-auto flex-1 font-bold"
-              onClick={() => setIsEditing(true)}
-            >
-              Editar
-            </button>
-          )}
+  {/* Botón Cerrar */}
+  <button
+    className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition w-full sm:w-auto flex-1 font-bold"
+    onClick={onClose}
+    disabled={loading}
+  >
+    Cerrar
+  </button>
 
-          <button
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full sm:w-auto flex-1 font-bold"
-            onClick={handleDelete}
-            disabled={loading}
-          >
-            {loading ? 'Eliminando...' : 'Eliminar'}
-          </button>
-          </>
-          )}
+  {/* Botón Guardar (solo si se puede editar y está en modo edición) */}
+  {canEdit && isEditing && (
+    <button
+      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex-1 font-bold"
+      onClick={handleSave}
+      disabled={loading}
+    >
+      {loading ? 'Guardando...' : 'Guardar'}
+    </button>
+  )}
 
-          <a
-            href={`https://wa.me/50660369857?text=${encodeURIComponent(
-              `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC . ¿Está disponible todavía?`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex justify-center items-center text-xl flex-1"
-            title="Enviar mensaje por WhatsApp"
-          >
-            <FaWhatsapp />
-          </a>
-        </div>
+  {/* Botón Editar (solo si se puede editar y no está en modo edición) */}
+  {canEdit && !isEditing && (
+    <button
+      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full sm:w-auto flex-1 font-bold"
+      onClick={() => setIsEditing(true)}
+    >
+      Editar
+    </button>
+  )}
+
+  {/* Botón Eliminar (solo si se puede eliminar) */}
+  {canDelete && (
+    <button
+      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full sm:w-auto flex-1 font-bold"
+      onClick={handleDelete}
+      disabled={loading}
+    >
+      {loading ? 'Eliminando...' : 'Eliminar'}
+    </button>
+  )}
+</div>
+
+{/* Botón de WhatsApp */}
+<a
+  href={`https://wa.me/50660369857?text=${encodeURIComponent(
+  `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC. ¿Está disponible?`
+  )}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex justify-center items-center text-center mt-4 font-bold"
+  title="Enviar mensaje por WhatsApp"
+>
+  <FaWhatsapp className="mr-2" />
+  Enviar mensaje por WhatsApp
+</a>    
       </div>
+      
     </div>
   );
 }
