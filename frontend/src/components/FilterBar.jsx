@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-const filterOptions = ['Todos', 'Player', 'Fan', 'Mujer', 'Nacional', 'Abrigos', 'Retro', 'Niño'];
+const filterOptions = ['Todos', 'Player', 'Fan', 'Mujer', 'Nacional', 'Abrigos', 'Retro', 'Niño','F1', 'NBA', 'MLB', 'NFL'];
 
 export default function FilterBar({ searchTerm, setSearchTerm, filterType, setFilterType }) {
   return (
