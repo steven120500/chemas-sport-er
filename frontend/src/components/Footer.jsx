@@ -2,7 +2,7 @@ import { FaFacebookF, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-white text-center py-8 border-t">
+    <footer className="pt-10 mt-10  bg-white text-center py-8 border-t">
       {/* Íconos sociales centrados y grandes */}
       <div className="flex justify-center gap-6 mb-0">
         <a
@@ -34,7 +34,7 @@ export default function Footer() {
       </div>
 
       {/* Texto inferior */}
-      <div className="text-sm text-gray-800 space-y-1">
+      <div className="mt-4 text-sm text-gray-800 space-y-1">
       <p></p>
         <p>© 2025 ChemaSport ER. Todos los derechos reservados.</p>
         <p>Diseñado con 🖥️ y pasión por el fútbol.</p>

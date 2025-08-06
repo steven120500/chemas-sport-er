@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -10,16 +12,20 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) return alert('Todos los campos son requeridos');
+
+    if (!username || !password) {
+      toast.warn('Todos los campos son requeridos');
+      return;
+    }
 
     const endpoint = isRegister ? 'register' : 'login';
 
     try {
-      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`, {
+      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`,{
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
-      });
+    });
 
       const data = await res.json();
 
@@ -27,17 +33,17 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         throw new Error(data.error || 'Error al autenticar');
       }
 
-      const userData = ({
+      const userData = {
         username: data.username,
         roles: data.roles,
         isSuperUser: data.isSuperUser,
-      });
+      };
 
-      localStorage.setItem("user" , JSON.stringify(userData));
+      localStorage.setItem('user', JSON.stringify(userData));
       onLoginSuccess(userData);
       onClose();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message || 'Error desconocido');
     }
   };
 
@@ -68,7 +74,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-gray-600"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-600"
             >
               {showPassword ? 'No Mostrar' : 'Mostrar'}
             </button>
@@ -86,7 +92,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             onClick={() => setIsRegister(!isRegister)}
             className="text-sm underline text-center"
           >
-            {isRegister ? '¿Ya tienes cuenta? Iniciar sesión' : '¿No tienes cuenta? Regístrate'}
+            {isRegister
+              ? '¿Ya tienes cuenta? Iniciar sesión'
+              : '¿No tienes cuenta? Regístrate'}
           </button>
 
           <button

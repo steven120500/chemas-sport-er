@@ -25,7 +25,10 @@ export default function UserDropdown({ isSuperUser, onLogout, onAddUser, onViewU
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
                 onSelect={(e) => {
                   e.preventDefault();
-                  onAddUser();
+                  document.dispatchEvent(new KeyboardEvent("keydown",{key: "Escape"}))
+                    onAddUser();
+                  
+                  
                 }}
               >
                 <FiUserPlus /> Agregar usuario
@@ -35,6 +38,7 @@ export default function UserDropdown({ isSuperUser, onLogout, onAddUser, onViewU
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
                 onSelect={(e) => {
                   e.preventDefault();
+                  document.dispatchEvent(new KeyboardEvent("keydown",{key: "Escape"}))
                   onViewUsers();
                 }}
               >

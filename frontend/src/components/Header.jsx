@@ -2,9 +2,18 @@ import logo from "../assets/logo.png";
 import { FaUser } from "react-icons/fa";
 import UserDropDown from "./UserDropDown";
 
-export default function Header({ onLoginClick, user, isSuperUser, setShowRegisterUserModal,setShowUserListModal,onLogout }) {
+export default function Header({
+  onLoginClick,
+  user,
+  isSuperUser,
+  setShowRegisterUserModal,
+  setShowUserListModal,
+  onLogout,
+}) {
+
+ 
   return (
-    <header className="w-full bg-white shadow-md px-6 py-4 mb-6 relative">
+    <header className="bg-white shadow-md px-6 py-4 relative">
       <div className="flex items-center justify-between flex-wrap">
         {/* Logo */}
         <div className="flex items-center">
@@ -13,18 +22,20 @@ export default function Header({ onLoginClick, user, isSuperUser, setShowRegiste
 
         {/* Título */}
         <div className="w-full mt-4 sm:mt-0 sm:w-auto text-center flex-grow">
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">ChemaSport ER</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            ChemaSport ER
+          </h1>
         </div>
 
-        {/* Botón de usuario o login */}
+        {/* Botón de usuario o Login */}
         <div className="absolute top-6 right-6 flex flex-col gap-2 items-end">
           {user ? (
             <UserDropDown
               isSuperUser={isSuperUser}
-              onLogout={()=>{}}
+              onLogout={onLogout}
               onAddUser={() => setShowRegisterUserModal(true)}
-              onViewUsers={() =>setShowUserListModal(true)}
-          />
+              onViewUsers={() => setShowUserListModal(true)}
+            />
           ) : (
             <button
               onClick={onLoginClick}

@@ -94,11 +94,18 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setShowLogin(false);
-    toast.success(`Bienvenido, ${userData.username}`);
+    toast.success(`Bienvenido`);
   };
 
   const handleRegisterClick = () => {
+
+    setShowUserDropDown(false);
+    setTimeout(() => {
     setShowRegisterUserModal(true);
+    },100);
+
+
+    
   };
 
   const filteredProducts = products.filter((product) => {
@@ -109,17 +116,16 @@ function App() {
 
   return (
     <>
-    {user && (
-      <UserDropdown
-        isSuperUser={isSuperUser}
-        onLogout={handleLogout}
-        onAddUser={() => setShowRegisterUserModal(true)}
-        onViewUsers={() => setShowUserListModal(true)}
-      />
-      )}
+    
 
       {showRegisterUserModal &&(
-        <RegisterUserModal onClose={()=> setShowRegisterUserModal(false)}/>
+       <RegisterUserModal
+       onClose={() => {
+        setShowRegisterUserModal(false);
+        setShowUserDropDown(false);
+
+       }}
+       />
       )}
       
       {showUserListModal && (
@@ -197,7 +203,7 @@ function App() {
           onLoginSuccess={(userData) => {
             setUser(userData);
             setShowLogin(false);
-            toast.success(`Bienvenido, ${userData.username}`);
+            toast.success(`Bienvenido`);
           }}
           onRegisterClick={handleRegisterClick}
         />

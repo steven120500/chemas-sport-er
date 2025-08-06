@@ -4,7 +4,7 @@ const filterOptions = ['Todos', 'Player', 'Fan', 'Mujer', 'Nacional', 'Abrigos',
 
 export default function FilterBar({ searchTerm, setSearchTerm, filterType, setFilterType }) {
   return (
-    <div className="flex flex-col items-center gap-4 mb-8">
+    <div className="mt-4 flex flex-col items-center gap-4 mb-8">
       {/* Input de búsqueda */}
       <motion.input
         type="text"
