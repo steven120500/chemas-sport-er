@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -13,96 +13,97 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!email || !password) {
+    if (!username || !password) {
       toast.warn('Todos los campos son requeridos');
-      return;
-    }
-
-    if (!emailRegex.test(email)) {
-      toast.warn('Correo inválido');
       return;
     }
 
     const endpoint = isRegister ? 'register' : 'login';
 
     try {
-      const response = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`, {
+      const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/auth/${endpoint}`,{
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+    });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        toast.error(data.message || 'Error al iniciar sesión');
-        return;
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al autenticar');
       }
 
-      toast.success(data.message || 'Autenticación exitosa');
-      onLoginSuccess(data.user); // Puedes ajustar según cómo manejes el usuario
+      const userData = {
+        username: data.username,
+        roles: data.roles,
+        isSuperUser: data.isSuperUser,
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+      onLoginSuccess(userData);
       onClose();
-    } catch (error) {
-      console.error('Error en login:', error);
-      toast.error('Ocurrió un error al iniciar sesión');
+    } catch (err) {
+      toast.error(err.message || 'Error desconocido');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded shadow-md w-full max-w-sm">
-        <h2 className="text-lg font-bold mb-4">{isRegister ? 'Registrar usuario' : 'Iniciar sesión'}</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm">
+        <h2 className="text-xl font-bold mb-4 text-center">
+          {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 p-2 rounded"
+            type="text"
+            placeholder="Usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border border-gray-300 px-3 py-2 rounded"
           />
-          <input
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 p-2 rounded"
-          />
-          <div className="flex items-center justify-between">
-            <label className="text-sm">
-              <input
-                type="checkbox"
-                checked={showPassword}
-                onChange={() => setShowPassword(!showPassword)}
-              />{' '}
-              Mostrar contraseña
-            </label>
+
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="border border-gray-300 px-3 py-2 rounded w-full"
+            />
             <button
               type="button"
-              onClick={() => setIsRegister(!isRegister)}
-              className="text-blue-500 text-sm underline"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-600"
             >
-              {isRegister ? 'Ya tengo cuenta' : 'Crear cuenta'}
+              {showPassword ? 'No Mostrar' : 'Mostrar'}
             </button>
           </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-400 text-white rounded"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded"
-            >
-              {isRegister ? 'Registrar' : 'Entrar'}
-            </button>
-          </div>
+
+          <button
+            type="submit"
+            className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          >
+            {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsRegister(!isRegister)}
+            className="text-sm underline text-center"
+          >
+            {isRegister
+              ? '¿Ya tienes cuenta? Iniciar sesión'
+              : '¿No tienes cuenta? Regístrate'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400 transition"
+          >
+            Cancelar
+          </button>
         </form>
       </div>
     </div>

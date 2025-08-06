@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from 'react-toastify';
 
 export default function RegisterUserModal({ onClose }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [roles, setRoles] = useState({
@@ -11,130 +11,102 @@ export default function RegisterUserModal({ onClose }) {
     delete: false,
   });
 
-  const validateEmail = (email) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!email || !password) {
-      toast.error("Todos los campos son requeridos");
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      toast.error("Correo inválido");
-      return;
-    }
-
+  const handleSubmit = async () => {
     try {
-      const response = await fetch("https://chemas-sport-er-backend.onrender.com/api/auth/register", {
+      const selectedRoles = Object.entries(roles)
+        .filter(([_, value]) => value)
+        .map(([key]) => key);
+
+      const payload = { username, password, roles: selectedRoles };
+
+      const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          roles: Object.entries(roles)
-            .filter(([_, value]) => value)
-            .map(([key]) => key),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
+      if (res.ok) {
+        toast.success("Usuario registrado correctamente");
+        onClose();
+      } else {
         toast.error(data.message || "Error al registrar usuario");
-        return;
       }
-
-      toast.success(data.message || "Usuario registrado con éxito");
-      onClose();
     } catch (error) {
       console.error("Error al registrar usuario:", error);
-      toast.error("Ocurrió un error al registrar el usuario");
+      toast.error("Error en el servidor");
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded shadow-md w-full max-w-sm">
-        <h2 className="text-lg font-bold mb-4">Registrar nuevo usuario</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white p-6 rounded w-[90%] max-w-[600px]">
+        <h2 className="text-xl font-bold mb-4">Registrar nuevo usuario</h2>
+
+        {/* Usuario */}
+        <div className="border p-2 w-full mb-3">
           <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 p-2 rounded"
+            type="text"
+            placeholder="Nombre de usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full"
           />
+        </div>
+
+        {/* Contraseña */}
+        <div className="relative mb-3">
           <input
             type={showPassword ? "text" : "password"}
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 p-2 rounded"
+            className="border p-2 w-full pr-10"
           />
-          <label className="text-sm">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={() => setShowPassword(!showPassword)}
-            />{" "}
-            Mostrar contraseña
-          </label>
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-2 top-1/2 text-xs transform -translate-y-1/2 text-gray-600"
+          >
+            {showPassword ? "No Mostrar" : "Mostrar"}
+          </button>
+        </div>
 
-          <div>
-            <p className="font-medium">Permisos:</p>
-            <label className="block text-sm">
+        {/* Permisos */}
+        <label className="block font-semibold mb-1">Permisos:</label>
+        <div className="mb-4 space-y-2">
+          {["add", "edit",].map((perm) => (
+            <label key={perm} className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={roles.add}
+                checked={roles[perm]}
                 onChange={() =>
-                  setRoles((prev) => ({ ...prev, add: !prev.add }))
+                  setRoles((prev) => ({ ...prev, [perm]: !prev[perm] }))
                 }
-              />{" "}
-              Agregar productos
-            </label>
-            <label className="block text-sm">
-              <input
-                type="checkbox"
-                checked={roles.edit}
-                onChange={() =>
-                  setRoles((prev) => ({ ...prev, edit: !prev.edit }))
-                }
-              />{" "}
-              Editar y eliminar productos
-            </label>
-            <label className="block text-sm">
-              <input
-                type="checkbox"
-                checked={roles.delete}
-                onChange={() =>
-                  setRoles((prev) => ({ ...prev, delete: !prev.delete }))
-                }
-              />{" "}
-              Eliminar productos
-            </label>
-          </div>
+              />
+              {perm === "add" && "Agregar productos"}
+              {perm === "edit" && "Editar y eliminar productos"}
 
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-400 text-white rounded"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-green-600 text-white rounded"
-            >
-              Registrar
-            </button>
-          </div>
-        </form>
+            </label>
+          ))}
+        </div>
+
+        {/* Botones */}
+        <div className="flex justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-400 text-white rounded"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-green-600 text-white rounded"
+          >
+            Registrar
+          </button>
+        </div>
       </div>
     </div>
   );
