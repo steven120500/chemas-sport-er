@@ -1,3 +1,4 @@
+import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useState } from 'react';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -218,6 +219,7 @@ function App() {
       <Footer />
       <FloatingWhatsapp />
       <ToastContainer />
+      <Toaster position="top-center" reverseOrder={false}/>
     </>
   );
 }

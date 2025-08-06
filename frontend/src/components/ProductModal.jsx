@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { motion } from 'framer-motion';
+import { toast as toastHOT } from 'react-hot-toast';
 
 
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
@@ -246,14 +247,39 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
   {/* Botón Eliminar (solo si se puede eliminar) */}
   {canDelete && (
-    <button
-      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full sm:w-auto flex-1 font-bold"
-      onClick={handleDelete}
-      disabled={loading}
-    >
-      {loading ? 'Eliminando...' : 'Eliminar'}
-    </button>
-  )}
+  <button
+    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full sm:w-auto flex-1 font-bold"
+    onClick={() => {
+      toastHOT((t) => (
+        <span>
+          ¿Seguro que quieres eliminar?
+          <div className="mt-2 flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                toastHOT.dismiss(t.id);
+                handleDelete(); // tu lógica de eliminar
+              }}
+              className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+            >
+              Sí
+            </button>
+            <button
+              onClick={() => toastHOT.dismiss(t.id)}
+              className="bg-gray-200 px-3 py-1 rounded text-sm"
+            >
+              No
+            </button>
+          </div>
+        </span>
+      ), {
+        duration: 6000,
+      });
+    }}
+    disabled={loading}
+  >
+    {loading ? 'Eliminando...' : 'Eliminar'}
+  </button>
+)}
 </div>
 
 {/* Botón de WhatsApp */}
