@@ -5,7 +5,7 @@ export default function ProductCard({ product, onClick }) {
     <motion.div
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
-      className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
+      className="relative bg-white  rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
       {/* Etiqueta del tipo de producto */}
@@ -18,7 +18,7 @@ export default function ProductCard({ product, onClick }) {
       )}
 
       {/* Imagen del producto con altura fija */}
-      <div className="w-full h-[300px] bg-gray-100">
+      <div className="w-full  h-[300px] bg-gray-100">
         <img
           src={product.imageSrc}
           alt={product.imageAlt || product.name}
