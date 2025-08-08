@@ -6,7 +6,7 @@ const KID_SIZES   = ['16','18','20','22','24','26','28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
 // ~1 MB en base64 por imagen (ajústalo si ocupás más)
-const MAX_IMAGE_BASE64_LEN = 1_000_000;
+const MAX_IMAGE_BASE64_LEN = 1_500_000;
 
 // Valida data URL de imagen en base64 y limita tamaño
 const imageValidator = {
