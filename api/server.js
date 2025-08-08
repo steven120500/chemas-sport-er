@@ -6,6 +6,8 @@ import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
 import bodyParser from 'body-parser';
+import historyRoutes from './routes/historyroutes.js';
+
 
 
 dotenv.config();
@@ -25,6 +27,9 @@ app.use(express.json({ limit: '25mb' }));
 app.use('/api/auth', authRoutes);
 
 app.use('/api', pdfRoutes);
+
+
+app.use('/api/history', historyRoutes);
 
 
 
