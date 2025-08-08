@@ -10,7 +10,7 @@ const MAX_IMAGES = 2;
 const MAX_WIDTH = 1200;     // reescala si es más ancho
 const QUALITY = 0.8;        // calidad WebP
 // ~900 KB por imagen en base64 (ajústalo si tu backend lo permite)
-const MAX_IMAGE_BASE64_LEN = 1_800_000;
+const MAX_IMAGE_BASE64_LEN = 2_800_000;
 
 // ==== Helpers ====
 // Convierte File -> dataURL WebP (reescala si hace falta)
