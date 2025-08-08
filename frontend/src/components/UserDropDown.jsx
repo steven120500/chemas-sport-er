@@ -1,8 +1,14 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FaUser } from 'react-icons/fa';
-import { FiLogOut, FiUserPlus, FiUsers } from 'react-icons/fi';
+import { FiLogOut, FiUserPlus, FiUsers, FiClock } from 'react-icons/fi';
 
-export default function UserDropdown({ isSuperUser, onLogout, onAddUser, onViewUsers }) {
+export default function UserDropdown({
+  isSuperUser,
+  onLogout,
+  onAddUser,
+  onViewUsers,
+  onViewHistory, // <-- NUEVO callback
+}) {
   return (
     <div className="relative">
       <DropdownMenu.Root>
@@ -21,32 +27,45 @@ export default function UserDropdown({ isSuperUser, onLogout, onAddUser, onViewU
         >
           {isSuperUser && (
             <>
+              {/* Agregar usuario */}
               <DropdownMenu.Item
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
                 onSelect={(e) => {
                   e.preventDefault();
-                  document.dispatchEvent(new KeyboardEvent("keydown",{key: "Escape"}))
-                    onAddUser();
-                  
-                  
+                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                  onAddUser();
                 }}
               >
                 <FiUserPlus /> Agregar usuario
               </DropdownMenu.Item>
 
+              {/* Ver usuarios */}
               <DropdownMenu.Item
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
                 onSelect={(e) => {
                   e.preventDefault();
-                  document.dispatchEvent(new KeyboardEvent("keydown",{key: "Escape"}))
+                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
                   onViewUsers();
                 }}
               >
                 <FiUsers /> Ver usuarios
               </DropdownMenu.Item>
+
+              {/* Historial (sólo súper) */}
+              <DropdownMenu.Item
+                className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                  onViewHistory(); // abre modal/página de auditoría
+                }}
+              >
+                <FiClock /> Historial
+              </DropdownMenu.Item>
             </>
           )}
 
+          {/* Cerrar sesión */}
           <DropdownMenu.Item
             className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
             onClick={(e) => {

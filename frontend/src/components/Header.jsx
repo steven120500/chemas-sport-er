@@ -8,6 +8,7 @@ export default function Header({
   isSuperUser,
   setShowRegisterUserModal,
   setShowUserListModal,
+  setShowHistoryModal,
   onLogout,
 }) {
 
@@ -35,6 +36,7 @@ export default function Header({
               onLogout={onLogout}
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
+              onViewHistory={() => setShowHistoryModal(true)}
             />
           ) : (
             <button

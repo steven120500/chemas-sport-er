@@ -18,6 +18,10 @@ import './index.css';
 import TopBanner from './components/TopBanner';
 import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
+import HistoryModal from './components/HistoryModal';
+
+
+
 
 
 
@@ -31,6 +35,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
+  const [showHistoyModal, setShowHistoryModal] = useState(false);
   
 
   const [user, setUser] =useState (() => {
@@ -135,6 +140,12 @@ function App() {
         onClose={() => setShowUserListModal(false)}/>
       )}
 
+      {showHistoyModal && (
+        <HistoryModal 
+        open = {showHistoyModal}
+        onClose={() => setShowHistoryModal(false)}/>
+      )}
+
       <TopBanner />
 
       {loading && <LoadingOverlay message="Cargando productos..." />}
@@ -146,6 +157,9 @@ function App() {
         isSuperUser={user?.isSuperUser}
         setShowRegisterUserModal={setShowRegisterUserModal}
         setShowUserListModal={setShowUserListModal}
+        setShowHistoryModal={setShowHistoryModal}
+  
+        
       />
 
       {canAdd && (

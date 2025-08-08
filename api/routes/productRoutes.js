@@ -4,16 +4,22 @@ import Product from '../models/Product.js';
 
 const router = express.Router();
 
-/* ----------------- helpers ----------------- */
+/* -------------------------- helpers / constantes -------------------------- */
 
+// Tallas permitidas
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
-const KID_SIZES   = ['16','18','20','22','24','26','28'];
+const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
-// ≈ 800 KB de base64 por imagen (ajústalo si ocupás más)
-const MAX_IMAGE_BASE64_LEN = 4_000_000;
+// Límite de longitud de cada imagen en base64 (ajústalo a tu gusto/hosting)
+const MAX_IMAGE_BASE64_LEN = 4_000_000; // ~4 MB por imagen (string base64)
 
-// Sanea y valida el body. Lanza Error con details si algo está mal.
+/**
+ * Sanea y valida el body. Si algo falla lanza un Error con detalles.
+ * @param {object} body
+ * @param {boolean} partial  - true cuando es update (PUT), permite campos faltantes
+ * @returns {object} out     - objeto listo para guardar
+ */
 function sanitizeAndValidate(body, { partial = false } = {}) {
   const errors = [];
   const out = {};
@@ -25,17 +31,20 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
     } else {
       out.name = body.name.trim().slice(0, 150);
     }
-  } else if (!partial) errors.push('name es requerido.');
+  } else if (!partial) {
+    errors.push('name es requerido.');
+  }
 
   // price (acepta string numérica)
   if (body.price !== undefined) {
-    const n =
-      typeof body.price === 'number'
-        ? body.price
-        : Number(String(body.price).replace(/[^\d]/g, ''));
-    if (!Number.isFinite(n) || n < 0) errors.push('price inválido.');
+    const n = typeof body.price === 'number'
+      ? body.price
+      : Number(String(body.price).replace(/[^\d]/g, ''));
+    if (!Number.isFinite(n) || n <= 0) errors.push('price inválido.');
     else out.price = Math.trunc(n);
-  } else if (!partial) errors.push('price es requerido.');
+  } else if (!partial) {
+    errors.push('price es requerido.');
+  }
 
   // type (libre, pero corto)
   if (body.type !== undefined) {
@@ -44,38 +53,43 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
     } else {
       out.type = body.type.trim().slice(0, 40);
     }
-  } else if (!partial) errors.push('type es requerido.');
+  } else if (!partial) {
+    errors.push('type es requerido.');
+  }
 
   // imageAlt
   if (body.imageAlt !== undefined) {
-    if (typeof body.imageAlt !== 'string') errors.push('imageAlt debe ser string.');
-    else out.imageAlt = body.imageAlt.slice(0, 150);
+    if (typeof body.imageAlt !== 'string') {
+      errors.push('imageAlt debe ser string.');
+    } else {
+      out.imageAlt = body.imageAlt.slice(0, 150);
+    }
   }
 
-  // imageSrc / imageSrc2 (base64 opcional — con límite)
+  // imageSrc / imageSrc2 (base64 opcional – con límite)
   for (const key of ['imageSrc', 'imageSrc2']) {
     if (body[key] !== undefined && body[key] !== null) {
       if (typeof body[key] !== 'string') {
         errors.push(`${key} debe ser string base64 (data URL).`);
       } else if (body[key].length > MAX_IMAGE_BASE64_LEN) {
-        errors.push(`${key} es muy grande (límite ~${MAX_IMAGE_BASE64_LEN} chars).`);
+        errors.push(`${key} es muy grande (límite ${MAX_IMAGE_BASE64_LEN} chars).`);
       } else {
         out[key] = body[key];
       }
-    } else if (!partial) {
-      // si querés forzar que exista al menos imageSrc:
-      // if (key === 'imageSrc') errors.push('imageSrc es requerido.');
+    } else if (!partial && key === 'imageSrc') {
+      // para crear es requerida la imagen principal
+      errors.push('imageSrc es requerido.');
     }
   }
 
-  // stock (objeto { talla: cantidad })
+  // stock objeto { talla: cantidad }
   if (body.stock !== undefined) {
     if (typeof body.stock !== 'object' || body.stock === null || Array.isArray(body.stock)) {
       errors.push('stock debe ser objeto { talla: cantidad }.');
     } else {
       const cleanStock = {};
       for (const [size, qty] of Object.entries(body.stock)) {
-        if (!ALL_SIZES.has(String(size))) continue; // ignorar tallas desconocidas
+        if (!ALL_SIZES.has(String(size))) continue; // ignora tallas desconocidas
         const n = Number(qty);
         cleanStock[size] = Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
       }
@@ -94,36 +108,32 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
   return out;
 }
 
-/* ----------------- routes ----------------- */
+/* --------------------------------- rutas --------------------------------- */
 
 // Crear producto
 router.post('/', async (req, res) => {
   try {
-    const data = sanitizeAndValidate(req.body);
+    const data = sanitizeAndValidate(req.body, { partial: false });
     const newProduct = new Product(data);
     const saved = await newProduct.save();
     res.status(201).json({ message: 'Producto guardado', product: saved });
   } catch (err) {
-    if (err?.message === 'VALIDATION_ERROR') {
-      console.error('❌ Validación producto:', err.details);
+    if (err.message === 'VALIDATION_ERROR') {
+      console.error('✖ Validación (POST):', err.details);
       return res.status(400).json({ error: 'Payload inválido', details: err.details });
     }
-    console.error('❌ Error al guardar producto:', err);
-    res.status(500).json({ error: 'Error al guardar producto' });
+    console.error('✖ Error al guardar producto:', err);
+    res.status(500).json({ message: 'Error al guardar producto' });
   }
 });
 
-// Obtener todos (ordenados por reciente)
-// Sugerencia: usar lean() para objetos planos y performance
+// Obtener todos (ordenados por reciente y lean para perf)
 router.get('/', async (_req, res) => {
   try {
-    const products = await Product.find({})
-      .sort({ createdAt: -1 })
-      .lean();
-
+    const products = await Product.find().sort({ createdAt: -1 }).lean();
     res.json(products);
   } catch (error) {
-    console.error('❌ Error al obtener los productos:', error);
+    console.error('✖ Error al obtener los productos:', error);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
@@ -133,7 +143,7 @@ router.get('/health', async (_req, res) => {
   try {
     const count = await Product.countDocuments();
     res.json({ ok: true, count });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ ok: false });
   }
 });
@@ -150,12 +160,12 @@ router.put('/:id', async (req, res) => {
     if (!updated) return res.status(404).json({ message: 'Producto no encontrado' });
     res.json(updated);
   } catch (error) {
-    if (error?.message === 'VALIDATION_ERROR') {
-      console.error('❌ Validación (PUT):', error.details);
+    if (error.message === 'VALIDATION_ERROR') {
+      console.error('✖ Validación (PUT):', error.details);
       return res.status(400).json({ error: 'Payload inválido', details: error.details });
     }
-    console.error('❌ Error al actualizar producto:', error);
-    res.status(500).json({ error: 'Error al actualizar producto' });
+    console.error('✖ Error al actualizar producto:', error);
+    res.status(500).json({ message: 'Error al actualizar producto' });
   }
 });
 
@@ -166,8 +176,8 @@ router.delete('/:id', async (req, res) => {
     if (!deleted) return res.status(404).json({ message: 'Producto no encontrado' });
     res.json({ message: 'Producto eliminado con éxito' });
   } catch (error) {
-    console.error('❌ Error al eliminar producto:', error);
-    res.status(500).json({ error: 'Error al eliminar producto' });
+    console.error('✖ Error al eliminar producto:', error);
+    res.status(500).json({ message: 'Error al eliminar producto' });
   }
 });
 
