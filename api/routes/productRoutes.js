@@ -11,7 +11,7 @@ const KID_SIZES   = ['16','18','20','22','24','26','28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
 // ≈ 800 KB de base64 por imagen (ajústalo si ocupás más)
-const MAX_IMAGE_BASE64_LEN = 2_500_000;
+const MAX_IMAGE_BASE64_LEN = 3_500_000;
 
 // Sanea y valida el body. Lanza Error con details si algo está mal.
 function sanitizeAndValidate(body, { partial = false } = {}) {
