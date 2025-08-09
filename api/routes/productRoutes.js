@@ -2,6 +2,8 @@
 import express from 'express';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
+import attachUser from '../middleware/attachUser.js'; 
+
 
 const router = express.Router();
 
@@ -17,12 +19,7 @@ const MAX_IMAGE_BASE64_LEN = 5_000_000; // ~5MB por imagen en base64
 
 // Quién hizo el cambio (toma del header, body o deja “Sistema”)
 function whoDidIt(req) {
-  return (
-    req.headers['x-user'] ||
-    req.body?.user ||
-    req.user?.name ||
-    'Sistema'
-  );
+  return req.user?.name || req.user?.email || req.headers['x-user'] || req.body.user || 'Sistema';
 }
 
 // Diff de stock (obj1 vs obj2) -> ["stock[S]: a -> b", ...]
@@ -155,8 +152,9 @@ router.post('/', async (req, res) => {
     await History.create({
       user: whoDidIt(req),
       action: 'creó producto',
-      item: `${saved.name} (#${saved._id})`,
+      item: `${created.name} (#${created._id})`,
       date: new Date(),
+      details: `Stock inicial: ${JSON.stringify(created.stock)}`
     });
 
     res.status(201).json({ message: 'Producto guardado', product: saved });
@@ -211,9 +209,9 @@ router.put('/:id', async (req, res) => {
       await History.create({
         user: whoDidIt(req),
         action: 'actualizó producto',
-        item: `${updated.name} (#${updated._id})`,
-        details: changes.join(' | '),
+        item: `${updated.name} (#${updated._id}) `,
         date: new Date(),
+        details: changes.join(' | ') // Ej: "Talla M: 0 → 6 | Precio: ₡5000 → ₡6000"
       });
     }
 
@@ -240,6 +238,7 @@ router.delete('/:id', async (req, res) => {
       action: 'eliminó producto',
       item: `${deleted.name} (#${deleted._id})`,
       date: new Date(),
+      details: 'Producto eliminado del inventario'
     });
 
     res.json({ message: 'Producto eliminado con éxito' });
@@ -247,6 +246,8 @@ router.delete('/:id', async (req, res) => {
     console.error('× Error al eliminar producto:', error);
     res.status(500).json({ message: 'Error al eliminar producto' });
   }
+
+  router.use(attachUser);
 });
 
 export default router;

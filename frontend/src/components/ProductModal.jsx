@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'react-toastify'
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { toast as toastHOT } from 'react-hot-toast';
@@ -35,9 +35,11 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
       const imageSrc = images[0]?.src || null;
       const imageSrc2 = images[1]?.src || null;
 
+      const displayName = user?.username || user?.email || 'ChemaSportER';
+
       const response = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' , 'x-user' : displayName, },
         body: JSON.stringify({
           stock: editedStock,
           name: editedName,
@@ -65,8 +67,13 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   const handleDelete = async () => {
     setLoading(true);
     try {
+
+      const displayName = user?.username || user?.email || 'ChemaSportER';
+
       const res = await fetch(`https://chemas-sport-er-backend.onrender.com/api/products/${product._id}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' , 'x-user' : displayName, },
+
       });
 
       if (!res.ok) throw new Error('Error al eliminar');
