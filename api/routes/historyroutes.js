@@ -1,18 +1,28 @@
 import express from 'express';
-import History from '../models/History.js';   // tu modelo
+import History from '../models/History.js';
 
 const router = express.Router();
 
-// opcional: proteger con middleware de auth
-// router.use(requireAuth);
-
-router.get('/', async (req, res) => {
+// GET historial (ya lo tienes)
+router.get('/', async (_req, res) => {
   try {
-    const logs = await History.find().sort({ date: -1 }).limit(50).lean();
+    const logs = await History.find().sort({ date: -1 }).limit(200).lean();
     res.json(logs);
   } catch (err) {
-    console.error('Error history:', err);
     res.status(500).json({ error: 'No se pudo obtener el historial' });
+  }
+});
+
+// DELETE historial (solo superusuario si quieres)
+router.delete('/', async (req, res) => {
+  try {
+    // Si ya tienes auth y quieres restringir:
+    // if (!req.user?.isSuperUser) return res.status(403).json({ error: 'Solo súper usuario' });
+
+    const r = await History.deleteMany({});
+    res.json({ ok: true, deleted: r.deletedCount });
+  } catch (err) {
+    res.status(500).json({ error: 'No se pudo limpiar el historial' });
   }
 });
 

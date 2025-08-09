@@ -13,7 +13,7 @@ const KID_SIZES   = ['16','18','20','22','24','26','28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
 // Límite de longitud de cada imagen en base64 (caracteres)
-const MAX_IMAGE_BASE64_LEN = 4_000_000; // ≈4MB por imagen en base64
+const MAX_IMAGE_BASE64_LEN = 5_000_000; // ≈4MB por imagen en base64
 
 // Quién hizo el cambio (toma del header, body o deja “Sistema”)
 function whoDidIt(req) {
