@@ -7,6 +7,7 @@ import attachUser from '../middleware/attachUser.js';
 
 const router = express.Router();
 
+
 /* ----------------------------- helpers ------------------------------ */
 
 // Tallas permitidas
@@ -16,6 +17,8 @@ const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
 // Límite de longitud de cada imagen en base64 (caracteres)
 const MAX_IMAGE_BASE64_LEN = 5_000_000; // ~5MB por imagen en base64
+
+const created = await Product.create(req.body);
 
 // Quién hizo el cambio (toma del header, body o deja “Sistema”)
 function whoDidIt(req) {
