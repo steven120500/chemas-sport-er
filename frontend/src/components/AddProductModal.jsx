@@ -10,7 +10,7 @@ const MAX_IMAGES = 2;
 const MAX_WIDTH = 1000;     // reescala si es más ancho
 const QUALITY = 0.75;        // calidad WebP
 // ~900 KB por imagen en base64 (ajústalo si tu backend lo permite)
-const MAX_IMAGE_BASE64_LEN = 3_800_000;
+const MAX_IMAGE_BASE64_LEN = 13_800_000;
 
 // ==== Helpers ====
 // Convierte File -> dataURL WebP (reescala si hace falta)
@@ -256,7 +256,7 @@ export default function AddProductModal({ onAdd, onCancel }) {
                 <input
                   type="number"
                   min="0"
-                  value={stock[size] ?? 0}
+                  value={stock[size] ?? ""}
                   onChange={(e) => handleStockChange(size, e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-center"
                 />
