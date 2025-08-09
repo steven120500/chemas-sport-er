@@ -198,11 +198,13 @@ function App() {
           onUpdate={handleProductUpdate}
           canEdit={canEdit}
           canDelete={canDelete}
+          user={user}
         />
       )}
 
       {showAddModal && (
         <AddProductModal
+        user={user}
           tallaPorTipo={tallaPorTipo}
           onAdd={(newProduct) => {
             setProducts((prev) => [...prev, newProduct]);

@@ -9,7 +9,7 @@ const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
 const acceptedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
 
-export default function ProductModal({ product, onClose, onUpdate, canEdit, canDelete }) {
+export default function ProductModal({ product, onClose, onUpdate, canEdit, canDelete, user}) {
   const modalRef = useRef(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });

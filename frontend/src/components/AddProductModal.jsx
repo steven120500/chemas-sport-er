@@ -52,7 +52,7 @@ async function convertToWebp(file, { maxWidth = MAX_WIDTH, quality = QUALITY } =
   return out;
 }
 
-export default function AddProductModal({ onAdd, onCancel }) {
+export default function AddProductModal({ onAdd, onCancel, user }) {
   const [images, setImages] = useState([]); // [{src}]
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
