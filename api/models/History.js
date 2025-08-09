@@ -4,6 +4,7 @@ const HistorySchema = new mongoose.Schema({
   user: String,
   action: String,
   item: String,
+  details: String,
   date: Date
 });
 
