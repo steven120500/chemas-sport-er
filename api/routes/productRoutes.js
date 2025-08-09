@@ -18,7 +18,7 @@ const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 // Límite de longitud de cada imagen en base64 (caracteres)
 const MAX_IMAGE_BASE64_LEN = 5_000_000; // ~5MB por imagen en base64
 
-const created = await Product.create(req.body);
+
 
 // Quién hizo el cambio (toma del header, body o deja “Sistema”)
 function whoDidIt(req) {
@@ -150,14 +150,15 @@ router.post('/', async (req, res) => {
     const data = sanitizeAndValidate(req.body, { partial: false });
     const newProduct = new Product(data);
     const saved = await newProduct.save();
+  
 
     // Log de historial
     await History.create({
       user: whoDidIt(req),
       action: 'creó producto',
-      item: `${created.name} (#${created._id})`,
+      item: `${saved.name} (#${saved._id})`,
       date: new Date(),
-      details: `Stock inicial: ${JSON.stringify(created.stock)}`
+      details: `Stock inicial: ${JSON.stringify(saved.stock)}`
     });
 
     res.status(201).json({ message: 'Producto guardado', product: saved });
