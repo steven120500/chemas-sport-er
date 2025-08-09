@@ -143,7 +143,9 @@ function App() {
       {showHistoyModal && (
         <HistoryModal 
         open = {showHistoyModal}
-        onClose={() => setShowHistoryModal(false)}/>
+        onClose={() => setShowHistoryModal(false)}
+        isSuperUser={user?.isSuperUser == true}
+        />
       )}
 
       <TopBanner />
