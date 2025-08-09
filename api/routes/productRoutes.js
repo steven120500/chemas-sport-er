@@ -5,7 +5,7 @@ import History from '../models/History.js';
 
 const router = express.Router();
 
-/* ----------------------------- helpers -------------------------------- */
+/* ----------------------------- helpers ------------------------------ */
 
 // Tallas permitidas
 const ADULT_SIZES = ['S','M','L','XL','XXL','3XL','4XL'];
@@ -13,7 +13,7 @@ const KID_SIZES   = ['16','18','20','22','24','26','28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
 // Límite de longitud de cada imagen en base64 (caracteres)
-const MAX_IMAGE_BASE64_LEN = 5_000_000; // ≈4MB por imagen en base64
+const MAX_IMAGE_BASE64_LEN = 5_000_000; // ~5MB por imagen en base64
 
 // Quién hizo el cambio (toma del header, body o deja “Sistema”)
 function whoDidIt(req) {
@@ -25,14 +25,14 @@ function whoDidIt(req) {
   );
 }
 
-// Dif de stock (obj1 vs obj2)
+// Diff de stock (obj1 vs obj2) -> ["stock[S]: a -> b", ...]
 function diffStock(prev = {}, next = {}) {
-  const sizes = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
+  const sizes = new Set([...(Object.keys(prev||{})), ...(Object.keys(next||{}))]);
   const out = [];
   for (const s of sizes) {
     const a = Number(prev?.[s] ?? 0);
     const b = Number(next?.[s] ?? 0);
-    if (a !== b) out.push(`stock[${s}]: ${a} → ${b}`);
+    if (a !== b) out.push(`stock[${s}]: ${a} -> ${b}`);
   }
   return out;
 }
@@ -40,18 +40,18 @@ function diffStock(prev = {}, next = {}) {
 // Diferencias “legibles” de producto
 function diffProduct(prev, next) {
   const changes = [];
-  if (prev.name  !== next.name)  changes.push(`nombre: "${prev.name}" → "${next.name}"`);
-  if (prev.price !== next.price) changes.push(`precio: ${prev.price} → ${next.price}`);
-  if (prev.type  !== next.type)  changes.push(`tipo: "${prev.type}" → "${next.type}"`);
+  if (prev.name !== next.name) changes.push(`nombre: "${prev.name}" -> "${next.name}"`);
+  if (prev.price !== next.price) changes.push(`precio: ${prev.price} -> ${next.price}`);
+  if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" -> "${next.type}"`);
   changes.push(...diffStock(prev.stock, next.stock));
   return changes;
 }
 
-/* -------------------- sanea y valida el body --------------------------- */
+/* -------------------------- sanea y valida el body -------------------------- */
 /**
  * Sanea y valida el body. Lanza Error con details si algo está mal.
  * @param {object} body
- * @param {boolean} partial true cuando es update (PUT)
+ * @param {boolean} partial - true cuando es update (PUT), permite campos faltantes
  * @returns {object} objeto listo para guardar
  */
 function sanitizeAndValidate(body, { partial = false } = {}) {
@@ -104,7 +104,7 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
   for (const key of ['imageSrc', 'imageSrc2']) {
     if (body[key] !== undefined && body[key] !== null) {
       if (typeof body[key] !== 'string') {
-        errors.push(`${key} debe ser string base64 (data URL).`);
+        errors.push (`${key} debe ser string base64 (data URL).`);
       } else if (body[key].length > MAX_IMAGE_BASE64_LEN) {
         errors.push(`${key} es muy grande (límite ${MAX_IMAGE_BASE64_LEN} chars).`);
       } else {
@@ -138,10 +138,11 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
     err.details = errors;
     throw err;
   }
+
   return out;
 }
 
-/* ------------------------------- rutas --------------------------------- */
+/* --------------------------------- rutas --------------------------------- */
 
 // Crear producto
 router.post('/', async (req, res) => {
@@ -150,7 +151,7 @@ router.post('/', async (req, res) => {
     const newProduct = new Product(data);
     const saved = await newProduct.save();
 
-    // log de historial
+    // Log de historial
     await History.create({
       user: whoDidIt(req),
       action: 'creó producto',
@@ -161,21 +162,21 @@ router.post('/', async (req, res) => {
     res.status(201).json({ message: 'Producto guardado', product: saved });
   } catch (error) {
     if (error.message === 'VALIDATION_ERROR') {
-      console.error('✗ Validación (POST):', error.details);
+      console.error('× Validación (POST):', error.details);
       return res.status(400).json({ error: 'Payload inválido', details: error.details });
     }
-    console.error('✗ Error al guardar producto:', error);
+    console.error('× Error al guardar producto:', error);
     res.status(500).json({ message: 'Error al guardar producto' });
   }
 });
 
-// Obtener todos (ordenados por reciente) y lean
+// Obtener todos (ordenados por reciente) y Lean para perf
 router.get('/', async (_req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 }).lean();
     res.json(products);
   } catch (error) {
-    console.error('✗ Error al obtener los productos:', error);
+    console.error('× Error al obtener los productos:', error);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
@@ -204,7 +205,7 @@ router.put('/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // log de historial (solo si hubo cambios)
+    // Log de historial (solo si hubo cambios)
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
       await History.create({
@@ -219,10 +220,10 @@ router.put('/:id', async (req, res) => {
     res.json(updated);
   } catch (error) {
     if (error.message === 'VALIDATION_ERROR') {
-      console.error('✗ Validación (PUT):', error.details);
+      console.error('× Validación (PUT):', error.details);
       return res.status(400).json({ error: 'Payload inválido', details: error.details });
     }
-    console.error('✗ Error al actualizar producto:', error);
+    console.error('× Error al actualizar producto:', error);
     res.status(500).json({ message: 'Error al actualizar producto' });
   }
 });
@@ -233,7 +234,7 @@ router.delete('/:id', async (req, res) => {
     const deleted = await Product.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    // log de historial
+    // Log de historial
     await History.create({
       user: whoDidIt(req),
       action: 'eliminó producto',
@@ -243,7 +244,7 @@ router.delete('/:id', async (req, res) => {
 
     res.json({ message: 'Producto eliminado con éxito' });
   } catch (error) {
-    console.error('✗ Error al eliminar producto:', error);
+    console.error('× Error al eliminar producto:', error);
     res.status(500).json({ message: 'Error al eliminar producto' });
   }
 });

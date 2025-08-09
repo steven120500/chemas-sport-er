@@ -1,5 +1,7 @@
+// src/components/HistoryModal.jsx
 import React, { useEffect, useState } from "react";
 
+// Cambia esto si tienes un helper para el base URL
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 export default function HistoryModal({ open, onClose, isSuperUser = false }) {
@@ -24,6 +26,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         if (!abort) setLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         if (!abort) {
+          console.error("Error cargando historial:", err);
           setErrMsg("No se pudo cargar el historial.");
           setLogs([]);
         }
@@ -33,19 +36,25 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
 
     load();
-    return () => { abort = true; };
+    return () => {
+      abort = true;
+    };
   }, [open]);
 
   async function handleClear() {
+    if (!isSuperUser) return;
     if (!confirm("¿Borrar TODO el historial? Esta acción no se puede deshacer.")) return;
+
     setClearing(true);
     try {
       const res = await fetch(`${API_BASE}/api/history`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // recargar
-      const refreshed = await fetch(`${API_BASE}/api/history`).then(r => r.json());
+
+      // vuelve a cargar
+      const refreshed = await fetch(`${API_BASE}/api/history`).then((r) => r.json());
       setLogs(Array.isArray(refreshed) ? refreshed : []);
     } catch (err) {
+      console.error("Error limpiando historial:", err);
       setErrMsg("No se pudo limpiar el historial.");
     } finally {
       setClearing(false);
@@ -84,7 +93,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
         {/* Body con scroll */}
         <div className="p-4 overflow-y-auto max-h-[70vh]">
-          {loading && <p className="text-gray-500">Cargando…</p>}
+          {loading && <p className="text-gray-500">Cargando...</p>}
           {!loading && errMsg && <p className="text-red-600">{errMsg}</p>}
           {!loading && !errMsg && logs.length === 0 && (
             <p className="text-gray-600">No hay cambios registrados.</p>
@@ -95,16 +104,17 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
               {logs.map((log, idx) => (
                 <li key={log._id || idx} className="border rounded p-3 text-sm">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <strong>{log.user || "—"}</strong>
+                    <strong>{log.user || "Desconocido"}</strong>
                     <span className="text-gray-700">{log.action || "acción"}</span>
                   </div>
 
-                  <em className="text-gray-700">{log.item || ""}</em>
+                  <em className="text-gray-700 block">{log.item || ""}</em>
 
-                  <div className="text-gray-500 text-xs mt-1">
+                  <small className="text-gray-500 block mt-1">
                     {log.date ? new Date(log.date).toLocaleString() : ""}
-                  </div>
+                  </small>
 
+                  {/* Si guardaste más info, muéstrala aquí */}
                   {log.details && (
                     <pre className="mt-2 bg-gray-50 p-2 rounded text-[11px] overflow-x-auto">
                       {typeof log.details === "string"

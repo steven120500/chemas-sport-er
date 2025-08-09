@@ -13,16 +13,15 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// DELETE historial (solo superusuario si quieres)
+
+// DELETE /api/history - Elimina todo el historial
 router.delete('/', async (req, res) => {
   try {
-    // Si ya tienes auth y quieres restringir:
-    // if (!req.user?.isSuperUser) return res.status(403).json({ error: 'Solo súper usuario' });
-
-    const r = await History.deleteMany({});
-    res.json({ ok: true, deleted: r.deletedCount });
-  } catch (err) {
-    res.status(500).json({ error: 'No se pudo limpiar el historial' });
+    await History.deleteMany({});
+    res.json({ message: 'Historial eliminado correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar historial:', error);
+    res.status(500).json({ message: 'Error al eliminar historial' });
   }
 });
 

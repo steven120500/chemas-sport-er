@@ -1,12 +1,10 @@
-import mongoose from "mongoose";
-
+// models/History.js
+import mongoose from 'mongoose';
 const HistorySchema = new mongoose.Schema({
   user: String,
   action: String,
   item: String,
-  details: String,
-  date: Date
+  date: { type: Date, default: Date.now },
+  details: mongoose.Schema.Types.Mixed, // <--- opcional/diff
 });
-
-const History = mongoose.model("History", HistorySchema);
-export default History;
+export default mongoose.model('History', HistorySchema);
