@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const HistorySchema = new mongoose.Schema({
   user: String,
@@ -7,4 +7,5 @@ const HistorySchema = new mongoose.Schema({
   date: Date
 });
 
-module.exports = mongoose.model("History", HistorySchema);
+const History = mongoose.model("History", HistorySchema);
+export default History;
