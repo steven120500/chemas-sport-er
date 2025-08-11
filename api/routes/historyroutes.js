@@ -3,26 +3,30 @@ import History from '../models/History.js';
 
 const router = express.Router();
 
-// GET historial (ya lo tienes)
-router.get('/', async (_req, res) => {
-  try {
-    const logs = await History.find().sort({ date: -1 }).limit(200).lean();
-    res.json(logs);
-  } catch (err) {
-    res.status(500).json({ error: 'No se pudo obtener el historial' });
-  }
+function getRoles(req) {
+  const raw = req.headers['x-roles'] || '';
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
+function isSuper(req) {
+  return req.user?.isSuperUser || req.headers['x-super'] === 'true';
+}
+
+// ✅ Ver historial: superadmin o rol "history"
+router.get('/', (req, res, next) => {
+  if (isSuper(req) || getRoles(req).includes('history')) return next();
+  return res.status(403).json({ message: 'No autorizado a ver historial' });
+}, async (_req, res) => {
+  const logs = await History.find().sort({ date: -1 }).lean();
+  res.json(logs);
 });
 
-
-// DELETE /api/history - Elimina todo el historial
-router.delete('/', async (req, res) => {
-  try {
-    await History.deleteMany({});
-    res.json({ message: 'Historial eliminado correctamente' });
-  } catch (error) {
-    console.error('Error al eliminar historial:', error);
-    res.status(500).json({ message: 'Error al eliminar historial' });
-  }
+// 🗑 Limpiar historial: solo superadmin
+router.delete('/', (req, res, next) => {
+  if (isSuper(req)) return next();
+  return res.status(403).json({ message: 'Solo superadmin puede limpiar historial' });
+}, async (_req, res) => {
+  await History.deleteMany({});
+  res.json({ ok: true });
 });
 
 export default router;

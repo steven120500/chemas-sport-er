@@ -1,35 +1,42 @@
+// src/components/RegisterUserModal.jsx
 import { useState } from "react";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 
 export default function RegisterUserModal({ onClose }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // ← añadimos history aquí (los otros se mantienen igual)
   const [roles, setRoles] = useState({
     add: false,
     edit: false,
     delete: false,
+    history: false,
   });
 
-  const handleSubmit = async () => {
+  async function handleSubmit() {
     try {
       const selectedRoles = Object.entries(roles)
-        .filter(([_, value]) => value)
+        .filter(([, value]) => value)
         .map(([key]) => key);
 
       const payload = { username, password, roles: selectedRoles };
 
-      const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        "https://chemas-sport-er-backend.onrender.com/api/auth/register",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
 
       if (res.ok) {
         toast.success("Usuario registrado correctamente");
-        onClose();
+        onClose?.();
       } else {
         toast.error(data.message || "Error al registrar usuario");
       }
@@ -37,7 +44,7 @@ export default function RegisterUserModal({ onClose }) {
       console.error("Error al registrar usuario:", error);
       toast.error("Error en el servidor");
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
@@ -56,7 +63,7 @@ export default function RegisterUserModal({ onClose }) {
         </div>
 
         {/* Contraseña */}
-        <div className="relative mb-3">
+        <div className="relative mb-2">
           <input
             type={showPassword ? "text" : "password"}
             placeholder="Contraseña"
@@ -67,7 +74,7 @@ export default function RegisterUserModal({ onClose }) {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2 top-1/2 text-xs transform -translate-y-1/2 text-gray-600"
+            className="absolute right-2 top-1 text-xs -translate-y-1/2 text-gray-600"
           >
             {showPassword ? "No Mostrar" : "Mostrar"}
           </button>
@@ -76,7 +83,7 @@ export default function RegisterUserModal({ onClose }) {
         {/* Permisos */}
         <label className="block font-semibold mb-1">Permisos:</label>
         <div className="mb-4 space-y-2">
-          {["add", "edit", "delete"].map((perm) => (
+          {["add", "edit", "delete", "history"].map((perm) => (
             <label key={perm} className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -85,9 +92,12 @@ export default function RegisterUserModal({ onClose }) {
                   setRoles((prev) => ({ ...prev, [perm]: !prev[perm] }))
                 }
               />
-              {perm === "add" && "Agregar productos"}
-              {perm === "edit" && "Editar productos"}
-              {perm === "delete" && "Eliminar productos"}
+              <span>
+                {perm === "add" && "Agregar productos"}
+                {perm === "edit" && "Editar productos"}
+                {perm === "delete" && "Eliminar productos"}
+                {perm === "history" && "Ver historial"}
+              </span>
             </label>
           ))}
         </div>

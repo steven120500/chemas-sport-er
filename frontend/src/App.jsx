@@ -24,7 +24,6 @@ import HistoryModal from './components/HistoryModal';
 
 
 
-
 function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +35,7 @@ function App() {
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoyModal, setShowHistoryModal] = useState(false);
-  
+
 
   const [user, setUser] =useState (() => {
     try{
@@ -49,6 +48,8 @@ function App() {
   });
 
   const isSuperUser = user?.isSuperUser || false;
+  const canSeeHistory = user?.isSuperUser || user?.roles?.includes('history');
+  const canClearHistory = user?.isSuperUser; 
   const canAdd = user?.isSuperUser || user?.roles?.includes("add");
   const canEdit = user?.isSuperUser || user?.roles?.includes("edit");
   const canDelete = user?.isSuperUser || user?.roles?.includes("delete");
@@ -235,6 +236,13 @@ function App() {
           onClose={() => setShowRegisterUserModal(false)}
         />
       )}
+
+      {canSeeHistory && (
+
+      <button onClick={() => setShowHistory(true)}>Historial</button>
+      )}
+      
+      
 
       <Footer />
       <FloatingWhatsapp />
