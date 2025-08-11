@@ -87,7 +87,9 @@ function App() {
       toast.success("Producto eliminado correctamente");
     } else {
       setProducts((prev) =>
-        prev.map((p) => (p._id === updatedProduct._id ? updatedProduct : p))
+        prev.map((p) => 
+          String(p._id) === String(updatedProduct._id) ? updatedProduct : p
+        )
       );
       toast.success("Producto actualizado correctamente");
     }
@@ -207,7 +209,7 @@ function App() {
         user={user}
           tallaPorTipo={tallaPorTipo}
           onAdd={(newProduct) => {
-            setProducts((prev) => [...prev, newProduct]);
+            setProducts((prev) => [newProduct, ...prev]);
             setShowAddModal(false);
             toast.success("Producto agregado correctamente");
           }}

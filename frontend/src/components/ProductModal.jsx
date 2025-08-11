@@ -11,10 +11,12 @@ const acceptedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
 
 export default function ProductModal({ product, onClose, onUpdate, canEdit, canDelete, user}) {
   const modalRef = useRef(null);
+  const [viewProduct, setViewProduct] = useState(product);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStock, setEditedStock] = useState({ ...product.stock });
   const [editedName, setEditedName] = useState(product.name);
   const [editedPrice, setEditedPrice] = useState(product.price);  
+  const [editedType, setEditedType] = useState(product?.type || 'Player');
   const [images, setImages] = useState([
     { src: product.imageSrc, isNew: false },
     ...(product.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : [])
@@ -22,6 +24,12 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   const [loading, setLoading] = useState(false);
   const [showSecondImage, setShowSecondImage] = useState(false);
 
+  useEffect(() => {
+    setViewProduct(product); 
+  }, [product]);
+
+
+  
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -44,6 +52,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
           stock: editedStock,
           name: editedName,
           price: editedPrice,
+          type: editedType,
           imageSrc,
           imageSrc2,
           imageAlt: editedName
@@ -53,9 +62,13 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
       if (!response.ok) throw new Error('Error al actualizar');
 
       const updatedProduct = await response.json();
-      onUpdate(updatedProduct);
-   
+      onUpdate(updatedProduct);                 // actualiza la lista afuera
+      setViewProduct(updatedProduct);           // actualiza lo que se ve dentro
+      setEditedName(updatedProduct.name);       // sincroniza inputs
+      setEditedType(updatedProduct.type);
       setIsEditing(false);
+
+
     } catch (error) {
       console.error('Error al guardar:', error);
       toast.error('Hubo un problema al actualizar el producto');
@@ -121,19 +134,43 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
       ref={modalRef}
       className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
     >
-        {/* Título */}
-        <h2 className="text-xl font-bold mb-2 text-center break-words">
-          {isEditing && canEdit ? (
-            <input
-              type="text"
-              className="text-center border-b-2 w-full font-semibold"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-            />
-          ) : (
-            product.name
-          )}
-        </h2>
+
+  <h2 
+ className="mb-2 text-center">
+{isEditing && canEdit ? (
+  <>
+    {/* Editar tipo */}
+    <label className="block text-xs text-gray-500 mb-1">Tipo</label>
+    <select
+      value={editedType}
+      onChange={(e) => setEditedType(e.target.value)}
+      className="w-full px-3 py-2 border rounded mb-3"
+    >
+      {['Player','Fan','Mujer','Nacional','Abrigos','Retro','Niño','F1','NBA','MLB','NFL'].map(t => (
+        <option key={t} value={t}>{t}</option>
+      ))}
+    </select>
+
+    {/* Editar nombre */}
+    <label className="block text-xs text-gray-500 mb-1">Nombre</label>
+    <input
+      type="text"
+      className="text-center border-b-2 w-full font-semibold"
+      value={editedName}
+      onChange={(e) => setEditedName(e.target.value)}
+    />
+  </>
+) : (
+  <>
+    <span className="block text-xs uppercase tracking-wide text-gray-500 font-semibold">
+    {viewProduct?.type}
+    </span>
+    <h2 className="text-xl font-bold">{viewProduct?.name}</h2>
+  </>
+ 
+)}
+ 
+</h2>
 
         {/* Imagen o edición de imágenes */}
         {isEditing && canEdit? (
@@ -192,7 +229,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
               onChange={(e) => setEditedPrice(e.target.value)}
             />
           ) : (
-            `₡${product.price}`
+            <p>₡{Number(viewProduct?.price).toLocaleString('de-DE')}</p>
           )}
         </div>
 
@@ -292,7 +329,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 {/* Botón de WhatsApp */}
 <a
   href={`https://wa.me/50660369857?text=${encodeURIComponent(
-  `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price} CRC. ¿Está disponible?`
+  `¡Hola! Me interesa la camiseta ${product.name} ${product.type} en la página con un valor de ₡${product.price}. CRC. ¿Está disponible?`
   )}`}
   target="_blank"
   rel="noopener noreferrer"

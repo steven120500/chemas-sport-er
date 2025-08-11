@@ -87,15 +87,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsRegister(!isRegister)}
-            className="text-sm underline text-center"
-          >
-            {isRegister
-              ? '¿Ya tienes cuenta? Iniciar sesión'
-              : '¿No tienes cuenta? Regístrate'}
-          </button>
+        
 
           <button
             type="button"
