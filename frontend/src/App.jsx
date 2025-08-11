@@ -148,6 +148,7 @@ function App() {
         open = {showHistoyModal}
         onClose={() => setShowHistoryModal(false)}
         isSuperUser={user?.isSuperUser == true}
+        roles={user?.roles || []}
         />
       )}
 

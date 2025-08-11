@@ -20,7 +20,11 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       setErrMsg("");
       try {
         const res = await fetch(`${API_BASE}/api/history`, {
-          headers: { Accept: "application/json" },
+          headers: {  
+            "Content-Type": "application/json",
+            "x-super": storedUser?.isSuperUser ? "true" : "false",
+            "x-roles": storedUser?.roles?.join(".") || ""
+        },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
