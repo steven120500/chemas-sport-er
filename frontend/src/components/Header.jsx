@@ -4,21 +4,24 @@ import UserDropDown from "./UserDropDown";
 
 export default function Header({
   onLoginClick,
+  onLogout,
   user,
+  canSeeHistory,
   isSuperUser,
   setShowRegisterUserModal,
   setShowUserListModal,
   setShowHistoryModal,
-  onLogout,
 }) {
-
- 
   return (
     <header className="bg-white shadow-md px-6 py-4 relative">
       <div className="flex items-center justify-between flex-wrap">
         {/* Logo */}
         <div className="flex items-center">
-          <img src={logo} alt="Logo Chemas Sport" className="h-20 w-auto" />
+          <img
+            src={logo}
+            alt="Logo Chemas Sport"
+            className="h-20 w-auto"
+          />
         </div>
 
         {/* Título */}
@@ -37,6 +40,7 @@ export default function Header({
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
               onViewHistory={() => setShowHistoryModal(true)}
+              canSeeHistory={canSeeHistory}
             />
           ) : (
             <button

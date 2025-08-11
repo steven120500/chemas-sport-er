@@ -1,14 +1,20 @@
+// src/components/UserDropDown.jsx
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { FaUser } from 'react-icons/fa';
 import { FiLogOut, FiUserPlus, FiUsers, FiClock } from 'react-icons/fi';
 
 export default function UserDropdown({
-  isSuperUser,
-  onLogout,
-  onAddUser,
-  onViewUsers,
-  onViewHistory, // <-- NUEVO callback
+  isSuperUser,        // boolean
+  canSeeHistory,      // boolean -> super o rol 'history'
+  onLogout,           // () => void
+  onAddUser,          // () => void
+  onViewUsers,        // () => void
+  onViewHistory,      // () => void
 }) {
+  // util para cerrar el menú en móviles al hacer click
+  const closeMenu = () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
   return (
     <div className="relative">
       <DropdownMenu.Root>
@@ -25,53 +31,39 @@ export default function UserDropdown({
           sideOffset={8}
           className="bg-white border rounded shadow-lg p-2 text-sm space-y-1 z-50"
         >
+          {/* Opciones solo para súper */}
           {isSuperUser && (
             <>
-              {/* Agregar usuario */}
               <DropdownMenu.Item
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-                  onAddUser();
-                }}
+                onSelect={(e) => { e.preventDefault(); closeMenu(); onAddUser(); }}
               >
                 <FiUserPlus /> Agregar usuario
               </DropdownMenu.Item>
 
-              {/* Ver usuarios */}
               <DropdownMenu.Item
                 className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-                  onViewUsers();
-                }}
+                onSelect={(e) => { e.preventDefault(); closeMenu(); onViewUsers(); }}
               >
                 <FiUsers /> Ver usuarios
               </DropdownMenu.Item>
-
-              {/* Historial (sólo súper) */}
-              <DropdownMenu.Item
-                className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-                  onViewHistory(); // abre modal/página de auditoría
-                }}
-              >
-                <FiClock /> Historial
-              </DropdownMenu.Item>
             </>
+          )}
+
+          {/* Historial: súper o rol 'history' */}
+          {canSeeHistory && (
+            <DropdownMenu.Item
+              className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
+              onSelect={(e) => { e.preventDefault(); closeMenu(); onViewHistory(); }}
+            >
+              <FiClock /> Historial
+            </DropdownMenu.Item>
           )}
 
           {/* Cerrar sesión */}
           <DropdownMenu.Item
             className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 p-2 rounded"
-            onClick={(e) => {
-              e.preventDefault();
-              onLogout();
-            }}
+            onSelect={(e) => { e.preventDefault(); closeMenu(); onLogout(); }}
           >
             <FiLogOut /> Cerrar sesión
           </DropdownMenu.Item>

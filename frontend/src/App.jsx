@@ -163,6 +163,7 @@ function App() {
         setShowRegisterUserModal={setShowRegisterUserModal}
         setShowUserListModal={setShowUserListModal}
         setShowHistoryModal={setShowHistoryModal}
+        canSeeHistory={canSeeHistory}
   
         
       />
@@ -224,8 +225,10 @@ function App() {
           onClose={() => setShowLogin(false)}
           onLoginSuccess={(userData) => {
             setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData)); // 🔹 Guardar en localStorage
             setShowLogin(false);
-            toast.success(`Bienvenido`);
+            toast.success('Bienvenido');
+            
           }}
           onRegisterClick={handleRegisterClick}
         />
