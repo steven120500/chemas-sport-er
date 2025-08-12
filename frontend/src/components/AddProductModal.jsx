@@ -206,7 +206,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                     onClick={(e) => { e.stopPropagation(); handleRemoveImage(i); }}
                     className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full px-1"
                   >
-                    <FaTimes />
+                    <FaTimes size={18} />
                   </button>
                 </div>
               ))}

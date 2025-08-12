@@ -154,7 +154,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       onClick={onClose}
       
       className="absolute top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
-            <FaTimes />
+            <FaTimes size={18} />
               
       </button>
           
