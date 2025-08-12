@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { toast as toastHOT } from 'react-hot-toast';
 
 
+
 const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
 const acceptedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
@@ -132,7 +133,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
     <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center py-6">
     <div
       ref={modalRef}
-      className="bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+      className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
     >
 
   <h2 
@@ -261,12 +262,12 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
   {/* Botón Cerrar */}
   <button
-    className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition w-full sm:w-auto flex-1 font-bold"
-    onClick={onClose}
-    disabled={loading}
-  >
-    Cerrar
-  </button>
+      onClick={onClose}
+      
+      className="absolute top-2 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
+            <FaTimes />
+              
+      </button>
 
   {/* Botón Guardar (solo si se puede editar y está en modo edición) */}
   {canEdit && isEditing && (

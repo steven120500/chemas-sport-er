@@ -182,7 +182,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     >
       <div className="bg-white rounded-lg max-w-md w-full shadow-lg overflow-y-auto scrollbar-thin">
         <div className="relative p-6">
-          <button onClick={onCancel} className="absolute top-2 right-2 text-gray-500 hover:text-gray-800">
+          <button onClick={onCancel} className="absolute top-2 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
             <FaTimes />
           </button>
 

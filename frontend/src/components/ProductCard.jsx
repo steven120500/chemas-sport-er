@@ -32,7 +32,7 @@ export default function ProductCard({ product, onClick }) {
           {product.name}
         </h3>
         <p className="text-xl font-bold text-gray-800">
-          ₡{product.price?.toLocaleString?.() || product.price}
+          ₡{product.price?.toLocaleString('de-DE') || product.price}
         </p>
       </div>
     </motion.div>
