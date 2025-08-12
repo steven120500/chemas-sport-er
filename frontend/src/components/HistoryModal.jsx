@@ -150,12 +150,13 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                 {clearing ? "Limpiando..." : "Limpiar"}
               </button>
             )}
-            <button
-  onClick={onClose}
-  className="absolute top-5 right-3 bg-black text-white w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded hover:bg-gray-800 text-2xl sm:text-xl"
->
-  &times;
-</button>
+        <button
+      onClick={onClose}
+      
+      className="absolute top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
+            <FaTimes />
+              
+      </button>
           
           </div>
         </div>

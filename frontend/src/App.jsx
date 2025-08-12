@@ -37,6 +37,16 @@ function App() {
   const [showHistoyModal, setShowHistoryModal] = useState(false);
 
 
+
+  const anyModalOpen =
+  !!selectedProduct ||
+  showAddModal ||
+  showLogin ||
+  showRegisterUserModal ||
+  showUserListModal ||
+  showHistoyModal;
+
+  
   const [user, setUser] =useState (() => {
     try{
       const storedUser = localStorage.getItem("user");
@@ -108,6 +118,7 @@ function App() {
 
   const handleRegisterClick = () => {
 
+    
     setShowUserDropDown(false);
     setTimeout(() => {
     setShowRegisterUserModal(true);
@@ -156,6 +167,7 @@ function App() {
 
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
+      {!anyModalOpen && (
       <Header
         onLoginClick={handleLoginClick}
         onLogout={handleLogout}
@@ -168,6 +180,7 @@ function App() {
   
         
       />
+      )}
 
       {canAdd && (
         <button
@@ -249,7 +262,9 @@ function App() {
       
 
       <Footer />
+      {!anyModalOpen && (
       <FloatingWhatsapp />
+      )}
       <ToastContainer />
       <Toaster position="top-center" reverseOrder={false}/>
     </>

@@ -47,7 +47,7 @@ export default function FloatingWhatsapp({ show = true }) {
         {/* Botón flotante (siempre clickeable) */}
         <button
           onClick={() => setOpen(!open)}
-          className="pointer-events-auto bg-black text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+          className="pointer-events-auto bg-black  text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
           title="Contacto WhatsApp"
         >
           <FaWhatsapp size={24} />
