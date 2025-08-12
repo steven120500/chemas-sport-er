@@ -264,7 +264,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   <button
       onClick={onClose}
       
-      className="absolute top-2 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
+      className="absolute top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
             <FaTimes />
               
       </button>

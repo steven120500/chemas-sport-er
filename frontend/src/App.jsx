@@ -243,7 +243,7 @@ function App() {
 
       {canSeeHistory && (
 
-      <button onClick={() => setShowHistory(true)}>Historial</button>
+      <button onClick={() => setShowHistory(true)}></button>
       )}
       
       
