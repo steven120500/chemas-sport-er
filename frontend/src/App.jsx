@@ -34,7 +34,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
-  const [showHistoyModal, setShowHistoryModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
 
 
@@ -44,7 +44,7 @@ function App() {
   showLogin ||
   showRegisterUserModal ||
   showUserListModal ||
-  showHistoyModal;
+  showHistoryModal;
 
   
   const [user, setUser] =useState (() => {
@@ -154,9 +154,9 @@ function App() {
         onClose={() => setShowUserListModal(false)}/>
       )}
 
-      {showHistoyModal && (
+      {showHistoryModal && (
         <HistoryModal 
-        open = {showHistoyModal}
+        open = {showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         isSuperUser={user?.isSuperUser == true}
         roles={user?.roles || []}
@@ -182,7 +182,9 @@ function App() {
       />
       )}
 
-      {canAdd && (
+      
+
+      {canAdd && !anyModalOpen && (
         <button
           className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
           onClick={() => setShowAddModal(true)}

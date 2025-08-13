@@ -89,19 +89,32 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   async function doClear() {
     if (!isSuperUser) return;
     setClearing(true);
+  
     try {
-      const res = await fetch(`${API_BASE}/api/history, { method: "DELETE" }`);
+      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
+      const xsuper = storedUser?.isSuperUser ? "true" : "false";
+  
+      // OJO: cerrar el backtick justo después de /history  👇
+      const res = await fetch(`${API_BASE}/api/history`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-super": xsuper,
+          "x-roles": roles,
+        },
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // refrescar lista
-      const roles =
-        Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
+  
+      // refrescar lista con los mismos headers
       const refreshed = await fetch(`${API_BASE}/api/history`, {
         headers: {
           "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false",
+          "x-super": xsuper,
           "x-roles": roles,
         },
-      }).then((r) => r.json());
+      }).then(r => r.json());
+  
       setLogs(Array.isArray(refreshed) ? refreshed : []);
       toastHOT.success("Historial limpiado.");
     } catch (e) {
@@ -111,7 +124,9 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       setClearing(false);
     }
   }
+  
 
+  
   // Filtro por nombre de producto (log.item)
   const filteredLogs = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -124,7 +139,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   if (!open) return null;
 
   return (
-    <div className="fixed mt-20 inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed mt-24 mb-12 inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
         {/* Header */}
         <div className="flex items-center justify-between gap-2 pb-4 border-b">

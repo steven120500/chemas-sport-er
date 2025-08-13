@@ -130,13 +130,13 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   const tallasVisibles = product.type === 'Niño' ? tallasNino : tallasAdulto;
 
   return (
-    <div className=" mt-20 fixed pt-15 inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center py-6">
+    <div className=" mt-32 mb-24 fixed pt-15 inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center py-6">
     <div
       ref={modalRef}
       className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
     >
 
-  <h2 
+  <div
  className="mb-2 text-center">
 {isEditing && canEdit ? (
   <>
@@ -171,7 +171,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
  
 )}
  
-</h2>
+</div>
 
         {/* Imagen o edición de imágenes */}
         {isEditing && canEdit? (

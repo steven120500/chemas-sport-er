@@ -20,7 +20,7 @@ export default function UserDropdown({
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button
-            className="rounded-full bg-green-500 p-3 text-white hover:bg-green-600 absolute top-6 right-4 z-50"
+            className="rounded-full p-3 shadow-lg transition bg-green-500 text-white bg-black hover:bg-gray-800"
             aria-label="User menu"
           >
             <FaUser size={20} />
