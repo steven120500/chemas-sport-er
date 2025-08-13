@@ -124,8 +124,8 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   if (!open) return null;
 
   return (
-    <div className="fixed pt-15 inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="relative pt-15 bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
+    <div className="fixed mt-20 inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
         {/* Header */}
         <div className="flex items-center justify-between gap-2 pb-4 border-b">
           <h2 className="text-lg font-semibold"></h2>
