@@ -22,7 +22,7 @@ import HistoryModal from './components/HistoryModal';
 
 
 
-
+const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 function App() {
   const [products, setProducts] = useState([]);
