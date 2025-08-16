@@ -172,16 +172,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Obtener todos (ordenados por reciente) y Lean para perf
-router.get('/', async (_req, res) => {
-  try {
-    const products = await Product.find().sort({ createdAt: -1 }).lean();
-    res.json(products);
-  } catch (error) {
-    console.error('× Error al obtener los productos:', error);
-    res.status(500).json({ error: 'Error al obtener los productos' });
-  }
-});
+
 
 // Endpoint opcional de salud / conteo
 router.get('/health', async (_req, res) => {
@@ -253,5 +244,42 @@ router.delete('/:id', async (req, res) => {
 
   router.use(attachUser);
 });
+
+// Obtener productos paginados
+router.get('/', async (req, res) => {
+  try {
+    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+
+    const q    = (req.query.q || '').trim();     // búsqueda por nombre
+    const type = (req.query.type || '').trim();  // filtro por tipo
+
+    const find = {};
+    if (q)    find.name = { $regex: q, $options: 'i' };
+    if (type) find.type = type;
+
+    const [items, total] = await Promise.all([
+      Product.find(find)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(find),
+    ]);
+
+    res.json({
+      items,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      limit,
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener los productos paginados:', error);
+    res.status(500).json({ error: 'Error al obtener los productos' });
+  }
+});
+
+
 
 export default router;

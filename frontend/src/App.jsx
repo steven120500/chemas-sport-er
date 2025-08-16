@@ -35,6 +35,14 @@ function App() {
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+ 
+  // --- estados de paginación ---
+const [page, setPage] = useState(1);
+const [limit, setLimit] = useState(20);
+const [total, setTotal] = useState(0);
+const pages = Math.max(1, Math.ceil(total / limit));
+
+
 
 
 
@@ -72,24 +80,41 @@ function App() {
     toast.success("Sesión cerrada correctamente");
   };
 
-  const fetchProducts = async () => {
-    try {
-      const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/products");
-      if (!res.ok) throw new Error("No se pudo obtener los productos");
+  // --- cargar productos con paginación y filtros ---
+const fetchProducts = async (opts = {}) => {
+  const p  = opts.page ?? page;
+  const q  = (opts.q ?? searchTerm).trim();
+  const tp = (opts.type ?? filterType).trim();
 
-      const data = await res.json();
-      setProducts(data);
-    } catch (error) {
-      console.error("Error al cargar productos:", error);
-      toast.error("No se pudieron cargar los productos");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const params = new URLSearchParams({
+      page: String(p),
+      limit: String(limit),
+      ...(q  ? { q }        : {}),
+      ...(tp ? { type: tp } : {}),
+    });
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+    const res = await fetch(`${API_BASE}/api/products?` + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const json = await res.json(); // { items,total,page,pages,limit }
+    setProducts(json.items);
+    setTotal(json.total);
+    setPage(json.page);
+  } catch (e) {
+    console.error('fetchProducts error:', e);
+    setProducts([]);
+    setTotal(0);
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchProducts({ page, q: searchTerm, type: filterType });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [page, limit, searchTerm, filterType]);
 
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
