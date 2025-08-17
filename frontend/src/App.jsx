@@ -24,6 +24,14 @@ import HistoryModal from './components/HistoryModal';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
+// helper para páginas 1 ... (page-2) (page-1) [page] (page+1) (page+2) ... last
+function buildPages(page, pages) {
+  const out = new Set([1, pages, page, page - 1, page - 2, page + 1, page + 2]);
+  return [...out]
+    .filter(n => n >= 1 && n <= pages)
+    .sort((a, b) => a - b);
+}
+
 function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -286,7 +294,72 @@ useEffect(() => {
       <button onClick={() => setShowHistory(true)}></button>
       )}
       
-      
+      {/* --- Paginación --- */}
+{pages > 1 && (
+  <div className="mt-8 flex flex-col items-center gap-3">
+    {/* Info y selector de tamaño de página */}
+    
+
+    {/* Controles */}
+    <nav className="flex items-center justify-center gap-2">
+      <button
+        onClick={() => setPage(1)}
+        disabled={page === 1}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Primera"
+      >
+        «
+      </button>
+      <button
+        onClick={() => setPage(p => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Anterior"
+      >
+        Anterior
+      </button>
+
+      {/* Números con elipsis */}
+      {(() => {
+        const nums = buildPages(page, pages);
+        return nums.map((n, i) => {
+          const prev = nums[i - 1];
+          const showDots = i > 0 && n - prev > 1;
+          return (
+            <span key={n} className="flex">
+              {showDots && <span className="px-2">…</span>}
+              <button
+                onClick={() => setPage(n)}
+                className={`px-3 py-1 rounded border ${
+                  n === page ? "bg-black text-white" : "hover:bg-gray-100"
+                }`}
+              >
+                {n}
+              </button>
+            </span>
+          );
+        });
+      })()}
+
+      <button
+        onClick={() => setPage(p => Math.min(pages, p + 1))}
+        disabled={page === pages}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Siguiente"
+      >
+        Siguiente
+      </button>
+      <button
+        onClick={() => setPage(pages)}
+        disabled={page === pages}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Última"
+      >
+        »
+      </button>
+    </nav>
+  </div>
+)}
 
       <Footer />
       {!anyModalOpen && (

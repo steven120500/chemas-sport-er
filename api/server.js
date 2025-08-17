@@ -1,76 +1,66 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import compression from 'compression';
 import connectDB from './config/db.js';
+
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
-import bodyParser from 'body-parser';
 import historyRoutes from './routes/historyroutes.js';
-
-
 
 dotenv.config();
 
 const app = express();
 
+/* -------- ajustes generales -------- */
+app.disable('x-powered-by');                // seguridad
+app.set('json spaces', 0);                  // respuestas JSON compactas
+app.set('trust proxy', 1);                  // útil en Render/Proxies
 
-// Habilitar CORS con origen específico (o dejarlo abierto si preferís)
+/* -------- middlewares globales -------- */
+app.use(compression());                     // gzip/brotli
+
+// Restringe origin a tu sitio (ajusta URL del front)
 app.use(cors({
-  origin: '*', 
+  origin: [
+    'https://chemasport-er.onrender.com',
+    'http://localhost:5173'
+  ],
 }));
 
-// Parseo de JSON
-app.use(express.json({ limit: '25mb' }));
+// Si no envías imágenes en el body, 10MB es suficiente
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
+/* -------- health/ping MUY arriba y livianos -------- */
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', t: Date.now() });
+});
 
+app.get('/api/ping', (_req, res) => {
+  res.json({ message: 'API ok' });
+});
+
+/* -------- conecta DB ANTES de montar rutas -------- */
+await connectDB();
+
+/* -------- rutas de la app -------- */
 app.use('/api/auth', authRoutes);
-
 app.use('/api', pdfRoutes);
-
-
 app.use('/api/history', historyRoutes);
-
-
-
-
-// Conexión a MongoDB
-connectDB();
-
-// Rutas
 app.use('/api/products', productRoutes);
 
-// Ruta raíz para evitar "Cannot GET /"
-app.get('/', (req, res) => {
-  res.send('Chemas Sport ER API');
-});
+// raíz (opcional)
+app.get('/', (_req, res) => res.send('Chema Sport ER API'));
 
-// Ruta de prueba para monitoreo
-app.get('/api/ping', (req, res) => {
-  res.json({ message: 'API funcionando con Mongo Atlas' });
-});
-
-// En tu server.js o donde defines las rutas principales
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Manejo de errores 404
-app.use((req, res, next) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
-
-// Manejo de errores generales
-app.use((err, req, res, next) => {
+/* -------- manejo de errores -------- */
+app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
+app.use((err, _req, res, _next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-// Arrancar servidor
+/* -------- levantar -------- */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

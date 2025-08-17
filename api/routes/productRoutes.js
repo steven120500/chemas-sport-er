@@ -246,20 +246,24 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Obtener productos paginados
+// api/routes/productRoutes.js  (GET paginado)
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
-
-    const q    = (req.query.q || '').trim();     // búsqueda por nombre
-    const type = (req.query.type || '').trim();  // filtro por tipo
+    const q     = (req.query.q || '').trim();
+    const type  = (req.query.type || '').trim();
 
     const find = {};
     if (q)    find.name = { $regex: q, $options: 'i' };
     if (type) find.type = type;
 
+    // 📦 PROYECCIÓN: evita mandar stock e imágenes pesadas que no se usan
+    const projection = 'name price type imageSrc createdAt';
+
     const [items, total] = await Promise.all([
       Product.find(find)
+        .select(projection)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -267,18 +271,16 @@ router.get('/', async (req, res) => {
       Product.countDocuments(find),
     ]);
 
-    res.json({
-      items,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      limit,
-    });
-  } catch (error) {
-    console.error('❌ Error al obtener los productos paginados:', error);
+    // ⏱ cache cortito de navegador (se invalida cuando cambia la query)
+    res.set('Cache-Control', 'public, max-age=20'); // ~20s
+    res.json({ items, total, page, pages: Math.ceil(total / limit), limit });
+  } catch (err) {
+    console.error('GET /api/products paginado', err);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
+
+
 
 
 
