@@ -262,12 +262,12 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
   {/* Botón Cerrar */}
   <button
-      onClick={onClose}
-      
-      className="absolute top-6 right-2 L text-white text-white-500 hover:text-gray-800 bg-black">
+            onClick={onClose}
+            className="absolute top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black rounded p-1"
+            title="Cerrar"
+          >
             <FaTimes size={18} />
-              
-      </button>
+          </button>
 
   {/* Botón Guardar (solo si se puede editar y está en modo edición) */}
   {canEdit && isEditing && (
