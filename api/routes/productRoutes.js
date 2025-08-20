@@ -259,7 +259,7 @@ router.get('/', async (req, res) => {
     if (type) find.type = type;
 
     // 📦 PROYECCIÓN: evita mandar stock e imágenes pesadas que no se usan
-    const projection = 'name price type imageSrc createdAt';
+    const projection = 'name price type imageSrc stock createdAt';
 
     const [items, total] = await Promise.all([
       Product.find(find)
