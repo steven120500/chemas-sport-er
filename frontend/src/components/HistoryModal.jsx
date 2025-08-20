@@ -1,7 +1,7 @@
 // src/components/HistoryModal.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaCalendarAlt } from "react-icons/fa";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -10,9 +10,16 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   const [clearing, setClearing] = useState(false);
-  const [q, setQ] = useState(""); // <- término de búsqueda
 
-  // helpers: tomar user guardado para mandar headers
+  // búsqueda por texto (opcional, la mantengo)
+  const [q, setQ] = useState("");
+
+  // ---- fecha seleccionada ----
+  // vacío = sin filtro. Si quieres “hoy” por defecto, usa: new Date().toISOString().slice(0,10)
+  const [selectedDate, setSelectedDate] = useState("");
+  const dateInputRef = useRef(null);
+
+  // helper: user guardado para headers
   const storedUser = useMemo(() => {
     try {
       const raw = localStorage.getItem("user");
@@ -22,7 +29,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
   }, []);
 
-  // Cargar historial cuando abre
+  // Cargar historial cuando abre o cambia fecha
   useEffect(() => {
     if (!open) return;
     let abort = false;
@@ -31,9 +38,13 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       setLoading(true);
       setErrMsg("");
       try {
-        const roles =
-          Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
-        const res = await fetch(`${API_BASE}/api/history`, {
+        const roles = Array.isArray(storedUser?.roles)
+          ? storedUser.roles.join(",")
+          : "";
+        const params = new URLSearchParams(
+          selectedDate ? { date: selectedDate } : {}
+        );
+        const res = await fetch(`${API_BASE}/api/history? ` + params.toString(), {
           headers: {
             "Content-Type": "application/json",
             "x-super": storedUser?.isSuperUser ? "true" : "false",
@@ -56,7 +67,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return () => {
       abort = true;
     };
-  }, [open, storedUser]);
+  }, [open, storedUser, selectedDate]);
 
   // Confirm visual para borrar
   function handleAskClearToast() {
@@ -89,13 +100,12 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   async function doClear() {
     if (!isSuperUser) return;
     setClearing(true);
-  
     try {
-      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
+      const roles = Array.isArray(storedUser?.roles)
+        ? storedUser.roles.join(",")
+        : "";
       const xsuper = storedUser?.isSuperUser ? "true" : "false";
-  
-      // OJO: cerrar el backtick justo después de /history  👇
+
       const res = await fetch(`${API_BASE}/api/history`, {
         method: "DELETE",
         headers: {
@@ -105,16 +115,20 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  
-      // refrescar lista con los mismos headers
-      const refreshed = await fetch(`${API_BASE}/api/history`, {
-        headers: {
-          "Content-Type": "application/json",
-          "x-super": xsuper,
-          "x-roles": roles,
-        },
-      }).then(r => r.json());
-  
+
+      // refrescar con los mismos filtros
+      const refreshed = await fetch(
+        `${API_BASE}/api/history?` +
+          new URLSearchParams(selectedDate ? { date: selectedDate } : {}),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "x-super": xsuper,
+            "x-roles": roles,
+          },
+        }
+      ).then((r) => r.json());
+
       setLogs(Array.isArray(refreshed) ? refreshed : []);
       toastHOT.success("Historial limpiado.");
     } catch (e) {
@@ -124,9 +138,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       setClearing(false);
     }
   }
-  
 
-  
   // Filtro por nombre de producto (log.item)
   const filteredLogs = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -140,51 +152,89 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
   return (
     <div className="fixed mt-24 mb-12 inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
+      <div className="relative bg-white p-6 rounded-lg shadow-md max-w-4xl w-full max-h-screen overflow-y-auto scroll-smooth">
         {/* Header */}
         <div className="flex items-center justify-between gap-2 pb-4 border-b">
-          <h2 className="text-lg font-semibold"></h2>
+          <h2 className="text-lg font-semibold">Historial</h2>
 
-          {/* Buscador */}
+          <div className="flex items-center gap-2">
+            {/* Botón Calendario */}
+            <button
+              onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded border hover:bg-gray-100"
+              title="Elegir fecha"
+            >
+              <FaCalendarAlt />
+              <span className="text-sm">
+                {selectedDate ? selectedDate : "Fecha"}
+              </span>
+            </button>
+
+            {/* Limpiar fecha */}
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate("")}
+                className="text-xs px-2 py-1 rounded border hover:bg-gray-100"
+                title="Quitar filtro de fecha"
+              >
+                Quitar fecha
+              </button>
+            )}
+
+            {/* (Opcional) Borrar historial completo */}
+            {isSuperUser && (
+              <button
+                onClick={handleAskClearToast}
+                disabled={clearing}
+                className="px-3 py-2 rounded border hover:bg-gray-100 disabled:opacity-50"
+                title="Limpiar historial"
+              >
+                Limpiar
+              </button>
+            )}
+
+            {/* Cerrar */}
+            <button
+              onClick={onClose}
+              className="ml-2 p-2 rounded bg-black text-white hover:bg-gray-800"
+              title="Cerrar"
+            >
+              <FaTimes size={18} />
+            </button>
+          </div>
+
+          {/* input date oculto que abre el calendario nativo */}
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="absolute opacity-0 pointer-events-none w-0 h-0"
+            aria-hidden
+          />
+        </div>
+
+        {/* Buscador opcional por producto */}
+        <div className="mt-4 flex items-center gap-2">
           <input
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por producto…"
-            className=" flex sticky left top-0 z-10 bg-white border-b "
+            className="border px-3 py-2 rounded w-full"
           />
-
-          <div className="flex pr-20 items-center gap-2">
-            {isSuperUser && (
-              <button
-                onClick={handleAskClearToast}
-                disabled={clearing}
-                title="Borrar todo el historial"
-                className="whitespace-nowrap bg-gray-800 text-white text-sm px-3 py-2 rounded hover:bg-black"
-              >
-                {clearing ? "Limpiando..." : "Limpiar"}
-              </button>
-            )}
-        <button
-      onClick={onClose}
-      
-      className="absolute top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black">
-            <FaTimes size={18} />
-              
-      </button>
-          
-          </div>
         </div>
 
         {/* Body con scroll */}
         <div className="py-4">
-          {loading && <p className="text-gray-500">Cargando...</p>}
-          {!loading && errMsg && (
-            <p className="text-red-600">{errMsg}</p>
-          )}
+          {loading && <p className="text-gray-500">Cargando…</p>}
+          {!loading && errMsg && <p className="text-red-600">{errMsg}</p>}
+
           {!loading && !errMsg && filteredLogs.length === 0 && (
             <p className="text-gray-600">
-              {q ? <>No hay resultados para “{q}”.</> : "No hay cambios registrados."}
+              {selectedDate
+                ? `No hay cambios registrados para ${selectedDate}.`
+                : "No hay cambios registrados."}
             </p>
           )}
 
@@ -199,7 +249,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
                   <em className="text-gray-700 block">{log.item || "—"}</em>
                   <small className="text-gray-500 block mt-1">
-                    {log.date ? new Date(log.date).toLocaleString() : ""}
+                    {new Date(log.date).toLocaleString()}
                   </small>
 
                   {log.details && (
