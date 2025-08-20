@@ -25,34 +25,31 @@ function dayRange(dateStr) {
   return { $gte: start, $lt: next };
 }
 
-/* ========== GET: ver historial (con filtro por día) ========== */
-// Permite: superadmin o rol "history"
 router.get('/', async (req, res) => {
   try {
-    if (!(isSuper(req) || getRoles(req).includes('history'))) {
-      return res.status(403).json({ message: 'No autorizado a ver historial' });
-    }
+    const { date, page = '1', limit = '200' } = req.query;
 
-    const { date, q } = req.query; // ?date=YYYY-MM-DD  |  ?q=texto (opcional)
-
+    // rango del día en UTC (evita problemas de TZ)
     const find = {};
-    // filtro por rango de día
-    const range = dayRange(date);
-    if (range) find.date = range;
+    const day = (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) 
+                ? new Date(`${date}T00:00:00.000Z`)
+                : new Date(new Date().toISOString().slice(0,10) + 'T00:00:00.000Z');
 
-    // filtro opcional por texto en item o action
-    if (q && String(q).trim()) {
-      const rx = new RegExp(String(q).trim(), 'i');
-      find.$or = [{ item: rx }, { action: rx }, { user: rx }];
-    }
+    const start = day;                          // 00:00 UTC
+    const end   = new Date(start.getTime() + 24*60*60*1000); // 24h después
+    find.date = { $gte: start, $lt: end };
 
-    const logs = await History.find(find)
-      .sort({ date: -1 })
-      .lean();
+    const p = Math.max(parseInt(page, 10) || 1, 1);
+    const l = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 1000);
 
-    res.json(logs);
-  } catch (err) {
-    console.error('Error al obtener historial:', err);
+    const [items, total] = await Promise.all([
+      History.find(find).sort({ date: -1 }).skip((p-1)*l).limit(l).lean(),
+      History.countDocuments(find),
+    ]);
+
+    res.json({ items, total, page: p, pages: Math.max(1, Math.ceil(total/l)), limit: l });
+  } catch (e) {
+    console.error('history GET error:', e);
     res.status(500).json({ error: 'Error al obtener historial' });
   }
 });
