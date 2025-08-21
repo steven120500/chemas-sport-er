@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 import History from '../models/History.js';
 import attachUser from '../middleware/attachUser.js'; 
 import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
+import multer from 'multer';
 
 const router = express.Router();
 
