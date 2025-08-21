@@ -15,53 +15,48 @@ dotenv.config();
 const app = express();
 
 /* -------- ajustes generales -------- */
-app.disable('x-powered-by');           // seguridad
-app.set('json spaces', 0);             // respuestas JSON compactas
-app.set('trust proxy', 1);             // útil en Render/Proxies
-app.use(compression());                // gzip/brotli
+app.disable('x-powered-by');      // seguridad
+app.set('json spaces', 0);        // JSON compacto
+app.set('trust proxy', 1);        // útil en Render/Proxies
+app.use(compression());           // gzip/brotli
 
-/* -------- CORS (debe ir ANTES de las rutas) -------- */
+/* -------- CORS (antes de las rutas) -------- */
 const ALLOWED_ORIGINS = [
-  'https://chemas-sport-er.onrender.com', // tu front en Render
-  'http://localhost:5173',                 // desarrollo local
+  'https://chemas-sport-er.onrender.com', // front en Render
+  'http://localhost:5173',                // dev local
+  // Agrega aquí tu dominio propio si usas uno, ej:
+  // 'https://tu-dominio.com',
 ];
 
 app.use(
   cors({
-    origin: (origin, cb) => {
-      // permitir herramientas sin Origin (curl, healthchecks)
+    origin(origin, cb) {
+      // Permitir herramientas sin Origin (curl, healthchecks)
       if (!origin) return cb(null, true);
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-user'],
-    credentials: false, // pon true solo si usas cookies/sesiones
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'x-user', 'Authorization'],
+    credentials: false, // true solo si usas cookies/sesiones
     maxAge: 86400,      // cachea preflight por 1 día
   })
 );
-// por si algún proxy no reenvía OPTIONS correctamente
+// Por si algún proxy no reenvía OPTIONS correctamente
 app.options('*', cors());
 
 /* -------- body parsers -------- */
-// si no envías imágenes en el body, 10MB es suficiente
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-/* -------- endpoints livianos de salud (arriba) -------- */
+/* -------- endpoints livianos de salud -------- */
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', t: Date.now() });
 });
 app.get('/api/ping', (_req, res) => {
   res.json({ message: 'API ok' });
 });
-// Debug route opcional, solo si existe en las env
-if (process.env.DEBUG_URL) {
-  const dbg = process.env.DEBUG_URL;
-  if (dbg.startsWith("/")) {
-    app.get(dbg, (_req, res) => res.json({ ok: true, debug: true, t: Date.now() }));
-  }
-}
+
 /* -------- conectar DB ANTES de montar rutas -------- */
 await connectDB();
 
