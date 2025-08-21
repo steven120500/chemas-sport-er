@@ -55,7 +55,13 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/ping', (_req, res) => {
   res.json({ message: 'API ok' });
 });
-
+// Debug route opcional, solo si existe en las env
+if (process.env.DEBUG_URL) {
+  const dbg = process.env.DEBUG_URL;
+  if (dbg.startsWith("/")) {
+    app.get(dbg, (_req, res) => res.json({ ok: true, debug: true, t: Date.now() }));
+  }
+}
 /* -------- conectar DB ANTES de montar rutas -------- */
 await connectDB();
 
