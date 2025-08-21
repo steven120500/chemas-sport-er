@@ -134,15 +134,33 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   };
 
   
-// Convierte un dataURL base64 a Blob
-function dataUrlToBlob(dataUrl) {
-  const [meta, b64] = dataUrl.split(',');
-  const mime = meta.match(/:(.*?);/)[1];
-  const bin = atob(b64);
-  const len = bin.length;
-  const u8 = new Uint8Array(len);
-  for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
-  return new Blob([u8], { type: mime });
+  // Convierte distintos tipos de src a Blob: data:, blob:, http(s)
+async function srcToBlob(src) {
+  if (!src) throw new Error('Imagen sin src');
+
+  // blob: u http(s): -> usar fetch
+  if (src.startsWith('blob:') || src.startsWith('http')) {
+    const r = await fetch(src);
+    if (!r.ok) throw new Error('No se pudo leer blob/url');
+    return await r.blob();
+  }
+
+  // data:...;base64,... -> decodificar a mano
+  if (src.startsWith('data:')) {
+    const parts = src.split(',');
+    if (parts.length < 2) throw new Error('dataURL inválido');
+    const meta = parts[0];
+    const b64  = parts[1];
+    const mimeMatch = meta.match(/data:(.*?);base64/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+
+    const bin = atob(b64);
+    const u8  = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new Blob([u8], { type: mime });
+  }
+
+  throw new Error('Formato de imagen no soportado');
 }
 
   // ====== Submit ======
@@ -172,10 +190,14 @@ function dataUrlToBlob(dataUrl) {
       
 
          // 👉 adjunta TODAS las imágenes como "images"
-    for (let i = 0; i < images.length; i++) {
-      const blob = await dataUrlToBlob(images[i].src);   // tu estado guarda {src: dataURL}
-      formData.append('images', blob, `product-${i}.webp`);
-    }
+      
+      // adjuntar TODAS las imágenes que tengan src válido
+for (let i = 0; i < images.length; i++) {
+  const src = images[i]?.src;
+  if (!src) continue;                     // evita undefined
+  const blob = await srcToBlob(src);      // usa el helper robusto
+  formData.append('images', blob, `product-${i}.webp`);
+}
 
       const res = await fetch(`${API_BASE}/api/products`, {
         method: "POST",

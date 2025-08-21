@@ -149,8 +149,7 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 }
 
 /* --------------------------------- rutas --------------------------------- */
-
-// helper: promesa para upload_stream
+// helper: sube un buffer a Cloudinary (promisificado)
 function uploadToCloudinary(buffer) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -161,24 +160,28 @@ function uploadToCloudinary(buffer) {
   });
 }
 
+// ---------- crear producto (MULTI imagen) ----------
 router.post('/', upload.array('images', 5), async (req, res) => {
   try {
     if (!req.files?.length) {
       return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
-    // 1) subir todas
+    // 1) subir todas a cloudinary
     const uploaded = await Promise.all(
-      req.files.map(f => uploadToCloudinary(f.buffer))
+      req.files.map((f) => uploadToCloudinary(f.buffer))
     );
-    const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
-    const imageSrc = images[0]?.url || ''; // principal = la primera
+    // arreglo [{ public_id, url }]
+    const images = uploaded.map((u) => ({ public_id: u.public_id, url: u.secure_url }));
+    // principal = la primera
+    const imageSrc = images[0]?.url || '';
 
-    // 2) parsear stock
+    // 2) parsear stock (viene como string en multipart)
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
-    } catch {}
+      else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
+    } catch (_) {}
 
     // 3) crear
     const product = await Product.create({
@@ -186,16 +189,19 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       price: Number(req.body.price),
       type: String(req.body.type || '').trim(),
       stock,
-      imageSrc,          // principal para la tarjeta/listado
-      images             // arreglo completo
+      imageSrc,   // principal para tarjeta/lista
+      images,     // arreglo completo
     });
 
     res.status(201).json(product);
   } catch (err) {
-    console.error('POST /api/products', err);
+    console.error('POST /api/products error:', err);
     res.status(500).json({ error: err.message || 'Error al crear producto' });
   }
 });
+
+
+
 // Endpoint opcional de salud / conteo
 router.get('/health', async (_req, res) => {
   try {
