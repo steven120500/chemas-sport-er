@@ -59,27 +59,31 @@ function uploadToCloudinary(buffer) {
 // ===== Rutas =====
 
 // Crear producto (múltiples imágenes)
-router.post('/', upload.array('images', 5), async (req, res) => {
+router.post('/', upload.any(), async (req, res) => {
   try {
-    // 1) validar imágenes
-    if (!req.files?.length) {
+    // Algunos clientes envían 'images', otros 'image'; juntamos todo
+    const files = (req.files || []).filter(f =>
+      f.fieldname === 'images' || f.fieldname === 'image'
+    );
+
+    if (!files.length) {
       return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
-    // 2) subir todas a cloudinary
-    const uploaded = await Promise.all(req.files.map(f => uploadToCloudinary(f.buffer)));
-    // normalizar [{ public_id, url }]
+    // Subir todas a cloudinary
+    const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
-    const imageSrc = images[0]?.url || ''; // principal = primera
+    const imageSrc = images[0]?.url || '';
 
-    // 3) parsear stock/sizes (llega como string en form-data)
+    // Parsear stock/sizes (form-data llega como string)
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
       else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
+      else if (typeof req.body.stock === 'object') stock = req.body.stock;
     } catch (_) { stock = {}; }
 
-    // (opcional) sanitizar tallas: filtra claves no permitidas y fuerza enteros >=0
+    // Sanitizar tallas: filtra claves no permitidas y fuerza enteros >=0
     const cleanStock = {};
     for (const [size, qty] of Object.entries(stock || {})) {
       if (!ALL_SIZES.has(String(size))) continue;
@@ -87,30 +91,28 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       cleanStock[size] = n;
     }
 
-    // 4) crear en Mongo
     const product = await Product.create({
       name: String((req.body.name || '')).trim(),
       price: Number(req.body.price),
       type:  String((req.body.type || '')).trim(),
       stock: cleanStock,
-      imageSrc,       // usada por la tarjeta/lista
-      images,         // arreglo completo de cloudinary
+      imageSrc,       // principal (compat tarjeta)
+      images,         // arreglo completo
     });
 
-    // 5) historial (no romper si falla)
+    // Historial (no bloquear si falla)
     try {
       await History.create({
         user:  whoDidIt(req),
         action:'creó producto',
         item:  `${product.name} (#${product._id})`,
         date:  new Date(),
-        details: `img: ${imageSrc}`,
+        details: `img principal: ${imageSrc}`,
       });
     } catch (e) {
-      console.warn('No se pudo guardar historial:', e.message);
+      console.warn('No se pudo guardar historial (create):', e.message);
     }
 
-    // 6) responder
     res.status(201).json(product);
   } catch (err) {
     console.error('POST /api/products error:', err);
@@ -124,35 +126,46 @@ router.put('/:id', async (req, res) => {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // parsear/limpiar posibles campos
-    const next = {
-      name: typeof req.body.name === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
-      type: typeof req.body.type === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
+    // Normalizar entradas
+    let incomingStock = req.body.stock;
+    if (typeof incomingStock === 'string') {
+      try { incomingStock = JSON.parse(incomingStock); } catch { incomingStock = undefined; }
+    }
+
+    // Limpiar/validar stock si viene
+    let nextStock = prev.stock;
+    if (incomingStock && typeof incomingStock === 'object') {
+      const clean = {};
+      for (const [size, qty] of Object.entries(incomingStock || {})) {
+        if (!ALL_SIZES.has(String(size))) continue;
+        const n = Math.max(0, Math.trunc(Number(qty) || 0));
+        clean[size] = n;
+      }
+      nextStock = clean;
+    }
+
+    const update = {
+      name:  typeof req.body.name  === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
+      type:  typeof req.body.type  === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
       price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
-      stock: prev.stock,
+      stock: nextStock,
     };
 
-    // stock (JSON)
-    try {
-      if (typeof req.body.stock === 'string') {
-        const raw = JSON.parse(req.body.stock);
-        const clean = {};
-        for (const [size, qty] of Object.entries(raw || {})) {
-          if (!ALL_SIZES.has(String(size))) continue;
-          const n = Math.max(0, Math.trunc(Number(qty) || 0));
-          clean[size] = n;
-        }
-        next.stock = clean;
-      }
-    } catch (_) { /* ignorar */ }
+    // compatibilidad con imageSrc/imageSrc2/imageAlt
+    if (req.body.imageSrc  !== undefined) update.imageSrc  = req.body.imageSrc  || '';
+    if (req.body.imageSrc2 !== undefined) update.imageSrc2 = req.body.imageSrc2 || '';
+    if (req.body.imageAlt  !== undefined) update.imageAlt  = req.body.imageAlt  || '';
+
+    // si se mandan images (array cloudinary) y quieres permitir actualizar referencias:
+    if (Array.isArray(req.body.images)) update.images = req.body.images;
 
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
-      next,
+      { $set: update },
       { new: true, runValidators: true }
     );
 
-    // historial de cambios
+    // Historial de cambios
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
       try {
@@ -161,10 +174,10 @@ router.put('/:id', async (req, res) => {
           action:'actualizó producto',
           item:  `${updated.name} (#${updated._id})`,
           date:  new Date(),
-          details: changes.join(' | ')
+          details: changes.join(' | '),
         });
       } catch (e) {
-        console.warn('No se pudo guardar historial:', e.message);
+        console.warn('No se pudo guardar historial (update):', e.message);
       }
     }
 
@@ -189,6 +202,20 @@ router.delete('/:id', async (req, res) => {
     }
 
     await product.deleteOne();
+
+    // History
+    try {
+      await History.create({
+        user:  whoDidIt(req),
+        action:'eliminó producto',
+        item:  `${product.name} (#${product._id})`,
+        date:  new Date(),
+        details: `imagenes borradas: ${product.images?.length || 0}`,
+      });
+    } catch (e) {
+      console.warn('No se pudo guardar historial (delete):', e.message);
+    }
+
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
     console.error('DELETE /api/products/:id error:', err);
@@ -206,7 +233,7 @@ router.get('/health', async (_req, res) => {
   }
 });
 
-// Listado paginado (sin campos pesados innecesarios)
+// Listado paginado
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -218,7 +245,6 @@ router.get('/', async (req, res) => {
     if (q) find.name = { $regex: q, $options: 'i' };
     if (type) find.type = type;
 
-    // PROYECCIÓN: evita mandar stock completo si no lo usás en la lista
     const projection = 'name price type imageSrc images stock createdAt';
 
     const [items, total] = await Promise.all([
@@ -231,7 +257,6 @@ router.get('/', async (req, res) => {
       Product.countDocuments(find),
     ]);
 
-    // cache cortito del navegador
     res.set('Cache-Control', 'public, max-age=20');
 
     res.json({

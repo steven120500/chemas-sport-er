@@ -20,8 +20,6 @@ import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 
-
-
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 // helper para páginas 1 ... (page-2) (page-1) [page] (page+1) (page+2) ... last
@@ -43,31 +41,26 @@ function App() {
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
- 
+
   // --- estados de paginación ---
-const [page, setPage] = useState(1);
-const [limit, setLimit] = useState(20);
-const [total, setTotal] = useState(0);
-const pages = Math.max(1, Math.ceil(total / limit));
-
-
-
-
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const pages = Math.max(1, Math.ceil(total / limit));
 
   const anyModalOpen =
-  !!selectedProduct ||
-  showAddModal ||
-  showLogin ||
-  showRegisterUserModal ||
-  showUserListModal ||
-  showHistoryModal;
+    !!selectedProduct ||
+    showAddModal ||
+    showLogin ||
+    showRegisterUserModal ||
+    showUserListModal ||
+    showHistoryModal;
 
-  
-  const [user, setUser] =useState (() => {
-    try{
+  const [user, setUser] = useState(() => {
+    try {
       const storedUser = localStorage.getItem("user");
       return storedUser ? JSON.parse(storedUser) : null;
-    }catch(error){
+    } catch (error) {
       console.error("Error parsing user from localStorage", error);
       return null;
     }
@@ -75,12 +68,10 @@ const pages = Math.max(1, Math.ceil(total / limit));
 
   const isSuperUser = user?.isSuperUser || false;
   const canSeeHistory = user?.isSuperUser || user?.roles?.includes('history');
-  const canClearHistory = user?.isSuperUser; 
+  const canClearHistory = user?.isSuperUser;
   const canAdd = user?.isSuperUser || user?.roles?.includes("add");
   const canEdit = user?.isSuperUser || user?.roles?.includes("edit");
   const canDelete = user?.isSuperUser || user?.roles?.includes("delete");
- 
-
 
   const handleLogout = () => {
     setUser(null);
@@ -89,54 +80,60 @@ const pages = Math.max(1, Math.ceil(total / limit));
   };
 
   // --- cargar productos con paginación y filtros ---
-const fetchProducts = async (opts = {}) => {
-  const p  = opts.page ?? page;
-  const q  = (opts.q ?? searchTerm).trim();
-  const tp = (opts.type ?? filterType).trim();
+  const fetchProducts = async (opts = {}) => {
+    const p  = opts.page ?? page;
+    const q  = (opts.q ?? searchTerm).trim();
+    const tp = (opts.type ?? filterType).trim();
 
-  setLoading(true);
-  try {
-    const params = new URLSearchParams({
-      page: String(p),
-      limit: String(limit),
-      ...(q  ? { q }        : {}),
-      ...(tp ? { type: tp } : {}),
-    });
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(p),
+        limit: String(limit),
+        ...(q  ? { q }        : {}),
+        ...(tp ? { type: tp } : {}),
+      });
 
-    const res = await fetch(`${API_BASE}/api/products?` + params.toString());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+      const res = await fetch(`${API_BASE}/api/products?` + params.toString());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
 
-    const json = await res.json(); // { items,total,page,pages,limit }
-    setProducts(json.items);
-    setTotal(json.total);
-    setPage(json.page);
-  } catch (e) {
-    console.error('fetchProducts error:', e);
-    setProducts([]);
-    setTotal(0);
-  } finally {
-    setLoading(false);
-  }
-};
+      const json = await res.json(); // { items,total,page,pages,limit }
+      setProducts(json.items);
+      setTotal(json.total);
+      setPage(json.page);
+    } catch (e) {
+      console.error('fetchProducts error:', e);
+      setProducts([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-useEffect(() => {
-  fetchProducts({ page, q: searchTerm, type: filterType });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [page, limit, searchTerm, filterType]);
+  useEffect(() => {
+    fetchProducts({ page, q: searchTerm, type: filterType });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, searchTerm, filterType]);
 
+  // ✅ Actualiza lista y el producto abierto en el modal
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
-      setProducts((prev) => prev.filter((p) => p._id !== deletedId));
+      setProducts(prev => prev.filter(p => String(p._id) !== String(deletedId)));
       setSelectedProduct(null);
       toast.success("Producto eliminado correctamente");
-    } else {
-      setProducts((prev) =>
-        prev.map((p) => 
-          String(p._id) === String(updatedProduct._id) ? updatedProduct : p
-        )
-      );
-      toast.success("Producto actualizado correctamente");
+      return;
     }
+
+    setProducts(prev =>
+      prev.map(p =>
+        String(p._id) === String(updatedProduct._id) ? updatedProduct : p
+      )
+    );
+
+    // Mantén el modal sincronizado con los datos nuevos
+    setSelectedProduct(updatedProduct);
+
+    toast.success("Producto actualizado correctamente");
   };
 
   const handleLoginClick = () => {
@@ -146,19 +143,15 @@ useEffect(() => {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setShowLogin(false);
-    toast.success(`Bienvenido`);
+    toast.success(Bienvenido);
   };
 
   const handleRegisterClick = () => {
-
-    
-    setShowUserDropDown(false);
+    // Si usas un dropdown, asegúrate de definir setShowUserDropDown en este componente
+    // setShowUserDropDown(false);
     setTimeout(() => {
-    setShowRegisterUserModal(true);
-    },100);
-
-
-    
+      setShowRegisterUserModal(true);
+    }, 100);
   };
 
   const filteredProducts = products.filter((product) => {
@@ -169,30 +162,28 @@ useEffect(() => {
 
   return (
     <>
-    
-
-      {showRegisterUserModal &&(
-       <RegisterUserModal
-       onClose={() => {
-        setShowRegisterUserModal(false);
-        setShowUserDropDown(false);
-
-       }}
-       />
+      {showRegisterUserModal && (
+        <RegisterUserModal
+          onClose={() => {
+            setShowRegisterUserModal(false);
+            // setShowUserDropDown(false);
+          }}
+        />
       )}
-      
+
       {showUserListModal && (
-        <UserListModal 
-        open = {showUserListModal}
-        onClose={() => setShowUserListModal(false)}/>
+        <UserListModal
+          open={showUserListModal}
+          onClose={() => setShowUserListModal(false)}
+        />
       )}
 
       {showHistoryModal && (
-        <HistoryModal 
-        open = {showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
-        isSuperUser={user?.isSuperUser == true}
-        roles={user?.roles || []}
+        <HistoryModal
+          open={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          isSuperUser={user?.isSuperUser === true}
+          roles={user?.roles || []}
         />
       )}
 
@@ -201,21 +192,17 @@ useEffect(() => {
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
       {!anyModalOpen && (
-      <Header
-        onLoginClick={handleLoginClick}
-        onLogout={handleLogout}
-        user={user}
-        isSuperUser={user?.isSuperUser}
-        setShowRegisterUserModal={setShowRegisterUserModal}
-        setShowUserListModal={setShowUserListModal}
-        setShowHistoryModal={setShowHistoryModal}
-        canSeeHistory={canSeeHistory}
-  
-        
-      />
+        <Header
+          onLoginClick={handleLoginClick}
+          onLogout={handleLogout}
+          user={user}
+          isSuperUser={user?.isSuperUser}
+          setShowRegisterUserModal={setShowRegisterUserModal}
+          setShowUserListModal={setShowUserListModal}
+          setShowHistoryModal={setShowHistoryModal}
+          canSeeHistory={canSeeHistory}
+        />
       )}
-
-      
 
       {canAdd && !anyModalOpen && (
         <button
@@ -246,6 +233,7 @@ useEffect(() => {
 
       {selectedProduct && (
         <ProductModal
+          key={`${selectedProduct._id}-${selectedProduct.updatedAt || ''}`}
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onUpdate={handleProductUpdate}
@@ -257,7 +245,7 @@ useEffect(() => {
 
       {showAddModal && (
         <AddProductModal
-        user={user}
+          user={user}
           tallaPorTipo={tallaPorTipo}
           onAdd={(newProduct) => {
             setProducts((prev) => [newProduct, ...prev]);
@@ -274,99 +262,88 @@ useEffect(() => {
           onClose={() => setShowLogin(false)}
           onLoginSuccess={(userData) => {
             setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData)); // 🔹 Guardar en localStorage
+            localStorage.setItem('user', JSON.stringify(userData));
             setShowLogin(false);
             toast.success('Bienvenido');
-            
           }}
           onRegisterClick={handleRegisterClick}
         />
       )}
 
       {showRegisterUserModal && (
-        <RegisterUserModal
-          onClose={() => setShowRegisterUserModal(false)}
-        />
+        <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
       )}
 
       {canSeeHistory && (
-
-      <button onClick={() => setShowHistory(true)}></button>
+        <button onClick={() => setShowHistoryModal(true)} style={{ display: 'none' }} />
       )}
-      
+
       {/* --- Paginación --- */}
-{pages > 1 && (
-  <div className="mt-8 flex flex-col items-center gap-3">
-    {/* Info y selector de tamaño de página */}
-    
+      {pages > 1 && (
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <nav className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="px-3 py-1 rounded border disabled:opacity-50"
+              title="Primera"
+            >
+              «
+            </button>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1 rounded border disabled:opacity-50"
+              title="Anterior"
+            >
+              Anterior
+            </button>
 
-    {/* Controles */}
-    <nav className="flex items-center justify-center gap-2">
-      <button
-        onClick={() => setPage(1)}
-        disabled={page === 1}
-        className="px-3 py-1 rounded border disabled:opacity-50"
-        title="Primera"
-      >
-        «
-      </button>
-      <button
-        onClick={() => setPage(p => Math.max(1, p - 1))}
-        disabled={page === 1}
-        className="px-3 py-1 rounded border disabled:opacity-50"
-        title="Anterior"
-      >
-        Anterior
-      </button>
+            {(() => {
+              const nums = buildPages(page, pages);
+              return nums.map((n, i) => {
+                const prev = nums[i - 1];
+                const showDots = i > 0 && n - prev > 1;
+                return (
+                  <span key={n} className="flex">
+                    {showDots && <span className="px-2">…</span>}
+                    <button
+                      onClick={() => setPage(n)}
+                      className={`px-3 py-1 rounded border ${
+                        n === page ? "bg-black text-white" : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  </span>
+                );
+              });
+            })()}
 
-      {/* Números con elipsis */}
-      {(() => {
-        const nums = buildPages(page, pages);
-        return nums.map((n, i) => {
-          const prev = nums[i - 1];
-          const showDots = i > 0 && n - prev > 1;
-          return (
-            <span key={n} className="flex">
-              {showDots && <span className="px-2">…</span>}
-              <button
-                onClick={() => setPage(n)}
-                className={`px-3 py-1 rounded border ${
-                  n === page ? "bg-black text-white" : "hover:bg-gray-100"
-                }`}
-              >
-                {n}
-              </button>
-            </span>
-          );
-        });
-      })()}
-
-      <button
-        onClick={() => setPage(p => Math.min(pages, p + 1))}
-        disabled={page === pages}
-        className="px-3 py-1 rounded border disabled:opacity-50"
-        title="Siguiente"
-      >
-        Siguiente
-      </button>
-      <button
-        onClick={() => setPage(pages)}
-        disabled={page === pages}
-        className="px-3 py-1 rounded border disabled:opacity-50"
-        title="Última"
-      >
-        »
-      </button>
-    </nav>
-  </div>
-)}
+            <button
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
+              disabled={page === pages}
+              className="px-3 py-1 rounded border disabled:opacity-50"
+              title="Siguiente"
+            >
+              Siguiente
+            </button>
+            <button
+              onClick={() => setPage(pages)}
+              disabled={page === pages}
+              className="px-3 py-1 rounded border disabled:opacity-50"
+              title="Última"
+            >
+              »
+            </button>
+          </nav>
+        </div>
+      )}
 
       <Footer />
-      {!anyModalOpen && (
-      <FloatingWhatsapp />
-      )}
+      {!anyModalOpen && <FloatingWhatsapp />}
       <ToastContainer />
-      <Toaster position="top-center" reverseOrder={false}/>
+      <Toaster position="top-center" reverseOrder={false} />
     </>
   );
 }

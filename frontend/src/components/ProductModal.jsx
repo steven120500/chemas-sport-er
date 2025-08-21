@@ -3,10 +3,8 @@ import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { toast as toastHOT } from 'react-hot-toast';
 
-// -------- Config --------
 const API_BASE = 'https://chemas-sport-er-backend.onrender.com';
 
-// -------- Datos auxiliares --------
 const TALLAS_ADULTO = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const TALLAS_NINO   = ['16', '18', '20', '22', '24', '26', '28'];
 const ACCEPTED_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
@@ -30,15 +28,13 @@ export default function ProductModal({
   const [editedType,  setEditedType]  = useState(product?.type || 'Player');
   const [loading,     setLoading]     = useState(false);
 
-  // -------- Galería (preferimos product.images) --------
+  // -------- Galería preferente (product.images) --------
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
-      // backend guarda [{ public_id, url }]
       return product.images
         .map(i => (typeof i === 'string' ? i : i?.url))
         .filter(Boolean);
     }
-    // compatibilidad con los campos viejos
     return [product?.imageSrc, product?.imageSrc2].filter(Boolean);
   }, [product]);
 
@@ -46,24 +42,27 @@ export default function ProductModal({
     galleryFromProduct.map(src => ({ src, isNew: false }))
   );
 
-  // índice actual del carrusel
   const [idx, setIdx] = useState(0);
   const hasMany = localImages.length > 1;
   const currentSrc = localImages[idx]?.src || '';
 
-  // si cambian el producto o lo actualizan desde afuera, sincronizamos
+  // Sincroniza cuando cambie el product desde afuera
   useEffect(() => {
     setViewProduct(product);
-    setEditedStock({ ...(product?.stock || {}) });
-    setEditedName(product?.name || '');
-    setEditedPrice(product?.price ?? 0);
-    setEditedType(product?.type || 'Player');
+    setEditedName(product.name || '');
+    setEditedPrice(product.price || 0);
+    setEditedType(product.type || 'Player');
+    setEditedStock({ ...(product.stock || {}) });
 
-    const g = Array.isArray(product?.images) && product.images.length > 0
-      ? product.images.map(i => (typeof i === 'string' ? i : i?.url)).filter(Boolean)
-      : [product?.imageSrc, product?.imageSrc2].filter(Boolean);
-
-    setLocalImages(g.map(src => ({ src, isNew: false })));
+    // 👇 Aquí estaba el bug: debe ser setLocalImages, no setImages
+    setLocalImages(
+      product.images?.length
+        ? product.images.map(img => ({ src: img.url, isNew: false }))
+        : [
+            ...(product.imageSrc  ? [{ src: product.imageSrc,  isNew: false }] : []),
+            ...(product.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
+          ]
+    );
     setIdx(0);
   }, [product]);
 
@@ -77,8 +76,6 @@ export default function ProductModal({
   const handleSave = async () => {
     try {
       setLoading(true);
-
-      // Este PUT actualiza nombre, precio, tipo y stock (no imágenes)
       const displayName = user?.username || user?.email || 'ChemaSportER';
 
       const res = await fetch(`${API_BASE}/api/products/${product._id}`, {
@@ -92,7 +89,7 @@ export default function ProductModal({
           name: editedName,
           price: editedPrice,
           type: editedType,
-          // si quieres mantener compatibilidad con imageSrc/imageSrc2
+          // compatibilidad con imageSrc/imageSrc2
           imageSrc:  localImages[0]?.src || null,
           imageSrc2: localImages[1]?.src || null,
           imageAlt: editedName,
@@ -102,8 +99,24 @@ export default function ProductModal({
       if (!res.ok) throw new Error('Error al actualizar');
 
       const updated = await res.json();
-      onUpdate?.(updated);            // actualiza lista externa
-      setViewProduct(updated);        // refresca dentro del modal
+
+      // 🔁 Sincroniza todo localmente para que se vea al instante
+      setViewProduct(updated);
+      setEditedName(updated.name || '');
+      setEditedPrice(updated.price ?? 0);
+      setEditedType(updated.type || 'Player');
+      setEditedStock({ ...(updated.stock || {}) });
+      setLocalImages(
+        updated.images?.length
+          ? updated.images.map(img => ({ src: img.url, isNew: false }))
+          : [
+              ...(updated.imageSrc  ? [{ src: updated.imageSrc,  isNew: false }] : []),
+              ...(updated.imageSrc2 ? [{ src: updated.imageSrc2, isNew: false }] : []),
+            ]
+      );
+      setIdx(0);
+
+      onUpdate?.(updated); // actualiza lista externa
       setIsEditing(false);
       toast.success('Producto actualizado');
     } catch (err) {
@@ -125,7 +138,7 @@ export default function ProductModal({
       });
 
       if (!res.ok) throw new Error('Error al eliminar');
-      onUpdate?.(null, product._id); // avisa afuera para quitarlo de la lista
+      onUpdate?.(null, product._id);
       toast.success('Producto eliminado');
       onClose?.();
     } catch (err) {
@@ -140,7 +153,6 @@ export default function ProductModal({
     setEditedStock(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
   };
 
-  // En edición, permitir “cambiar” imágenes de manera local (no sube)
   const handleImageChange = (e, index) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -171,8 +183,9 @@ export default function ProductModal({
     setIdx(0);
   };
 
-  // tallas a mostrar según el tipo del producto
-  const tallasVisibles = (viewProduct?.type === 'Niño') ? TALLAS_NINO : TALLAS_ADULTO;
+  // Tallas visibles (si está editando, usa el tipo editado; si no, el del producto mostrado)
+  const isNino = (isEditing ? editedType : viewProduct?.type) === 'Niño';
+  const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
   return (
     <div className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
@@ -189,7 +202,7 @@ export default function ProductModal({
           <FaTimes size={18} />
         </button>
 
-        {/* Encabezado: tipo + nombre o inputs si edición */}
+        {/* Encabezado */}
         <div className="mb-2 text-center">
           {isEditing && canEdit ? (
             <>
@@ -263,7 +276,6 @@ export default function ProductModal({
             )}
           </div>
         ) : (
-          // Edición visual de imágenes (no sube)
           <div className="flex gap-4 justify-center flex-wrap mb-4">
             {localImages.map((img, i) => (
               <div key={i} className="relative">
@@ -306,22 +318,25 @@ export default function ProductModal({
         <div className="mb-4">
           <p className="text-center font-semibold mb-2">Stock por talla:</p>
           <div className="grid grid-cols-3 gap-2">
-            {(viewProduct?.type === 'Niño' ? TALLAS_NINO : TALLAS_ADULTO).map((talla) => (
-              <div key={talla} className="text-center border rounded p-2">
-                <label className="block text-sm font-medium">{talla}</label>
-                {isEditing ? (
-                  <input
-                    type="number"
-                    min="0"
-                    className="w-full border border-gray-300 rounded px-1 text-center"
-                    value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
-                    onChange={(e) => handleStockChange(talla, e.target.value)}
-                  />
-                ) : (
-                  <p className="text-sm">{editedStock[talla] || 0} disponibles</p>
-                )}
-              </div>
-            ))}
+            {tallasVisibles.map((talla) => {
+              const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
+              return (
+                <div key={talla} className="text-center border rounded p-2">
+                  <label className="block text-sm font-medium">{talla}</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full border border-gray-300 rounded px-1 text-center"
+                      value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
+                      onChange={(e) => handleStockChange(talla, e.target.value)}
+                    />
+                  ) : (
+                    <p className="text-sm">{stockToShow[talla] || 0} disponibles</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
