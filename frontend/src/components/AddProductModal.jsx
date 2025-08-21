@@ -168,7 +168,7 @@ const dataUrlToBlob = async (dataUrl) => {
          // 👉 adjunta TODAS las imágenes como "images"
     for (let i = 0; i < images.length; i++) {
       const blob = await dataUrlToBlob(images[i].src);   // tu estado guarda {src: dataURL}
-      fd.append('images', blob, `product-${i}.webp`);
+      formData.append('images', blob, `product-${i}.webp`);
     }
 
       const res = await fetch(`${API_BASE}/api/products`, {
