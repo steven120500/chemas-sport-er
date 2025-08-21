@@ -5,10 +5,10 @@ import dotenv from 'dotenv';
 import compression from 'compression';
 
 import connectDB from './config/db.js';
-import productRoutes from './routes/productRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import pdfRoutes from './routes/pdfRoutes.js';
-import historyRoutes from './routes/historyroutes.js';
+//import productRoutes from './routes/productRoutes.js';
+//import authRoutes from './routes/authRoutes.js';
+//import pdfRoutes from './routes/pdfRoutes.js';
+//import historyRoutes from './routes/historyroutes.js';
 
 dotenv.config();
 
