@@ -64,7 +64,7 @@ await connectDB();
 app.use('/api/auth', authRoutes);
 app.use('/api', pdfRoutes);
 app.use('/api/history', historyRoutes);
-app.use('/api/products', productRoutes);
+//app.use('/api/products', productRoutes);
 
 /* -------- raíz (opcional) -------- */
 app.get('/', (_req, res) => res.send('Chema Sport ER API'));
