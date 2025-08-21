@@ -133,11 +133,17 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     setStock((prev) => ({ ...prev, [size]: parseInt(value) || 0 }));
   };
 
-  // helper: dataURL -> Blob
-const dataUrlToBlob = async (dataUrl) => {
-  const res = await fetch(dataUrl);
-  return await res.blob();
-};
+  
+// Convierte un dataURL base64 a Blob
+function dataUrlToBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',');
+  const mime = meta.match(/:(.*?);/)[1];
+  const bin = atob(b64);
+  const len = bin.length;
+  const u8 = new Uint8Array(len);
+  for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: mime });
+}
 
   // ====== Submit ======
   const handleSubmit = async (e) => {
