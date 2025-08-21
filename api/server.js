@@ -61,9 +61,9 @@ app.get('/api/ping', (_req, res) => {
 await connectDB();
 
 /* -------- rutas de la app -------- */
-app.use('/api/auth', authRoutes);
-app.use('/api', pdfRoutes);
-app.use('/api/history', historyRoutes);
+//app.use('/api/auth', authRoutes);
+//app.use('/api', pdfRoutes);
+//app.use('/api/history', historyRoutes);
 //app.use('/api/products', productRoutes);
 
 /* -------- raíz (opcional) -------- */
