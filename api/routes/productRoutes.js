@@ -7,6 +7,8 @@ import multer from 'multer';
 
 const router = express.Router();
 
+
+
 // ===== Multer (buffer en memoria) =====
 const storage = multer.memoryStorage();
 const upload  = multer({ storage });

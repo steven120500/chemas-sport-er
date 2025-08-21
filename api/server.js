@@ -1,72 +1,57 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import compression from 'compression';
-
 import connectDB from './config/db.js';
-//import productRoutes from './routes/productRoutes.js';
-//import authRoutes from './routes/authRoutes.js';
-//import pdfRoutes from './routes/pdfRoutes.js';
-//import historyRoutes from './routes/historyroutes.js';
+
+import productRoutes from './routes/productRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import pdfRoutes from './routes/pdfRoutes.js';
+import historyRoutes from './routes/historyroutes.js';
 
 dotenv.config();
 
 const app = express();
 
 /* -------- ajustes generales -------- */
-app.disable('x-powered-by');      // seguridad
-app.set('json spaces', 0);        // JSON compacto
-app.set('trust proxy', 1);        // útil en Render/Proxies
-app.use(compression());           // gzip/brotli
+app.disable('x-powered-by');                // seguridad
+app.set('json spaces', 0);                  // respuestas JSON compactas
+app.set('trust proxy', 1);                  // útil en Render/Proxies
 
-/* -------- CORS (antes de las rutas) -------- */
-const ALLOWED_ORIGINS = [
-  'https://chemas-sport-er.onrender.com', // front en Render
-  'http://localhost:5173',                // dev local
-  // Agrega aquí tu dominio propio si usas uno, ej:
-  // 'https://tu-dominio.com',
-];
+/* -------- middlewares globales -------- */
+app.use(compression());                     // gzip/brotli
 
-app.use(
-  cors({
-    origin(origin, cb) {
-      // Permitir herramientas sin Origin (curl, healthchecks)
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
-    allowedHeaders: ['Content-Type', 'x-user', 'Authorization'],
-    credentials: false, // true solo si usas cookies/sesiones
-    maxAge: 86400,      // cachea preflight por 1 día
-  })
-);
-// Por si algún proxy no reenvía OPTIONS correctamente
-app.options('*', cors());
+// Restringe origin a tu sitio (ajusta URL del front)
+app.use(cors({
+  origin: [
+    'https://chemasport-er.onrender.com',
+    'http://localhost:5173'
+  ],
+}));
 
-/* -------- body parsers -------- */
+// Si no envías imágenes en el body, 10MB es suficiente
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-/* -------- endpoints livianos de salud -------- */
+/* -------- health/ping MUY arriba y livianos -------- */
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', t: Date.now() });
 });
+
 app.get('/api/ping', (_req, res) => {
   res.json({ message: 'API ok' });
 });
 
-/* -------- conectar DB ANTES de montar rutas -------- */
+/* -------- conecta DB ANTES de montar rutas -------- */
 await connectDB();
 
 /* -------- rutas de la app -------- */
-//app.use('/api/auth', authRoutes);
-//app.use('/api', pdfRoutes);
-//app.use('/api/history', historyRoutes);
-//app.use('/api/products', productRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api', pdfRoutes);
+app.use('/api/history', historyRoutes);
+app.use('/api/products', productRoutes);
 
-/* -------- raíz (opcional) -------- */
+// raíz (opcional)
 app.get('/', (_req, res) => res.send('Chema Sport ER API'));
 
 /* -------- manejo de errores -------- */
