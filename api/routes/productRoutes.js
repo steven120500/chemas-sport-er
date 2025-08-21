@@ -3,7 +3,7 @@ import express from 'express';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
 import attachUser from '../middleware/attachUser.js'; 
-
+import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
 
 const router = express.Router();
 
@@ -147,31 +147,37 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 // Crear producto
 router.post('/', async (req, res) => {
   try {
-    const data = sanitizeAndValidate(req.body, { partial: false });
-    const newProduct = new Product(data);
-    const saved = await newProduct.save();
-  
+    const { name, price, type, stock, imagesBase64 } = req.body;
 
-    // Log de historial
-    await History.create({
-      user: whoDidIt(req),
-      action: 'creó producto',
-      item: `${saved.name} (#${saved._id})`,
-      date: new Date(),
-      details: `Stock inicial: ${JSON.stringify(saved.stock)}`
+    // Subir imágenes a Cloudinary
+    let uploadedImages = [];
+    if (imagesBase64 && imagesBase64.length > 0) {
+      for (let img of imagesBase64) {
+        const uploadRes = await cloudinary.uploader.upload(img, {
+          folder: 'chemas-sport-er/products',
+        });
+        uploadedImages.push({
+          public_id: uploadRes.public_id,
+          url: uploadRes.secure_url,
+        });
+      }
+    }
+
+    const product = new Product({
+      name,
+      price,
+      type,
+      stock,
+      images: uploadedImages,
     });
 
-    res.status(201).json({ message: 'Producto guardado', product: saved });
-  } catch (error) {
-    if (error.message === 'VALIDATION_ERROR') {
-      console.error('× Validación (POST):', error.details);
-      return res.status(400).json({ error: 'Payload inválido', details: error.details });
-    }
-    console.error('× Error al guardar producto:', error);
-    res.status(500).json({ message: 'Error al guardar producto' });
+    await product.save();
+    res.json(product);
+  } catch (err) {
+    console.error("Error al crear producto:", err);
+    res.status(500).json({ error: 'Error al crear producto' });
   }
 });
-
 
 
 // Endpoint opcional de salud / conteo
@@ -224,25 +230,20 @@ router.put('/:id', async (req, res) => {
 // Eliminar producto
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Producto no encontrado' });
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // Log de historial
-    await History.create({
-      user: whoDidIt(req),
-      action: 'eliminó producto',
-      item: `${deleted.name} (#${deleted._id})`,
-      date: new Date(),
-      details: 'Producto eliminado del inventario'
-    });
+    // Borrar imágenes de Cloudinary
+    for (let img of product.images) {
+      await cloudinary.uploader.destroy(img.public_id);
+    }
 
-    res.json({ message: 'Producto eliminado con éxito' });
-  } catch (error) {
-    console.error('× Error al eliminar producto:', error);
-    res.status(500).json({ message: 'Error al eliminar producto' });
+    await product.deleteOne();
+    res.json({ message: 'Producto eliminado' });
+  } catch (err) {
+    console.error("Error al eliminar producto:", err);
+    res.status(500).json({ error: 'Error al eliminar producto' });
   }
-
-  router.use(attachUser);
 });
 
 // Obtener productos paginados
@@ -259,7 +260,7 @@ router.get('/', async (req, res) => {
     if (type) find.type = type;
 
     // 📦 PROYECCIÓN: evita mandar stock e imágenes pesadas que no se usan
-    const projection = 'name price type imageSrc stock createdAt';
+    const projection = 'name price type imageSrc stock images createdAt';
 
     const [items, total] = await Promise.all([
       Product.find(find)
