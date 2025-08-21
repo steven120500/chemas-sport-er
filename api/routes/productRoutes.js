@@ -5,11 +5,13 @@ import History from '../models/History.js';
 import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
 import multer from 'multer';
 
+
+
 const router = express.Router();
 
 // multer manejará el archivo temporal antes de subirlo
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 
 /* ----------------------------- helpers ------------------------------ */
@@ -148,65 +150,50 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 
 /* --------------------------------- rutas --------------------------------- */
 
-// util: subir buffer a Cloudinary como promesa
-const uploadToCloudinary = (buffer) =>
-  new Promise((resolve, reject) => {
+// helper: promesa para upload_stream
+function uploadToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder: 'products', resource_type: 'image' },
       (err, result) => (err ? reject(err) : resolve(result))
     );
     stream.end(buffer);
   });
+}
 
 router.post('/', upload.array('images', 5), async (req, res) => {
   try {
     if (!req.files?.length) {
-      return res.status(400).json({ error: 'No se envió imagen' });
-    }
-    if (!req.body.name || !req.body.price || !req.body.type) {
-      return res.status(400).json({ error: 'Faltan campos obligatorios (name, price, type)' });
+      return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
     // 1) subir todas
     const uploaded = await Promise.all(
-      req.files.map((f) => uploadToCloudinary(f.buffer))
+      req.files.map(f => uploadToCloudinary(f.buffer))
     );
-    const images = uploaded.map((u) => ({ public_id: u.public_id, url: u.secure_url }));
+    const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
+    const imageSrc = images[0]?.url || ''; // principal = la primera
 
     // 2) parsear stock
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
-      else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
     } catch {}
 
-    // 3) guardar producto
+    // 3) crear
     const product = await Product.create({
-      name: String(req.body.name).trim(),
+      name: String(req.body.name || '').trim(),
       price: Number(req.body.price),
-      type: String(req.body.type).trim(),
+      type: String(req.body.type || '').trim(),
       stock,
-      images,                      // ⬅️ todas las imágenes
-      imageSrc: images[0]?.url,    // ⬅️ compatibilidad con vistas viejas
+      imageSrc,          // principal para la tarjeta/listado
+      images             // arreglo completo
     });
-
-    // opcional: history
-    try {
-      await History.create({
-        user: whoDidIt(req),
-        action: 'creó producto',
-        item: `${product.name} (#${product._id})`,
-        date: new Date(),
-        details: { images },
-      });
-    } catch (e) {
-      console.warn('No se pudo guardar historial:', e.message);
-    }
 
     res.status(201).json(product);
   } catch (err) {
-    console.error('POST /api/products error:', err);
-    res.status(500).json({ error: 'Error al crear producto' });
+    console.error('POST /api/products', err);
+    res.status(500).json({ error: err.message || 'Error al crear producto' });
   }
 });
 // Endpoint opcional de salud / conteo
