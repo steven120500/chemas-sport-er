@@ -219,7 +219,7 @@ router.get('/', async (req, res) => {
     if (type) find.type = type;
 
     // PROYECCIÓN: evita mandar stock completo si no lo usás en la lista
-    const projection = 'name price type imageSrc images createdAt';
+    const projection = 'name price type imageSrc images stock createdAt';
 
     const [items, total] = await Promise.all([
       Product.find(find)

@@ -24,7 +24,7 @@ export default function ProductModal({
   // -------- Estado base / edición --------
   const [viewProduct, setViewProduct] = useState(product);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedStock, setEditedStock] = useState({ ...(product?.stock || {}) });
+  const [editedStock, setEditedStock] = useState(product.stock || {});
   const [editedName,  setEditedName]  = useState(product?.name || '');
   const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
   const [editedType,  setEditedType]  = useState(product?.type || 'Player');
