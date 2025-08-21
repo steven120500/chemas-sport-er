@@ -168,7 +168,7 @@ router.post("/", upload.single("image"), async (req, res) => {
           name: req.body.name,
           price: req.body.price,
           type: req.body.type,
-          sizes: req.body.sizes,
+          sizes: JSON.parse(req.body.sizes),
           imageSrc: result.secure_url, // 🔹 se guarda la URL de Cloudinary
         });
 
