@@ -171,7 +171,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       }
 
       const data = await res.json();
-      toast.success("Producto guardado");
       onAdd?.(data);       // refresca lista
       onCancel?.();        // cierra modal
     } catch (err) {
