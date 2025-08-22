@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
-import historyroutes from "./routes/historyroutes";
+import historyRoutes from "./routes/historyroutes";
 import pdfRoutes from "./routes/pdfRoutes.js";
 
 
@@ -37,7 +37,7 @@ app.use(express.json());
 // ---------- RUTAS ----------
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
-app.use("/api/history", historyroutes);
+app.use("/api/history", historyRoutes);
 app.use("/api/pdfRoutes", pdfRoutes);
 
 // Ruta de prueba para verificar que el server responde
