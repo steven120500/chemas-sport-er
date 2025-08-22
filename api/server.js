@@ -79,7 +79,6 @@ app.use(cors({
   credentials: false,
   maxAge: 86400,
 }));
-app.options('*', cors());
 
 /* ---------------- Body parsers ---------------- */
 app.use(express.json({ limit: '10mb' }));
