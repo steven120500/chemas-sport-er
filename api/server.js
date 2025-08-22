@@ -44,8 +44,7 @@ app.use(
     maxAge: 86400, // cachea preflight por 1 día
   })
 );
-// Por si algún proxy no maneja bien OPTIONS
-app.options('*', cors());
+
 
 /* ------------ Health checks ligeros ------------ */
 app.get('/api/health', (_req, res) => {
