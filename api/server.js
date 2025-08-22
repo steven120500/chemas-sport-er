@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import compression from 'compression';
 
 import connectDB from './config/db.js';
+
+// RUTAS (puede que alguna esté exportando mal — por eso las inspeccionamos)
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
@@ -14,55 +16,76 @@ dotenv.config();
 
 const app = express();
 
-/* -------- ajustes generales -------- */
-app.disable('x-powered-by');        // seguridad
-app.set('json spaces', 0);          // respuestas JSON compactas
-app.set('trust proxy', 1);          // útil en Render/Proxies
+/* ---------------- Ajustes generales ---------------- */
+app.disable('x-powered-by');
+app.set('json spaces', 0);
+app.set('trust proxy', 1);
+app.use(compression());
 
-/* ===== Parche de diagnóstico: loguea cada app.use(path, ...) ===== */
+/* ---------------- Parche de diagnóstico ---------------- */
+// Loggear todo montaje de middlewares/rutas.
 const _use = app.use.bind(app);
 app.use = (...args) => {
   const first = args[0];
   if (typeof first === 'string') {
-    console.log('Montando ruta:', first);
+    console.log('>> app.use(PATH):', first);
   } else {
-    console.log('Montando middleware sin path (global).');
+    console.log('>> app.use(GLOBAL middleware)');
   }
   return _use(...args);
 };
-/* ===== Fin parche diagnóstico ===== */
 
-/* -------- middlewares globales -------- */
-app.use(compression());
+// Pequeña utilidad para inspeccionar routers antes de montarlos
+function dumpRouter(label, r) {
+  const type = typeof r;
+  const name = r?.constructor?.name;
+  const stackLen = Array.isArray(r?.stack) ? r.stack.length : 'n/a';
+  console.log(`\n[ROUTER ${label}] typeof=${type} ctor=${name} stackLen=${stackLen}`);
 
-/* -------- CORS (ajusta tu dominio del front) -------- */
+  if (Array.isArray(r?.stack)) {
+    try {
+      const paths = r.stack
+        .map(l => {
+          // layer.route?.path para rutas, layer.regexp para middlewares montados dentro
+          const p = l?.route?.path ?? l?.regexp?.toString?.() ?? '(layer)';
+          const methods = l?.route ? Object.keys(l.route.methods || {}) : [];
+          return `${methods.join(',').toUpperCase() || 'MW'}  ${p}`;
+        })
+        .slice(0, 50); // no spamear
+      console.log(`[ROUTER ${label}] layers:\n - ` + paths.join('\n - '));
+    } catch (e) {
+      console.log(`[ROUTER ${label}] error al listar stack:`, e.message);
+    }
+  } else {
+    console.log(`[ROUTER ${label}] no tiene stack (¿export default router faltante?)`);
+  }
+}
+
+/* ---------------- CORS (antes de rutas) ---------------- */
 const ALLOWED_ORIGINS = [
   'https://chemasport-er.onrender.com', // tu front en Render (sin guion)
-  'http://localhost:5173',              // dev local
+  'http://localhost:5173',               // dev local
 ];
 
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      // Permite herramientas sin Origin (curl, healthchecks, etc.)
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-user', 'x-roles', 'x-super'],
-    credentials: false,
-    maxAge: 86400, // cache preflight 1 día
-  })
-);
-// asegura respuesta a preflight aunque algún proxy no reenvíe bien
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // curl/healthchecks
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    console.warn('CORS bloqueado para Origin:', origin);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-user', 'x-roles', 'x-super'],
+  credentials: false,
+  maxAge: 86400,
+}));
 app.options('*', cors());
 
-/* -------- body parsers -------- */
+/* ---------------- Body parsers ---------------- */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-/* -------- endpoints de salud -------- */
+/* ---------------- Endpoints de salud ---------------- */
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', t: Date.now() });
 });
@@ -70,30 +93,54 @@ app.get('/api/ping', (_req, res) => {
   res.json({ message: 'API ok' });
 });
 
-/* -------- conectar DB ANTES de montar rutas -------- */
+/* ---------------- Conectar DB antes de rutas ---------------- */
 await connectDB();
 
-console.log('authRoutes:', authRoutes);
-console.log('pdfRoutes:', pdfRoutes);
-console.log('historyRoutes:', historyRoutes);
-console.log('productRoutes:', productRoutes);
+/* ---------------- DUMPs de routers antes de montar ---------------- */
+dumpRouter('authRoutes', authRoutes);
+dumpRouter('pdfRoutes', pdfRoutes);
+dumpRouter('historyRoutes', historyRoutes);
+dumpRouter('productRoutes', productRoutes);
 
-/* -------- rutas de la app -------- */
-app.use('/api/auth', authRoutes);
-app.use('/api', pdfRoutes);
-app.use('/api/history', historyRoutes);
-app.use('/api/products', productRoutes);
+/* ---------------- Montaje de rutas (con try/catch) ---------------- */
+try {
+  app.use('/api/auth', authRoutes);
+  console.log('Montado: /api/auth');
+} catch (e) {
+  console.error('Fallo montando /api/auth:', e);
+}
 
-/* -------- raíz (opcional) -------- */
+try {
+  app.use('/api', pdfRoutes);
+  console.log('Montado: /api (pdfRoutes)');
+} catch (e) {
+  console.error('Fallo montando /api (pdfRoutes):', e);
+}
+
+try {
+  app.use('/api/history', historyRoutes);
+  console.log('Montado: /api/history');
+} catch (e) {
+  console.error('Fallo montando /api/history:', e);
+}
+
+try {
+  app.use('/api/products', productRoutes);
+  console.log('Montado: /api/products');
+} catch (e) {
+  console.error('Fallo montando /api/products:', e);
+}
+
+/* ---------------- Raíz opcional ---------------- */
 app.get('/', (_req, res) => res.send('Chema Sport ER API'));
 
-/* -------- manejo de errores -------- */
+/* ---------------- Manejo de errores ---------------- */
 app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 app.use((err, _req, res, _next) => {
-  console.error(err.stack);
+  console.error('ERROR middleware:', err.stack || err);
   res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-/* -------- levantar -------- */
+/* ---------------- Levantar ---------------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
