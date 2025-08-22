@@ -10,8 +10,6 @@ const router = express.Router();
 /* ================== Multer (buffers en memoria) ================== */
 const upload = multer({ storage: multer.memoryStorage() });
 
-console.log('[productRoutes] cargando');
-
 /* ================== Helpers / Constantes ================== */
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
@@ -55,21 +53,41 @@ const uploadToCloudinary = (buffer) =>
 
 /* ================== Rutas ================== */
 
-/** GET /api/products?Page&limit&q&type  (listado paginado + filtros) */
-// Listado paginado de productos
+/** GET /api/products/health  (ping rápido + conteo) */
+router.get('/health', async (_req, res) => {
+  try {
+    const count = await Product.countDocuments();
+    res.json({ ok: true, count });
+  } catch {
+    res.status(500).json({ ok: false });
+  }
+});
+
+/** GET /api/products?Page=&limit=&q=&type=  (listado paginado + filtros) */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const q     = (req.query.q || '').trim();
+    const type  = (req.query.type || '').trim();
+
+    const find = {};
+    if (q) find.name = { $regex: q, $options: 'i' };
+    if (type) find.type = type;
+
+    const projection = 'name price type imageSrc images stock createdAt';
 
     const [items, total] = await Promise.all([
-      Product.find({})
+      Product.find(find)
+        .select(projection)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-      Product.countDocuments(),
+      Product.countDocuments(find),
     ]);
+
+    res.set('Cache-Control', 'public, max-age=20');
 
     res.json({
       items,
@@ -81,15 +99,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('GET /api/products error:', err);
     res.status(500).json({ error: 'Error al obtener los productos' });
-  }
-});
-/** GET /api/products/health  (ping rápido + conteo) */
-router.get('/health', async (_req, res) => {
-  try {
-    const count = await Product.countDocuments();
-    res.json({ ok: true, count });
-  } catch {
-    res.status(500).json({ ok: false });
   }
 });
 
@@ -152,7 +161,7 @@ router.post('/', upload.any(), async (req, res) => {
   }
 });
 
-/** PUT /api/products/:id  (actualiza campos básicos e imagenes referenciadas) */
+/** PUT /api/products/:id  (actualiza campos básicos e imágenes referenciadas) */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
