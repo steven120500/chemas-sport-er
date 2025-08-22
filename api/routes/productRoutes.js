@@ -10,6 +10,8 @@ const router = express.Router();
 /* ================== Multer (buffers en memoria) ================== */
 const upload = multer({ storage: multer.memoryStorage() });
 
+console.log('[productRoutes] cargando');
+
 /* ================== Helpers / Constantes ================== */
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
