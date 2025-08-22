@@ -62,23 +62,23 @@ function dumpRouter(label, r) {
 }
 
 /* ---------------- CORS (antes de rutas) ---------------- */
+
 const ALLOWED_ORIGINS = [
-  'https://chemasport-er.onrender.com', // tu front en Render (sin guion)
-  'http://localhost:5173',               // dev local
+  'https://chemasport-er.onrender.com', // SIN guion
+  'http://localhost:5173',
 ];
 
+// CORS global (antes de las rutas)
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // curl/healthchecks
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    console.warn('CORS bloqueado para Origin:', origin);
-    return cb(new Error('Not allowed by CORS'));
-  },
+  origin: ALLOWED_ORIGINS,              // <- lista directa
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-user', 'x-roles', 'x-super'],
-  credentials: false,
+  allowedHeaders: ['Content-Type','x-user','x-roles','x-super'],
+  credentials: false,                   // true solo si usas cookies
   maxAge: 86400,
 }));
+
+// Si quieres permitir preflight explícito (no uses '*')
+app.options(/.*/, cors());
 
 /* ---------------- Body parsers ---------------- */
 app.use(express.json({ limit: '10mb' }));
