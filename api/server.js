@@ -73,6 +73,11 @@ app.get('/api/ping', (_req, res) => {
 /* -------- conectar DB ANTES de montar rutas -------- */
 await connectDB();
 
+console.log('authRoutes:', authRoutes);
+console.log('pdfRoutes:', pdfRoutes);
+console.log('historyRoutes:', historyRoutes);
+console.log('productRoutes:', productRoutes);
+
 /* -------- rutas de la app -------- */
 app.use('/api/auth', authRoutes);
 app.use('/api', pdfRoutes);
