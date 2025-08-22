@@ -56,37 +56,33 @@ const uploadToCloudinary = (buffer) =>
 /* ================== Rutas ================== */
 
 /** GET /api/products?Page&limit&q&type  (listado paginado + filtros) */
+// Listado paginado de productos
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
-    const q     = (req.query.q || '').trim();
-    const type  = (req.query.type || '').trim();
-
-    const find = {};
-    if (q) find.name = { $regex: q, $options: 'i' };
-    if (type) find.type = type;
-
-    const projection = 'name price type imageSrc images stock createdAt';
 
     const [items, total] = await Promise.all([
-      Product.find(find)
-        .select(projection)
+      Product.find({})
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-      Product.countDocuments(find),
+      Product.countDocuments(),
     ]);
 
-    res.set('Cache-Control', 'public, max-age=20');
-    res.json({ items, total, page, pages: Math.ceil(total / limit), limit });
+    res.json({
+      items,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      limit,
+    });
   } catch (err) {
     console.error('GET /api/products error:', err);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
-
 /** GET /api/products/health  (ping rápido + conteo) */
 router.get('/health', async (_req, res) => {
   try {
