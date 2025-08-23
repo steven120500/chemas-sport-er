@@ -142,7 +142,7 @@ export default function ProductModal({
 
       onUpdate?.(updated); // actualiza lista externa
       setIsEditing(false);
-      toast.success('Producto actualizado');
+      
     } catch (err) {
       console.error(err);
       toast.error('Hubo un problema al actualizar el producto');
@@ -176,7 +176,7 @@ export default function ProductModal({
       }
 
       onUpdate?.(null, id);
-      toast.success('Producto eliminado');
+      
       onClose?.();
     } catch (err) {
       console.error(err);

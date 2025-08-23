@@ -30,6 +30,9 @@ function buildPages(page, pages) {
     .sort((a, b) => a - b);
 }
 
+// ✅ Normaliza el id (_id o id) a string
+const getPid = (p) => String(p?._id ?? p?.id ?? '');
+
 function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,7 @@ function App() {
         ...(tp ? { type: tp } : {}),
       });
 
-      const res = await fetch(`${API_BASE}/api/products?` + params.toString());
+      const res = await fetch(`${API_BASE}/api/products? + params.toString()`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
 
       const json = await res.json(); // { items,total,page,pages,limit }
@@ -118,20 +121,20 @@ function App() {
   // ✅ Actualiza lista y el producto abierto en el modal
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
-      setProducts(prev => prev.filter(p => String(p._id) !== String(deletedId)));
+      setProducts(prev => prev.filter(p => getPid(p) !== String(deletedId)));
       setSelectedProduct(null);
       toast.success("Producto eliminado correctamente");
       return;
     }
 
     setProducts(prev =>
-      prev.map(p =>
-        String(p._id) === String(updatedProduct._id) ? updatedProduct : p
-      )
+      prev.map(p => (getPid(p) === getPid(updatedProduct) ? { ...p, ...updatedProduct } : p))
     );
 
     // Mantén el modal sincronizado con los datos nuevos
-    setSelectedProduct(updatedProduct);
+    setSelectedProduct(prev =>
+      prev && getPid(prev) === getPid(updatedProduct) ? { ...prev, ...updatedProduct } : prev
+    );
 
     toast.success("Producto actualizado correctamente");
   };
@@ -143,7 +146,7 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setShowLogin(false);
-    toast.success(Bienvenido);
+    toast.success('Bienvenido');
   };
 
   const handleRegisterClick = () => {
@@ -224,7 +227,7 @@ function App() {
       <div className="px-4 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.map((product) => (
           <ProductCard
-            key={product._id}
+            key={getPid(product)}
             product={product}
             onClick={() => setSelectedProduct(product)}
           />
@@ -233,7 +236,7 @@ function App() {
 
       {selectedProduct && (
         <ProductModal
-          key={`${selectedProduct._id}-${selectedProduct.updatedAt || ''}`}
+          key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onUpdate={handleProductUpdate}
