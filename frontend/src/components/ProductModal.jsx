@@ -297,13 +297,13 @@ export default function ProductModal({
               <>
                 <button
                   onClick={() => setIdx(i => (i - 1 + localImages.length) % localImages.length)}
-                  className="absolute left-0 z-10 bg-white/70 hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
+                  className="absolute left-0 z-10 bg-white hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
                 >
                   &#8592;
                 </button>
                 <button
                   onClick={() => setIdx(i => (i + 1) % localImages.length)}
-                  className="absolute right-0 z-10 bg-white/70 hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
+                  className="absolute right-0 z-10 bg-white hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
                 >
                   &#8594;
                 </button>
@@ -311,7 +311,7 @@ export default function ProductModal({
                   {localImages.map((_, i) => (
                     <span
                       key={i}
-                      className={`w-2 h-2 rounded-full ${i === idx ? 'bg-black' : 'bg-black/40'}`}
+                      className={`w-2 h-2 rounded-full ${i === idx ? 'bg-white' : 'bg-black/40'}`}
                     />
                   ))}
                 </div>
