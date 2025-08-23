@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 import History from '../models/History.js';
 import attachUser from '../middleware/attachUser.js'; 
 import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
+import multer from 'multer';
 
 const router = express.Router();
 
@@ -167,7 +168,7 @@ router.post("/", upload.single("image"), async (req, res) => {
           name: req.body.name,
           price: req.body.price,
           type: req.body.type,
-          sizes: req.body.sizes,
+          sizes: JSON.parse(req.body.sizes),
           imageSrc: result.secure_url, // 🔹 se guarda la URL de Cloudinary
         });
 

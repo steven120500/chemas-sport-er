@@ -123,55 +123,33 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   };
 
   // ---- Submit (una sola vez) ----
-  const handleSubmit = async () => {
-    if (loading) return; // guard
-    if (!name.trim() || !price || images.length === 0) {
-      toast.error('Todos los campos e imagen (mínimo 1) son obligatorios.');
-      return;
-    }
-
-    setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+  
     try {
-      const imageSrc = images[0]?.src || null;
-      const imageSrc2 = images[1]?.src || null;
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("price", price);
+      formData.append("type", type);
+      formData.append("sizes", JSON.stringify(stock)); // si stock es objeto
+      if (images.length > 0) {
+        formData.append("image", images[0]); // solo 1 imagen, si querés varias hacé un loop
+      }
   
-      const displayName = user?.username || user?.email || 'ChemaSportER'; // superusuario por defecto
-      const token = user?.token;
-  
-      const headers = {
-        'Content-Type': 'application/json',
-        'x-user': displayName,
-      };
-      if (token) headers.Authorization = `Bearer ${token}`;
-  
-      const response = await fetch('https://chemas-sport-er-backend.onrender.com/api/products', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: name.trim(),
-          price,
-          type,
-          stock,
-          imageSrc,
-          imageSrc2,
-          imageAlt: name.trim(),
-        }),
+      const res = await fetch("https://chemas-sport-er-backend.onrender.com/api/products", {
+        method: "POST",
+        body: formData,
       });
-
-      if (!response.ok) throw new Error('Falló al guardar en el servidor');
-
-      const data = await response.json();
-      onAdd?.(data.product); // ← solo el objeto del producto
-      
-
-      // limpiar/cerrar
-      setImages([]); setName(''); setPrice(''); setType('Player'); setStock({});
-      onCancel?.();
+  
+      if (!res.ok) throw new Error("Error al guardar producto");
+      const data = await res.json();
+  
+      console.log("Producto guardado:", data);
+      onAdd(data); // para refrescar lista
+      onCancel(); // cerrar modal
     } catch (err) {
-      console.error('Error al agregar el producto:', err);
-      toast.error(err.message || 'Error al agregar el producto');
-    } finally {
-      setLoading(false);
+      console.error(err);
+      alert("Error guardando el producto");
     }
   };
 
