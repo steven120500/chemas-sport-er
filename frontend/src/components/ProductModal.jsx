@@ -103,6 +103,11 @@ export default function ProductModal({
         name: (editedName || '').trim(),
         price: priceInt,
         type: (editedType || '').trim(),
+
+        // 👉 CLAVE: mandamos también el arreglo de imágenes para que el backend reemplace
+        images: localImages.map(i => i?.src).filter(Boolean),
+
+        // compat con tu backend actual (no estorba)
         imageSrc:  typeof localImages[0]?.src === 'string' ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === 'string' ? localImages[1].src : null,
         imageAlt: (editedName || '').trim(),
@@ -176,7 +181,6 @@ export default function ProductModal({
       }
 
       onUpdate?.(null, id);
-      
       onClose?.();
     } catch (err) {
       console.error(err);
@@ -203,7 +207,9 @@ export default function ProductModal({
     reader.onload = () => {
       setLocalImages(prev => {
         const copy = prev.slice();
-        copy[index] = { src: reader.result, isNew: true };
+        // si index está fuera (p.e. agregando 2da imagen), hacemos push
+        if (index >= copy.length) copy.push({ src: reader.result, isNew: true });
+        else copy[index] = { src: reader.result, isNew: true };
         return copy;
       });
       setIdx(index);
