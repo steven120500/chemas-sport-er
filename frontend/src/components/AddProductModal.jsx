@@ -187,6 +187,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         return;
       }
 
+      const displayName = user?.username || 'ChemaSportER';
+
       const formData = new FormData();
       formData.append("name", name.trim());
       formData.append("price", String(price).trim());
@@ -203,6 +205,9 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
       const res = await fetch(`${API_BASE}/api/products`, {
         method: "POST",
+        headers:{
+          'x-user':displayName,
+        },
         body: formData, // NO pongas Content-Type aquí
       });
 
@@ -227,11 +232,11 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 overflow-y-auto"
+      className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6"
       onDrop={handleImageDrop}
       onDragOver={handleDragOver}
     >
-      <div className="bg-white mt-20 pt-15 rounded-lg max-w-md w-full shadow-lg overflow-y-auto scrollbar-thin relative p-6">
+      <div className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
         <button onClick={onCancel} className="absolute top-6 right-2 text-white hover:text-gray-800 bg-black rounded p-1">
           <FaTimes size={18} />
         </button>

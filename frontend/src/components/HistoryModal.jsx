@@ -1,24 +1,16 @@
-// src/components/HistoryModal.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaTimes } from "react-icons/fa";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
-/* --- util de fecha local --- */
+/* --- util fecha local --- */
 function pad2(n){ return n < 10 ? `0${n}` : `${n}`; }
 function ymdLocal(d = new Date()){
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
   const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;  // YYYY-MM-DD local
-}
-/* >>> Ajuste clave: sumar días a un YYYY-MM-DD (en local) */
-function addDaysYmd(ymd, days){
-  const [y, m, d] = ymd.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + days);
-  return ymdLocal(dt);
+  return `${y}-${m}-${dd}`;  // YYYY-MM-DD en tu zona horaria
 }
 
 export default function HistoryModal({ open, onClose, isSuperUser = false }) {
@@ -29,8 +21,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [q, setQ] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => ymdLocal());
 
-  const dateInputRef = useRef(null);
-
   const storedUser = useMemo(() => {
     try {
       const raw = localStorage.getItem("user");
@@ -40,6 +30,12 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
   }, []);
 
+  // Asegura que al ABRIR el modal, la fecha sea hoy local
+  useEffect(() => {
+    if (open) setSelectedDate(ymdLocal());
+  }, [open]);
+
+  // Carga historial cuando cambia fecha o se abre
   useEffect(() => {
     if (!open) return;
     let aborted = false;
@@ -53,9 +49,8 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         const params = new URLSearchParams({
           page: "1",
           limit: "500",
-          // >>> Aquí mandamos la fecha +1 día para compensar el rango UTC del backend
-          date: addDaysYmd(selectedDate, 1),
-          _: String(Date.now()),
+          date: selectedDate,          // 👈 ya NO sumamos +1
+          _: String(Date.now()),       // evita cache
         });
 
         const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
@@ -140,14 +135,13 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   if (!open) return null;
 
   return (
-    <div className="mt-36 mb-28 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
+    <div className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
         {/* Header con calendario dentro */}
         <div className="flex items-center gap-2 pb-4 border-b">
           <h2 className="text-lg font-semibold flex-1">Historial</h2>
 
           <input
-            ref={dateInputRef}
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value || ymdLocal())}

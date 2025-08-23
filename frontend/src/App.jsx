@@ -97,7 +97,8 @@ function App() {
         ...(tp ? { type: tp } : {}),
       });
 
-      const res = await fetch(`${API_BASE}/api/products? + params.toString()`);
+      // 🔧 FIX: interpolación correcta
+      const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
 
       const json = await res.json(); // { items,total,page,pages,limit }
@@ -150,8 +151,6 @@ function App() {
   };
 
   const handleRegisterClick = () => {
-    // Si usas un dropdown, asegúrate de definir setShowUserDropDown en este componente
-    // setShowUserDropDown(false);
     setTimeout(() => {
       setShowRegisterUserModal(true);
     }, 100);
@@ -169,7 +168,6 @@ function App() {
         <RegisterUserModal
           onClose={() => {
             setShowRegisterUserModal(false);
-            // setShowUserDropDown(false);
           }}
         />
       )}
