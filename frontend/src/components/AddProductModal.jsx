@@ -232,7 +232,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       onDragOver={handleDragOver}
     >
       <div className="bg-white mt-20 pt-15 rounded-lg max-w-md w-full shadow-lg overflow-y-auto scrollbar-thin relative p-6">
-        <button onClick={onCancel} className="absolute pt-15 top-6 right-2 text-white text-white-500 hover:text-gray-800 bg-black rounded-full p-1">
+        <button onClick={onCancel} className="absolute top-6 right-2 text-white hover:text-gray-800 bg-black rounded p-1">
           <FaTimes size={18} />
         </button>
 
