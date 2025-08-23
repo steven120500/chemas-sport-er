@@ -133,6 +133,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     setStock((prev) => ({ ...prev, [size]: parseInt(value) || 0 }));
   };
 
+  // helper: dataURL -> Blob
+const dataUrlToBlob = async (dataUrl) => {
+  const res = await fetch(dataUrl);
+  return await res.blob();
+};
+
   // ====== Submit ======
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,8 +163,13 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("type", type.trim());
       formData.append("stock", JSON.stringify(stock)); // el backend acepta 'stock' o 'sizes'
 
-      // una sola imagen (si querés múltiples, hacé un loop con image[0], image[1], ...)
-      formData.append("image", images[0].blob, "product.webp");
+      
+
+         // 👉 adjunta TODAS las imágenes como "images"
+    for (let i = 0; i < images.length; i++) {
+      const blob = await dataUrlToBlob(images[i].src);   // tu estado guarda {src: dataURL}
+      formData.append('images', blob, `product-${i}.webp`);
+    }
 
       const res = await fetch(`${API_BASE}/api/products`, {
         method: "POST",
@@ -171,7 +182,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       }
 
       const data = await res.json();
-      toast.success("Producto guardado");
       onAdd?.(data);       // refresca lista
       onCancel?.();        // cierra modal
     } catch (err) {

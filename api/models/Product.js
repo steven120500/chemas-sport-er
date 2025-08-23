@@ -1,24 +1,28 @@
+// models/Product.js
 import mongoose from 'mongoose';
 
-// -------------------- Tallas --------------------
-const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
-const KID_SIZES = ['16', '18', '20', '22', '24', '26', '28'];
-const ALL_SIZES = new Set([...ADULT_SIZES, ...KID_SIZES]);
+// -------- Tallas ----------
+const ADULT_SIZES = ['S','M','L','XL','XXL','3XL','4XL'];
+const KID_SIZES   = ['16','18','20','22','24','26','28'];
+const ALL_SIZES   = new Set([ ...ADULT_SIZES, ...KID_SIZES ]);
 
-// -------------------- Límite imágenes Base64 --------------------
-const MAX_IMAGE_BASE64_LEN = 15_000_000; // ~15MB en string base64
-
-// -------------------- Validadores --------------------
-const imageValidator = {
+// --------- Validadores ----------
+/**
+ * Acepta:
+ *  - null/undefined
+ *  - data URL base64 (compatibilidad vieja)
+ *  - http(s) URL (Cloudinary)
+ */
+const imageAnyValidator = {
   validator(v) {
-    if (v == null) return true; // puede ser null
+    if (v == null) return true;
     if (typeof v !== 'string') return false;
-    if (v.length > MAX_IMAGE_BASE64_LEN) return false;
-
-    // Acepta png/jpg/jpeg/webp/heic en base64
-    return /^data:image\/(png|jpe?g|webp|heic);base64,/i.test(v);
+    const isData = /^data:image\/(png|jpe?g|webp|heic);base64,/i.test(v);
+    const isHttp = /^https?:\/\//i.test(v);
+    return isData || isHttp;
   },
-  message: 'Imagen inválida o demasiado grande (máx ~15MB, formatos: png/jpg/jpeg/webp/heic).'
+  message:
+    'Imagen inválida: debe ser data URL base64 o una URL http(s) (Cloudinary).'
 };
 
 const stockValidator = {
@@ -31,34 +35,39 @@ const stockValidator = {
     }
     return true;
   },
-  message: 'Stock inválido. Debe ser un objeto { talla: cantidad>=0 } con tallas válidas.'
+  message:
+    'Stock inválido. Debe ser un objeto { talla: cantidad>=0 } con tallas válidas.'
 };
 
-// -------------------- Sub-schema para Cloudinary --------------------
-const ImageSchema = new mongoose.Schema({
-  public_id: { type: String }, // ID en Cloudinary
-  url: { type: String },       // secure_url de Cloudinary
-}, { _id: false });
+// --------- Sub‑schema para Cloudinary ----------
+const ImageSchema = new mongoose.Schema(
+  {
+    public_id: { type: String, trim: true },
+    url:       { type: String, trim: true } // secure_url de Cloudinary
+  },
+  { _id: false }
+);
 
-// -------------------- Product Schema --------------------
-const productSchema = new mongoose.Schema({
-  name:   { type: String, required: true, trim: true, maxlength: 150 },
-  price:  { type: Number, required: true, min: 0 },
-  type:   { type: String, required: true, trim: true, maxlength: 40 },
+// --------- Schema principal ----------
+const productSchema = new mongoose.Schema(
+  {
+    name:  { type: String, required: true, trim: true, maxlength: 150 },
+    price: { type: Number, required: true, min: 0 },
+    type:  { type: String, required: true, trim: true, maxlength: 40 },
 
-  // Compatibilidad con tu sistema actual
-  imageSrc:  { type: String, trim: true, maxlength: 150, validate: imageValidator },
-  imageSrc2: { type: String, trim: true, maxlength: 150, validate: imageValidator },
+    // Compatibilidad con el sistema actual (ahora puede ser URL http(s)):
+    imageSrc: { type: String, trim: true, maxlength: 600, validate: imageAnyValidator },
 
-  // Nuevo: imágenes subidas a Cloudinary
-  images: [ImageSchema], 
+    // Nuevo: imágenes subidas a Cloudinary
+    images: [ImageSchema],
 
-  // Stock
-  stock: { type: Object, required: true, validate: stockValidator }
-}, { timestamps: true });
+    // Stock
+    stock: { type: Object, required: true, validate: stockValidator }
+  },
+  { timestamps: true }
+);
 
-// -------------------- Hooks --------------------
-// Redondea precio a entero si viene con decimales
+// --------- Hooks ----------
 productSchema.pre('validate', function (next) {
   if (typeof this.price === 'number' && Number.isFinite(this.price)) {
     this.price = Math.trunc(this.price);
@@ -66,17 +75,17 @@ productSchema.pre('validate', function (next) {
   next();
 });
 
-// -------------------- Índices --------------------
+// --------- Índices útiles ----------
 productSchema.index({ createdAt: -1 });
 productSchema.index({ name: 1 });
 productSchema.index({ type: 1 });
 productSchema.index({ type: 1, createdAt: -1 });
 
-// -------------------- Limpieza salida JSON --------------------
+// --------- Limpieza salida JSON ----------
 productSchema.set('toJSON', {
   virtuals: false,
   versionKey: false,
-  transform: (doc, ret) => {
+  transform: (_doc, ret) => {
     ret.id = String(ret._id);
     delete ret._id;
     return ret;

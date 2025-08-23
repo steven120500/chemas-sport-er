@@ -148,78 +148,67 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 
 /* --------------------------------- rutas --------------------------------- */
 
-// Crear producto
-router.post('/', upload.single('image'), async (req, res) => {
+// util: subir buffer a Cloudinary como promesa
+const uploadToCloudinary = (buffer) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'products', resource_type: 'image' },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    stream.end(buffer);
+  });
+
+router.post('/', upload.array('images', 5), async (req, res) => {
   try {
-    // 1) Validaciones básicas
-    if (!req.file) {
+    if (!req.files?.length) {
       return res.status(400).json({ error: 'No se envió imagen' });
     }
     if (!req.body.name || !req.body.price || !req.body.type) {
       return res.status(400).json({ error: 'Faltan campos obligatorios (name, price, type)' });
     }
 
-    // 2) Subir a Cloudinary usando stream (promisificado)
-    const uploadToCloudinary = (buffer) =>
-      new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: 'products', resource_type: 'image' },
-          (err, result) => {
-            if (err) return reject(err);
-            resolve(result);
-          }
-        );
-        stream.end(buffer);
-      });
+    // 1) subir todas
+    const uploaded = await Promise.all(
+      req.files.map((f) => uploadToCloudinary(f.buffer))
+    );
+    const images = uploaded.map((u) => ({ public_id: u.public_id, url: u.secure_url }));
 
-    const cld = await uploadToCloudinary(req.file.buffer); // { secure_url, public_id, ... }
-
-    // 3) Parsear stock/sizes (viene como string en multipart)
+    // 2) parsear stock
     let stock = {};
     try {
-      if (typeof req.body.stock === 'string') {
-        stock = JSON.parse(req.body.stock);
-      } else if (typeof req.body.sizes === 'string') {
-        stock = JSON.parse(req.body.sizes);
-      }
-    } catch (_) {
-      // si no parsea, lo dejamos vacío
-      stock = {};
-    }
+      if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
+      else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
+    } catch {}
 
-    // 4) Crear producto en Mongo
+    // 3) guardar producto
     const product = await Product.create({
       name: String(req.body.name).trim(),
       price: Number(req.body.price),
       type: String(req.body.type).trim(),
-      stock,                         // { S: n, M: n, ... }
-      imageSrc: cld.secure_url,      // URL de Cloudinary
-      // opcional: si agregaste esquema images []
-      // images: [{ public_id: cld.public_id, url: cld.secure_url }],
+      stock,
+      images,                      // ⬅️ todas las imágenes
+      imageSrc: images[0]?.url,    // ⬅️ compatibilidad con vistas viejas
     });
 
-    // 5) Guardar en historial
+    // opcional: history
     try {
       await History.create({
         user: whoDidIt(req),
         action: 'creó producto',
         item: `${product.name} (#${product._id})`,
         date: new Date(),
-        details: { image: cld.secure_url, public_id: cld.public_id },
+        details: { images },
       });
     } catch (e) {
-      // no rompemos si falla el historial
       console.warn('No se pudo guardar historial:', e.message);
     }
 
-    // 6) Responder
     res.status(201).json(product);
   } catch (err) {
     console.error('POST /api/products error:', err);
     res.status(500).json({ error: 'Error al crear producto' });
   }
 });
-
 // Endpoint opcional de salud / conteo
 router.get('/health', async (_req, res) => {
   try {
