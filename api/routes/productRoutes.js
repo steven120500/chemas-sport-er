@@ -2,14 +2,10 @@
 import express from 'express';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
+import attachUser from '../middleware/attachUser.js'; 
 import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
-import multer from 'multer';
 
 const router = express.Router();
-
-// multer manejará el archivo temporal antes de subirlo
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
 
 
 /* ----------------------------- helpers ------------------------------ */
@@ -149,50 +145,40 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 /* --------------------------------- rutas --------------------------------- */
 
 // Crear producto
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No se envió imagen' });
-    if (!req.body.name || !req.body.price || !req.body.type)
-      return res.status(400).json({ error: 'Faltan campos obligatorios (name, price, type)' });
+    const { name, price, type, stock, imagesBase64 } = req.body;
 
-    // 1) subir SOLO una vez
-    const cld = await uploadToCloudinary(req.file.buffer); // { secure_url, public_id, ... }
-
-    // 2) parsear stock si viene como string
-    let stock = {};
-    try {
-      if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
-      else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
-    } catch (_) {}
-
-    // 3) crear producto
-    const product = await Product.create({
-      name : String(req.body.name).trim(),
-      price: Number(req.body.price),
-      type : String(req.body.type).trim(),
-      stock,
-      imageSrc: cld.secure_url,            // o images: [{ public_id: cld.public_id, url: cld.secure_url }]
-    });
-
-    // 4) historial (no romper si falla)
-    try {
-      await History.create({
-        user: req.user?.name || req.headers['x-user'] || 'Sistema',
-        action: 'creó producto',
-        item: `${product.name} (#${product._id})`,
-        date: new Date(),
-        details: { image: cld.secure_url, public_id: cld.public_id },
-      });
-    } catch (e) {
-      console.warn('No se pudo guardar historial:', e.message);
+    // Subir imágenes a Cloudinary
+    let uploadedImages = [];
+    if (imagesBase64 && imagesBase64.length > 0) {
+      for (let img of imagesBase64) {
+        const uploadRes = await cloudinary.uploader.upload(img, {
+          folder: 'chemas-sport-er/products',
+        });
+        uploadedImages.push({
+          public_id: uploadRes.public_id,
+          url: uploadRes.secure_url,
+        });
+      }
     }
 
-    res.status(201).json(product);
+    const product = new Product({
+      name,
+      price,
+      type,
+      stock,
+      images: uploadedImages,
+    });
+
+    await product.save();
+    res.json(product);
   } catch (err) {
-    console.error('POST /api/products error:', err);
+    console.error("Error al crear producto:", err);
     res.status(500).json({ error: 'Error al crear producto' });
   }
 });
+
 
 // Endpoint opcional de salud / conteo
 router.get('/health', async (_req, res) => {

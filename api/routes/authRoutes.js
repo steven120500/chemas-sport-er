@@ -4,13 +4,6 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
-
-
-const app = express();
-app.get('/', (_req, res) => res.send('ok'));
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log('UP on', PORT));
-
 // Registro de usuario normal (cliente o usuario limitado)
 router.post('/register', async (req, res) => {
   console.log('REQ.BODY', req.body);
