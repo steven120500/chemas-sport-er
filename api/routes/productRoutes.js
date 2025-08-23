@@ -7,6 +7,10 @@ import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
 
 const router = express.Router();
 
+// multer manejará el archivo temporal antes de subirlo
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
 
 /* ----------------------------- helpers ------------------------------ */
 
@@ -145,37 +149,37 @@ function sanitizeAndValidate(body, { partial = false } = {}) {
 /* --------------------------------- rutas --------------------------------- */
 
 // Crear producto
-router.post('/', async (req, res) => {
+router.post("/", upload.single("image"), async (req, res) => {
   try {
-    const { name, price, type, stock, imagesBase64 } = req.body;
-
-    // Subir imágenes a Cloudinary
-    let uploadedImages = [];
-    if (imagesBase64 && imagesBase64.length > 0) {
-      for (let img of imagesBase64) {
-        const uploadRes = await cloudinary.uploader.upload(img, {
-          folder: 'chemas-sport-er/products',
-        });
-        uploadedImages.push({
-          public_id: uploadRes.public_id,
-          url: uploadRes.secure_url,
-        });
-      }
+    if (!req.file) {
+      return res.status(400).json({ error: "No se envió imagen" });
     }
 
-    const product = new Product({
-      name,
-      price,
-      type,
-      stock,
-      images: uploadedImages,
-    });
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "products" },
+      async (error, result) => {
+        if (error) {
+          console.error("Error subiendo a Cloudinary:", error);
+          return res.status(500).json({ error: "Error subiendo imagen" });
+        }
 
-    await product.save();
-    res.json(product);
+        const newProduct = new Product({
+          name: req.body.name,
+          price: req.body.price,
+          type: req.body.type,
+          sizes: req.body.sizes,
+          imageSrc: result.secure_url, // 🔹 se guarda la URL de Cloudinary
+        });
+
+        const savedProduct = await newProduct.save();
+        res.status(201).json(savedProduct);
+      }
+    );
+
+    stream.end(req.file.buffer);
   } catch (err) {
     console.error("Error al crear producto:", err);
-    res.status(500).json({ error: 'Error al crear producto' });
+    res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
