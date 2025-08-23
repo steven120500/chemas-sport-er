@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
     console.error('GET /api/products error:', err);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
-});
+}); 
 
 /** POST /api/products  (crear; sube múltiples imágenes) */
 router.post('/', upload.any(), async (req, res) => {
