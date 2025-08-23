@@ -9,6 +9,10 @@ const TALLAS_ADULTO = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const TALLAS_NINO   = ['16', '18', '20', '22', '24', '26', '28'];
 const ACCEPTED_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
 
+function isLikelyObjectId(v) {
+  return typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v);
+}
+
 export default function ProductModal({
   product,
   onClose,
@@ -49,18 +53,18 @@ export default function ProductModal({
   // Sincroniza cuando cambie el product desde afuera
   useEffect(() => {
     setViewProduct(product);
-    setEditedName(product.name || '');
-    setEditedPrice(product.price || 0);
-    setEditedType(product.type || 'Player');
-    setEditedStock({ ...(product.stock || {}) });
+    setEditedName(product?.name || '');
+    setEditedPrice(product?.price ?? 0);
+    setEditedType(product?.type || 'Player');
+    setEditedStock({ ...(product?.stock || {}) });
 
-    // 👇 Aquí estaba el bug: debe ser setLocalImages, no setImages
+    // 👇 importante: usar setLocalImages (no setImages)
     setLocalImages(
-      product.images?.length
+      product?.images?.length
         ? product.images.map(img => ({ src: img.url, isNew: false }))
         : [
-            ...(product.imageSrc  ? [{ src: product.imageSrc,  isNew: false }] : []),
-            ...(product.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
+            ...(product?.imageSrc  ? [{ src: product.imageSrc,  isNew: false }] : []),
+            ...(product?.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
           ]
     );
     setIdx(0);
@@ -74,44 +78,64 @@ export default function ProductModal({
 
   // -------- Acciones --------
   const handleSave = async () => {
+    if (loading) return;
+
+    // tomar id de _id o id; validar
+    const id = product?._id || product?.id;
+    if (!id || !isLikelyObjectId(id)) {
+      console.error('ID inválido o ausente en el modal', product);
+      toast.error('No se encontró un ID válido del producto');
+      return;
+    }
+
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || 'ChemaSportER';
 
-      const res = await fetch(`${API_BASE}/api/products/${product._id}`, {
+      // Normalizar payload
+      const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
+      const cleanStock = Object.fromEntries(
+        Object.entries(editedStock || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)])
+      );
+
+      const payload = {
+        stock: cleanStock,
+        name: (editedName || '').trim(),
+        price: priceInt,
+        type: (editedType || '').trim(),
+        imageSrc:  typeof localImages[0]?.src === 'string' ? localImages[0].src : null,
+        imageSrc2: typeof localImages[1]?.src === 'string' ? localImages[1].src : null,
+        imageAlt: (editedName || '').trim(),
+      };
+
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-user': displayName,
         },
-        body: JSON.stringify({
-          stock: editedStock,
-          name: editedName,
-          price: editedPrice,
-          type: editedType,
-          // compatibilidad con imageSrc/imageSrc2
-          imageSrc:  localImages[0]?.src || null,
-          imageSrc2: localImages[1]?.src || null,
-          imageAlt: editedName,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Error al actualizar');
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`Error al actualizar (${res.status}) ${txt}`);
+      }
 
       const updated = await res.json();
 
-      // 🔁 Sincroniza todo localmente para que se vea al instante
+      // 🔁 sincroniza vistas locales
       setViewProduct(updated);
       setEditedName(updated.name || '');
       setEditedPrice(updated.price ?? 0);
       setEditedType(updated.type || 'Player');
       setEditedStock({ ...(updated.stock || {}) });
       setLocalImages(
-        updated.images?.length
+        updated?.images?.length
           ? updated.images.map(img => ({ src: img.url, isNew: false }))
           : [
-              ...(updated.imageSrc  ? [{ src: updated.imageSrc,  isNew: false }] : []),
-              ...(updated.imageSrc2 ? [{ src: updated.imageSrc2, isNew: false }] : []),
+              ...(updated?.imageSrc  ? [{ src: updated.imageSrc,  isNew: false }] : []),
+              ...(updated?.imageSrc2 ? [{ src: updated.imageSrc2, isNew: false }] : []),
             ]
       );
       setIdx(0);
@@ -128,17 +152,30 @@ export default function ProductModal({
   };
 
   const handleDelete = async () => {
+    if (loading) return;
+
+    const id = product?._id || product?.id;
+    if (!id || !isLikelyObjectId(id)) {
+      console.error('ID inválido o ausente en el modal (delete)', product);
+      toast.error('No se encontró un ID válido del producto');
+      return;
+    }
+
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || 'ChemaSportER';
 
-      const res = await fetch(`${API_BASE}/api/products/${product._id}`, {
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', 'x-user': displayName },
       });
 
-      if (!res.ok) throw new Error('Error al eliminar');
-      onUpdate?.(null, product._id);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`Error al eliminar (${res.status}) ${txt}`);
+      }
+
+      onUpdate?.(null, id);
       toast.success('Producto eliminado');
       onClose?.();
     } catch (err) {
@@ -183,7 +220,7 @@ export default function ProductModal({
     setIdx(0);
   };
 
-  // Tallas visibles (si está editando, usa el tipo editado; si no, el del producto mostrado)
+  // Tallas visibles
   const isNino = (isEditing ? editedType : viewProduct?.type) === 'Niño';
   const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
