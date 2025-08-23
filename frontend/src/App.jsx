@@ -1,5 +1,5 @@
 import { Toaster } from 'react-hot-toast';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
@@ -16,18 +16,20 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
 import TopBanner from './components/TopBanner';
+import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 
-// Toma la URL del backend desde .env (sin barra final). Si no existe, usa Render:
-const API_BASE =
-  (import.meta.env.VITE_API_URL?.replace(/\/+$/, '')) ||
-  'https://chemas-sport-er-backend.onrender.com';
 
-// helper páginas: 1 … (p-2)(p-1)[p](p+1)(p+2) … last
+
+const API_BASE = "https://chemas-sport-er-backend.onrender.com";
+
+// helper para páginas 1 ... (page-2) (page-1) [page] (page+1) (page+2) ... last
 function buildPages(page, pages) {
   const out = new Set([1, pages, page, page - 1, page - 2, page + 1, page + 2]);
-  return [...out].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  return [...out]
+    .filter(n => n >= 1 && n <= pages)
+    .sort((a, b) => a - b);
 }
 
 function App() {
@@ -36,157 +38,161 @@ function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
-
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+ 
+  // --- estados de paginación ---
+const [page, setPage] = useState(1);
+const [limit, setLimit] = useState(20);
+const [total, setTotal] = useState(0);
+const pages = Math.max(1, Math.ceil(total / limit));
 
-  // paginación
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
-  const [total, setTotal] = useState(0);
-  const pages = Math.max(1, Math.ceil(total / limit));
+
+
+
 
   const anyModalOpen =
-    !!selectedProduct ||
-    showAddModal ||
-    showLogin ||
-    showRegisterUserModal ||
-    showUserListModal ||
-    showHistoryModal;
+  !!selectedProduct ||
+  showAddModal ||
+  showLogin ||
+  showRegisterUserModal ||
+  showUserListModal ||
+  showHistoryModal;
 
-  const [user, setUser] = useState(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
+  
+  const [user, setUser] =useState (() => {
+    try{
+      const storedUser = localStorage.getItem("user");
       return storedUser ? JSON.parse(storedUser) : null;
-    } catch {
+    }catch(error){
+      console.error("Error parsing user from localStorage", error);
       return null;
     }
   });
 
-  const isSuperUser = !!user?.isSuperUser;
-  const canSeeHistory = isSuperUser || user?.roles?.includes('history');
-  const canAdd = isSuperUser || user?.roles?.includes('add');
-  const canEdit = isSuperUser || user?.roles?.includes('edit');
-  const canDelete = isSuperUser || user?.roles?.includes('delete');
+  const isSuperUser = user?.isSuperUser || false;
+  const canSeeHistory = user?.isSuperUser || user?.roles?.includes('history');
+  const canClearHistory = user?.isSuperUser; 
+  const canAdd = user?.isSuperUser || user?.roles?.includes("add");
+  const canEdit = user?.isSuperUser || user?.roles?.includes("edit");
+  const canDelete = user?.isSuperUser || user?.roles?.includes("delete");
+ 
+
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    toast.success('Sesión cerrada correctamente');
+    localStorage.removeItem("user");
+    toast.success("Sesión cerrada correctamente");
   };
 
-  // Cargar productos
-  const fetchProducts = async (opts = {}) => {
-    const p = opts.page ?? page;
-    const q = (opts.q ?? searchTerm).trim();
-    const tp = (opts.type ?? filterType).trim();
+  // --- cargar productos con paginación y filtros ---
+const fetchProducts = async (opts = {}) => {
+  const p  = opts.page ?? page;
+  const q  = (opts.q ?? searchTerm).trim();
+  const tp = (opts.type ?? filterType).trim();
 
-    setLoading(true);
-    const controller = new AbortController();
+  setLoading(true);
+  try {
+    const params = new URLSearchParams({
+      page: String(p),
+      limit: String(limit),
+      ...(q  ? { q }        : {}),
+      ...(tp ? { type: tp } : {}),
+    });
 
-    try {
-      const params = new URLSearchParams({
-        page: String(p),
-        limit: String(limit),
-        ...(q ? { q } : {}),
-        ...(tp ? { type: tp } : {}),
-      });
+    const res = await fetch(`${API_BASE}/api/products?` + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
 
-      const url = `${API_BASE}/api/products?${params.toString()}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        mode: 'cors',
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      });
+    const json = await res.json(); // { items,total,page,pages,limit }
+    setProducts(json.items);
+    setTotal(json.total);
+    setPage(json.page);
+  } catch (e) {
+    console.error('fetchProducts error:', e);
+    setProducts([]);
+    setTotal(0);
+  } finally {
+    setLoading(false);
+  }
+};
 
-      if (!res.ok) {
-        toast.error(`Error al cargar (HTTP ${res.status})`);
-        throw new Error('HTTP ' + res.status);
-      }
+useEffect(() => {
+  fetchProducts({ page, q: searchTerm, type: filterType });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [page, limit, searchTerm, filterType]);
 
-      const json = await res.json();
-      setProducts(Array.isArray(json.items) ? json.items : []);
-      setTotal(Number(json.total || 0));
-      setPage(Number(json.page || p));
-    } catch (e) {
-      if (e.name !== 'AbortError') {
-        console.error('fetchProducts error:', e);
-        setProducts([]);
-        setTotal(0);
-      }
-    } finally {
-      setLoading(false);
-    }
-
-    return () => controller.abort();
-  };
-
-  useEffect(() => {
-    const cancel = fetchProducts({ page, q: searchTerm, type: filterType });
-    return () => typeof cancel === 'function' && cancel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, searchTerm, filterType, API_BASE]);
-
-  // Sincroniza modal y lista cuando se edita/borra
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
-      setProducts(prev => prev.filter(p => String(p._id) !== String(deletedId)));
+      setProducts((prev) => prev.filter((p) => p._id !== deletedId));
       setSelectedProduct(null);
-      toast.success('Producto eliminado correctamente');
-      return;
+      toast.success("Producto eliminado correctamente");
+    } else {
+      setProducts((prev) =>
+        prev.map((p) => 
+          String(p._id) === String(updatedProduct._id) ? updatedProduct : p
+        )
+      );
+      toast.success("Producto actualizado correctamente");
     }
-    setProducts(prev =>
-      prev.map(p => (String(p._id) === String(updatedProduct._id) ? updatedProduct : p))
-    );
-    setSelectedProduct(updatedProduct);
-    toast.success('Producto actualizado correctamente');
   };
 
-  const handleLoginClick = () => setShowLogin(true);
+  const handleLoginClick = () => {
+    setShowLogin(true);
+  };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
     setShowLogin(false);
-    toast.success('Bienvenido'); // <-- antes faltaban comillas
+    toast.success(`Bienvenido`);
   };
 
   const handleRegisterClick = () => {
-    setTimeout(() => setShowRegisterUserModal(true), 100);
+
+    
+    setShowUserDropDown(false);
+    setTimeout(() => {
+    setShowRegisterUserModal(true);
+    },100);
+
+
+    
   };
 
-  const filteredProducts = useMemo(() => {
-    const s = searchTerm.toLowerCase();
-    return products.filter(p => {
-      const matchName = (p.name || '').toLowerCase().includes(s);
-      const matchType = filterType ? p.type === filterType : true;
-      return matchName && matchType;
-    });
-  }, [products, searchTerm, filterType]);
+  const filteredProducts = products.filter((product) => {
+    const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchType = filterType ? product.type === filterType : true;
+    return matchName && matchType;
+  });
 
   return (
     <>
-      {showRegisterUserModal && (
-        <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
-      )}
+    
 
+      {showRegisterUserModal &&(
+       <RegisterUserModal
+       onClose={() => {
+        setShowRegisterUserModal(false);
+        setShowUserDropDown(false);
+
+       }}
+       />
+      )}
+      
       {showUserListModal && (
-        <UserListModal
-          open={showUserListModal}
-          onClose={() => setShowUserListModal(false)}
-        />
+        <UserListModal 
+        open = {showUserListModal}
+        onClose={() => setShowUserListModal(false)}/>
       )}
 
       {showHistoryModal && (
-        <HistoryModal
-          open={showHistoryModal}
-          onClose={() => setShowHistoryModal(false)}
-          isSuperUser={isSuperUser}
-          roles={user?.roles || []}
+        <HistoryModal 
+        open = {showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        isSuperUser={user?.isSuperUser == true}
+        roles={user?.roles || []}
         />
       )}
 
@@ -195,17 +201,21 @@ function App() {
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
       {!anyModalOpen && (
-        <Header
-          onLoginClick={handleLoginClick}
-          onLogout={handleLogout}
-          user={user}
-          isSuperUser={isSuperUser}
-          setShowRegisterUserModal={setShowRegisterUserModal}
-          setShowUserListModal={setShowUserListModal}
-          setShowHistoryModal={setShowHistoryModal}
-          canSeeHistory={canSeeHistory}
-        />
+      <Header
+        onLoginClick={handleLoginClick}
+        onLogout={handleLogout}
+        user={user}
+        isSuperUser={user?.isSuperUser}
+        setShowRegisterUserModal={setShowRegisterUserModal}
+        setShowUserListModal={setShowUserListModal}
+        setShowHistoryModal={setShowHistoryModal}
+        canSeeHistory={canSeeHistory}
+  
+        
+      />
       )}
+
+      
 
       {canAdd && !anyModalOpen && (
         <button
@@ -236,7 +246,6 @@ function App() {
 
       {selectedProduct && (
         <ProductModal
-          key={`${selectedProduct._id}-${selectedProduct.updatedAt || ''}`}
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           onUpdate={handleProductUpdate}
@@ -248,12 +257,12 @@ function App() {
 
       {showAddModal && (
         <AddProductModal
-          user={user}
+        user={user}
           tallaPorTipo={tallaPorTipo}
           onAdd={(newProduct) => {
-            setProducts(prev => [newProduct, ...prev]);
+            setProducts((prev) => [newProduct, ...prev]);
             setShowAddModal(false);
-            toast.success('Producto agregado correctamente');
+            toast.success("Producto agregado correctamente");
           }}
           onCancel={() => setShowAddModal(false)}
         />
@@ -263,77 +272,101 @@ function App() {
         <LoginModal
           isOpen={showLogin}
           onClose={() => setShowLogin(false)}
-          onLoginSuccess={handleLoginSuccess}
+          onLoginSuccess={(userData) => {
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData)); // 🔹 Guardar en localStorage
+            setShowLogin(false);
+            toast.success('Bienvenido');
+            
+          }}
           onRegisterClick={handleRegisterClick}
         />
       )}
 
-      {/* Paginación */}
-      {pages > 1 && (
-        <div className="mt-8 flex flex-col items-center gap-3">
-          <nav className="flex items-center justify-center gap-2">
-            <button
-              onClick={() => setPage(1)}
-              disabled={page === 1}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Primera"
-            >
-              «
-            </button>
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Anterior"
-            >
-              Anterior
-            </button>
-
-            {(() => {
-              const nums = buildPages(page, pages);
-              return nums.map((n, i) => {
-                const prev = nums[i - 1];
-                const showDots = i > 0 && n - prev > 1;
-                return (
-                  <span key={n} className="flex">
-                    {showDots && <span className="px-2">…</span>}
-                    <button
-                      onClick={() => setPage(n)}
-                      className={`px-3 py-1 rounded border ${
-                        n === page ? 'bg-black text-white' : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  </span>
-                );
-              });
-            })()}
-
-            <button
-              onClick={() => setPage(p => Math.min(pages, p + 1))}
-              disabled={page === pages}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Siguiente"
-            >
-              Siguiente
-            </button>
-            <button
-              onClick={() => setPage(pages)}
-              disabled={page === pages}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Última"
-            >
-              »
-            </button>
-          </nav>
-        </div>
+      {showRegisterUserModal && (
+        <RegisterUserModal
+          onClose={() => setShowRegisterUserModal(false)}
+        />
       )}
 
+      {canSeeHistory && (
+
+      <button onClick={() => setShowHistory(true)}></button>
+      )}
+      
+      {/* --- Paginación --- */}
+{pages > 1 && (
+  <div className="mt-8 flex flex-col items-center gap-3">
+    {/* Info y selector de tamaño de página */}
+    
+
+    {/* Controles */}
+    <nav className="flex items-center justify-center gap-2">
+      <button
+        onClick={() => setPage(1)}
+        disabled={page === 1}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Primera"
+      >
+        «
+      </button>
+      <button
+        onClick={() => setPage(p => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Anterior"
+      >
+        Anterior
+      </button>
+
+      {/* Números con elipsis */}
+      {(() => {
+        const nums = buildPages(page, pages);
+        return nums.map((n, i) => {
+          const prev = nums[i - 1];
+          const showDots = i > 0 && n - prev > 1;
+          return (
+            <span key={n} className="flex">
+              {showDots && <span className="px-2">…</span>}
+              <button
+                onClick={() => setPage(n)}
+                className={`px-3 py-1 rounded border ${
+                  n === page ? "bg-black text-white" : "hover:bg-gray-100"
+                }`}
+              >
+                {n}
+              </button>
+            </span>
+          );
+        });
+      })()}
+
+      <button
+        onClick={() => setPage(p => Math.min(pages, p + 1))}
+        disabled={page === pages}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Siguiente"
+      >
+        Siguiente
+      </button>
+      <button
+        onClick={() => setPage(pages)}
+        disabled={page === pages}
+        className="px-3 py-1 rounded border disabled:opacity-50"
+        title="Última"
+      >
+        »
+      </button>
+    </nav>
+  </div>
+)}
+
       <Footer />
-      {!anyModalOpen && <FloatingWhatsapp />}
+      {!anyModalOpen && (
+      <FloatingWhatsapp />
+      )}
       <ToastContainer />
-      <Toaster position="top-center" reverseOrder={false} />
+      <Toaster position="top-center" reverseOrder={false}/>
     </>
   );
 }

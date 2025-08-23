@@ -1,29 +1,37 @@
 // api/routes/productRoutes.js
 import express from 'express';
-import multer from 'multer';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
-import cloudinary from '../config/cloudinary.js';
+import cloudinary from '../config/cloudinary.js'; // o donde tengas la config
+import multer from 'multer';
 
 const router = express.Router();
 
-/* ================== Multer (buffers en memoria) ================== */
-const upload = multer({ storage: multer.memoryStorage() });
+// multer manejará el archivo temporal antes de subirlo
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-/* ================== Helpers / Constantes ================== */
-const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
-const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
+
+/* ----------------------------- helpers ------------------------------ */
+
+// Tallas permitidas
+const ADULT_SIZES = ['S','M','L','XL','XXL','3XL','4XL'];
+const KID_SIZES   = ['16','18','20','22','24','26','28'];
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
 
-const whoDidIt = (req) =>
-  req.user?.name ||
-  req.user?.email ||
-  req.headers['x-user'] ||
-  req.body.user ||
-  'Sistema';
+// Límite de longitud de cada imagen en base64 (caracteres)
+const MAX_IMAGE_BASE64_LEN = 5_000_000; // ~5MB por imagen en base64
 
-const diffStock = (prev = {}, next = {}) => {
-  const sizes = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
+
+
+// Quién hizo el cambio (toma del header, body o deja “Sistema”)
+function whoDidIt(req) {
+  return req.user?.name || req.user?.email || req.headers['x-user'] || req.body.user || 'Sistema';
+}
+
+// Diff de stock (obj1 vs obj2) -> ["stock[S]: a -> b", ...]
+function diffStock(prev = {}, next = {}) {
+  const sizes = new Set([...(Object.keys(prev||{})), ...(Object.keys(next||{}))]);
   const out = [];
   for (const s of sizes) {
     const a = Number(prev?.[s] ?? 0);
@@ -31,211 +39,264 @@ const diffStock = (prev = {}, next = {}) => {
     if (a !== b) out.push(`stock[${s}]: ${a} -> ${b}`);
   }
   return out;
-};
+}
 
-const diffProduct = (prev, next) => {
-  const ch = [];
-  if (prev.name !== next.name) ch.push(`nombre: "${prev.name}" -> "${next.name}"`);
-  if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
-  if (prev.type !== next.type) ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
-  ch.push(...diffStock(prev.stock, next.stock));
-  return ch;
-};
+// Diferencias “legibles” de producto
+function diffProduct(prev, next) {
+  const changes = [];
+  if (prev.name !== next.name) changes.push(`nombre: "${prev.name}" -> "${next.name}"`);
+  if (prev.price !== next.price) changes.push(`precio: ${prev.price} -> ${next.price}`);
+  if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" -> "${next.type}"`);
+  changes.push(...diffStock(prev.stock, next.stock));
+  return changes;
+}
 
-const uploadToCloudinary = (buffer) =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'products', resource_type: 'image' },
-      (err, result) => (err ? reject(err) : resolve(result))
-    );
-    stream.end(buffer);
-  });
+/* -------------------------- sanea y valida el body -------------------------- */
+/**
+ * Sanea y valida el body. Lanza Error con details si algo está mal.
+ * @param {object} body
+ * @param {boolean} partial - true cuando es update (PUT), permite campos faltantes
+ * @returns {object} objeto listo para guardar
+ */
+function sanitizeAndValidate(body, { partial = false } = {}) {
+  const errors = [];
+  const out = {};
 
-/* ================== Rutas ================== */
-
-/** GET /api/products/health  (ping rápido + conteo) */
-router.get('/health', async (_req, res) => {
-  try {
-    const count = await Product.countDocuments();
-    res.json({ ok: true, count });
-  } catch {
-    res.status(500).json({ ok: false });
-  }
-});
-
-/** GET /api/products?Page=&limit=&q=&type=  (listado paginado + filtros) */
-// GET /api/products?page=&limit=
-router.get('/', async (req, res) => {
-  try {
-    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
-
-    const [items, total] = await Promise.all([
-      Product.find({}).sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Product.countDocuments(),
-    ]);
-
-    res.json({ items, total, page, pages: Math.ceil(total / limit), limit });
-  } catch (err) {
-    console.error('GET /api/products error:', err);
-    res.status(500).json({ error: 'Error al obtener los productos' });
-  }
-}); 
-
-/** POST /api/products  (crear; sube múltiples imágenes) */
-router.post('/', upload.any(), async (req, res) => {
-  try {
-    // acepta 'images' o 'image'
-    const files = (req.files || []).filter(f =>
-      f.fieldname === 'images' || f.fieldname === 'image'
-    );
-    if (!files.length) {
-      return res.status(400).json({ error: 'No se enviaron imágenes' });
+  // name
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || !body.name.trim()) {
+      errors.push('name debe ser string no vacío.');
+    } else {
+      out.name = body.name.trim().slice(0, 150);
     }
+  } else if (!partial) {
+    errors.push('name es requerido.');
+  }
 
-    const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
-    const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
-    const imageSrc = images[0]?.url || '';
+  // price (acepta string numérica)
+  if (body.price !== undefined) {
+    const n = typeof body.price === 'number'
+      ? body.price
+      : Number(String(body.price).replace(/[^\d]/g, ''));
+    if (!Number.isFinite(n) || n <= 0) errors.push('price inválido.');
+    else out.price = Math.trunc(n);
+  } else if (!partial) {
+    errors.push('price es requerido.');
+  }
 
-    // stock puede venir string JSON o objeto
+  // type
+  if (body.type !== undefined) {
+    if (typeof body.type !== 'string' || !body.type.trim()) {
+      errors.push('type debe ser string.');
+    } else {
+      out.type = body.type.trim().slice(0, 40);
+    }
+  } else if (!partial) {
+    errors.push('type es requerido.');
+  }
+
+  // imageAlt
+  if (body.imageAlt !== undefined) {
+    if (typeof body.imageAlt !== 'string') {
+      errors.push('imageAlt debe ser string.');
+    } else {
+      out.imageAlt = body.imageAlt.slice(0, 150);
+    }
+  }
+
+  // imageSrc / imageSrc2 (base64 opcional – con límite)
+  for (const key of ['imageSrc', 'imageSrc2']) {
+    if (body[key] !== undefined && body[key] !== null) {
+      if (typeof body[key] !== 'string') {
+        errors.push (`${key} debe ser string base64 (data URL).`);
+      } else if (body[key].length > MAX_IMAGE_BASE64_LEN) {
+        errors.push(`${key} es muy grande (límite ${MAX_IMAGE_BASE64_LEN} chars).`);
+      } else {
+        out[key] = body[key];
+      }
+    } else if (!partial && key === 'imageSrc') {
+      // en create es requerida la imagen principal
+      errors.push('imageSrc es requerido.');
+    }
+  }
+
+  // stock objeto { talla: cantidad }
+  if (body.stock !== undefined) {
+    if (typeof body.stock !== 'object' || body.stock === null || Array.isArray(body.stock)) {
+      errors.push('stock debe ser objeto { talla: cantidad }.');
+    } else {
+      const cleanStock = {};
+      for (const [size, qty] of Object.entries(body.stock)) {
+        if (!ALL_SIZES.has(String(size))) continue; // ignora tallas desconocidas
+        const n = Number(qty);
+        cleanStock[size] = Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+      }
+      out.stock = cleanStock;
+    }
+  } else if (!partial) {
+    out.stock = {}; // por defecto vacío
+  }
+
+  if (errors.length) {
+    const err = new Error('VALIDATION_ERROR');
+    err.details = errors;
+    throw err;
+  }
+
+  return out;
+}
+
+/* --------------------------------- rutas --------------------------------- */
+
+// Crear producto
+router.post('/', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se envió imagen' });
+    if (!req.body.name || !req.body.price || !req.body.type)
+      return res.status(400).json({ error: 'Faltan campos obligatorios (name, price, type)' });
+
+    // 1) subir SOLO una vez
+    const cld = await uploadToCloudinary(req.file.buffer); // { secure_url, public_id, ... }
+
+    // 2) parsear stock si viene como string
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
       else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
-      else if (typeof req.body.stock === 'object') stock = req.body.stock;
-    } catch { stock = {}; }
+    } catch (_) {}
 
-    const cleanStock = {};
-    for (const [size, qty] of Object.entries(stock || {})) {
-      if (!ALL_SIZES.has(String(size))) continue;
-      const n = Math.max(0, Math.trunc(Number(qty) || 0));
-      cleanStock[size] = n;
-    }
-
+    // 3) crear producto
     const product = await Product.create({
-      name:  String(req.body.name || '').trim(),
-      price: Math.trunc(Number(req.body.price) || 0),
-      type:  String(req.body.type || '').trim(),
-      stock: cleanStock,
-      imageSrc,
-      images,
+      name : String(req.body.name).trim(),
+      price: Number(req.body.price),
+      type : String(req.body.type).trim(),
+      stock,
+      imageSrc: cld.secure_url,            // o images: [{ public_id: cld.public_id, url: cld.secure_url }]
     });
 
-    // historial (best-effort)
+    // 4) historial (no romper si falla)
     try {
       await History.create({
-        user:  whoDidIt(req),
-        action:'creó producto',
-        item:  `${product.name} (#${product._id})`,
-        date:  new Date(),
-        details: `img principal: ${imageSrc}`,
+        user: req.user?.name || req.headers['x-user'] || 'Sistema',
+        action: 'creó producto',
+        item: `${product.name} (#${product._id})`,
+        date: new Date(),
+        details: { image: cld.secure_url, public_id: cld.public_id },
       });
     } catch (e) {
-      console.warn('Historial create falló:', e.message);
+      console.warn('No se pudo guardar historial:', e.message);
     }
 
     res.status(201).json(product);
   } catch (err) {
     console.error('POST /api/products error:', err);
-    res.status(500).json({ error: err.message || 'Error al crear producto' });
+    res.status(500).json({ error: 'Error al crear producto' });
   }
 });
 
-/** PUT /api/products/:id  (actualiza campos básicos e imágenes referenciadas) */
+// Endpoint opcional de salud / conteo
+router.get('/health', async (_req, res) => {
+  try {
+    const count = await Product.countDocuments();
+    res.json({ ok: true, count });
+  } catch (_e) {
+    res.status(500).json({ ok: false });
+  }
+});
+
+// Actualizar producto
 router.put('/:id', async (req, res) => {
   try {
+    // obtener versión previa para armar el diff
     const prev = await Product.findById(req.params.id).lean();
-    if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
+    if (!prev) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    let incomingStock = req.body.stock;
-    if (typeof incomingStock === 'string') {
-      try { incomingStock = JSON.parse(incomingStock); } catch { incomingStock = undefined; }
-    }
-
-    let nextStock = prev.stock;
-    if (incomingStock && typeof incomingStock === 'object') {
-      const clean = {};
-      for (const [size, qty] of Object.entries(incomingStock)) {
-        if (!ALL_SIZES.has(String(size))) continue;
-        const n = Math.max(0, Math.trunc(Number(qty) || 0));
-        clean[size] = n;
-      }
-      nextStock = clean;
-    }
-
-    const update = {
-      name:  typeof req.body.name  === 'string' ? req.body.name.trim().slice(0, 150) : prev.name,
-      type:  typeof req.body.type  === 'string' ? req.body.type.trim().slice(0, 40)  : prev.type,
-      price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
-      stock: nextStock,
-    };
-
-    if (req.body.imageSrc  !== undefined) update.imageSrc  = req.body.imageSrc  || '';
-    if (Array.isArray(req.body.images))    update.images   = req.body.images;
-
+    const data = sanitizeAndValidate(req.body, { partial: true });
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
-      { $set: update },
+      data,
       { new: true, runValidators: true }
     );
 
-    // historial
+    // Log de historial (solo si hubo cambios)
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
-      try {
-        await History.create({
-          user:  whoDidIt(req),
-          action:'actualizó producto',
-          item:  `${updated.name} (#${updated._id})`,
-          date:  new Date(),
-          details: changes.join(' | '),
-        });
-      } catch (e) {
-        console.warn('Historial update falló:', e.message);
-      }
+      await History.create({
+        user: whoDidIt(req),
+        action: 'actualizó producto',
+        item: `${updated.name} (#${updated._id}) `,
+        date: new Date(),
+        details: changes.join(' | ') // Ej: "Talla M: 0 → 6 | Precio: ₡5000 → ₡6000"
+      });
     }
 
     res.json(updated);
-  } catch (err) {
-    console.error('PUT /api/products/:id error:', err);
-    res.status(500).json({ error: 'Error al actualizar producto' });
+  } catch (error) {
+    if (error.message === 'VALIDATION_ERROR') {
+      console.error('× Validación (PUT):', error.details);
+      return res.status(400).json({ error: 'Payload inválido', details: error.details });
+    }
+    console.error('× Error al actualizar producto:', error);
+    res.status(500).json({ message: 'Error al actualizar producto' });
   }
 });
 
-/** DELETE /api/products/:id  (elimina y borra imágenes en Cloudinary) */
+// Eliminar producto
 router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    for (const img of product.images || []) {
-      if (img.public_id) {
-        try { await cloudinary.uploader.destroy(img.public_id); } catch {}
-      }
+    // Borrar imágenes de Cloudinary
+    for (let img of product.images) {
+      await cloudinary.uploader.destroy(img.public_id);
     }
 
     await product.deleteOne();
-
-    try {
-      await History.create({
-        user:  whoDidIt(req),
-        action:'eliminó producto',
-        item:  `${product.name} (#${product._id})`,
-        date:  new Date(),
-        details: `imagenes borradas: ${product.images?.length || 0}`,
-      });
-    } catch (e) {
-      console.warn('Historial delete falló:', e.message);
-    }
-
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
-    console.error('DELETE /api/products/:id error:', err);
+    console.error("Error al eliminar producto:", err);
     res.status(500).json({ error: 'Error al eliminar producto' });
   }
 });
+
+// Obtener productos paginados
+// api/routes/productRoutes.js  (GET paginado)
+router.get('/', async (req, res) => {
+  try {
+    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const q     = (req.query.q || '').trim();
+    const type  = (req.query.type || '').trim();
+
+    const find = {};
+    if (q)    find.name = { $regex: q, $options: 'i' };
+    if (type) find.type = type;
+
+    // 📦 PROYECCIÓN: evita mandar stock e imágenes pesadas que no se usan
+    const projection = 'name price type imageSrc stock images createdAt';
+
+    const [items, total] = await Promise.all([
+      Product.find(find)
+        .select(projection)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(find),
+    ]);
+
+    // ⏱ cache cortito de navegador (se invalida cuando cambia la query)
+    res.set('Cache-Control', 'public, max-age=20'); // ~20s
+    res.json({ items, total, page, pages: Math.ceil(total / limit), limit });
+  } catch (err) {
+    console.error('GET /api/products paginado', err);
+    res.status(500).json({ error: 'Error al obtener los productos' });
+  }
+});
+
+
+
+
 
 export default router;
