@@ -1,5 +1,5 @@
 import { Toaster } from 'react-hot-toast';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
@@ -19,6 +19,7 @@ import TopBanner from './components/TopBanner';
 import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
+import Medidas from './components/Medidas'; // ⬅️ Medidas
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -44,6 +45,7 @@ function App() {
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showMedidas, setShowMedidas] = useState(false); // ⬅️ Medidas
 
   // --- estados de paginación ---
   const [page, setPage] = useState(1);
@@ -57,7 +59,8 @@ function App() {
     showLogin ||
     showRegisterUserModal ||
     showUserListModal ||
-    showHistoryModal;
+    showHistoryModal ||
+    showMedidas; // ⬅️ Medidas
 
   const [user, setUser] = useState(() => {
     try {
@@ -114,8 +117,15 @@ function App() {
     }
   };
 
+  // ⬆️ scroll al top al cambiar de página
+  const pageTopRef = useRef(null);
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
+    if (pageTopRef.current) {
+      pageTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, searchTerm, filterType]);
 
@@ -164,6 +174,8 @@ function App() {
 
   return (
     <>
+      <div ref={pageTopRef} />
+
       {showRegisterUserModal && (
         <RegisterUserModal
           onClose={() => {
@@ -185,6 +197,15 @@ function App() {
           onClose={() => setShowHistoryModal(false)}
           isSuperUser={user?.isSuperUser === true}
           roles={user?.roles || []}
+        />
+      )}
+
+      {/* Modal Medidas */}
+      {showMedidas && (
+        <Medidas
+          open={showMedidas}
+          onClose={() => setShowMedidas(false)}
+          currentType={filterType || 'Todos'}
         />
       )}
 
@@ -227,7 +248,19 @@ function App() {
         setFilterType={setFilterType}
       />
 
-      <div className="px-3 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+      {/* ⬇️ Bloque pregunta + botón Medidas */}
+      <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
+        <span className="text-sm sm:text-base text-gray-700">¿Querés saber tu talla?</span>
+        <button
+          onClick={() => setShowMedidas(true)}
+          className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 transition text-s s:text-base"
+          title="Ver medidas"
+        >
+          Medidas
+        </button>
+      </div>
+
+      <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.map((product) => (
           <ProductCard
             key={getPid(product)}
@@ -289,7 +322,7 @@ function App() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
             <button
-              onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onClick={() => setPage(1)}
               disabled={page === 1}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Primera"
@@ -297,13 +330,7 @@ function App() {
               «
             </button>
             <button
-              onClick={() =>
-                setPage(p => {
-                  const np = Math.max(1, p - 1);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                  return np;
-                })
-              }
+              onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Anterior"
@@ -320,7 +347,7 @@ function App() {
                   <span key={n} className="flex">
                     {showDots && <span className="px-2">…</span>}
                     <button
-                      onClick={() => { setPage(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      onClick={() => setPage(n)}
                       className={`px-3 py-1 rounded border ${
                         n === page ? "bg-black text-white" : "hover:bg-gray-100"
                       }`}
@@ -333,13 +360,7 @@ function App() {
             })()}
 
             <button
-              onClick={() =>
-                setPage(p => {
-                  const np = Math.min(pages, p + 1);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                  return np;
-                })
-              }
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
               disabled={page === pages}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Siguiente"
@@ -347,7 +368,7 @@ function App() {
               Siguiente
             </button>
             <button
-              onClick={() => { setPage(pages); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onClick={() => setPage(pages)}
               disabled={page === pages}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Última"

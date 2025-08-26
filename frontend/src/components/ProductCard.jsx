@@ -10,7 +10,7 @@ export default function ProductCard({ product, onClick }) {
     >
       {/* Etiqueta del tipo de producto */}
       {product.type && (
-        <div className="absolute top-2 left-2 z-10 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-2 left-2 z-1 group-hover:opacity-100 transition-opacity duration-300">
           <div className="bg-black text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
             {product.type}
           </div>
