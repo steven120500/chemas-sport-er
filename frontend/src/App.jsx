@@ -289,7 +289,7 @@ function App() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
             <button
-              onClick={() => setPage(1)}
+              onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               disabled={page === 1}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Primera"
@@ -297,7 +297,13 @@ function App() {
               «
             </button>
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() =>
+                setPage(p => {
+                  const np = Math.max(1, p - 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  return np;
+                })
+              }
               disabled={page === 1}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Anterior"
@@ -314,7 +320,7 @@ function App() {
                   <span key={n} className="flex">
                     {showDots && <span className="px-2">…</span>}
                     <button
-                      onClick={() => setPage(n)}
+                      onClick={() => { setPage(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       className={`px-3 py-1 rounded border ${
                         n === page ? "bg-black text-white" : "hover:bg-gray-100"
                       }`}
@@ -327,7 +333,13 @@ function App() {
             })()}
 
             <button
-              onClick={() => setPage(p => Math.min(pages, p + 1))}
+              onClick={() =>
+                setPage(p => {
+                  const np = Math.min(pages, p + 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  return np;
+                })
+              }
               disabled={page === pages}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Siguiente"
@@ -335,7 +347,7 @@ function App() {
               Siguiente
             </button>
             <button
-              onClick={() => setPage(pages)}
+              onClick={() => { setPage(pages); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               disabled={page === pages}
               className="px-3 py-1 rounded border disabled:opacity-50"
               title="Última"
