@@ -239,14 +239,14 @@ export default function ProductModal({
         {/* Botón cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-2 text-white bg-black rounded p-1"
+          className="absolute mr-2 top-12 right-2 text-white bg-black rounded p-1"
           title="Cerrar"
         >
           <FaTimes size={30} />
         </button>
 
         {/* Encabezado */}
-        <div className="mt-6 mb-2 text-center">
+        <div className="mt-16 mb-2 text-center">
           {isEditing && canEdit ? (
             <>
               <label className="block text-xs text-gray-500 mb-1">Tipo</label>
@@ -344,11 +344,11 @@ export default function ProductModal({
         )}
 
         {/* Precio */}
-        <div className="text-center text-lg font-semibold mb-2">
+        <div className="text-center text-lg font-semibold mb-5">
           {isEditing ? (
             <input
               type="number"
-              className="text-center border-b-2 w-full font-semibold"
+              className="text-center border-b-2 w-full font-semibold text-xl"
               value={editedPrice}
               onChange={(e) => setEditedPrice(e.target.value)}
             />
@@ -357,8 +357,8 @@ export default function ProductModal({
           )}
         </div>
 {/* Tallas / Stock */}
-<div className="mb-4">
-  <p className="text-center font-semibold mb-2">Stock por talla:</p>
+<div className="mb-0">
+  <p className="text-center font-semibold mb-6">Stock por talla:</p>
   <div className="grid grid-cols-3 gap-2">
     {tallasVisibles.map((talla) => {
       const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
@@ -374,7 +374,7 @@ export default function ProductModal({
               onChange={(e) => handleStockChange(talla, e.target.value)}
             />
           ) : (
-            <p className="text-sm">{stockToShow[talla] || 0} disponibles</p>
+            <p className="text-xs">{stockToShow[talla] || 0} disponibles</p>
           )}
         </div>
       );
@@ -383,8 +383,8 @@ export default function ProductModal({
 </div>
 
 {/* Acciones (debajo de las tallas, centradas y compactas) */}
-<div className="mt-4 border-t pt-4">
-  <div className="grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
+<div className="mt-2 border-t pt-4">
+  <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
     {canEdit && isEditing ? (
       <button
         className="col-span-2 bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition font-bold"
