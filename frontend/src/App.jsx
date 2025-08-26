@@ -227,7 +227,7 @@ function App() {
         setFilterType={setFilterType}
       />
 
-      <div className="px-4 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+      <div className="px-3 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.map((product) => (
           <ProductCard
             key={getPid(product)}
