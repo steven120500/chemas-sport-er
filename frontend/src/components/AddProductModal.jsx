@@ -238,7 +238,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     >
       <div className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
         <button onClick={onCancel} className="absolute top-6 right-2 text-white hover:text-gray-800 bg-black rounded p-1">
-          <FaTimes size={24} />
+          <FaTimes size={30} />
         </button>
 
         <h2 className="text-lg font-semibold mb-4">Agregar producto</h2>

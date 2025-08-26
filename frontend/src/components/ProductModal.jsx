@@ -242,7 +242,7 @@ export default function ProductModal({
           className="absolute top-6 right-2 text-white bg-black rounded p-1"
           title="Cerrar"
         >
-          <FaTimes size={24} />
+          <FaTimes size={30} />
         </button>
 
         {/* Encabezado */}

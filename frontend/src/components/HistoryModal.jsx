@@ -154,7 +154,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
             className="text-white hover:text-gray-800 bg-black rounded p-1"
             title="Cerrar"
           >
-            <FaTimes size={24} />
+            <FaTimes size={30} />
           </button>
         </div>
 
