@@ -231,7 +231,7 @@ export default function ProductModal({
   const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
   return (
-    <div className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
+    <div className="mt-32 mb-32 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
         className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"

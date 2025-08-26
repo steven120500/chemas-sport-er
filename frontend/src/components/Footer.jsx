@@ -33,10 +33,20 @@ export default function Footer() {
         </a>
       </div>
 
-      {/* Texto inferior */}
-      <div className="mt-4 text-sm text-gray-800 space-y-1">
+       {/* Texto inferior */}
+       <div className="mt-4 text-sm text-gray-800 space-y-1">
         <p>© 2025 ChemaSport ER. Todos los derechos reservados.</p>
-        <p>Diseñado por Steven Corrales Alfaro.</p>
+        <p>
+          Diseñado por{" "}
+          <a
+            href="https://wa.me/50688028216"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-800 font-bold underline hover:text-gray-800 font-medium"
+          >
+            Steven Corrales Alfaro
+          </a>
+        </p>
       </div>
     </footer>
   );
