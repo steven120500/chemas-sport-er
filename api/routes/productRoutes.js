@@ -212,7 +212,7 @@ router.put('/:id', async (req, res) => {
         await History.create({
           user:  whoDidIt(req),
           action:'actualizó producto',
-          item:  `${product.name} (${product.type})`,
+          item:  `${updated.name} (${updated.type})`,
           date:  new Date(),
           details: changes.join(' | '),
         });
