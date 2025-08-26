@@ -231,7 +231,7 @@ export default function ProductModal({
   const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
   return (
-    <div className="mt-32 mb-32 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
+    <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
         className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
@@ -356,84 +356,84 @@ export default function ProductModal({
             <p>₡{Number(viewProduct?.price).toLocaleString('de-DE')}</p>
           )}
         </div>
-
-        {/* Tallas / Stock */}
-        <div className="mb-4">
-          <p className="text-center font-semibold mb-2">Stock por talla:</p>
-          <div className="grid grid-cols-3 gap-2">
-            {tallasVisibles.map((talla) => {
-              const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
-              return (
-                <div key={talla} className="text-center border rounded p-2">
-                  <label className="block text-sm font-medium">{talla}</label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full border border-gray-300 rounded px-1 text-center"
-                      value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
-                      onChange={(e) => handleStockChange(talla, e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm">{stockToShow[talla] || 0} disponibles</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Acciones */}
-        <div className="flex justify-between mt-4 gap-2 flex-wrap">
-          {canEdit && isEditing && (
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex-1 font-bold"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              {loading ? 'Guardando...' : 'Guardar'}
-            </button>
-          )}
-
-          {canEdit && !isEditing && (
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition w-full sm:w-auto flex-1 font-bold"
-              onClick={() => setIsEditing(true)}
-            >
-              Editar
-            </button>
-          )}
-
-          {canDelete && (
-            <button
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition w-full sm:w-auto flex-1 font-bold"
-              onClick={() => {
-                toastHOT((t) => (
-                  <span>
-                    ¿Seguro que quieres eliminar?
-                    <div className="mt-2 flex gap-2 justify-end">
-                      <button
-                        onClick={() => { toastHOT.dismiss(t.id); handleDelete(); }}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                      >
-                        Sí
-                      </button>
-                      <button
-                        onClick={() => toastHOT.dismiss(t.id)}
-                        className="bg-gray-200 px-3 py-1 rounded text-sm"
-                      >
-                        No
-                      </button>
-                    </div>
-                  </span>
-                ), { duration: 6000 });
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Eliminando...' : 'Eliminar'}
-            </button>
+{/* Tallas / Stock */}
+<div className="mb-4">
+  <p className="text-center font-semibold mb-2">Stock por talla:</p>
+  <div className="grid grid-cols-3 gap-2">
+    {tallasVisibles.map((talla) => {
+      const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
+      return (
+        <div key={talla} className="text-center border rounded p-2">
+          <label className="block text-sm font-medium">{talla}</label>
+          {isEditing ? (
+            <input
+              type="number"
+              min="0"
+              className="w-full border border-gray-300 rounded px-1 text-center"
+              value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
+              onChange={(e) => handleStockChange(talla, e.target.value)}
+            />
+          ) : (
+            <p className="text-sm">{stockToShow[talla] || 0} disponibles</p>
           )}
         </div>
+      );
+    })}
+  </div>
+</div>
+
+{/* Acciones (debajo de las tallas, centradas y compactas) */}
+<div className="mt-4 border-t pt-4">
+  <div className="grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
+    {canEdit && isEditing ? (
+      <button
+        className="col-span-2 bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition font-bold"
+        onClick={handleSave}
+        disabled={loading}
+      >
+        {loading ? 'Guardando...' : 'Guardar'}
+      </button>
+    ) : canEdit ? (
+      <button
+        className="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700 transition font-bold"
+        onClick={() => setIsEditing(true)}
+      >
+        Editar
+      </button>
+    ) : null}
+
+    {canDelete && (
+      <button
+        className="bg-red-600 text-white px-3 py-2 text-sm rounded hover:bg-red-700 transition font-bold"
+        onClick={() => {
+          toastHOT((t) => (
+            <span>
+              ¿Seguro que quieres eliminar?
+              <div className="mt-2 flex gap-2 justify-end">
+                <button
+                  onClick={() => { toastHOT.dismiss(t.id); handleDelete(); }}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                >
+                  Sí
+                </button>
+                <button
+                  onClick={() => toastHOT.dismiss(t.id)}
+                  className="bg-gray-200 px-3 py-1 rounded text-sm"
+                >
+                  No
+                </button>
+              </div>
+            </span>
+          ), { duration: 6000 });
+        }}
+        disabled={loading}
+      >
+        {loading ? 'Eliminando...' : 'Eliminar'}
+      </button>
+    )}
+  </div>
+</div>
+
 
         {/* WhatsApp */}
         {/* <a 
