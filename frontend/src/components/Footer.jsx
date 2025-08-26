@@ -24,7 +24,7 @@ export default function Footer() {
         </a>
 
         <a
-          href="https://wa.me/50660363957"
+          href="https://wa.me/50660369857"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-black text-white w-12 h-12 flex items-center justify-center rounded-full hover:opacity-80 transition text-2xl z-50 pointer-events-auto"
@@ -36,7 +36,7 @@ export default function Footer() {
       {/* Texto inferior */}
       <div className="mt-4 text-sm text-gray-800 space-y-1">
         <p>© 2025 ChemaSport ER. Todos los derechos reservados.</p>
-        <p>Diseñado por corralessteven1205@gmail.com y pasión por el fútbol.</p>
+        <p>Diseñado por Steven Corrales Alfaro.</p>
       </div>
     </footer>
   );

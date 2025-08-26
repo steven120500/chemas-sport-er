@@ -103,7 +103,7 @@ router.post('/', upload.any(), async (req, res) => {
       await History.create({
         user:  whoDidIt(req),
         action:'creó producto',
-        item:  `${product.name} (#${product._id})`,
+        item:  `${product.name} (#${product.type} || '-')`,
         date:  new Date(),
         details: `img principal: ${imageSrc}`,
       });
@@ -212,7 +212,7 @@ router.put('/:id', async (req, res) => {
         await History.create({
           user:  whoDidIt(req),
           action:'actualizó producto',
-          item:  `${updated.name} (#${updated._id})`,
+          item:  `${product.name} (#${product.type} || '-')`,
           date:  new Date(),
           details: changes.join(' | '),
         });
@@ -246,7 +246,7 @@ router.delete('/:id', async (req, res) => {
       await History.create({
         user:  whoDidIt(req),
         action:'eliminó producto',
-        item:  `${product.name} (#${product._id})`,
+        item:  `${product.name} (#${product.type} || '-')`,
         date:  new Date(),
         details: `imagenes borradas: ${product.images?.length || 0}`,
       });

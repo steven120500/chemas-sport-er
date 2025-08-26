@@ -196,6 +196,11 @@ function App() {
         <Header
           onLoginClick={handleLoginClick}
           onLogout={handleLogout}
+          onLogoClick={()=>{
+            setFilterType("");
+            setSearchTerm("");
+            setPage(1);
+          }}
           user={user}
           isSuperUser={user?.isSuperUser}
           setShowRegisterUserModal={setShowRegisterUserModal}

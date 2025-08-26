@@ -242,11 +242,11 @@ export default function ProductModal({
           className="absolute top-6 right-2 text-white bg-black rounded p-1"
           title="Cerrar"
         >
-          <FaTimes size={18} />
+          <FaTimes size={24} />
         </button>
 
         {/* Encabezado */}
-        <div className="mb-2 text-center">
+        <div className="mt-6 mb-2 text-center">
           {isEditing && canEdit ? (
             <>
               <label className="block text-xs text-gray-500 mb-1">Tipo</label>
@@ -436,7 +436,7 @@ export default function ProductModal({
         </div>
 
         {/* WhatsApp */}
-        <a
+        {/* <a 
           href={`https://wa.me/50660369857?text=${encodeURIComponent(
             `¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} en la página con un valor de ₡${product?.price}. CRC. ¿Está disponible?`
           )}`}
@@ -447,7 +447,7 @@ export default function ProductModal({
         >
           <FaWhatsapp className="mr-2" />
           Enviar mensaje por WhatsApp
-        </a>
+        </a>*/}
       </div>
     </div>
   );

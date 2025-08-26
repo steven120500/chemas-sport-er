@@ -5,6 +5,7 @@ import UserDropDown from "./UserDropDown";
 export default function Header({
   onLoginClick,
   onLogout,
+  onLogoClick, // callback para volver al inicio
   user,
   canSeeHistory,
   isSuperUser,
@@ -13,26 +14,20 @@ export default function Header({
   setShowHistoryModal,
 }) {
   return (
-    <header className="bg-white shadow-md px-6 py-4 relative">
-      <div className="flex items-center justify-between flex-wrap">
-        {/* Logo */}
-        <div className="flex items-center">
-          <img
-            src={logo}
-            alt="Logo Chemas Sport"
-            className="h-20 w-auto"
-          />
-        </div>
-
-        {/* Título */}
-        <div className="w-full mt-4 sm:mt-0 sm:w-auto text-center flex-grow">
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
-            ChemaSport ER
-          </h1>
-        </div>
+    <header className="bg-white shadow-md px-4 sm:px-6 py-3 sm:py-4 relative">
+      {/* Fila superior (siempre): logo izq, usuario der */}
+      <div className="flex items-center justify-between">
+        {/* Logo como botón */}
+        <button
+          onClick={onLogoClick}
+          className="focus:outline-none bg-white"
+          title="Volver al inicio"
+        >
+          <img src={logo} alt="Logo Chemas Sport" className="h-14 sm:h-20" />
+        </button>
 
         {/* Botón de usuario o Login */}
-        <div className="absolute top-6 right-6 flex flex-col gap-2 items-end">
+        <div className="flex items-center">
           {user ? (
             <UserDropDown
               isSuperUser={isSuperUser}
@@ -40,7 +35,7 @@ export default function Header({
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
               onViewHistory={() => setShowHistoryModal(true)}
-              canSeeHistory={user?.isSuperUser || user?.roles?.includes('history')}
+              canSeeHistory={user?.isSuperUser || user?.roles?.includes("history")}
             />
           ) : (
             <button
@@ -53,6 +48,14 @@ export default function Header({
           )}
         </div>
       </div>
+
+      
+      {/* Título */}
+      <div className="text-center">
+      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+        ChemaSport ER
+      </h1>
+    </div>
     </header>
   );
 }
