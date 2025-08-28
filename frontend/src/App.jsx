@@ -245,7 +245,10 @@ function App() {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         filterType={filterType}
-        setFilterType={setFilterType}
+        setFilterType={(t) => {
+          setFilterType(t);
+          setPage(1);
+        }}
       />
 
       {/* ⬇️ Bloque pregunta + botón Medidas */}
@@ -253,7 +256,7 @@ function App() {
         <span className="text-sm sm:text-base text-gray-700">¿Querés saber tu talla?</span>
         <button
           onClick={() => setShowMedidas(true)}
-          className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 transition text-s s:text-base"
+          className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight"
           title="Ver medidas"
         >
           Medidas

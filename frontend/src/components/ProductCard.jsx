@@ -28,10 +28,10 @@ export default function ProductCard({ product, onClick }) {
 
       {/* Nombre y precio */}
       <div className="p-4 text-center flex flex-col items-center justify-between h-[100px]">
-        <h3 className="text-base font-bold text-gray-900 leading-tight line-clamp-2">
+        <h3 className="text-sm sm:text-base md:text-lg font-extrabold font-sans text-gray-900 leading-tight line-clamp-2">
           {product.name}
         </h3>
-        <p className="text-xl font-bold text-gray-800">
+        <p className="mt-2 text-base sm:text-lg md:text-xl font-semibold tracking-tight text-black">
           ₡{product.price?.toLocaleString('de-DE') || product.price}
         </p>
       </div>

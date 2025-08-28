@@ -273,7 +273,7 @@ export default function ProductModal({
               <span className="block text-xs uppercase tracking-wide text-gray-500 font-semibold">
                 {viewProduct?.type}
               </span>
-              <h2 className="text-xl font-bold">{viewProduct?.name}</h2>
+              <h2 className="text-xl font-extrabold font-sans ">{viewProduct?.name}</h2>
             </>
           )}
         </div>
@@ -311,7 +311,7 @@ export default function ProductModal({
                   {localImages.map((_, i) => (
                     <span
                       key={i}
-                      className={`w-2 h-2 rounded-full ${i === idx ? 'bg-white' : 'bg-black/40'}`}
+                      className={`w-2 h-2 rounded-full transition-colors ${i === idx ? 'bg-white' : 'bg-gray-500'}`}
                     />
                   ))}
                 </div>
@@ -344,11 +344,11 @@ export default function ProductModal({
         )}
 
         {/* Precio */}
-        <div className="text-center text-lg font-semibold mb-5">
+        <div className="mt-2 text-base text-center sm:text-lg md:text-2xl font-semibold tracking-tight text-black">
           {isEditing ? (
             <input
               type="number"
-              className="text-center border-b-2 w-full font-semibold text-xl"
+              className="text-center border-b-2 w-full font-semibold text-2xl"
               value={editedPrice}
               onChange={(e) => setEditedPrice(e.target.value)}
             />
