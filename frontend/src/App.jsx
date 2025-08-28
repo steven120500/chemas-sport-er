@@ -328,7 +328,7 @@ function App() {
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1 rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm rounded border disabled:opacity-50"
               title="Anterior"
             >
               Anterior
@@ -358,7 +358,7 @@ function App() {
             <button
               onClick={() => setPage(p => Math.min(pages, p + 1))}
               disabled={page === pages}
-              className="px-3 py-1 rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm rounded border disabled:opacity-50"
               title="Siguiente"
             >
               Siguiente
