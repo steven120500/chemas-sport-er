@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { toast as toastHOT } from 'react-hot-toast';
+import { FaChevronLeft,FaChevronRight } from 'react-icons/fa';
 
 const API_BASE = 'https://chemas-sport-er-backend.onrender.com';
 
@@ -297,21 +298,21 @@ export default function ProductModal({
               <>
                 <button
                   onClick={() => setIdx(i => (i - 1 + localImages.length) % localImages.length)}
-                  className="absolute left-0 z-10 bg-white hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
+                  className="absolute left-0 z-10 bg-black text-white  px-3 py-1 rounded-full shadow-md text-l"
                 >
-                  &#8592;
+                  <FaChevronLeft/>
                 </button>
                 <button
                   onClick={() => setIdx(i => (i + 1) % localImages.length)}
-                  className="absolute right-0 z-10 bg-white hover:bg-white px-3 py-1 rounded-full shadow-md text-xl"
+                  className="absolute right-0 z-10 bg-black text-white px-3 py-1 rounded-full shadow-md text-l"
                 >
-                  &#8594;
+                  <FaChevronRight/>
                 </button>
                 <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                   {localImages.map((_, i) => (
                     <span
                       key={i}
-                      className={`w-2 h-2 rounded-full transition-colors ${i === idx ? 'bg-white' : 'bg-gray-500'}`}
+                      className={`w-2 h-2 rounded-full transition-colors ${i === idx ? 'bg-black' : 'bg-gray-500'}`}
                     />
                   ))}
                 </div>

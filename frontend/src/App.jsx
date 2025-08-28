@@ -20,6 +20,7 @@ import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 import Medidas from './components/Medidas'; // ⬅️ Medidas
+import { FaChevronLeft,FaChevronRight } from 'react-icons/fa';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -328,10 +329,10 @@ function App() {
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-2 py-1 text-sm rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
               title="Anterior"
             >
-              Anterior
+             <FaChevronLeft/>
             </button>
 
             {(() => {
@@ -358,10 +359,11 @@ function App() {
             <button
               onClick={() => setPage(p => Math.min(pages, p + 1))}
               disabled={page === pages}
-              className="px-2 py-1 text-sm rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
               title="Siguiente"
             >
-              Siguiente
+              <FaChevronRight/>
+
             </button>
             
           </nav>
