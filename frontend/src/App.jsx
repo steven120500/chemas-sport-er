@@ -324,14 +324,7 @@ function App() {
       {pages > 1 && (
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
-            <button
-              onClick={() => setPage(1)}
-              disabled={page === 1}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Primera"
-            >
-              «
-            </button>
+           
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
@@ -370,14 +363,7 @@ function App() {
             >
               Siguiente
             </button>
-            <button
-              onClick={() => setPage(pages)}
-              disabled={page === pages}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-              title="Última"
-            >
-              »
-            </button>
+            
           </nav>
         </div>
       )}
