@@ -2,13 +2,36 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { FaWhatsapp, FaTimes } from 'react-icons/fa';
 import { toast as toastHOT } from 'react-hot-toast';
-import { FaChevronLeft,FaChevronRight } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const API_BASE = 'https://chemas-sport-er-backend.onrender.com';
 
 const TALLAS_ADULTO = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const TALLAS_NINO   = ['16', '18', '20', '22', '24', '26', '28'];
 const ACCEPTED_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/heic'];
+
+/* ---------- SOLO PARA AHORRAR ANCHO DE BANDA ---------- */
+const MODAL_IMG_MAX_W = 800; // ancho tope para la imagen grande del modal
+const THUMB_MAX_W     = 240; // ancho tope para miniaturas en modo edición
+
+function transformCloudinary(url, maxW) {
+  // Inserta transformaciones en URLs de Cloudinary sin alterar la URL original en el estado
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes('res.cloudinary.com')) return url;
+
+    // form: /image/upload/...  -> /image/upload/<transforms>/...
+    const parts = u.pathname.split('/upload/');
+    if (parts.length < 2) return url;
+
+    const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW},dpr_auto`;
+    u.pathname = `${parts[0]}/upload/${transforms}/${parts[1]}`;
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+/* ------------------------------------------------------ */
 
 function isLikelyObjectId(v) {
   return typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v);
@@ -59,10 +82,9 @@ export default function ProductModal({
     setEditedType(product?.type || 'Player');
     setEditedStock({ ...(product?.stock || {}) });
 
-    // 👇 importante: usar setLocalImages (no setImages)
     setLocalImages(
       product?.images?.length
-        ? product.images.map(img => ({ src: img.url, isNew: false }))
+        ? product.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
         : [
             ...(product?.imageSrc  ? [{ src: product.imageSrc,  isNew: false }] : []),
             ...(product?.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
@@ -105,10 +127,9 @@ export default function ProductModal({
         price: priceInt,
         type: (editedType || '').trim(),
 
-        // 👉 CLAVE: mandamos también el arreglo de imágenes para que el backend reemplace
+        // Enviamos las URLs originales (no las transformadas)
         images: localImages.map(i => i?.src).filter(Boolean),
 
-        // compat con tu backend actual (no estorba)
         imageSrc:  typeof localImages[0]?.src === 'string' ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === 'string' ? localImages[1].src : null,
         imageAlt: (editedName || '').trim(),
@@ -138,7 +159,7 @@ export default function ProductModal({
       setEditedStock({ ...(updated.stock || {}) });
       setLocalImages(
         updated?.images?.length
-          ? updated.images.map(img => ({ src: img.url, isNew: false }))
+          ? updated.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
           : [
               ...(updated?.imageSrc  ? [{ src: updated.imageSrc,  isNew: false }] : []),
               ...(updated?.imageSrc2 ? [{ src: updated.imageSrc2, isNew: false }] : []),
@@ -208,7 +229,6 @@ export default function ProductModal({
     reader.onload = () => {
       setLocalImages(prev => {
         const copy = prev.slice();
-        // si index está fuera (p.e. agregando 2da imagen), hacemos push
         if (index >= copy.length) copy.push({ src: reader.result, isNew: true });
         else copy[index] = { src: reader.result, isNew: true };
         return copy;
@@ -230,6 +250,11 @@ export default function ProductModal({
   // Tallas visibles
   const isNino = (isEditing ? editedType : viewProduct?.type) === 'Niño';
   const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
+
+  // URL optimizada SOLO para mostrar en modal
+  const displayUrl = currentSrc
+    ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W)
+    : '';
 
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
@@ -282,11 +307,21 @@ export default function ProductModal({
         {/* Galería */}
         {!isEditing ? (
           <div className="relative mb-4 flex items-center justify-center">
-            {currentSrc ? (
+            {displayUrl ? (
               <img
-                src={currentSrc}
+                src={displayUrl}
                 alt={viewProduct?.imageAlt || viewProduct?.name || 'Producto'}
                 className="rounded-lg max-h-[400px] object-contain"
+                /* ahorro de datos */
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+                sizes="(max-width: 640px) 90vw, 800px"
+                srcSet={[
+                  transformCloudinary(currentSrc, 480)  + ' 480w',
+                  transformCloudinary(currentSrc, 800)  + ' 800w',
+                  transformCloudinary(currentSrc, 1200) + ' 1200w',
+                ].join(', ')}
               />
             ) : (
               <div className="h-[300px] w-full grid place-items-center text-gray-400">
@@ -321,19 +356,39 @@ export default function ProductModal({
           </div>
         ) : (
           <div className="flex gap-4 justify-center flex-wrap mb-4">
-            {localImages.map((img, i) => (
-              <div key={i} className="relative">
-                <img src={img.src} alt={`img-${i}`} className="h-48 rounded object-contain" />
-                <button
-                  onClick={() => handleImageRemove(i)}
-                  className="absolute top-0 right-0 bg-black text-white rounded-full p-1 text-sm"
-                  title="Quitar"
-                >
-                  <FaTimes />
-                </button>
-                <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, i)} />
-              </div>
-            ))}
+            {localImages.map((img, i) => {
+              const thumbUrl = img?.src ? transformCloudinary(img.src, THUMB_MAX_W) : '';
+              return (
+                <div key={i} className="relative">
+                  <img
+                    src={thumbUrl || img.src}
+                    alt={`img-${i}`}
+                    className="h-48 rounded object-contain"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    sizes="200px"
+                    srcSet={
+                      img?.src
+                        ? [
+                            transformCloudinary(img.src, 160) + ' 160w',
+                            transformCloudinary(img.src, 240) + ' 240w',
+                            transformCloudinary(img.src, 320) + ' 320w',
+                          ].join(', ')
+                        : undefined
+                    }
+                  />
+                  <button
+                    onClick={() => handleImageRemove(i)}
+                    className="absolute top-0 right-0 bg-black text-white rounded-full p-1 text-sm"
+                    title="Quitar"
+                  >
+                    <FaTimes />
+                  </button>
+                  <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, i)} />
+                </div>
+              );
+            })}
             {localImages.length < 2 && (
               <input
                 type="file"
@@ -357,89 +412,90 @@ export default function ProductModal({
             <p>₡{Number(viewProduct?.price).toLocaleString('de-DE')}</p>
           )}
         </div>
-{/* Tallas / Stock */}
-<div className="mb-0">
-  <p className="text-center font-semibold mb-6">Stock por talla:</p>
-  <div className="grid grid-cols-3 gap-2">
-    {tallasVisibles.map((talla) => {
-      const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
-      return (
-        <div key={talla} className="text-center border rounded p-2">
-          <label className="block text-sm font-medium">{talla}</label>
-          {isEditing ? (
-            <input
-              type="number"
-              min="0"
-              className="w-full border border-gray-300 rounded px-1 text-center"
-              value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
-              onChange={(e) => handleStockChange(talla, e.target.value)}
-            />
-          ) : (
-            <p className="text-xs">{stockToShow[talla] || 0} disponibles</p>
-          )}
+
+        {/* Tallas / Stock */}
+        <div className="mb-0">
+          <p className="text-center font-semibold mb-6">Stock por talla:</p>
+          <div className="grid grid-cols-3 gap-2">
+            {tallasVisibles.map((talla) => {
+              const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
+              return (
+                <div key={talla} className="text-center border rounded p-2">
+                  <label className="block text-sm font-medium">{talla}</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full border border-gray-300 rounded px-1 text-center"
+                      value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
+                      onChange={(e) => handleStockChange(talla, e.target.value)}
+                    />
+                  ) : (
+                    <p className="text-xs">{stockToShow[talla] || 0} disponibles</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      );
-    })}
-  </div>
-</div>
 
-{/* Acciones (debajo de las tallas, centradas y compactas) */}
-<div className="mt-2 border-t pt-4">
-  <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
-    {canEdit && isEditing ? (
-      <button
-        className="col-span-2 bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition font-bold"
-        onClick={handleSave}
-        disabled={loading}
-      >
-        {loading ? 'Guardando...' : 'Guardar'}
-      </button>
-    ) : canEdit ? (
-      <button
-        className="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700 transition font-bold"
-        onClick={() => setIsEditing(true)}
-      >
-        Editar
-      </button>
-    ) : null}
+        {/* Acciones (debajo de las tallas, centradas y compactas) */}
+        <div className="mt-2 border-t pt-4">
+          <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
+            {canEdit && isEditing ? (
+              <button
+                className="col-span-2 bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition font-bold"
+                onClick={handleSave}
+                disabled={loading}
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+            ) : canEdit ? (
+              <button
+                className="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700 transition font-bold"
+                onClick={() => setIsEditing(true)}
+              >
+                Editar
+              </button>
+            ) : null}
 
-    {canDelete && (
-      <button
-        className="bg-red-600 text-white px-3 py-2 text-sm rounded hover:bg-red-700 transition font-bold"
-        onClick={() => {
-          toastHOT((t) => (
-            <span>
-              ¿Seguro que quieres eliminar?
-              <div className="mt-2 flex gap-2 justify-end">
-                <button
-                  onClick={() => { toastHOT.dismiss(t.id); handleDelete(); }}
-                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                >
-                  Sí
-                </button>
-                <button
-                  onClick={() => toastHOT.dismiss(t.id)}
-                  className="bg-gray-200 px-3 py-1 rounded text-sm"
-                >
-                  No
-                </button>
-              </div>
-            </span>
-          ), { duration: 6000 });
-        }}
-        disabled={loading}
-      >
-        {loading ? 'Eliminando...' : 'Eliminar'}
-      </button>
-    )}
-  </div>
-</div>
+            {canDelete && (
+              <button
+                className="bg-red-600 text-white px-3 py-2 text-sm rounded hover:bg-red-700 transition font-bold"
+                onClick={() => {
+                  toastHOT((t) => (
+                    <span>
+                      ¿Seguro que quieres eliminar?
+                      <div className="mt-2 flex gap-2 justify-end">
+                        <button
+                          onClick={() => { toastHOT.dismiss(t.id); handleDelete(); }}
+                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                        >
+                          Sí
+                        </button>
+                        <button
+                          onClick={() => toastHOT.dismiss(t.id)}
+                          className="bg-gray-200 px-3 py-1 rounded text-sm"
+                        >
+                          No
+                        </button>
+                      </div>
+                    </span>
+                  ), { duration: 6000 });
+                }}
+                disabled={loading}
+              >
+                {loading ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            )}
+          </div>
+        </div>
 
-
-        {/* WhatsApp */}
-        {/* <a 
+        {/* WhatsApp (sin cambios, estaba comentado) */}
+        {/*
+        <a 
           href={`https://wa.me/50660369857?text=${encodeURIComponent(
-            `¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} en la página con un valor de ₡${product?.price}. CRC. ¿Está disponible?`
+            ¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} en la página con un valor de ₡${product?.price}. CRC. ¿Está disponible?
           )}`}
           target="_blank"
           rel="noopener noreferrer"
@@ -448,7 +504,8 @@ export default function ProductModal({
         >
           <FaWhatsapp className="mr-2" />
           Enviar mensaje por WhatsApp
-        </a>*/}
+        </a>
+        */}
       </div>
     </div>
   );
