@@ -15,15 +15,11 @@ const MODAL_IMG_MAX_W = 800; // ancho tope para la imagen grande del modal
 const THUMB_MAX_W     = 240; // ancho tope para miniaturas en modo edición
 
 function transformCloudinary(url, maxW) {
-  // Inserta transformaciones en URLs de Cloudinary sin alterar la URL original en el estado
   try {
     const u = new URL(url);
     if (!u.hostname.includes('res.cloudinary.com')) return url;
-
-    // form: /image/upload/...  -> /image/upload/<transforms>/...
     const parts = u.pathname.split('/upload/');
     if (parts.length < 2) return url;
-
     const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW},dpr_auto`;
     u.pathname = `${parts[0]}/upload/${transforms}/${parts[1]}`;
     return u.toString();
@@ -50,11 +46,16 @@ export default function ProductModal({
   // -------- Estado base / edición --------
   const [viewProduct, setViewProduct] = useState(product);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedStock, setEditedStock] = useState(product.stock || {});
-  const [editedName,  setEditedName]  = useState(product?.name || '');
-  const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
-  const [editedType,  setEditedType]  = useState(product?.type || 'Player');
-  const [loading,     setLoading]     = useState(false);
+
+  // 🆕 modo de inventario: 'stock' o 'bodega'
+  const [invMode, setInvMode] = useState('stock');
+
+  const [editedStock,  setEditedStock]  = useState(product.stock  || {});
+  const [editedBodega, setEditedBodega] = useState(product.bodega || {}); // 🆕
+  const [editedName,   setEditedName]   = useState(product?.name || '');
+  const [editedPrice,  setEditedPrice]  = useState(product?.price ?? 0);
+  const [editedType,   setEditedType]   = useState(product?.type || 'Player');
+  const [loading,      setLoading]      = useState(false);
 
   // -------- Galería preferente (product.images) --------
   const galleryFromProduct = useMemo(() => {
@@ -80,8 +81,8 @@ export default function ProductModal({
     setEditedName(product?.name || '');
     setEditedPrice(product?.price ?? 0);
     setEditedType(product?.type || 'Player');
-    setEditedStock({ ...(product?.stock || {}) });
-
+    setEditedStock({ ...(product?.stock  || {}) });
+    setEditedBodega({ ...(product?.bodega || {}) }); // 🆕
     setLocalImages(
       product?.images?.length
         ? product.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
@@ -103,7 +104,6 @@ export default function ProductModal({
   const handleSave = async () => {
     if (loading) return;
 
-    // tomar id de _id o id; validar
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
       console.error('ID inválido o ausente en el modal', product);
@@ -117,19 +117,21 @@ export default function ProductModal({
 
       // Normalizar payload
       const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
-      const cleanStock = Object.fromEntries(
-        Object.entries(editedStock || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)])
-      );
+      const clean = (obj) =>
+        Object.fromEntries(
+          Object.entries(obj || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)])
+        );
 
       const payload = {
-        stock: cleanStock,
         name: (editedName || '').trim(),
         price: priceInt,
         type: (editedType || '').trim(),
+        // 🆕 envia ambos inventarios
+        stock:  clean(editedStock),
+        bodega: clean(editedBodega),
 
         // Enviamos las URLs originales (no las transformadas)
         images: localImages.map(i => i?.src).filter(Boolean),
-
         imageSrc:  typeof localImages[0]?.src === 'string' ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === 'string' ? localImages[1].src : null,
         imageAlt: (editedName || '').trim(),
@@ -156,7 +158,8 @@ export default function ProductModal({
       setEditedName(updated.name || '');
       setEditedPrice(updated.price ?? 0);
       setEditedType(updated.type || 'Player');
-      setEditedStock({ ...(updated.stock || {}) });
+      setEditedStock({ ...(updated.stock  || {}) });
+      setEditedBodega({ ...(updated.bodega || {}) }); // 🆕
       setLocalImages(
         updated?.images?.length
           ? updated.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
@@ -167,7 +170,7 @@ export default function ProductModal({
       );
       setIdx(0);
 
-      onUpdate?.(updated); // actualiza lista externa
+      onUpdate?.(updated);
       setIsEditing(false);
       
     } catch (err) {
@@ -180,28 +183,23 @@ export default function ProductModal({
 
   const handleDelete = async () => {
     if (loading) return;
-
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
       console.error('ID inválido o ausente en el modal (delete)', product);
       toast.error('No se encontró un ID válido del producto');
       return;
     }
-
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || 'ChemaSportER';
-
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', 'x-user': displayName },
       });
-
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
         throw new Error(`Error al eliminar (${res.status}) ${txt}`);
       }
-
       onUpdate?.(null, id);
       onClose?.();
     } catch (err) {
@@ -212,19 +210,22 @@ export default function ProductModal({
     }
   };
 
+  // cambia el inventario que se edita según el modo
   const handleStockChange = (size, value) => {
-    setEditedStock(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+    if (invMode === 'stock') {
+      setEditedStock(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+    } else {
+      setEditedBodega(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+    }
   };
 
   const handleImageChange = (e, index) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!ACCEPTED_TYPES.includes(file.type)) {
       toast.error('Formato de imagen no soportado');
       return;
     }
-
     const reader = new FileReader();
     reader.onload = () => {
       setLocalImages(prev => {
@@ -252,9 +253,13 @@ export default function ProductModal({
   const tallasVisibles = isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
   // URL optimizada SOLO para mostrar en modal
-  const displayUrl = currentSrc
-    ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W)
-    : '';
+  const displayUrl = currentSrc ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W) : '';
+
+  // inventario a mostrar según modo
+  const getInventoryToShow = () => {
+    if (isEditing) return invMode === 'stock' ? editedStock : editedBodega;
+    return invMode === 'stock' ? (viewProduct?.stock || {}) : (viewProduct?.bodega || {});
+  };
 
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
@@ -312,7 +317,6 @@ export default function ProductModal({
                 src={displayUrl}
                 alt={viewProduct?.imageAlt || viewProduct?.name || 'Producto'}
                 className="rounded-lg max-h-[400px] object-contain"
-                /* ahorro de datos */
                 loading="lazy"
                 decoding="async"
                 fetchPriority="low"
@@ -413,12 +417,36 @@ export default function ProductModal({
           )}
         </div>
 
-        {/* Tallas / Stock */}
+        {/* 🆕 Selector Stock / Bodega (solo si puede editar) */}
+        {canEdit && (
+          <div className="mt-4 mb-2 flex items-center justify-center gap-2">
+            <button
+              className={`px-3 py-1 rounded border text-sm ${invMode === 'stock' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              onClick={() => setInvMode('stock')}
+              type="button"
+              title="Ver/editar stock disponible"
+            >
+              Stock
+            </button>
+            <button
+              className={`px-3 py-1 rounded border text-sm ${invMode === 'bodega' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              onClick={() => setInvMode('bodega')}
+              type="button"
+              title="Ver/editar inventario en bodega"
+            >
+              Bodega
+            </button>
+          </div>
+        )}
+
+        {/* Tallas / Inventario según modo */}
         <div className="mb-0">
-          <p className="text-center font-semibold mb-6">Stock por talla:</p>
+          <p className="text-center font-semibold mb-6">
+            {invMode === 'stock' ? 'Stock por talla:' : 'Bodega por talla:'}
+          </p>
           <div className="grid grid-cols-3 gap-2">
             {tallasVisibles.map((talla) => {
-              const stockToShow = isEditing ? editedStock : (viewProduct?.stock || {});
+              const inv = getInventoryToShow();
               return (
                 <div key={talla} className="text-center border rounded p-2">
                   <label className="block text-sm font-medium">{talla}</label>
@@ -427,11 +455,11 @@ export default function ProductModal({
                       type="number"
                       min="0"
                       className="w-full border border-gray-300 rounded px-1 text-center"
-                      value={editedStock[talla] === 0 ? '' : (editedStock[talla] ?? '')}
+                      value={inv[talla] === 0 ? '' : (inv[talla] ?? '')}
                       onChange={(e) => handleStockChange(talla, e.target.value)}
                     />
                   ) : (
-                    <p className="text-xs">{stockToShow[talla] || 0} disponibles</p>
+                    <p className="text-xs">{inv[talla] || 0} disponibles</p>
                   )}
                 </div>
               );
@@ -439,7 +467,7 @@ export default function ProductModal({
           </div>
         </div>
 
-        {/* Acciones (debajo de las tallas, centradas y compactas) */}
+        {/* Acciones */}
         <div className="mt-2 border-t pt-4">
           <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
             {canEdit && isEditing ? (
@@ -491,11 +519,11 @@ export default function ProductModal({
           </div>
         </div>
 
-        {/* WhatsApp (sin cambios, estaba comentado) */}
+        {/* WhatsApp (comentado) */}
         {/*
         <a 
           href={`https://wa.me/50660369857?text=${encodeURIComponent(
-            ¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} en la página con un valor de ₡${product?.price}. CRC. ¿Está disponible?
+            `¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} con valor de ₡${product?.price}. ¿Está disponible?`
           )}`}
           target="_blank"
           rel="noopener noreferrer"

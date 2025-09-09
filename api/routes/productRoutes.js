@@ -23,14 +23,14 @@ function whoDidIt(req) {
   return req.user?.name || req.user?.email || req.headers['x-user'] || req.body.user || 'Sistema';
 }
 
-// Diferencias de stock (para historial)
-function diffStock(prev = {}, next = {}) {
+// Dif de stock/bodega (para historial)
+function diffInv(label, prev = {}, next = {}) {
   const sizes = new Set([...(Object.keys(prev||{})), ...(Object.keys(next||{}))]);
   const out = [];
   for (const s of sizes) {
     const a = Number(prev?.[s] ?? 0);
     const b = Number(next?.[s] ?? 0);
-    if (a !== b) out.push(`stock[${s}]: ${a} -> ${b}`);
+    if (a !== b) out.push(`${label}[${s}]: ${a} -> ${b}`);
   }
   return out;
 }
@@ -41,7 +41,8 @@ function diffProduct(prev, next) {
   if (prev.name  !== next.name)  ch.push(`nombre: "${prev.name}" -> "${next.name}"`);
   if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
   if (prev.type  !== next.type)  ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
-  ch.push(...diffStock(prev.stock, next.stock));
+  ch.push(...diffInv('stock',  prev.stock,  next.stock));
+  ch.push(...diffInv('bodega', prev.bodega, next.bodega));
   return ch;
 }
 
@@ -54,6 +55,17 @@ function uploadToCloudinary(buffer) {
     );
     stream.end(buffer);
   });
+}
+
+// Sanitiza inventario (stock/bodega)
+function sanitizeInv(obj) {
+  const clean = {};
+  for (const [size, qty] of Object.entries(obj || {})) {
+    if (!ALL_SIZES.has(String(size))) continue;
+    const n = Math.max(0, Math.trunc(Number(qty) || 0));
+    clean[size] = n;
+  }
+  return clean;
 }
 
 /* ================= Rutas ================= */
@@ -80,20 +92,22 @@ router.post('/', upload.any(), async (req, res) => {
       else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
       else if (typeof req.body.stock === 'object') stock = req.body.stock;
     } catch { stock = {}; }
+    const cleanStock = sanitizeInv(stock);
 
-    // Sanitizar tallas
-    const cleanStock = {};
-    for (const [size, qty] of Object.entries(stock || {})) {
-      if (!ALL_SIZES.has(String(size))) continue;
-      const n = Math.max(0, Math.trunc(Number(qty) || 0));
-      cleanStock[size] = n;
-    }
+    // ⬇️ NUEVO: parsear bodega si viene
+    let bodega = {};
+    try {
+      if (typeof req.body.bodega === 'string') bodega = JSON.parse(req.body.bodega);
+      else if (typeof req.body.bodega === 'object') bodega = req.body.bodega;
+    } catch { bodega = {}; }
+    const cleanBodega = sanitizeInv(bodega);
 
     const product = await Product.create({
       name : String(req.body.name || '').trim(),
       price: Number(req.body.price),
       type : String(req.body.type || '').trim(),
       stock: cleanStock,
+      bodega: cleanBodega,   // ⬅️ NUEVO
       imageSrc,
       images,
     });
@@ -131,13 +145,17 @@ router.put('/:id', async (req, res) => {
     }
     let nextStock = prev.stock;
     if (incomingStock && typeof incomingStock === 'object') {
-      const clean = {};
-      for (const [size, qty] of Object.entries(incomingStock || {})) {
-        if (!ALL_SIZES.has(String(size))) continue;
-        const n = Math.max(0, Math.trunc(Number(qty) || 0));
-        clean[size] = n;
-      }
-      nextStock = clean;
+      nextStock = sanitizeInv(incomingStock);
+    }
+
+    // -------- BODEGA (NUEVO) --------
+    let incomingBodega = req.body.bodega;
+    if (typeof incomingBodega === 'string') {
+      try { incomingBodega = JSON.parse(incomingBodega); } catch { incomingBodega = undefined; }
+    }
+    let nextBodega = prev.bodega || {};
+    if (incomingBodega && typeof incomingBodega === 'object') {
+      nextBodega = sanitizeInv(incomingBodega);
     }
 
     // -------- CAMPOS --------
@@ -146,14 +164,14 @@ router.put('/:id', async (req, res) => {
       type : typeof req.body.type  === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
       price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
       stock: nextStock,
+      bodega: nextBodega, // ⬅️ NUEVO
     };
 
     if (req.body.imageSrc  !== undefined) update.imageSrc  = req.body.imageSrc  || '';
     if (req.body.imageSrc2 !== undefined) update.imageSrc2 = req.body.imageSrc2 || '';
     if (req.body.imageAlt  !== undefined) update.imageAlt  = req.body.imageAlt  || '';
 
-    // -------- IMÁGENES (CAMBIO MINIMO NECESARIO) --------
-    // Si el frontend envía images: [url|dataURL, ...]:
+    // -------- IMÁGENES --------
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -162,9 +180,8 @@ router.put('/:id', async (req, res) => {
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
 
-      // Normaliza cada entrada: si es dataURL -> subir; si coincide con una url anterior -> conservar public_id
       const normalized = [];
-      for (const raw of incomingImages.slice(0, 2)) {  // tu UI usa máx 2
+      for (const raw of incomingImages.slice(0, 2)) {  // UI máx 2
         if (!raw) continue;
         if (typeof raw === 'string' && raw.startsWith('data:')) {
           const up = await cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' });
@@ -186,8 +203,8 @@ router.put('/:id', async (req, res) => {
         }
       }
 
-      update.images   = normalized;
-      update.imageSrc = normalized[0]?.url || '';
+      update.images    = normalized;
+      update.imageSrc  = normalized[0]?.url || '';
       update.imageSrc2 = normalized[1]?.url || '';
     } else {
       // Compatibilidad: si solo te mandan imageSrc/imageSrc2, reflejarlas en images
@@ -283,7 +300,8 @@ router.get('/', async (req, res) => {
     if (q) find.name = { $regex: q, $options: 'i' };
     if (type) find.type = type;
 
-    const projection = 'name price type imageSrc images stock createdAt';
+    // ⬇️ añadimos bodega a la proyección
+    const projection = 'name price type imageSrc images stock bodega createdAt';
 
     const [items, total] = await Promise.all([
       Product.find(find)

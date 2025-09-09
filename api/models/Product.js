@@ -24,7 +24,7 @@ const imageAnyValidator = {
   message: 'Imagen inválida: debe ser data URL base64 o una URL http(s).'
 };
 
-// stock debe ser { talla: cantidad>=0 } con tallas válidas
+// stock y bodega deben ser { talla: cantidad>=0 } con tallas válidas
 const stockValidator = {
   validator(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
@@ -35,7 +35,7 @@ const stockValidator = {
     }
     return true;
   },
-  message: 'Stock inválido. Debe ser un objeto { talla: cantidad>=0 } con tallas válidas.'
+  message: 'Inventario inválido. Debe ser un objeto { talla: cantidad>=0 } con tallas válidas.'
 };
 
 // ===== Sub-esquema para imágenes (Cloudinary) =====
@@ -59,8 +59,11 @@ const productSchema = new mongoose.Schema(
     // Nuevo: arreglo de imágenes subidas a Cloudinary
     images: { type: [ImageSchema], default: [] },
 
-    // Stock por talla
+    // Stock por talla (visible en la tienda)
     stock: { type: Object, required: true, validate: stockValidator },
+
+    // Nuevo: inventario de bodega (invisible al cliente, solo admins)
+    bodega: { type: Object, default: {}, validate: stockValidator },
 
     // Tipo de producto (ej. Player, Fan, Mujer, Niño...)
     type: { type: String, required: true, trim: true, maxlength: 40 }
@@ -98,4 +101,4 @@ productSchema.set('toObject', { virtuals: false, versionKey: false });
 productSchema.set('minimize', true);
 productSchema.set('strictQuery', true);
 
-export default mongoose.model('Product', productSchema);  
+export default mongoose.model('Product', productSchema);
