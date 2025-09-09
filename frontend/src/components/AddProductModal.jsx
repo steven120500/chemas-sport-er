@@ -6,19 +6,16 @@ import "react-toastify/dist/ReactToastify.css";
 import tallaPorTipo from "../utils/tallaPorTipo";
 
 // ===== Config =====
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://chemas-sport-er-backend.onrender.com";
-
-const MAX_IMAGES = 2;    // hasta 2 imágenes por producto
-const MAX_WIDTH  = 1000; // reescalar si la imagen es más ancha
-const QUALITY    = 0.75; // calidad WebP
+const API_BASE = import.meta.env.VITE_API_BASE || "https://chemas-sport-er-backend.onrender.com";
+const MAX_IMAGES = 2;
+const MAX_WIDTH = 1000;   // reescala si la imagen es más ancha
+const QUALITY = 0.75;     // calidad WebP
 
 // ===== Helpers =====
 
-// File -> Blob WebP (reescalando si hace falta)
+// Convierte File -> Blob WebP (reescala si hace falta)
 async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) {
-  // 1) File -> dataURL
+  // (1) File -> dataURL
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
@@ -26,7 +23,7 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     reader.readAsDataURL(file);
   });
 
-  // 2) dataURL -> Image
+  // (2) dataURL -> Image
   const img = await new Promise((resolve, reject) => {
     const i = new Image();
     i.onload = () => resolve(i);
@@ -34,24 +31,20 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     i.src = dataUrl;
   });
 
-  // 3) Canvas + posible reescalado
+  // (3) Canvas + posible reescalado
   const canvas = document.createElement("canvas");
   const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
   canvas.width = Math.round(img.width * ratio);
   canvas.height = Math.round(img.height * ratio);
-
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  // 4) Canvas -> Blob WebP (fallback a PNG si el browser no soporta WebP)
+  // (4) Canvas -> Blob WebP (fallback PNG si el browser no soporta webp)
   const blob = await new Promise((resolve) => {
     const tryType = "image/webp";
-    const supportsWebp = canvas
-      .toDataURL(tryType)
-      .startsWith("data:image/webp");
     canvas.toBlob(
       (b) => resolve(b),
-      supportsWebp ? tryType : "image/png",
+      canvas.toDataURL(tryType).startsWith("data:image/webp") ? tryType : "image/png",
       quality
     );
   });
@@ -64,12 +57,14 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
 async function srcToBlob(src) {
   if (!src) throw new Error("Imagen sin src");
 
+  // blob: u http(s): -> usan fetch
   if (src.startsWith("blob:") || src.startsWith("http")) {
     const r = await fetch(src);
     if (!r.ok) throw new Error("No se pudo leer blob/url");
     return await r.blob();
   }
 
+  // data:...base64,... -> decodificar a mano
   if (src.startsWith("data:")) {
     const parts = src.split(",");
     if (parts.length < 2) throw new Error("dataURL inválido");
@@ -88,17 +83,18 @@ async function srcToBlob(src) {
 }
 
 export default function AddProductModal({ onAdd, onCancel, user }) {
-  // imágenes optimizadas en memoria: [{ blob, previewUrl }]
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState([]); // [{ blob, previewUrl }]
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [type, setType] = useState("Player");
 
-  // NUEVO: modo de inventario
-  const [inventoryMode, setInventoryMode] = useState("Stock"); // "Stock" | "Bodega"
-
-  // cantidades por talla (aplican al inventario seleccionado)
+  // 👉 Estados separados para cada inventario
   const [stock, setStock] = useState({});
+  const [bodega, setBodega] = useState({});
+
+  // 👉 Modo visible (no borra lo ya escrito en el otro)
+  const [mode, setMode] = useState("stock"); // 'stock' | 'bodega'
+
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -108,7 +104,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
-      // limpiar ObjectURLs
+      // limpiar objectURLs
       setImages((prev) => {
         prev.forEach((it) => it.previewUrl && URL.revokeObjectURL(it.previewUrl));
         return [];
@@ -126,6 +122,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     try {
       setLoading(true);
       const converted = [];
+
       for (const file of files) {
         if (!file.type.startsWith("image/")) {
           toast.error("Formato de imagen no soportado");
@@ -158,6 +155,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     const file = e.target.files?.[0];
     if (!file) return;
     await handleFiles([file]);
+    // permite volver a elegir el mismo archivo
     e.target.value = "";
   };
 
@@ -173,12 +171,16 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     });
   };
 
-  // ===== Stock =====
-  const handleStockChange = (size, value) => {
-    setStock((prev) => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+  // ====== Inventarios ======
+  const visibleInv = mode === "stock" ? stock : bodega;
+  const setVisibleInv = mode === "stock" ? setStock : setBodega;
+
+  const handleInvChange = (size, value) => {
+    const n = Math.max(0, parseInt(value, 10) || 0);
+    setVisibleInv((prev) => ({ ...prev, [size]: n }));
   };
 
-  // ===== Submit =====
+  // ====== Submit ======
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -186,6 +188,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     try {
       setLoading(true);
 
+      // Validaciones simples
       if (!name.trim() || !price || !type.trim()) {
         toast.error("Completá nombre, precio y tipo.");
         return;
@@ -202,19 +205,11 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("price", String(price).trim());
       formData.append("type", type.trim());
 
-      // 👇 NUEVO: modo de inventario y datos
-      // Para máxima compatibilidad con tu backend actual:
-      // - Enviamos siempre "inventoryMode"
-      // - Si es Stock -> "stock"
-      // - Si es Bodega -> "bodega" (puedes leerlo como quieras en el backend)
-      formData.append("inventoryMode", inventoryMode);
-      if (inventoryMode === "Bodega") {
-        formData.append("bodega", JSON.stringify(stock));
-      } else {
-        formData.append("stock", JSON.stringify(stock));
-      }
+      // ⬇️ Enviar AMBOS inventarios (da igual en cuál modo estés al guardar)
+      formData.append("stock", JSON.stringify(stock));
+      formData.append("bodega", JSON.stringify(bodega));
 
-      // Adjuntar todas las imágenes como 'images'
+      // 👉 adjunta TODAS las imágenes con la misma key 'images'
       for (let i = 0; i < images.length; i++) {
         const blob = images[i].blob || (await srcToBlob(images[i].src));
         formData.append("images", blob, `product-${i}.webp`);
@@ -222,20 +217,21 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
       const res = await fetch(`${API_BASE}/api/products`, {
         method: "POST",
-        headers: { "x-user": displayName },
-        body: formData, // NO poner Content-Type manualmente
+        headers: {
+          "x-user": displayName,
+        },
+        body: formData, // NO pongas Content-Type aquí
       });
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
-        throw new Error(
-          `Error al guardar producto (${res.status}). ${txt || ""}`.trim()
-        );
+        throw new Error(`Error al guardar producto (${res.status}). ${txt || ""}`.trim());
       }
 
       const data = await res.json();
-      onAdd?.(data);
-      onCancel?.();
+
+      onAdd?.(data);   // refresca lista
+      onCancel?.();    // cierra modal
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Error guardando el producto");
@@ -253,49 +249,27 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       onDragOver={handleDragOver}
     >
       <div className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
-        {/* Cerrar */}
         <button
           onClick={onCancel}
           className="absolute top-6 right-2 text-white hover:text-gray-800 bg-black rounded p-1"
-          title="Cerrar"
         >
           <FaTimes size={30} />
         </button>
 
         <h2 className="text-lg font-semibold mb-4">Agregar producto</h2>
 
-        {/* Inventario: Stock / Bodega */}
-        <label className="block text-xs text-gray-500 mb-1">Inventario</label>
-        <select
-          value={inventoryMode}
-          onChange={(e) => setInventoryMode(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-4"
-        >
-          <option value="Stock">Stock (visible para clientes)</option>
-          <option value="Bodega">Bodega (interno)</option>
-        </select>
-
         {/* Zona de imágenes */}
         <p className="text-gray-500 mb-2">
-          Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para
-          seleccionar (se convertirán a WebP)
+          Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para seleccionar (se convertirán a WebP)
         </p>
 
         <div className="flex gap-2 justify-center flex-wrap mb-3">
           {images.map((img, i) => (
             <div key={`preview-${i}`} className="relative">
-              <img
-                src={img.previewUrl}
-                alt={`preview-${i}`}
-                className="w-24 h-24 object-cover rounded"
-              />
+              <img src={img.previewUrl} alt={`preview-${i}`} className="w-24 h-24 object-cover rounded" />
               <button
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  handleRemoveImage(i);
-                }}
+                onClick={(e) => { e.stopPropagation(); handleRemoveImage(i); }}
                 className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full px-1"
-                title="Quitar"
               >
                 ✕
               </button>
@@ -344,16 +318,27 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-4"
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
         >
           {Object.keys(tallaPorTipo).map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
+            <option key={t} value={t}>{t}</option>
           ))}
         </select>
 
-        {/* Stock por talla (aplica al inventario elegido) */}
+        {/* Selector de inventario (no borra lo ingresado al cambiar) */}
+        <div className="mb-3">
+          <label className="block text-xs text-gray-500 mb-1">Inventario a editar</label>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded"
+          >
+            <option value="stock">Stock (visible)</option>
+            <option value="bodega">Bodega</option>
+          </select>
+        </div>
+
+        {/* Stock/Bodega por talla (según modo) */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {tallas.map((size) => (
             <label key={size} className="text-center">
@@ -361,8 +346,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <input
                 type="number"
                 min="0"
-                value={stock[size] ?? ""}
-                onChange={(e) => handleStockChange(size, e.target.value)}
+                value={visibleInv[size] ?? ""}
+                onChange={(e) => handleInvChange(size, e.target.value)}
                 className="w-full px-2 py-1 border border-gray-300 rounded text-center"
               />
             </label>
@@ -379,11 +364,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           >
             {loading ? "Agregando..." : "Agregar producto"}
           </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded"
-          >
+          <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded">
             Cancelar
           </button>
         </div>
