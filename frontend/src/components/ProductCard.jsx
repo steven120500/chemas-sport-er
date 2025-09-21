@@ -1,4 +1,4 @@
-  // src/components/ProductCard.jsx
+// src/components/ProductCard.jsx
 import { motion } from "framer-motion";
 
 // 🔽 helper para armar URLs de Cloudinary optimizadas
@@ -16,9 +16,9 @@ export default function ProductCard({ product, onClick, user }) {
   // 🔹 Validar permisos
   const canEdit = user?.isSuperUser || user?.roles?.includes("edit");
 
-  // 🔹 Detectar tallas con poco stock (1 o 2)
+  // 🔹 Detectar tallas con poco o nulo stock (0, 1 o 2)
   const lowStockSizes = Object.entries(product.stock || {}).filter(
-    ([, qty]) => Number(qty) > 0 && Number(qty) <= 2
+    ([, qty]) => Number(qty) >= 0 && Number(qty) <= 2
   );
 
   return (
@@ -64,8 +64,8 @@ export default function ProductCard({ product, onClick, user }) {
         })()}
       </div>
 
-      {/* Nombre y precio */}
-      <div className="p-4 text-center flex flex-col items-center justify-between h-[120px]">
+      {/* Nombre, precio y warning */}
+      <div className="p-4 text-center flex flex-col items-center justify-between h-[130px]">
         <h3 className="text-sm sm:text-base md:text-lg font-extrabold font-sans text-gray-900 leading-tight line-clamp-2">
           {product.name}
         </h3>
@@ -73,12 +73,12 @@ export default function ProductCard({ product, onClick, user }) {
           ₡{product.price?.toLocaleString("de-DE") || product.price}
         </p>
 
-        {/* 🔔 Warning de bajo stock (solo si tiene permisos) */}
+        {/* 🔔 Warning de bajo o nulo stock (solo si tiene permisos) */}
         {canEdit && lowStockSizes.length > 0 && (
           <div className="mt-2 text-xs text-red-600 font-semibold">
             {lowStockSizes.map(([size, qty]) => (
               <div key={size}>
-                ⚠️ Quedan {qty} en talla {size}
+                ⚠️ {qty === 0 ? `Agotado en talla ${size}` : `Quedan ${qty} en talla ${size}`}
               </div>
             ))}
           </div>
