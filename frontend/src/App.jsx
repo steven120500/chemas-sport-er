@@ -270,6 +270,7 @@ function App() {
             key={getPid(product)}
             product={product}
             onClick={() => setSelectedProduct(product)}
+            user={user}
           />
         ))}
       </div>
