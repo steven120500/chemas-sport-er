@@ -16,11 +16,14 @@ const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 export default function ProductCard({ product, onClick, user }) {
   const isNino = product.type === "Niño";
   const sizesToCheck = isNino ? KID_SIZES : ADULT_SIZES;
+  
 
-  const agotadas = [];
-  const quedan1 = [];
+  let warnings = [];
 
-  if (user?.isSuperUser || user?.roles?.includes("edit")) {
+  if (user?.isSuperUser) {
+    const agotadas = [];
+    const quedan1 = [];
+
     for (const size of sizesToCheck) {
       const n = Number(product.stock?.[size]) || 0;
       if (n === 0) {
@@ -29,19 +32,22 @@ export default function ProductCard({ product, onClick, user }) {
         quedan1.push(size);
       }
     }
-  }
 
-  const warnings = [];
-  if (agotadas.length > 0) {
-    warnings.push(`⚠️ Agotado en talla${agotadas.length > 1 ? "s" : ""} ${agotadas.join(", ")}`);
-  }
-  if (quedan1.length > 0) {
-    warnings.push(`⚠️ Queda 1 en talla${quedan1.length > 1 ? "s" : ""} ${quedan1.join(", ")}`);
+    if (agotadas.length > 0) {
+      warnings.push(
+        `⚠️ Agotado en talla${agotadas.length > 1 ? "s" : ""} ${agotadas.join(", ")}`
+      );
+    }
+    if (quedan1.length > 0) {
+      warnings.push(
+        `⚠️ Queda 1 en talla${quedan1.length > 1 ? "s" : ""} ${quedan1.join(", ")}`
+      );
+    }
   }
 
   return (
     <motion.div
-      whileHover={{ scale: 1.03 }}
+      whileHover={{ scale: 1.09 }}
       whileTap={{ scale: 0.98 }}
       className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
@@ -87,7 +93,8 @@ export default function ProductCard({ product, onClick, user }) {
           ₡{product.price?.toLocaleString("de-DE") || product.price}
         </p>
 
-        {warnings.length > 0 && (
+        {/* ⚠️ SOLO superadmin ve esto */}
+        {user?.isSuperUser && warnings.length > 0 && (
           <div className="mt-2 space-y-1 text-xs sm:text-sm text-red-600 font-semibold">
             {warnings.map((msg, idx) => (
               <p key={idx}>{msg}</p>
