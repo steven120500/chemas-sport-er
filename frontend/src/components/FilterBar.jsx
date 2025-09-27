@@ -8,7 +8,7 @@ const filterOptions = [
   'Nacional',
   'Abrigos',
   'Retro',
-  'Niño (Tallatica)',
+  'Niño',
   'F1',
   'NBA',
   'MLB',
