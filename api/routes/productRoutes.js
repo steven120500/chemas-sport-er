@@ -70,7 +70,7 @@ function sanitizeInv(obj) {
 
 /* ================= Rutas ================= */
 
-/** Crear producto (múltiples imágenes via form-data) */
+/** Crear producto */
 router.post('/', upload.any(), async (req, res) => {
   try {
     const files = (req.files || []).filter(f =>
@@ -80,12 +80,10 @@ router.post('/', upload.any(), async (req, res) => {
       return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
-    // Subir todas
     const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images   = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
 
-    // Parsear stock
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
@@ -94,7 +92,6 @@ router.post('/', upload.any(), async (req, res) => {
     } catch { stock = {}; }
     const cleanStock = sanitizeInv(stock);
 
-    // ⬇️ NUEVO: parsear bodega si viene
     let bodega = {};
     try {
       if (typeof req.body.bodega === 'string') bodega = JSON.parse(req.body.bodega);
@@ -107,12 +104,11 @@ router.post('/', upload.any(), async (req, res) => {
       price: Number(req.body.price),
       type : String(req.body.type || '').trim(),
       stock: cleanStock,
-      bodega: cleanBodega,   // ⬅️ NUEVO
+      bodega: cleanBodega,
       imageSrc,
       images,
     });
 
-    // Historial (no bloquear si falla)
     try {
       await History.create({
         user:  whoDidIt(req),
@@ -132,13 +128,12 @@ router.post('/', upload.any(), async (req, res) => {
   }
 });
 
-/** Actualizar producto (campos + imágenes si se envía images) */
+/** Actualizar producto */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // -------- STOCK --------
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
       try { incomingStock = JSON.parse(incomingStock); } catch { incomingStock = undefined; }
@@ -148,7 +143,6 @@ router.put('/:id', async (req, res) => {
       nextStock = sanitizeInv(incomingStock);
     }
 
-    // -------- BODEGA (NUEVO) --------
     let incomingBodega = req.body.bodega;
     if (typeof incomingBodega === 'string') {
       try { incomingBodega = JSON.parse(incomingBodega); } catch { incomingBodega = undefined; }
@@ -158,20 +152,18 @@ router.put('/:id', async (req, res) => {
       nextBodega = sanitizeInv(incomingBodega);
     }
 
-    // -------- CAMPOS --------
     const update = {
       name : typeof req.body.name  === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
       type : typeof req.body.type  === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
       price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
       stock: nextStock,
-      bodega: nextBodega, // ⬅️ NUEVO
+      bodega: nextBodega,
     };
 
     if (req.body.imageSrc  !== undefined) update.imageSrc  = req.body.imageSrc  || '';
     if (req.body.imageSrc2 !== undefined) update.imageSrc2 = req.body.imageSrc2 || '';
     if (req.body.imageAlt  !== undefined) update.imageAlt  = req.body.imageAlt  || '';
 
-    // -------- IMÁGENES --------
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -179,9 +171,8 @@ router.put('/:id', async (req, res) => {
 
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
-
       const normalized = [];
-      for (const raw of incomingImages.slice(0, 2)) {  // UI máx 2
+      for (const raw of incomingImages.slice(0, 2)) {
         if (!raw) continue;
         if (typeof raw === 'string' && raw.startsWith('data:')) {
           const up = await cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' });
@@ -194,20 +185,16 @@ router.put('/:id', async (req, res) => {
           normalized.push({ public_id: raw.public_id || null, url: raw.url });
         }
       }
-
-      // Borrar de Cloudinary las que ya no están
       const keepUrls = new Set(normalized.map(i => i.url));
       for (const old of prevList) {
         if (old.public_id && !keepUrls.has(old.url)) {
           try { await cloudinary.uploader.destroy(old.public_id); } catch {}
         }
       }
-
       update.images    = normalized;
       update.imageSrc  = normalized[0]?.url || '';
       update.imageSrc2 = normalized[1]?.url || '';
     } else {
-      // Compatibilidad: si solo te mandan imageSrc/imageSrc2, reflejarlas en images
       if (req.body.imageSrc !== undefined || req.body.imageSrc2 !== undefined) {
         const imgs = [update.imageSrc, update.imageSrc2]
           .filter(Boolean)
@@ -222,7 +209,6 @@ router.put('/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // -------- HISTORIAL --------
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
       try {
@@ -245,7 +231,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-/** Eliminar producto + borrar imágenes de Cloudinary */
+/** Eliminar producto */
 router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -253,7 +239,7 @@ router.delete('/:id', async (req, res) => {
 
     for (const img of product.images || []) {
       if (img.public_id) {
-        try { await cloudinary.uploader.destroy(img.public_id); } catch { /* ignore */ }
+        try { await cloudinary.uploader.destroy(img.public_id); } catch {}
       }
     }
 
@@ -278,7 +264,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-/** Salud / conteo rápido */
+/** Salud */
 router.get('/health', async (_req, res) => {
   try {
     const count = await Product.countDocuments();
@@ -288,19 +274,29 @@ router.get('/health', async (_req, res) => {
   }
 });
 
-/** Listado paginado */
+/** Listado paginado con filtros */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const q     = (req.query.q || '').trim();
     const type  = (req.query.type || '').trim();
+    const sizes = (req.query.sizes || '').trim();
 
     const find = {};
     if (q) find.name = { $regex: q, $options: 'i' };
     if (type) find.type = type;
 
-    // ⬇️ añadimos bodega a la proyección
+    // ⬇️ Nuevo: filtro por tallas
+    if (sizes) {
+      const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
+      if (arr.length) {
+        find.$or = arr.map(size => ({
+          [`stock.${size}`]: { $gt: 0 }
+        }));
+      }
+    }
+
     const projection = 'name price type imageSrc images stock bodega createdAt';
 
     const [items, total] = await Promise.all([

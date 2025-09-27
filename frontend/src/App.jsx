@@ -19,12 +19,12 @@ import TopBanner from './components/TopBanner';
 import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
-import Medidas from './components/Medidas'; // ⬅️ Medidas
-import { FaChevronLeft,FaChevronRight } from 'react-icons/fa';
+import Medidas from './components/Medidas';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
-// helper para páginas 1 ... (page-2) (page-1) [page] (page+1) (page+2) ... last
+// helper para páginas
 function buildPages(page, pages) {
   const out = new Set([1, pages, page, page - 1, page - 2, page + 1, page + 2]);
   return [...out]
@@ -32,7 +32,6 @@ function buildPages(page, pages) {
     .sort((a, b) => a - b);
 }
 
-// ✅ Normaliza el id (_id o id) a string
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
 function App() {
@@ -41,14 +40,14 @@ function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterSizes, setFilterSizes] = useState([]); // ⬅️ tallas múltiples
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showMedidas, setShowMedidas] = useState(false); // ⬅️ Medidas
+  const [showMedidas, setShowMedidas] = useState(false);
 
-  // --- estados de paginación ---
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
@@ -61,7 +60,7 @@ function App() {
     showRegisterUserModal ||
     showUserListModal ||
     showHistoryModal ||
-    showMedidas; // ⬅️ Medidas
+    showMedidas;
 
   const [user, setUser] = useState(() => {
     try {
@@ -86,11 +85,12 @@ function App() {
     toast.success("Sesión cerrada correctamente");
   };
 
-  // --- cargar productos con paginación y filtros ---
+  // ✅ fetchProducts ahora manda `sizes`
   const fetchProducts = async (opts = {}) => {
     const p  = opts.page ?? page;
     const q  = (opts.q ?? searchTerm).trim();
     const tp = (opts.type ?? filterType).trim();
+    const sz = opts.sizes ?? filterSizes;
 
     setLoading(true);
     try {
@@ -99,13 +99,13 @@ function App() {
         limit: String(limit),
         ...(q  ? { q }        : {}),
         ...(tp ? { type: tp } : {}),
+        ...(sz.length ? { sizes: sz.join(",") } : {}),
       });
 
-      // 🔧 FIX: interpolación correcta
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
 
-      const json = await res.json(); // { items,total,page,pages,limit }
+      const json = await res.json();
       setProducts(json.items);
       setTotal(json.total);
       setPage(json.page);
@@ -118,19 +118,17 @@ function App() {
     }
   };
 
-  // ⬆️ scroll al top al cambiar de página
   const pageTopRef = useRef(null);
   useEffect(() => {
-    fetchProducts({ page, q: searchTerm, type: filterType });
+    fetchProducts({ page, q: searchTerm, type: filterType, sizes: filterSizes });
     if (pageTopRef.current) {
       pageTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, searchTerm, filterType]);
+  }, [page, limit, searchTerm, filterType, filterSizes]);
 
-  // ✅ Actualiza lista y el producto abierto en el modal
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts(prev => prev.filter(p => getPid(p) !== String(deletedId)));
@@ -143,7 +141,6 @@ function App() {
       prev.map(p => (getPid(p) === getPid(updatedProduct) ? { ...p, ...updatedProduct } : p))
     );
 
-    // Mantén el modal sincronizado con los datos nuevos
     setSelectedProduct(prev =>
       prev && getPid(prev) === getPid(updatedProduct) ? { ...prev, ...updatedProduct } : prev
     );
@@ -167,22 +164,16 @@ function App() {
     }, 100);
   };
 
-  const filteredProducts = products.filter((product) => {
-    const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchType = filterType ? product.type === filterType : true;
-    return matchName && matchType;
-  });
+  // tallas disponibles
+  const tallasAdulto = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+  const tallasNino = ["16", "18", "20", "22", "24", "26", "28"];
 
   return (
     <>
       <div ref={pageTopRef} />
 
       {showRegisterUserModal && (
-        <RegisterUserModal
-          onClose={() => {
-            setShowRegisterUserModal(false);
-          }}
-        />
+        <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
       )}
 
       {showUserListModal && (
@@ -201,7 +192,6 @@ function App() {
         />
       )}
 
-      {/* Modal Medidas */}
       {showMedidas && (
         <Medidas
           open={showMedidas}
@@ -221,6 +211,7 @@ function App() {
           onLogoClick={()=>{
             setFilterType("");
             setSearchTerm("");
+            setFilterSizes([]); // reset tallas
             setPage(1);
           }}
           user={user}
@@ -252,7 +243,30 @@ function App() {
         }}
       />
 
-      {/* ⬇️ Bloque pregunta + botón Medidas */}
+      {/* Filtro por tallas */}
+      <div className="px-4 mt-2 mb-4 flex flex-wrap gap-2 justify-center">
+        {[...tallasAdulto, ...tallasNino].map((size) => {
+          const isActive = filterSizes.includes(size);
+          return (
+            <button
+              key={size}
+              onClick={() => {
+                setFilterSizes((prev) =>
+                  isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                );
+                setPage(1); // reset a página 1
+              }}
+              className={`px-3 py-1 rounded border ${
+                isActive ? "bg-black text-white" : "bg-white hover:bg-gray-200"
+              }`}
+            >
+              {size}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Pregunta + botón Medidas */}
       <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
         <span className="text-sm sm:text-base text-gray-700">¿Querés saber tu talla?</span>
         <button
@@ -265,7 +279,7 @@ function App() {
       </div>
 
       <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
-        {filteredProducts.map((product) => (
+        {products.map((product) => (
           <ProductCard
             key={getPid(product)}
             product={product}
@@ -322,18 +336,16 @@ function App() {
         <button onClick={() => setShowHistoryModal(true)} style={{ display: 'none' }} />
       )}
 
-      {/* --- Paginación --- */}
       {pages > 1 && (
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
-           
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
               className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
               title="Anterior"
             >
-             <FaChevronLeft/>
+              <FaChevronLeft/>
             </button>
 
             {(() => {
@@ -364,9 +376,7 @@ function App() {
               title="Siguiente"
             >
               <FaChevronRight/>
-
             </button>
-            
           </nav>
         </div>
       )}
