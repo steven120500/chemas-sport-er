@@ -44,7 +44,8 @@ function App() {
   // --- filtros ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
-  const [filterSizes, setFilterSizes] = useState([]); // varias tallas
+  const [filterSizes, setFilterSizes] = useState([]); 
+  const [showSizes, setShowSizes] = useState(false);
 
   // --- modales ---
   const [showAddModal, setShowAddModal] = useState(false);
@@ -136,7 +137,6 @@ function App() {
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, searchTerm, filterType, filterSizes]);
 
   // update producto
@@ -164,9 +164,7 @@ function App() {
   };
 
   // login
-  const handleLoginClick = () => {
-    setShowLogin(true);
-  };
+  const handleLoginClick = () => setShowLogin(true);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -180,22 +178,10 @@ function App() {
     }, 100);
   };
 
-  // filtro
+  // filtro tallas
   const allSizes = [
-    'S',
-    'M',
-    'L',
-    'XL',
-    'XXL',
-    '3XL',
-    '4XL',
-    '16',
-    '18',
-    '20',
-    '22',
-    '24',
-    '26',
-    '28',
+    'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL',
+    '16', '18', '20', '22', '24', '26', '28',
   ];
 
   const filteredProducts = products.filter((product) => {
@@ -223,43 +209,27 @@ function App() {
 
   // tallas
   const tallasAdulto = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
-  const tallasNino = ['16', '18', '20', '22', '24', '26', '28'];
+  const tallasNino = [
+    { size: '16', label: '16 (Talla 2)' },
+    { size: '18', label: '18 (Talla 4)' },
+    { size: '20', label: '20 (Talla 6)' },
+    { size: '22', label: '22 (Talla 8)' },
+    { size: '24', label: '24 (Talla 10)' },
+    { size: '26', label: '26 (Talla 12)' },
+    { size: '28', label: '28 (Talla 14/16)' },
+  ];
 
-  // render
   return (
     <>
       <div ref={pageTopRef} />
 
-      {showRegisterUserModal && (
-        <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
-      )}
-
-      {showUserListModal && (
-        <UserListModal
-          open={showUserListModal}
-          onClose={() => setShowUserListModal(false)}
-        />
-      )}
-
-      {showHistoryModal && (
-        <HistoryModal
-          open={showHistoryModal}
-          onClose={() => setShowHistoryModal(false)}
-          isSuperUser={user?.isSuperUser === true}
-          roles={user?.roles || []}
-        />
-      )}
-
-      {showMedidas && (
-        <Medidas
-          open={showMedidas}
-          onClose={() => setShowMedidas(false)}
-          currentType={filterType || 'Todos'}
-        />
-      )}
+      {/* Modales */}
+      {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
+      {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
+      {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
+      {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
 
       <TopBanner />
-
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
       {!anyModalOpen && (
@@ -290,6 +260,7 @@ function App() {
         </button>
       )}
 
+      {/* Barra filtros */}
       <FilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -298,47 +269,67 @@ function App() {
           setFilterType(t);
           setPage(1);
         }}
+        onToggleTallas={() => setShowSizes(!showSizes)}
       />
 
-      {/* Filtro por tallas */}
-      <div className="px-4 mt-2 mb-4 flex flex-wrap gap-2 justify-center">
-        {[...tallasAdulto, ...tallasNino].map((size) => {
-          const isActive = filterSizes.includes(size);
-          return (
-            <button
-              key={size}
-              onClick={() => {
-                setFilterSizes((prev) =>
-                  isActive
-                    ? prev.filter((s) => s !== size)
-                    : [...prev, size]
+      {/* Botones tallas con subtítulos */}
+      {showSizes && (
+        <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
+          {/* Adulto */}
+          <div className="w-full text-center">
+            <h3 className="font-semibold text-gray-800 mb-2">Adulto</h3>
+            <div className="flex flex-wrap justify-center gap-2">
+              {tallasAdulto.map((size) => {
+                const isActive = filterSizes.includes(size);
+                return (
+                  <button
+                    key={size}
+                    onClick={() => {
+                      setFilterSizes((prev) =>
+                        isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                      );
+                    }}
+                    className={`px-3 py-1 rounded-md border ${
+                      isActive
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-black border-gray-400 hover:bg-gray-200'
+                    }`}
+                  >
+                    {size}
+                  </button>
                 );
-              }}
-              className={`px-3 py-1 rounded-md border ${
-                isActive
-                  ? 'bg-black text-white border-black'
-                  : 'bg-white text-black border-gray-400 hover:bg-gray-200'
-              }`}
-            >
-              {size}
-            </button>
-          );
-        })}
-      </div>
+              })}
+            </div>
+          </div>
 
-      {/* Pregunta + botón Medidas */}
-      <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
-        <span className="text-sm sm:text-base text-gray-700">
-          ¿Querés saber tu talla?
-        </span>
-        <button
-          onClick={() => setShowMedidas(true)}
-          className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight"
-          title="Ver medidas"
-        >
-          Medidas
-        </button>
-      </div>
+          {/* Niño (Tallatica) */}
+          <div className="w-full text-center">
+            <h3 className="font-semibold text-gray-800 mb-2">Niño (Talla de Costa Rica)</h3>
+            <div className="flex flex-wrap justify-center gap-2">
+              {tallasNino.map(({ size, label }) => {
+                const isActive = filterSizes.includes(size);
+                return (
+                  <button
+                    key={size}
+                    onClick={() => {
+                      setFilterSizes((prev) =>
+                        isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                      );
+                    }}
+                    className={`px-3 py-1 rounded-md border ${
+                      isActive
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-black border-gray-400 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Productos */}
       <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
@@ -354,14 +345,13 @@ function App() {
         ) : (
           <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
             {filterSizes.length > 0
-              ? `No tenemos disponibles en talla ${filterSizes.join(
-                  ', '
-                )} por ahora, ¡pero pronto tendremos más!`
+              ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora, ¡pero pronto tendremos más!`
               : 'No tenemos productos disponibles en este momento, ¡pero pronto tendremos más!'}
           </div>
         )}
       </div>
 
+      {/* Product modal */}
       {selectedProduct && (
         <ProductModal
           key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
@@ -374,6 +364,7 @@ function App() {
         />
       )}
 
+      {/* Add product modal */}
       {showAddModal && (
         <AddProductModal
           user={user}
@@ -387,6 +378,7 @@ function App() {
         />
       )}
 
+      {/* Login modal */}
       {showLogin && (
         <LoginModal
           isOpen={showLogin}
@@ -401,15 +393,12 @@ function App() {
         />
       )}
 
-      {showRegisterUserModal && (
-        <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />
-      )}
+      {/* Register user modal */}
+      {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
 
+      {/* Historial oculto */}
       {canSeeHistory && (
-        <button
-          onClick={() => setShowHistoryModal(true)}
-          style={{ display: 'none' }}
-        />
+        <button onClick={() => setShowHistoryModal(true)} style={{ display: 'none' }} />
       )}
 
       {/* Paginación */}
