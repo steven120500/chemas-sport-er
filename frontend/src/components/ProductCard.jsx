@@ -47,13 +47,13 @@ export default function ProductCard({ product, onClick, user }) {
 
   return (
     <motion.div
-      whileHover={{ scale: 1.09 }}
+      whileHover={{ scale: 1.09  }}
       whileTap={{ scale: 0.98 }}
       className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
       {product.type && (
-        <div className="absolute top-2 left-2 z-10">
+        <div className="absolute top-2 left-2 z-0">
           <div className="bg-black text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
             {product.type}
           </div>
