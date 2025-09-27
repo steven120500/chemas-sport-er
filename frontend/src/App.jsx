@@ -331,6 +331,20 @@ function App() {
         </div>
       )}
 
+      {/* Pregunta + botón Medidas */}
+      <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
+        <span className="text-sm sm:text-base text-gray-700">
+          ¿Querés saber tu talla?
+        </span>
+        <button
+          onClick={() => setShowMedidas(true)}
+          className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight"
+          title="Ver medidas"
+        >
+          Medidas
+        </button>
+      </div>
+
       {/* Productos */}
       <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
