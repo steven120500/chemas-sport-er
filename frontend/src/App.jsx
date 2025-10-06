@@ -135,28 +135,34 @@ function App() {
       let pageN = 1;
       const pageSize = 200;
       const acc = [];
-
+  
       while (true) {
         const params = new URLSearchParams({
           page: String(pageN),
           limit: String(pageSize),
+          t:Date.now().toString(),
+        });
+  
+        const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
+          cache: 'no-store',
         });
 
-        const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
         if (!res.ok) throw new Error("HTTP " + res.status);
         const json = await res.json();
-
+  
         acc.push(...json.items);
         if (acc.length >= json.total) break; // ya juntamos todos
         pageN += 1;
+        await new Promise((r) => setTimeout(r,100));
       }
-
+  
       setAllProductsForCounts(acc);
     } catch (e) {
       console.error("fetchAllForCounts error:", e);
       setAllProductsForCounts([]);
     }
   };
+  
 
   // scroll al top y fetch de productos
   const pageTopRef = useRef(null);
@@ -171,12 +177,16 @@ function App() {
 
   // ✅ cargar todos los productos para Cantidad
   useEffect(() => {
+    if(products.length > 0){
     fetchAllForCounts();
-  }, []);
+    }
+  }, [products]);
 
   // ✅ refrescar totales cada vez que agregás, editás o eliminás producto
   const refreshCounts = () => {
+    setTimeout(()=>{
     fetchAllForCounts();
+    }, 600);
   };
 
   // update producto
