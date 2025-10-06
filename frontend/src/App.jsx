@@ -404,6 +404,56 @@ function App() {
         }} onRegisterClick={handleRegisterClick} />
       )}
 
+        {/* Paginación */}
+        {pages > 1 && (
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <nav className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
+              title="Anterior"
+            >
+              <FaChevronLeft />
+            </button>
+
+            {(() => {
+              const nums = buildPages(page, pages);
+              return nums.map((n, i) => {
+                const prev = nums[i - 1];
+                const showDots = i > 0 && n - prev > 1;
+                return (
+                  <span key={n} className="flex">
+                    {showDots && <span className="px-2">…</span>}
+                    <button
+                      onClick={() => setPage(n)}
+                      className={`px-2 text-sm py-0.5 rounded border ${
+                        n === page
+                          ? 'bg-black text-white'
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  </span>
+                );
+              });
+            })()}
+
+            <button
+              onClick={() => setPage((p) => Math.min(pages, p + 1))}
+              disabled={page === pages}
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
+              title="Siguiente"
+            >
+              <FaChevronRight />
+            </button>
+          </nav>
+        </div>
+      )}
+
+
+
       <Footer />
       {!anyModalOpen && <FloatingWhatsapp />}
       <ToastContainer />
