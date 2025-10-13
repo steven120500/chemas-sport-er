@@ -302,7 +302,7 @@ export default function ProductModal({
               <label className="block text-xs text-gray-500 mb-1 mt-4">Precio con descuento</label>
               <input
                 type="number"
-                className="text-center border-b-2 w-full font-semibold text-2xl text-yellow-600"
+                className="text-center border-b-2 w-full font-semibold text-2xl text-green-600"
                 value={editedDiscountPrice}
                 onChange={(e) => setEditedDiscountPrice(e.target.value)}
               />
@@ -391,7 +391,7 @@ export default function ProductModal({
                 <p className="text-sm sm:text-base line-through text-gray-400">
                   ₡{Number(viewProduct.price).toLocaleString('de-DE')}
                 </p>
-                <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-yellow-600">
+                <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-600">
                   ₡{Number(viewProduct.discountPrice).toLocaleString('de-DE')}
                 </p>
               </>
@@ -456,7 +456,7 @@ export default function ProductModal({
           <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
             {canEdit && isEditing ? (
               <button
-                className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded hover:bg-yellow-500 transition font-bold"
+                className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded hover:bg-green-500 transition font-bold"
                 onClick={handleSave}
                 disabled={loading}
               >

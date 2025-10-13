@@ -65,7 +65,7 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* 💰 Etiqueta de oferta */}
       {hasDiscount && (
-        <div className="absolute top-2 right-2 bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow z-10">
+        <div className="absolute bottom-48 right-0 bg-green-600 text-white text-m font-bold px-3 py-1  shadow z-10">
           Oferta
         </div>
       )}
@@ -105,10 +105,10 @@ export default function ProductCard({ product, onClick, user }) {
         {/* 💰 Precio normal o con descuento */}
         {hasDiscount ? (
           <div className="mt-2 flex flex-col items-center">
-            <p className="text-sm sm:text-base line-through text-gray-400">
+            <p className="text-sm sm:text-base line-through text-gray-600">
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-yellow-600">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-600">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>

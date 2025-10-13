@@ -151,7 +151,7 @@ function App() {
         const json = await res.json();
   
         acc.push(...json.items);
-        if (acc.length >= json.total) break; // ya juntamos todos
+        if (acc.length >= json.total) break;
         pageN += 1;
         await new Promise((r) => setTimeout(r,100));
       }
@@ -182,7 +182,7 @@ function App() {
     }
   }, [products]);
 
-  // ✅ refrescar totales cada vez que agregás, editás o eliminás producto
+  // ✅ refrescar totales
   const refreshCounts = () => {
     setTimeout(()=>{
     fetchAllForCounts();
@@ -195,7 +195,7 @@ function App() {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
       setSelectedProduct(null);
       toast.success('Producto eliminado correctamente');
-      refreshCounts(); // ✅ actualiza cantidad
+      refreshCounts();
       return;
     }
 
@@ -212,7 +212,7 @@ function App() {
     );
 
     toast.success('Producto actualizado correctamente');
-    refreshCounts(); // ✅ actualiza cantidad
+    refreshCounts();
   };
 
   // login
@@ -227,8 +227,21 @@ function App() {
   // filtro tallas
   const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
 
+  // ✅ Filtro actualizado para Ofertas
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 🆕 Filtro especial para ofertas (si tiene discountPrice > 0)
+    if (filterType === 'Ofertas') {
+      return (
+        product.discountPrice !== undefined &&
+        product.discountPrice !== null &&
+        Number(product.discountPrice) > 0 &&
+        matchName
+      );
+    }
+
+    // Filtro por tipo normal
     const matchType = filterType ? product.type === filterType : true;
 
     if (filterSizes.length === allSizes.length) return matchName && matchType;
@@ -270,7 +283,6 @@ function App() {
       <TopBanner />
       {loading && <LoadingOverlay message="Cargando productos..." />}
 
-      {/* ✅ Cantidad global */}
       {!loading && allProductsForCounts?.length > 0 && (
         <Cantidad products={allProductsForCounts} isSuperUser={isSuperUser} />
       )}
@@ -365,7 +377,6 @@ function App() {
         </div>
       )}
 
-      {/* Pregunta + botón Medidas */}
       <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
         <span className="text-sm sm:text-base text-gray-700">¿Querés saber tu talla?</span>
         <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight" title="Ver medidas">
@@ -388,7 +399,6 @@ function App() {
         )}
       </div>
 
-      {/* Modales */}
       {selectedProduct && (
         <ProductModal key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`} product={selectedProduct} onClose={() => setSelectedProduct(null)} onUpdate={handleProductUpdate} canEdit={canEdit} canDelete={canDelete} user={user} />
       )}
@@ -399,7 +409,7 @@ function App() {
             setProducts((prev) => [newProduct, ...prev]);
             setShowAddModal(false);
             toast.success('Producto agregado correctamente');
-            refreshCounts(); // ✅ actualiza cantidad
+            refreshCounts();
           }}
           onCancel={() => setShowAddModal(false)}
         />
@@ -414,8 +424,7 @@ function App() {
         }} onRegisterClick={handleRegisterClick} />
       )}
 
-        {/* Paginación */}
-        {pages > 1 && (
+      {pages > 1 && (
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
             <button
@@ -461,8 +470,6 @@ function App() {
           </nav>
         </div>
       )}
-
-
 
       <Footer />
       {!anyModalOpen && <FloatingWhatsapp />}

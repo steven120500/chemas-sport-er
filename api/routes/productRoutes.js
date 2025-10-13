@@ -39,7 +39,6 @@ function diffProduct(prev, next) {
   const ch = [];
   if (prev.name  !== next.name)  ch.push(`nombre: "${prev.name}" -> "${next.name}"`);
   if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
-  // 🟡 Nuevo: comparar descuento
   if (prev.discountPrice !== next.discountPrice) ch.push(`descuento: ${prev.discountPrice} -> ${next.discountPrice}`);
   if (prev.type  !== next.type)  ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
   ch.push(...diffInv('stock',  prev.stock,  next.stock));

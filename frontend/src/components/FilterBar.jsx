@@ -1,3 +1,4 @@
+// src/components/FilterBar.jsx
 import { motion } from 'framer-motion';
 
 const filterOptions = [
@@ -13,6 +14,7 @@ const filterOptions = [
   'NBA',
   'MLB',
   'NFL',
+  'Ofertas', // ✅ nuevo botón
 ];
 
 export default function FilterBar({
