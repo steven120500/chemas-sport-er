@@ -286,10 +286,21 @@ router.get('/', async (req, res) => {
     const sizes = (req.query.sizes || '').trim();
 
     const find = {};
-    if (q) find.name = { $regex: q, $options: 'i' };
-    if (type) find.type = type;
 
-    // ⬇️ Nuevo: filtro por tallas
+    // 🔎 Búsqueda por nombre
+    if (q) find.name = { $regex: q, $options: 'i' };
+
+    // 🔥 Filtro especial para ofertas
+    if (type === 'Ofertas') {
+      find.discountPrice = { $gt: 0 };
+      find.$expr = { $lt: ['$discountPrice', '$price'] };
+    } 
+    // Tipo normal
+    else if (type) {
+      find.type = type;
+    }
+
+    // ⬇️ Filtro por tallas
     if (sizes) {
       const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
       if (arr.length) {
