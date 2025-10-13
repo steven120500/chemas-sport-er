@@ -51,9 +51,10 @@ export default function ProductModal({
   const [invMode, setInvMode] = useState('stock');
 
   const [editedStock,  setEditedStock]  = useState(product.stock  || {});
-  const [editedBodega, setEditedBodega] = useState(product.bodega || {}); // 🆕
+  const [editedBodega, setEditedBodega] = useState(product.bodega || {}); 
   const [editedName,   setEditedName]   = useState(product?.name || '');
   const [editedPrice,  setEditedPrice]  = useState(product?.price ?? 0);
+  const [editedDiscountPrice, setEditedDiscountPrice] = useState(product?.discountPrice ?? 0); // 🟡 nuevo
   const [editedType,   setEditedType]   = useState(product?.type || 'Player');
   const [loading,      setLoading]      = useState(false);
 
@@ -80,9 +81,10 @@ export default function ProductModal({
     setViewProduct(product);
     setEditedName(product?.name || '');
     setEditedPrice(product?.price ?? 0);
+    setEditedDiscountPrice(product?.discountPrice ?? 0); // 🟡 nuevo
     setEditedType(product?.type || 'Player');
     setEditedStock({ ...(product?.stock  || {}) });
-    setEditedBodega({ ...(product?.bodega || {}) }); // 🆕
+    setEditedBodega({ ...(product?.bodega || {}) }); 
     setLocalImages(
       product?.images?.length
         ? product.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
@@ -106,7 +108,6 @@ export default function ProductModal({
 
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
-      console.error('ID inválido o ausente en el modal', product);
       toast.error('No se encontró un ID válido del producto');
       return;
     }
@@ -115,8 +116,8 @@ export default function ProductModal({
       setLoading(true);
       const displayName = user?.username || user?.email || 'ChemaSportER';
 
-      // Normalizar payload
       const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
+      const discountInt = Math.max(0, parseInt(editedDiscountPrice, 10) || 0); // 🟡 nuevo
       const clean = (obj) =>
         Object.fromEntries(
           Object.entries(obj || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)])
@@ -125,12 +126,11 @@ export default function ProductModal({
       const payload = {
         name: (editedName || '').trim(),
         price: priceInt,
+        discountPrice: discountInt, // 🟡 nuevo
         type: (editedType || '').trim(),
-        // 🆕 envia ambos inventarios
         stock:  clean(editedStock),
         bodega: clean(editedBodega),
 
-        // Enviamos las URLs originales (no las transformadas)
         images: localImages.map(i => i?.src).filter(Boolean),
         imageSrc:  typeof localImages[0]?.src === 'string' ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === 'string' ? localImages[1].src : null,
@@ -146,20 +146,17 @@ export default function ProductModal({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        throw new Error(`Error al actualizar (${res.status}) ${txt}`);
-      }
+      if (!res.ok) throw new Error(`Error al actualizar (${res.status})`);
 
       const updated = await res.json();
 
-      // 🔁 sincroniza vistas locales
       setViewProduct(updated);
       setEditedName(updated.name || '');
       setEditedPrice(updated.price ?? 0);
+      setEditedDiscountPrice(updated.discountPrice ?? 0); // 🟡 nuevo
       setEditedType(updated.type || 'Player');
       setEditedStock({ ...(updated.stock  || {}) });
-      setEditedBodega({ ...(updated.bodega || {}) }); // 🆕
+      setEditedBodega({ ...(updated.bodega || {}) });
       setLocalImages(
         updated?.images?.length
           ? updated.images.map(img => ({ src: typeof img === 'string' ? img : img.url, isNew: false }))
@@ -185,7 +182,6 @@ export default function ProductModal({
     if (loading) return;
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
-      console.error('ID inválido o ausente en el modal (delete)', product);
       toast.error('No se encontró un ID válido del producto');
       return;
     }
@@ -196,21 +192,16 @@ export default function ProductModal({
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', 'x-user': displayName },
       });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        throw new Error(`Error al eliminar (${res.status}) ${txt}`);
-      }
+      if (!res.ok) throw new Error('Error al eliminar');
       onUpdate?.(null, id);
       onClose?.();
     } catch (err) {
-      console.error(err);
       toast.error('No se pudo eliminar el producto');
     } finally {
       setLoading(false);
     }
   };
 
-  // cambia el inventario que se edita según el modo
   const handleStockChange = (size, value) => {
     if (invMode === 'stock') {
       setEditedStock(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
@@ -255,11 +246,12 @@ export default function ProductModal({
   // URL optimizada SOLO para mostrar en modal
   const displayUrl = currentSrc ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W) : '';
 
-  // inventario a mostrar según modo
   const getInventoryToShow = () => {
     if (isEditing) return invMode === 'stock' ? editedStock : editedBodega;
     return invMode === 'stock' ? (viewProduct?.stock || {}) : (viewProduct?.bodega || {});
   };
+
+  const hasDiscount = viewProduct?.discountPrice && Number(viewProduct.discountPrice) > 0; // 🟡 nuevo
 
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
@@ -298,6 +290,22 @@ export default function ProductModal({
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
               />
+
+              <label className="block text-xs text-gray-500 mb-1 mt-4">Precio normal</label>
+              <input
+                type="number"
+                className="text-center border-b-2 w-full font-semibold text-2xl"
+                value={editedPrice}
+                onChange={(e) => setEditedPrice(e.target.value)}
+              />
+
+              <label className="block text-xs text-gray-500 mb-1 mt-4">Precio con descuento</label>
+              <input
+                type="number"
+                className="text-center border-b-2 w-full font-semibold text-2xl text-yellow-600"
+                value={editedDiscountPrice}
+                onChange={(e) => setEditedDiscountPrice(e.target.value)}
+              />
             </>
           ) : (
             <>
@@ -318,14 +326,6 @@ export default function ProductModal({
                 alt={viewProduct?.imageAlt || viewProduct?.name || 'Producto'}
                 className="rounded-lg max-h-[400px] object-contain"
                 loading="lazy"
-                decoding="async"
-                fetchPriority="low"
-                sizes="(max-width: 640px) 90vw, 800px"
-                srcSet={[
-                  transformCloudinary(currentSrc, 480)  + ' 480w',
-                  transformCloudinary(currentSrc, 800)  + ' 800w',
-                  transformCloudinary(currentSrc, 1200) + ' 1200w',
-                ].join(', ')}
               />
             ) : (
               <div className="h-[300px] w-full grid place-items-center text-gray-400">
@@ -347,14 +347,6 @@ export default function ProductModal({
                 >
                   <FaChevronRight/>
                 </button>
-                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                  {localImages.map((_, i) => (
-                    <span
-                      key={i}
-                      className={`w-2 h-2 rounded-full transition-colors ${i === idx ? 'bg-black' : 'bg-gray-500'}`}
-                    />
-                  ))}
-                </div>
               </>
             )}
           </div>
@@ -369,18 +361,6 @@ export default function ProductModal({
                     alt={`img-${i}`}
                     className="h-48 rounded object-contain"
                     loading="lazy"
-                    decoding="async"
-                    fetchPriority="low"
-                    sizes="200px"
-                    srcSet={
-                      img?.src
-                        ? [
-                            transformCloudinary(img.src, 160) + ' 160w',
-                            transformCloudinary(img.src, 240) + ' 240w',
-                            transformCloudinary(img.src, 320) + ' 320w',
-                          ].join(', ')
-                        : undefined
-                    }
                   />
                   <button
                     onClick={() => handleImageRemove(i)}
@@ -403,28 +383,33 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* Precio */}
-        <div className="mt-2 text-base text-center sm:text-lg md:text-2xl font-semibold tracking-tight text-black">
-          {isEditing ? (
-            <input
-              type="number"
-              className="text-center border-b-2 w-full font-semibold text-2xl"
-              value={editedPrice}
-              onChange={(e) => setEditedPrice(e.target.value)}
-            />
-          ) : (
-            <p>₡{Number(viewProduct?.price).toLocaleString('de-DE')}</p>
-          )}
-        </div>
+        {/* 💰 Precio */}
+        {!isEditing && (
+          <div className="mt-2 text-center">
+            {hasDiscount ? (
+              <>
+                <p className="text-sm sm:text-base line-through text-gray-400">
+                  ₡{Number(viewProduct.price).toLocaleString('de-DE')}
+                </p>
+                <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-yellow-600">
+                  ₡{Number(viewProduct.discountPrice).toLocaleString('de-DE')}
+                </p>
+              </>
+            ) : (
+              <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-black">
+                ₡{Number(viewProduct.price).toLocaleString('de-DE')}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* 🆕 Selector Stock / Bodega (solo si puede editar) */}
+        {/* 🆕 Selector Stock / Bodega */}
         {canEdit && (
           <div className="mt-4 mb-2 flex items-center justify-center gap-2">
             <button
               className={`px-3 py-1 rounded border text-sm ${invMode === 'stock' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
               onClick={() => setInvMode('stock')}
               type="button"
-              title="Ver/editar stock disponible"
             >
               Stock
             </button>
@@ -432,14 +417,13 @@ export default function ProductModal({
               className={`px-3 py-1 rounded border text-sm ${invMode === 'bodega' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
               onClick={() => setInvMode('bodega')}
               type="button"
-              title="Ver/editar inventario en bodega"
             >
               Bodega
             </button>
           </div>
         )}
 
-        {/* Tallas / Inventario según modo */}
+        {/* Tallas */}
         <div className="mb-0">
           <p className="text-center font-semibold mb-6">
             {invMode === 'stock' ? 'Stock por talla:' : 'Bodega por talla:'}
@@ -472,7 +456,7 @@ export default function ProductModal({
           <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
             {canEdit && isEditing ? (
               <button
-                className="col-span-2 bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition font-bold"
+                className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded hover:bg-yellow-500 transition font-bold"
                 onClick={handleSave}
                 disabled={loading}
               >
@@ -480,7 +464,7 @@ export default function ProductModal({
               </button>
             ) : canEdit ? (
               <button
-                className="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700 transition font-bold"
+                className="bg-green-700 text-white px-3 py-2 text-sm rounded hover:bg-gray-800 transition font-bold"
                 onClick={() => setIsEditing(true)}
               >
                 Editar
@@ -518,22 +502,6 @@ export default function ProductModal({
             )}
           </div>
         </div>
-
-        {/* WhatsApp (comentado) */}
-        {/*
-        <a 
-          href={`https://wa.me/50660369857?text=${encodeURIComponent(
-            `¡Hola! Me interesa la camiseta ${product?.name} ${product?.type} con valor de ₡${product?.price}. ¿Está disponible?`
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full sm:w-auto flex justify-center items-center text-center mt-4 font-bold"
-          title="Enviar mensaje por WhatsApp"
-        >
-          <FaWhatsapp className="mr-2" />
-          Enviar mensaje por WhatsApp
-        </a>
-        */}
       </div>
     </div>
   );

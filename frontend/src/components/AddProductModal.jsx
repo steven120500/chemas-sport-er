@@ -5,17 +5,13 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import tallaPorTipo from "../utils/tallaPorTipo";
 
-// ===== Config =====
 const API_BASE = import.meta.env.VITE_API_BASE || "https://chemas-sport-er-backend.onrender.com";
 const MAX_IMAGES = 2;
-const MAX_WIDTH = 1000;   // reescala si la imagen es más ancha
-const QUALITY = 0.75;     // calidad WebP
+const MAX_WIDTH = 1000;
+const QUALITY = 0.75;
 
 // ===== Helpers =====
-
-// Convierte File -> Blob WebP (reescala si hace falta)
 async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) {
-  // (1) File -> dataURL
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
@@ -23,7 +19,6 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     reader.readAsDataURL(file);
   });
 
-  // (2) dataURL -> Image
   const img = await new Promise((resolve, reject) => {
     const i = new Image();
     i.onload = () => resolve(i);
@@ -31,7 +26,6 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     i.src = dataUrl;
   });
 
-  // (3) Canvas + posible reescalado
   const canvas = document.createElement("canvas");
   const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
   canvas.width = Math.round(img.width * ratio);
@@ -39,7 +33,6 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  // (4) Canvas -> Blob WebP (fallback PNG si el browser no soporta webp)
   const blob = await new Promise((resolve) => {
     const tryType = "image/webp";
     canvas.toBlob(
@@ -53,18 +46,15 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
   return blob;
 }
 
-// Convierte distintos tipos de src a Blob: data:, blob:, http(s)
 async function srcToBlob(src) {
   if (!src) throw new Error("Imagen sin src");
 
-  // blob: u http(s): -> usan fetch
   if (src.startsWith("blob:") || src.startsWith("http")) {
     const r = await fetch(src);
     if (!r.ok) throw new Error("No se pudo leer blob/url");
     return await r.blob();
   }
 
-  // data:...base64,... -> decodificar a mano
   if (src.startsWith("data:")) {
     const parts = src.split(",");
     if (parts.length < 2) throw new Error("dataURL inválido");
@@ -72,7 +62,6 @@ async function srcToBlob(src) {
     const b64 = parts[1];
     const mimeMatch = meta.match(/data:(.*?);base64/);
     const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
-
     const bin = atob(b64);
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
@@ -83,18 +72,14 @@ async function srcToBlob(src) {
 }
 
 export default function AddProductModal({ onAdd, onCancel, user }) {
-  const [images, setImages] = useState([]); // [{ blob, previewUrl }]
+  const [images, setImages] = useState([]);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [discountPrice, setDiscountPrice] = useState(""); // 💰 Nuevo campo
   const [type, setType] = useState("Player");
-
-  // 👉 Estados separados para cada inventario
   const [stock, setStock] = useState({});
   const [bodega, setBodega] = useState({});
-
-  // 👉 Modo visible (no borra lo ya escrito en el otro)
-  const [mode, setMode] = useState("stock"); // 'stock' | 'bodega'
-
+  const [mode, setMode] = useState("stock");
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -104,7 +89,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
-      // limpiar objectURLs
       setImages((prev) => {
         prev.forEach((it) => it.previewUrl && URL.revokeObjectURL(it.previewUrl));
         return [];
@@ -114,15 +98,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
   const tallas = useMemo(() => tallaPorTipo[type] || [], [type]);
 
-  // ===== Imágenes =====
   const handleFiles = async (filesLike) => {
     const files = Array.from(filesLike).slice(0, MAX_IMAGES - images.length);
     if (files.length === 0) return;
-
     try {
       setLoading(true);
       const converted = [];
-
       for (const file of files) {
         if (!file.type.startsWith("image/")) {
           toast.error("Formato de imagen no soportado");
@@ -132,7 +113,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         const previewUrl = URL.createObjectURL(blob);
         converted.push({ blob, previewUrl });
       }
-
       if (converted.length) {
         setImages((prev) => [...prev, ...converted].slice(0, MAX_IMAGES));
         toast.success("Imágenes optimizadas a WebP");
@@ -155,7 +135,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     const file = e.target.files?.[0];
     if (!file) return;
     await handleFiles([file]);
-    // permite volver a elegir el mismo archivo
     e.target.value = "";
   };
 
@@ -171,7 +150,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     });
   };
 
-  // ====== Inventarios ======
   const visibleInv = mode === "stock" ? stock : bodega;
   const setVisibleInv = mode === "stock" ? setStock : setBodega;
 
@@ -180,7 +158,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     setVisibleInv((prev) => ({ ...prev, [size]: n }));
   };
 
-  // ====== Submit ======
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -188,9 +165,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     try {
       setLoading(true);
 
-      // Validaciones simples
       if (!name.trim() || !price || !type.trim()) {
         toast.error("Completá nombre, precio y tipo.");
+        return;
+      }
+      if (discountPrice && Number(discountPrice) > Number(price)) {
+        toast.error("El precio con descuento no puede ser mayor al precio original.");
         return;
       }
       if (!images.length) {
@@ -199,17 +179,14 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       }
 
       const displayName = user?.username || "ChemaSportER";
-
       const formData = new FormData();
       formData.append("name", name.trim());
       formData.append("price", String(price).trim());
+      formData.append("discountPrice", String(discountPrice).trim()); // 💰 Se envía al backend
       formData.append("type", type.trim());
-
-      // ⬇️ Enviar AMBOS inventarios (da igual en cuál modo estés al guardar)
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
 
-      // 👉 adjunta TODAS las imágenes con la misma key 'images'
       for (let i = 0; i < images.length; i++) {
         const blob = images[i].blob || (await srcToBlob(images[i].src));
         formData.append("images", blob, `product-${i}.webp`);
@@ -220,7 +197,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         headers: {
           "x-user": displayName,
         },
-        body: formData, // NO pongas Content-Type aquí
+        body: formData,
       });
 
       if (!res.ok) {
@@ -229,9 +206,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       }
 
       const data = await res.json();
-
-      onAdd?.(data);   // refresca lista
-      onCancel?.();    // cierra modal
+      onAdd?.(data);
+      onCancel?.();
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Error guardando el producto");
@@ -258,7 +234,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
         <h2 className="text-lg font-semibold mb-4">Agregar producto</h2>
 
-        {/* Zona de imágenes */}
         <p className="text-gray-500 mb-2">
           Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para seleccionar (se convertirán a WebP)
         </p>
@@ -268,7 +243,10 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             <div key={`preview-${i}`} className="relative">
               <img src={img.previewUrl} alt={`preview-${i}`} className="w-24 h-24 object-cover rounded" />
               <button
-                onClick={(e) => { e.stopPropagation(); handleRemoveImage(i); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveImage(i);
+                }}
                 className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full px-1"
               >
                 ✕
@@ -286,17 +264,10 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             >
               Seleccionar imagen
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
           </div>
         )}
 
-        {/* Nombre */}
         <input
           type="text"
           placeholder="Nombre del producto"
@@ -305,7 +276,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
         />
 
-        {/* Precio */}
         <input
           type="text"
           placeholder="Precio (₡)"
@@ -314,18 +284,27 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
         />
 
-        {/* Tipo */}
+        {/* 💰 Nuevo campo de descuento */}
+        <input
+          type="text"
+          placeholder="Precio con descuento (opcional)"
+          value={discountPrice}
+          onChange={(e) => setDiscountPrice(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
+        />
+
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
         >
           {Object.keys(tallaPorTipo).map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </select>
 
-        {/* Selector de inventario (no borra lo ingresado al cambiar) */}
         <div className="mb-3">
           <label className="block text-xs text-gray-500 mb-1">Inventario a editar</label>
           <select
@@ -338,7 +317,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           </select>
         </div>
 
-        {/* Stock/Bodega por talla (según modo) */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {tallas.map((size) => (
             <label key={size} className="text-center">
@@ -354,7 +332,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           ))}
         </div>
 
-        {/* Botones */}
         <div className="flex gap-2">
           <button
             type="button"

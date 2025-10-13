@@ -1,4 +1,3 @@
-// api/routes/productRoutes.js
 import express from 'express';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
@@ -40,6 +39,8 @@ function diffProduct(prev, next) {
   const ch = [];
   if (prev.name  !== next.name)  ch.push(`nombre: "${prev.name}" -> "${next.name}"`);
   if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
+  // 🟡 Nuevo: comparar descuento
+  if (prev.discountPrice !== next.discountPrice) ch.push(`descuento: ${prev.discountPrice} -> ${next.discountPrice}`);
   if (prev.type  !== next.type)  ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
   ch.push(...diffInv('stock',  prev.stock,  next.stock));
   ch.push(...diffInv('bodega', prev.bodega, next.bodega));
@@ -102,6 +103,7 @@ router.post('/', upload.any(), async (req, res) => {
     const product = await Product.create({
       name : String(req.body.name || '').trim(),
       price: Number(req.body.price),
+      discountPrice: Number(req.body.discountPrice) || 0, // 🟡 nuevo campo
       type : String(req.body.type || '').trim(),
       stock: cleanStock,
       bodega: cleanBodega,
@@ -115,7 +117,7 @@ router.post('/', upload.any(), async (req, res) => {
         action:'creó producto',
         item:  `${product.name} (${product.type})`,
         date:  new Date(),
-        details: `img principal: ${imageSrc}`,
+        details: `img principal: ${imageSrc} | descuento: ${product.discountPrice}`,
       });
     } catch (e) {
       console.warn('No se pudo guardar historial (create):', e.message);
@@ -156,6 +158,7 @@ router.put('/:id', async (req, res) => {
       name : typeof req.body.name  === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
       type : typeof req.body.type  === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
       price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
+      discountPrice: Number.isFinite(Number(req.body.discountPrice)) ? Math.trunc(Number(req.body.discountPrice)) : prev.discountPrice, // 🟡 nuevo
       stock: nextStock,
       bodega: nextBodega,
     };
@@ -297,7 +300,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    const projection = 'name price type imageSrc images stock bodega createdAt';
+    const projection = 'name price discountPrice type imageSrc images stock bodega createdAt'; // 🟡 se agrega discountPrice
 
     const [items, total] = await Promise.all([
       Product.find(find)

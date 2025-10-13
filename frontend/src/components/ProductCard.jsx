@@ -16,7 +16,6 @@ const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 export default function ProductCard({ product, onClick, user }) {
   const isNino = product.type === "Niño";
   const sizesToCheck = isNino ? KID_SIZES : ADULT_SIZES;
-  
 
   let warnings = [];
 
@@ -45,21 +44,33 @@ export default function ProductCard({ product, onClick, user }) {
     }
   }
 
+  const hasDiscount =
+    product.discountPrice && Number(product.discountPrice) > 0;
+
   return (
     <motion.div
-      whileHover={{ scale: 1.09  }}
+      whileHover={{ scale: 1.09 }}
       whileTap={{ scale: 0.98 }}
       className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
+      {/* 🔹 Tipo de producto */}
       {product.type && (
-        <div className="absolute top-2 left-2 z-0">
+        <div className="absolute top-2 left-2 z-10">
           <div className="bg-black text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
             {product.type}
           </div>
         </div>
       )}
 
+      {/* 💰 Etiqueta de oferta */}
+      {hasDiscount && (
+        <div className="absolute top-2 right-2 bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow z-10">
+          Oferta
+        </div>
+      )}
+
+      {/* Imagen */}
       <div className="w-full h-[300px] bg-gray-100">
         {(() => {
           const H = 700;
@@ -85,15 +96,29 @@ export default function ProductCard({ product, onClick, user }) {
         })()}
       </div>
 
+      {/* Información */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
         <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-gray-900 line-clamp-2">
           {product.name}
         </h3>
-        <p className="mt-2 text-base sm:text-lg md:text-xl font-semibold text-black">
-          ₡{product.price?.toLocaleString("de-DE") || product.price}
-        </p>
 
-        {/* ⚠️ SOLO superadmin ve esto */}
+        {/* 💰 Precio normal o con descuento */}
+        {hasDiscount ? (
+          <div className="mt-2 flex flex-col items-center">
+            <p className="text-sm sm:text-base line-through text-gray-400">
+              ₡{Number(product.price).toLocaleString("de-DE")}
+            </p>
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-yellow-600">
+              ₡{Number(product.discountPrice).toLocaleString("de-DE")}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-base sm:text-lg md:text-xl font-semibold text-black">
+            ₡{Number(product.price).toLocaleString("de-DE")}
+          </p>
+        )}
+
+        {/* ⚠️ Solo superadmin ve los avisos */}
         {user?.isSuperUser && warnings.length > 0 && (
           <div className="mt-2 space-y-1 text-xs sm:text-sm text-red-600 font-semibold">
             {warnings.map((msg, idx) => (

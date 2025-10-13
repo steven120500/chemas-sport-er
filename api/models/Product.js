@@ -1,4 +1,3 @@
-// models/Product.js
 import mongoose from "mongoose";
 
 // ===== Tallas =====
@@ -53,6 +52,9 @@ const productSchema = new mongoose.Schema(
     name:  { type: String, required: true, trim: true, maxlength: 150 },
     price: { type: Number, required: true, min: 0 },
 
+    // 🟡 Nuevo campo: precio con descuento
+    discountPrice: { type: Number, default: 0, min: 0 },
+
     // Compatibilidad con el front (principal para cards/listas)
     imageSrc: { type: String, trim: true, maxlength: 600, validate: imageAnyValidator },
 
@@ -76,6 +78,9 @@ const productSchema = new mongoose.Schema(
 productSchema.pre('validate', function (next) {
   if (typeof this.price === 'number' && Number.isFinite(this.price)) {
     this.price = Math.trunc(this.price);
+  }
+  if (typeof this.discountPrice === 'number' && Number.isFinite(this.discountPrice)) {
+    this.discountPrice = Math.trunc(this.discountPrice);
   }
   next();
 });
