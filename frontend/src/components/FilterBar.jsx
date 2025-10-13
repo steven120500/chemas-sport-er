@@ -55,19 +55,27 @@ export default function FilterBar({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        {filterOptions.map((label) => (
-          <button
-            key={label}
-            className={`px-4 py-2 rounded-md transition whitespace-nowrap shadow-sm font-medium ${
-              filterType === label || (label === 'Todos' && filterType === '')
-                ? 'bg-gray-800 text-white'
-                : 'bg-white text-black border border-gray-300 hover:bg-black hover:text-white'
-            }`}
-            onClick={() => setFilterType(label === 'Todos' ? '' : label)}
-          >
-            {label}
-          </button>
-        ))}
+        {filterOptions.map((label) => {
+          const isActive = filterType === label || (label === 'Todos' && filterType === '');
+          const isOffer = label === 'Ofertas';
+          return (
+            <button
+              key={label}
+              className={`px-4 py-2 rounded-md transition whitespace-nowrap shadow-sm font-medium ${
+                isOffer
+                  ? isActive
+                    ? 'bg-green-500 text-white'
+                  : 'bg-green-500 text-black border border-green-300 hover:bg-black hover:text-white'
+                  : isActive
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-white text-black border border-gray-300 hover:bg-black hover:text-white'
+              }`}
+              onClick={() => setFilterType(label === 'Todos' ? '' : label)}
+            >
+              {label}
+            </button>
+          );
+        })}
       </motion.div>
     </div>
   );
