@@ -446,7 +446,7 @@ function App() {
                     {showDots && <span className="px-2">…</span>}
                     <button
                       onClick={() => setPage(n)}
-                      className={`px-2 text-sm py-0.5 rounded border ${
+                      className={`px-2 text-sm text-black py-0.5 bg-white rounded border ${
                         n === page
                           ? 'bg-purple-600 text-white'
                           : 'hover:bg-yellow-600'
