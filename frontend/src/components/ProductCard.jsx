@@ -65,7 +65,7 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* 💰 Etiqueta de oferta */}
       {hasDiscount && (
-        <span className="absolute bottom-60 bg-green-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
+        <span className="absolute bottom-44 bg-green-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
           Oferta
         </span>
       )}
