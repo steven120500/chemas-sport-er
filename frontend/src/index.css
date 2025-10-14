@@ -60,7 +60,7 @@ button {
 }
 
 button:hover {
-  border-color: #646cff;
+  border-color: #ffaf64;
 }
 
 button:focus,
@@ -68,18 +68,13 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Modo claro */
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #000000;
-  }
+:root {
+  color-scheme: only light; /* ignora el modo oscuro del sistema */
+  background-color: #000 !important;
+  color: #fff !important;
+}
 
-  a:hover {
-    color: #747bff;
-  }
-
-  button {
-    background-color: #f9f9f9;
-  }
+html, body {
+  background-color: #000 !important;
+  color: #fff !important;
 }
