@@ -251,7 +251,10 @@ export default function ProductModal({
     return invMode === 'stock' ? (viewProduct?.stock || {}) : (viewProduct?.bodega || {});
   };
 
-  const hasDiscount = viewProduct?.discountPrice && Number(viewProduct.discountPrice) > 0; // 🟡 nuevo
+  const hasDiscount =
+  product.discountPrice !== undefined &&
+  product.discountPrice !== null &&
+  Number(product.discountPrice) > 0; // 🟡 nuevo
 
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">

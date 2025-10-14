@@ -45,7 +45,9 @@ export default function ProductCard({ product, onClick, user }) {
   }
 
   const hasDiscount =
-    product.discountPrice && Number(product.discountPrice) > 0;
+  product.discountPrice !== undefined &&
+  product.discountPrice !== null &&
+  Number(product.discountPrice) > 0;
 
   return (
     <motion.div
