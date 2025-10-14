@@ -17,7 +17,7 @@ export default function Header({
 }) {
   return (
     <header
-      className="relative bg-white shadow-md px-2 sm:px-6 py-8 sm:py-32 overflow-hidden min-h-[260px]"
+      className="relative bg-white shadow-md px-2 sm:px-6 py-8 sm:py-48 overflow-hidden min-h-[260px]"
     >
       {/* 🖼️ Imagen de fondo responsive */}
       <img
