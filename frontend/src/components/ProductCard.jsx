@@ -1,7 +1,5 @@
 // src/components/ProductCard.jsx
 import { motion } from "framer-motion";
-import Araña from "../assets/Araña.png";
-import mucielago from "../assets/mucielago.png";
 
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
@@ -76,7 +74,7 @@ export default function ProductCard({ product, onClick, user }) {
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
         {/* 🕷️ Telaraña decorativa */}
         <img
-          src={Araña}
+          src={"/Araña.png"}
           alt="Telaraña decorativa"
           className="absolute top-2 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
           style={{
@@ -87,7 +85,7 @@ export default function ProductCard({ product, onClick, user }) {
 
         {/* 🦇 Murciélago decorativo */}
         <img
-          src={mucielago}
+          src={"/mucielago.png"}
           alt="Murciélago decorativo"
           className="absolute -bottom-3 -right-12 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
           style={{
