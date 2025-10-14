@@ -1,5 +1,7 @@
 // src/components/ProductCard.jsx
 import { motion } from "framer-motion";
+import Araña from "../assets/Araña.png";
+import mucielago from "../assets/mucielago.png";
 
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
@@ -49,8 +51,8 @@ export default function ProductCard({ product, onClick, user }) {
 
   return (
     <motion.div
-      whileHover={{ scale: 1.09 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.97 }}
       className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
@@ -65,20 +67,43 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* 💰 Etiqueta de oferta */}
       {hasDiscount && (
-        <div className="absolute bottom-60 right-0 bg-green-600 text-white text-m font-bold px-3 py-1  shadow z-10">
+        <span className="absolute bottom-60 bg-green-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
           Oferta
-        </div>
+        </span>
       )}
 
-      {/* Imagen */}
-      <div className="w-full h-[300px] bg-gray-100">
+      {/* 🕸️ Imagen principal + decoraciones */}
+      <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
+        {/* 🕷️ Telaraña decorativa */}
+        <img
+          src={Araña}
+          alt="Telaraña decorativa"
+          className="absolute top-2 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
+          style={{
+            transform: "translate(-5px, -12px) rotate(-8deg)",
+            objectFit: "contain",
+          }}
+        />
+
+        {/* 🦇 Murciélago decorativo */}
+        <img
+          src={mucielago}
+          alt="Murciélago decorativo"
+          className="absolute -bottom-3 -right-12 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
+          style={{
+            transform: "translate(-10px, -15px) rotate(6deg)",
+            objectFit: "contain",
+          }}
+        />
+
+        {/* 🖼️ Imagen del producto */}
         {(() => {
-          const H = 700;
+          const H = 800;
           const img320 = cldUrl(product.imageSrc, 320, H);
           const img640 = cldUrl(product.imageSrc, 640, H);
           const img960 = cldUrl(product.imageSrc, 960, H);
           return (
-            <img
+            <motion.img
               src={img640 || product.imageSrc}
               srcSet={
                 img320 && img640 && img960
@@ -96,7 +121,7 @@ export default function ProductCard({ product, onClick, user }) {
         })()}
       </div>
 
-      {/* Información */}
+      {/* Información del producto */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
         <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-gray-900 line-clamp-2">
           {product.name}
@@ -118,7 +143,7 @@ export default function ProductCard({ product, onClick, user }) {
           </p>
         )}
 
-        {/* ⚠️ Solo superadmin ve los avisos */}
+        {/* ⚠️ Avisos solo para superadmin */}
         {user?.isSuperUser && warnings.length > 0 && (
           <div className="mt-2 space-y-1 text-xs sm:text-sm text-red-600 font-semibold">
             {warnings.map((msg, idx) => (
