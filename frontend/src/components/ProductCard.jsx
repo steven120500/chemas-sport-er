@@ -85,7 +85,7 @@ export default function ProductCard({ product, onClick, user }) {
 
         {/* 🦇 Murciélago decorativo */}
         <img
-          src={"/mucielago.png"}
+          src={"/Mucielago.png"}
           alt="Murciélago decorativo"
           className="absolute -bottom-3 -right-12 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
           style={{
