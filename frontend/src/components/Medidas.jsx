@@ -46,7 +46,7 @@ export default function Medidas({ open, onClose, currentType = "Todos" }) {
 
   const modal = (
     // 🧱 capa raíz con z-index altísimo + scroll general si hace falta
-    <div className="fixed inset-0 z-[2147483647] overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop que bloquea la UI detrás */}
       <div
         className="fixed inset-0 bg-black/60"
