@@ -59,7 +59,7 @@ export default function Header({
               <button
                 onClick={onLoginClick}
                 title="Iniciar sesión / Registrarse"
-                className="rounded-full p-3 shadow-lg transition text-white bg-black hover:bg-gray-800"
+                className="rounded-full p-3 shadow-lg transition text-white bg-purple-600 hover:bg-gray-800"
               >
                 <FaUser size={18} />
               </button>

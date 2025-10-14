@@ -257,7 +257,7 @@ export default function ProductModal({
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
-        className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+        className="relative bg-yellow-600 pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
       >
         {/* Botón cerrar */}
         <button
@@ -432,7 +432,7 @@ export default function ProductModal({
             {tallasVisibles.map((talla) => {
               const inv = getInventoryToShow();
               return (
-                <div key={talla} className="text-center border rounded p-2">
+                <div key={talla} className="text-center text-white bg-black border rounded p-2">
                   <label className="block text-sm font-medium">{talla}</label>
                   {isEditing ? (
                     <input

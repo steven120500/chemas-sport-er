@@ -51,7 +51,7 @@ export default function ProductCard({ product, onClick, user }) {
     <motion.div
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.97 }}
-      className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
+      className="relative bg-yellow-600 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
       {/* 🔹 Tipo de producto */}
@@ -65,7 +65,7 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* 💰 Etiqueta de oferta */}
       {hasDiscount && (
-        <span className="absolute bottom-44 bg-green-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
+        <span className="absolute bottom-44 bg-purple-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
           Oferta
         </span>
       )}
@@ -131,7 +131,7 @@ export default function ProductCard({ product, onClick, user }) {
             <p className="text-sm sm:text-base line-through text-gray-600">
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-600">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-purple-600">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>
