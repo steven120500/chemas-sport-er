@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Scrollbar personalizada (compatible sin plugin) */
+/* ===== Scrollbar personalizada ===== */
 .scroll-custom {
   scrollbar-width: thin;
   scrollbar-color: #a0aec0 transparent;
@@ -21,7 +21,7 @@
   background: transparent;
 }
 
-/* Estilos base */
+/* ===== Estilos base ===== */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -30,23 +30,43 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Fuerza modo claro y evita que el sistema cambie colores */
+  color-scheme: light !important;
+
+  /* Fondo base de tu app (negro en tu caso) */
+  background-color: #000000 !important;
+  color: #000000 !important;
 }
 
+/* ===== Elementos globales ===== */
+html,
+body {
+  background-color: #000000 !important; /* fondo negro */
+  color: #000000 !important; /* texto negro por defecto */
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== Links ===== */
 a {
   font-weight: 500;
   color: #646cff;
-  text-decoration: inherit;
+  text-decoration: none;
 }
 
 a:hover {
   color: #535bf2;
 }
 
+/* ===== Títulos ===== */
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+  color: #000000;
 }
 
+/* ===== Botones ===== */
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -55,6 +75,7 @@ button {
   font-weight: 500;
   font-family: inherit;
   background-color: #1a1a1a;
+  color: #ffffff; /* texto blanco sobre fondo negro */
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -68,13 +89,12 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-:root {
-  color-scheme: only light; /* ignora el modo oscuro del sistema */
-  background-color: #000 !important;
-  color: #fff !important;
-}
-
-html, body {
-  background-color: #000 !important;
-  color: #fff !important;
+/* ===== Evita interferencias del modo oscuro del sistema ===== */
+@media (prefers-color-scheme: dark) {
+  :root,
+  html,
+  body {
+    background-color: #000000 !important;
+    color: #000000 !important;
+  }
 }

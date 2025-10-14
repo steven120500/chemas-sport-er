@@ -328,7 +328,7 @@ function App() {
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
           <div className="w-full text-center">
-            <h3 className="font-semibold text-gray-800 mb-2">Adulto</h3>
+            <h3 className="font-semibold text-white-800 mb-2">Adulto</h3>
             <div className="flex flex-wrap justify-center gap-2">
               {tallasAdulto.map((size) => {
                 const isActive = filterSizes.includes(size);
@@ -341,7 +341,7 @@ function App() {
                       )
                     }
                     className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-gray-400 hover:bg-gray-200'
+                      isActive ? 'bg-purple-600 text-white border-black' : 'bg-yellow-600 text-black border-black-400 hover:bg-gray-200'
                     }`}
                   >
                     {size}
@@ -352,7 +352,7 @@ function App() {
           </div>
 
           <div className="w-full text-center">
-            <h3 className="font-semibold text-gray-800 mb-2">Niño (Talla de Costa Rica)</h3>
+            <h3 className="font-semibold text-white-800 mb-2">Niño (Talla de Costa Rica)</h3>
             <div className="flex flex-wrap justify-center gap-2">
               {tallasNino.map(({ size, label }) => {
                 const isActive = filterSizes.includes(size);
@@ -365,7 +365,7 @@ function App() {
                       )
                     }
                     className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-gray-400 hover:bg-gray-200'
+                      isActive ? 'bg-purple-600 text-white border-black' : 'bg-yellow-600 text-black border-black-400 hover:bg-gray-200'
                     }`}
                   >
                     {label}

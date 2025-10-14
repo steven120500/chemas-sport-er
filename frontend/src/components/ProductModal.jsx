@@ -432,7 +432,7 @@ export default function ProductModal({
             {tallasVisibles.map((talla) => {
               const inv = getInventoryToShow();
               return (
-                <div key={talla} className="text-center text-white bg-black border rounded p-2">
+                <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
                   <label className="block text-sm font-medium">{talla}</label>
                   {isEditing ? (
                     <input
