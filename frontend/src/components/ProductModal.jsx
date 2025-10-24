@@ -429,7 +429,7 @@ export default function ProductModal({
         {/* Tallas */}
         <div className="mb-0">
           <p className="text-center font-semibold mb-6">
-            {invMode === 'stock' ? 'Stock por talla:' : 'Bodega por talla:'}
+            {invMode === 'stock' ? 'Stock por talla:' : 'Stock por talla:'}
           </p>
           <div className="grid grid-cols-3 gap-2">
             {tallasVisibles.map((talla) => {
