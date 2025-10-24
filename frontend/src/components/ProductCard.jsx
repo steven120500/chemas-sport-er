@@ -98,7 +98,7 @@ export default function ProductCard({ product, onClick, user }) {
 
         {/* 🖼️ Imagen del producto */}
         {(() => {
-          const H = 800;
+          const H = 700;
           const img320 = cldUrl(product.imageSrc, 320, H);
           const img640 = cldUrl(product.imageSrc, 640, H);
           const img960 = cldUrl(product.imageSrc, 960, H);

@@ -407,24 +407,24 @@ export default function ProductModal({
         )}
 
         {/* 🆕 Selector Stock / Bodega */}
-        {canEdit && (
+        
           <div className="mt-4 mb-2 flex items-center justify-center gap-2">
             <button
-              className={`px-3 py-1 rounded border text-sm ${invMode === 'stock' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded border text-sm ${invMode === 'stock' ? 'bg-black text-white' : 'hover:bg-black-100'}`}
               onClick={() => setInvMode('stock')}
               type="button"
             >
-              Stock
+              Tienda #1
             </button>
             <button
-              className={`px-3 py-1 rounded border text-sm ${invMode === 'bodega' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded border text-sm ${invMode === 'bodega' ? 'bg-black text-white' : 'hover:bg-black-100'}`}
               onClick={() => setInvMode('bodega')}
               type="button"
             >
-              Bodega
+              Tienda #2
             </button>
           </div>
-        )}
+        
 
         {/* Tallas */}
         <div className="mb-0">
