@@ -17,37 +17,29 @@ export default function ProductCard({ product, onClick, user }) {
   const isNino = product.type === "Niño";
   const sizesToCheck = isNino ? KID_SIZES : ADULT_SIZES;
 
-  let warnings = [];
+  // --- Cálculo de avisos para superadmin ---
+  const stockAgotadas = [];
+  const stockQueda1 = [];
+  const bodegaAgotadas = [];
+  const bodegaQueda1 = [];
 
   if (user?.isSuperUser) {
-    const agotadas = [];
-    const quedan1 = [];
-
     for (const size of sizesToCheck) {
-      const n = Number(product.stock?.[size]) || 0;
-      if (n === 0) {
-        agotadas.push(size);
-      } else if (n === 1) {
-        quedan1.push(size);
-      }
-    }
+      const stockQty = Number(product.stock?.[size] ?? 0);
+      const bodeQty  = Number(product.bodega?.[size] ?? 0);
 
-    if (agotadas.length > 0) {
-      warnings.push(
-        `⚠️ Agotado en talla${agotadas.length > 1 ? "s" : ""} ${agotadas.join(", ")}`
-      );
-    }
-    if (quedan1.length > 0) {
-      warnings.push(
-        `⚠️ Queda 1 en talla${quedan1.length > 1 ? "s" : ""} ${quedan1.join(", ")}`
-      );
+      if (stockQty === 0) stockAgotadas.push(size);
+      if (stockQty === 1) stockQueda1.push(size);
+
+      if (bodeQty === 0) bodegaAgotadas.push(size);
+      if (bodeQty === 1) bodegaQueda1.push(size);
     }
   }
 
   const hasDiscount =
-  product.discountPrice !== undefined &&
-  product.discountPrice !== null &&
-  Number(product.discountPrice) > 0;
+    product.discountPrice !== undefined &&
+    product.discountPrice !== null &&
+    Number(product.discountPrice) > 0;
 
   return (
     <motion.div
@@ -56,7 +48,7 @@ export default function ProductCard({ product, onClick, user }) {
       className="relative bg-yellow-600 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
-      {/* 🔹 Tipo de producto */}
+      {/* Tipo */}
       {product.type && (
         <div className="absolute top-2 left-2 z-10">
           <div className="bg-black text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
@@ -65,38 +57,31 @@ export default function ProductCard({ product, onClick, user }) {
         </div>
       )}
 
-      {/* 💰 Etiqueta de oferta */}
+      {/* Oferta */}
       {hasDiscount && (
-        <span className="absolute bottom-44 bg-purple-600 text-white text-sm font-bold px-4 py-1 shadow z-10">
+        <span className="absolute bottom-44 -left-2 bg-purple-600 text-white text-m font-bold px-3 py-1 shadow z-10 ">
           Oferta
         </span>
       )}
 
-      {/* 🕸️ Imagen principal + decoraciones */}
+      {/* Imagen + decoraciones */}
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
-        {/* 🕷️ Telaraña decorativa */}
+        {/* Araña */}
         <img
           src={"/Araña.png"}
           alt="Telaraña decorativa"
-          className="absolute top-2 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
-          style={{
-            transform: "translate(-5px, -12px) rotate(-8deg)",
-            objectFit: "contain",
-          }}
+          className="absolute top-2 w-28 sm:w-48 duration-300 hover:scale-110"
+          style={{ transform: "translate(-5px, -12px) rotate(-8deg)", objectFit: "contain" }}
         />
-
-        {/* 🦇 Murciélago decorativo */}
+        {/* Murciélago */}
         <img
           src={"/Mucielago.png"}
           alt="Murciélago decorativo"
-          className="absolute -bottom-3 -right-12 w-28 sm:w-48 rotate-[12deg]  duration-300 hover:scale-110"
-          style={{
-            transform: "translate(-10px, -15px) rotate(6deg)",
-            objectFit: "contain",
-          }}
+          className="absolute -bottom-3 -right-12 w-28 sm:w-48 duration-300 hover:scale-110"
+          style={{ transform: "translate(-10px, -15px) rotate(6deg)", objectFit: "contain" }}
         />
 
-        {/* 🖼️ Imagen del producto */}
+        {/* Imagen del producto */}
         {(() => {
           const H = 700;
           const img320 = cldUrl(product.imageSrc, 320, H);
@@ -121,19 +106,19 @@ export default function ProductCard({ product, onClick, user }) {
         })()}
       </div>
 
-      {/* Información del producto */}
+      {/* Info */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
         <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-gray-900 line-clamp-2">
           {product.name}
         </h3>
 
-        {/* 💰 Precio normal o con descuento */}
+        {/* Precio */}
         {hasDiscount ? (
           <div className="mt-2 flex flex-col items-center">
-            <p className="text-sm sm:text-base line-through text-gray-600">
+            <p className="text-sm sm:text-base line-through text-gray-700">
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-purple-600">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-purple-700">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>
@@ -143,12 +128,42 @@ export default function ProductCard({ product, onClick, user }) {
           </p>
         )}
 
-        {/* ⚠️ Avisos solo para superadmin */}
-        {user?.isSuperUser && warnings.length > 0 && (
-          <div className="mt-2 space-y-1 text-xs sm:text-sm text-red-600 font-semibold">
-            {warnings.map((msg, idx) => (
-              <p key={idx}>{msg}</p>
-            ))}
+        {/* Avisos SOLO superadmin */}
+        {user?.isSuperUser && (
+          <div className="mt-3 text-xs sm:text-sm text-left w-full px-2">
+            {/* STOCK */}
+            {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
+              <>
+                <p className="font-bold text-black">Tienda #1</p>
+                {stockAgotadas.length > 0 && (
+                  <p className="text-red-600">
+                    Agotado {stockAgotadas.join(" ")}
+                  </p>
+                )}
+                {stockQueda1.length > 0 && (
+                  <p className="text-green-600">
+                    Queda 1 {stockQueda1.join(" ")}
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* BODEGA */}
+            {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
+              <>
+                <p className="font-bold text-black mt-2">Tienda #2</p>
+                {bodegaAgotadas.length > 0 && (
+                  <p className="text-red-600">
+                    Agotado {bodegaAgotadas.join(" ")}
+                  </p>
+                )}
+                {bodegaQueda1.length > 0 && (
+                  <p className="text-green-600">
+                    Queda 1 {bodegaQueda1.join(" ")}
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

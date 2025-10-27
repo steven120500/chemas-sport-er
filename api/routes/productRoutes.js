@@ -41,8 +41,8 @@ function diffProduct(prev, next) {
   if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
   if (prev.discountPrice !== next.discountPrice) ch.push(`descuento: ${prev.discountPrice} -> ${next.discountPrice}`);
   if (prev.type  !== next.type)  ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
-  ch.push(...diffInv('stock',  prev.stock,  next.stock));
-  ch.push(...diffInv('bodega', prev.bodega, next.bodega));
+  ch.push(...diffInv('Tienda #1',  prev.stock,  next.stock));
+  ch.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
   return ch;
 }
 
