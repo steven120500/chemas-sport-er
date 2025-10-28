@@ -252,9 +252,16 @@ export default function ProductModal({
   };
 
   const hasDiscount =
-  product.discountPrice !== undefined &&
-  product.discountPrice !== null &&
-  Number(product.discountPrice) > 0; // 🟡 nuevo
+    product.discountPrice !== undefined &&
+    product.discountPrice !== null &&
+    Number(product.discountPrice) > 0; // 🟡 nuevo
+
+  // 🟢 Suma tienda 1 + tienda 2 por talla (para clientes sin edición)
+  const getTotalBySize = (size) => {
+    const a = parseInt((viewProduct?.stock || {})[size] ?? 0, 10) || 0;   // Tienda #1
+    const b = parseInt((viewProduct?.bodega || {})[size] ?? 0, 10) || 0; // Tienda #2
+    return a + b;
+  };
 
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
@@ -406,8 +413,8 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* 🆕 Selector Stock / Bodega */}
-        
+        {/* 🆕 Selector Tienda #1 / Tienda #2: SOLO si puede editar */}
+        {canEdit && (
           <div className="mt-4 mb-2 flex items-center justify-center gap-2">
             <button
               className={`px-3 py-1 rounded border text-sm ${invMode === 'stock' ? 'bg-black text-white' : 'hover:bg-black-100'}`}
@@ -424,32 +431,48 @@ export default function ProductModal({
               Tienda #2
             </button>
           </div>
-        
+        )}
 
         {/* Tallas */}
         <div className="mb-0">
+          {/* Título cambia según permisos */}
           <p className="text-center font-semibold mb-6">
-            {invMode === 'stock' ? 'Stock por talla:' : 'Stock por talla:'}
+            {canEdit
+              ? (invMode === 'stock' ? 'Stock por talla:' : 'Stock por talla:')
+              : 'Stock por talla:'}
           </p>
+
           <div className="grid grid-cols-3 gap-2">
             {tallasVisibles.map((talla) => {
-              const inv = getInventoryToShow();
-              return (
-                <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
-                  <label className="block text-sm font-medium">{talla}</label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full border border-gray-300 rounded px-1 text-center"
-                      value={inv[talla] === 0 ? '' : (inv[talla] ?? '')}
-                      onChange={(e) => handleStockChange(talla, e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-xs">{inv[talla] || 0} disponibles</p>
-                  )}
-                </div>
-              );
+              if (canEdit) {
+                // Vista admin/editor: muestra Tienda #1 o Tienda #2 según selector
+                const inv = getInventoryToShow();
+                return (
+                  <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
+                    <label className="block text-sm font-medium">{talla}</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full border border-gray-300 rounded px-1 text-center"
+                        value={inv[talla] === 0 ? '' : (inv[talla] ?? '')}
+                        onChange={(e) => handleStockChange(talla, e.target.value)}
+                      />
+                    ) : (
+                      <p className="text-xs">{inv[talla] || 0} disponibles</p>
+                    )}
+                  </div>
+                );
+              } else {
+                // Vista cliente: SUMA Tienda #1 + Tienda #2
+                const total = getTotalBySize(talla);
+                return (
+                  <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
+                    <label className="block text-sm font-medium">{talla}</label>
+                    <p className="text-xs">{total} disponibles</p>
+                  </div>
+                );
+              }
             })}
           </div>
         </div>

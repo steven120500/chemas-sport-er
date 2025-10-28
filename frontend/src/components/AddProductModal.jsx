@@ -312,8 +312,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             onChange={(e) => setMode(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded"
           >
-            <option value="stock">Stock (visible)</option>
-            <option value="bodega">Bodega</option>
+            <option value="stock">Tienda #1</option>
+            <option value="bodega">Tienda #2</option>
           </select>
         </div>
 
