@@ -45,7 +45,7 @@ export default function ProductCard({ product, onClick, user }) {
     <motion.div
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.97 }}
-      className="relative bg-yellow-600 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
+      className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
       {/* Tipo */}
@@ -59,27 +59,15 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* Oferta */}
       {hasDiscount && (
-        <span className="absolute bottom-44 -left-2 bg-purple-600 text-white text-m font-bold px-3 py-1 shadow z-10 ">
+        <span className="absolute etiqueta-oferta-verde bottom-44 -left-2 bg-green-600 text-white text-m font-bold px-3 py-1 shadow z-10 ">
           Oferta
         </span>
       )}
 
       {/* Imagen + decoraciones */}
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
-        {/* Araña */}
-        <img
-          src={"/Araña.png"}
-          alt="Telaraña decorativa"
-          className="absolute top-2 w-28 sm:w-48 duration-300 hover:scale-110"
-          style={{ transform: "translate(-5px, -12px) rotate(-8deg)", objectFit: "contain" }}
-        />
-        {/* Murciélago */}
-        <img
-          src={"/Mucielago.png"}
-          alt="Murciélago decorativo"
-          className="absolute -bottom-3 -right-12 w-28 sm:w-48 duration-300 hover:scale-110"
-          style={{ transform: "translate(-10px, -15px) rotate(6deg)", objectFit: "contain" }}
-        />
+        
+        
 
         {/* Imagen del producto */}
         {(() => {
@@ -118,7 +106,7 @@ export default function ProductCard({ product, onClick, user }) {
             <p className="text-sm sm:text-base line-through text-gray-700">
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-purple-700">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-700">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>

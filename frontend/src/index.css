@@ -35,14 +35,14 @@
   color-scheme: light !important;
 
   /* Fondo base de tu app (negro en tu caso) */
-  background-color: #000000 !important;
+  background-color: #ffffff !important;
   color: #000000 !important;
 }
 
 /* ===== Elementos globales ===== */
 html,
 body {
-  background-color: #000000 !important; /* fondo negro */
+  background-color: #fffbfb !important; /* fondo negro */
   color: #000000 !important; /* texto negro por defecto */
   margin: 0;
   padding: 0;
@@ -56,7 +56,7 @@ a {
 }
 
 a:hover {
-  color: #535bf2;
+  color: #000000;
 }
 
 /* ===== Títulos ===== */
@@ -81,7 +81,7 @@ button {
 }
 
 button:hover {
-  border-color: #ffaf64;
+  border-color: #8d8c8c;
 }
 
 button:focus,
@@ -98,3 +98,36 @@ button:focus-visible {
     color: #000000 !important;
   }
 }
+
+@keyframes reflejoVerde {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.etiqueta-oferta-verde {
+  display: inline-block;
+  background: linear-gradient(
+    110deg,
+    #0f5132 0%,      /* verde oscuro base */
+    #2ecc71 40%,     /* verde brillante */
+    #7dffb3 50%,     /* reflejo casi neón */
+    #2ecc71 60%,
+    #0f5132 100%
+  );
+  background-size: 200% 100%;
+  animation: reflejoVerde 3s linear infinite;
+  animation-delay: 1s;
+  color: #ffffff;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+}
+

@@ -341,7 +341,7 @@ function App() {
                       )
                     }
                     className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-purple-600 text-white border-black' : 'bg-yellow-600 text-black border-black-400 hover:bg-gray-200'
+                      isActive ? 'bg-white text-white border-black' : 'bg-white-600 text-black border-black-400 hover:bg-gray-200'
                     }`}
                   >
                     {size}
@@ -365,7 +365,7 @@ function App() {
                       )
                     }
                     className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-purple-600 text-white border-black' : 'bg-yellow-600 text-black border-black-400 hover:bg-gray-200'
+                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black-400 hover:bg-gray-200'
                     }`}
                   >
                     {label}
@@ -378,8 +378,8 @@ function App() {
       )}
 
       <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
-        <span className="text-sm sm:text-base text-white">¿Querés saber tu talla?</span>
-        <button onClick={() => setShowMedidas(true)} className="bg-yellow-600 text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight" title="Ver medidas">
+        <span className="text-sm sm:text-base text-black">¿Querés saber tu talla?</span>
+        <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight" title="Ver medidas">
           Medidas
         </button>
       </div>
@@ -430,7 +430,7 @@ function App() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-2 py-1 text-sm text-white bg-purple-600 rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
               title="Anterior"
             >
               <FaChevronLeft />
@@ -446,10 +446,10 @@ function App() {
                     {showDots && <span className="px-2">…</span>}
                     <button
                       onClick={() => setPage(n)}
-                      className={`px-2 text-sm text-black py-0.5 bg-white rounded border ${
+                      className={`px-2 text-sm text-white  py-0.5 bg-black rounded  ${
                         n === page
-                          ? 'bg-purple-600 text-white'
-                          : 'hover:bg-yellow-600'
+                          ? 'bg-gray-600'
+                          : 'hover:bg-gray-300'
                       }`}
                     >
                       {n}
@@ -462,7 +462,7 @@ function App() {
             <button
               onClick={() => setPage((p) => Math.min(pages, p + 1))}
               disabled={page === pages}
-              className="px-2 py-1 text-sm text-white bg-purple-600 rounded border disabled:opacity-50"
+              className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
               title="Siguiente"
             >
               <FaChevronRight />

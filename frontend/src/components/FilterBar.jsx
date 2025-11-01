@@ -42,7 +42,7 @@ export default function FilterBar({
         />
         <button
           onClick={onToggleTallas}
-          className="px-3 py-2 rounded-md bg-yellow-600 text-white text-sm font-medium hover:bg-yellow-800 whitespace-nowrap"
+          className="px-3 py-2  rounded-md bg-black text-white text-sm font-medium hover:bg-gray-600 whitespace-nowrap"
         >
           Filtrar por talla
         </button>
@@ -64,11 +64,11 @@ export default function FilterBar({
               className={`px-4 py-2 rounded-md transition whitespace-nowrap shadow-sm font-medium ${
                 isOffer
                   ? isActive
-                    ? 'bg-green-500 text-white'
-                  : 'bg-green-500 text-black border border-green-300 hover:bg-black hover:text-white'
+                    ? 'bg-green-500 etiqueta-oferta-verde text-white'
+                  : 'bg-green-500 etiqueta-oferta-verde text-black border border-green-300 hover:bg-black hover:text-white'
                   : isActive
-                  ? 'bg-yellow-600 text-white'
-                  : 'bg-yellow-600 text-black border border-black  hover:text-white'
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-black border border-black  hover:text-gray-600'
               }`}
               onClick={() => setFilterType(label === 'Todos' ? '' : label)}
             >

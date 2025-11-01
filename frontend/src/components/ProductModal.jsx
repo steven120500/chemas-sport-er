@@ -267,7 +267,7 @@ export default function ProductModal({
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
-        className="relative bg-yellow-600 pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+        className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
       >
         {/* Botón cerrar */}
         <button
@@ -448,7 +448,7 @@ export default function ProductModal({
                 // Vista admin/editor: muestra Tienda #1 o Tienda #2 según selector
                 const inv = getInventoryToShow();
                 return (
-                  <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
+                  <div key={talla} className="text-center text-black bg-white border rounded p-2">
                     <label className="block text-sm font-medium">{talla}</label>
                     {isEditing ? (
                       <input
@@ -467,7 +467,7 @@ export default function ProductModal({
                 // Vista cliente: SUMA Tienda #1 + Tienda #2
                 const total = getTotalBySize(talla);
                 return (
-                  <div key={talla} className="text-center text-black bg-purple-600 border rounded p-2">
+                  <div key={talla} className="text-center text-black bg-white border rounded p-2">
                     <label className="block text-sm font-medium">{talla}</label>
                     <p className="text-xs">{total} disponibles</p>
                   </div>
