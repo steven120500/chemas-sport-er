@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link
@@ -8,8 +8,9 @@
       href="/Logo-Oficial-Transparente.svg"
     />
 
-    <!-- ✅ Evita el modo oscuro automático -->
+    <!-- ✅ Fuerza modo claro en todos los navegadores -->
     <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChemaSport ER</title>
@@ -20,7 +21,7 @@
       href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
     />
 
-    <!-- 🌞 Fuerza modo claro sin afectar botones -->
+    <!-- 🌞 Fuerza modo claro sin alterar estilos de botones -->
     <style>
       :root {
         color-scheme: light;
@@ -32,11 +33,17 @@
         color: #000000 !important;
       }
 
-      /* Evita que navegadores oscuros inviertan colores en imágenes */
+      /* Evita inversión de colores en imágenes o videos */
       img,
       video,
       canvas {
         filter: none !important;
+      }
+
+      /* Fuerza scrollbar y formularios en modo claro */
+      ::-webkit-scrollbar,
+      ::-webkit-input-placeholder {
+        color-scheme: light;
       }
     </style>
   </head>
