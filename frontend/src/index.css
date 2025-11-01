@@ -13,7 +13,7 @@
 }
 
 .scroll-custom::-webkit-scrollbar-thumb {
-  background-color: #a0aec0; /* gray-400 */
+  background-color: #a0aec0;
   border-radius: 9999px;
 }
 
@@ -26,15 +26,14 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Fuerza modo claro y evita que el sistema cambie colores */
+  /* Fuerza modo claro */
   color-scheme: light !important;
 
-  /* Fondo base de tu app (negro en tu caso) */
+  /* 🎨 Fondo blanco y texto negro global */
   background-color: #ffffff !important;
   color: #000000 !important;
 }
@@ -42,8 +41,8 @@
 /* ===== Elementos globales ===== */
 html,
 body {
-  background-color: #fffbfb !important; /* fondo negro */
-  color: #000000 !important; /* texto negro por defecto */
+  background-color: #ffffff !important; /* fondo blanco fijo */
+  color: #000000 !important; /* texto negro */
   margin: 0;
   padding: 0;
 }
@@ -51,12 +50,12 @@ body {
 /* ===== Links ===== */
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #007bff;
   text-decoration: none;
 }
 
 a:hover {
-  color: #000000;
+  color: #0056b3;
 }
 
 /* ===== Títulos ===== */
@@ -74,31 +73,33 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
-  color: #ffffff; /* texto blanco sobre fondo negro */
+  background-color: #1a1a1a; /* fondo oscuro del botón */
+  color: #ffffff; /* texto blanco */
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: border-color 0.25s, transform 0.2s;
 }
 
 button:hover {
-  border-color: #8d8c8c;
+  border-color: #4cc27b;
+  transform: scale(1.05);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 3px solid #4cc27b;
 }
 
-/* ===== Evita interferencias del modo oscuro del sistema ===== */
+/* 🚫 Evita que el modo oscuro del sistema cambie nada */
 @media (prefers-color-scheme: dark) {
   :root,
   html,
   body {
-    background-color: #000000 !important;
+    background-color: #ffffff !important;
     color: #000000 !important;
   }
 }
 
+/* ✨ Efecto de brillo verde para etiquetas de oferta */
 @keyframes reflejoVerde {
   0% {
     background-position: -200% 0;
@@ -112,9 +113,9 @@ button:focus-visible {
   display: inline-block;
   background: linear-gradient(
     110deg,
-    #0f5132 0%,      /* verde oscuro base */
-    #2ecc71 40%,     /* verde brillante */
-    #7dffb3 50%,     /* reflejo casi neón */
+    #0f5132 0%,
+    #2ecc71 40%,
+    #7dffb3 50%,
     #2ecc71 60%,
     #0f5132 100%
   );
@@ -130,4 +131,3 @@ button:focus-visible {
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
   box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
 }
-
