@@ -2,11 +2,45 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/Logo-Oficial-Transparente.svg" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/Logo-Oficial-Transparente.svg"
+    />
+
+    <!-- ✅ Evita el modo oscuro automático -->
+    <meta name="color-scheme" content="light" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChemaSport ER</title>
+
+    <!-- Tailwind CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+    />
+
+    <!-- 🌞 Fuerza modo claro sin afectar botones -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      html,
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      /* Evita que navegadores oscuros inviertan colores en imágenes */
+      img,
+      video,
+      canvas {
+        filter: none !important;
+      }
+    </style>
   </head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
