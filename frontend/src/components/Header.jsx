@@ -33,7 +33,7 @@ export default function Header({
         isDark ? "bg-black" : "bg-white"
       }`}
     >
-      {/* Fondo decorativo opcional (mantiene el fondo actual con transición) */}
+      {/* Fondo decorativo opcional */}
       <div
         className={`absolute inset-0 transition-opacity duration-1000 ${
           isDark ? "opacity-20" : "opacity-70"
@@ -45,60 +45,55 @@ export default function Header({
       ></div>
 
       {/* Contenido principal */}
-      <div className="relative z-10 flex flex-col gap-3">
-        {/* Fila superior (logo izq, usuario der) */}
-        <div className="flex items-center justify-between">
-          {/* Logo clickeable */}
-          <button
-            onClick={onLogoClick}
-            className="focus:outline-none bg-transparent"
-            title="Volver al inicio"
-          >
-            <img
-              src={logo}
-              alt="Logo Chemas Sport"
-              className="h-14 sm:h-20 transition-transform duration-700 hover:scale-105"
+      <div className="relative z-10 flex items-center justify-between w-full">
+        {/* Logo clickeable */}
+        <button
+          onClick={onLogoClick}
+          className="focus:outline-none bg-transparent"
+          title="Volver al inicio"
+        >
+          <img
+            src={logo}
+            alt="Logo Chemas Sport"
+            className="h-14 sm:h-20 transition-transform duration-700 hover:scale-105"
+          />
+        </button>
+
+        {/* Título centrado */}
+        <h1
+          className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-700 ${
+            isDark ? "text-white" : "text-black"
+          }`}
+        >
+          ChemaSport ER
+        </h1>
+
+        {/* Usuario o botón de Login */}
+        <div className="flex items-center">
+          {user ? (
+            <UserDropDown
+              isSuperUser={isSuperUser}
+              onLogout={onLogout}
+              onAddUser={() => setShowRegisterUserModal(true)}
+              onViewUsers={() => setShowUserListModal(true)}
+              onViewHistory={() => setShowHistoryModal(true)}
+              canSeeHistory={
+                user?.isSuperUser || user?.roles?.includes("history")
+              }
             />
-          </button>
-
-          {/* Usuario o botón de Login */}
-          <div className="flex items-center">
-            {user ? (
-              <UserDropDown
-                isSuperUser={isSuperUser}
-                onLogout={onLogout}
-                onAddUser={() => setShowRegisterUserModal(true)}
-                onViewUsers={() => setShowUserListModal(true)}
-                onViewHistory={() => setShowHistoryModal(true)}
-                canSeeHistory={
-                  user?.isSuperUser || user?.roles?.includes("history")
-                }
-              />
-            ) : (
-              <button
-                onClick={onLoginClick}
-                title="Iniciar sesión / Registrarse"
-                className={`rounded-full p-3 shadow-lg transition-all duration-700 ${
-                  isDark
-                    ? "bg-white text-black hover:bg-gray-200"
-                    : "bg-black text-white hover:bg-gray-800"
-                }`}
-              >
-                <FaUser size={18} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Título central */}
-        <div className="text-center mt-2 transition-all duration-700">
-          <h1
-            className={`text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-700 ${
-              isDark ? "text-white" : "text-black"
-            }`}
-          >
-            ChemaSportER
-          </h1>
+          ) : (
+            <button
+              onClick={onLoginClick}
+              title="Iniciar sesión / Registrarse"
+              className={`rounded-full p-3 shadow-lg transition-all duration-700 ${
+                isDark
+                  ? "bg-white text-black hover:bg-gray-200"
+                  : "bg-black text-white hover:bg-gray-800"
+              }`}
+            >
+              <FaUser size={18} />
+            </button>
+          )}
         </div>
       </div>
     </header>

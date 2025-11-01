@@ -341,7 +341,7 @@ function App() {
                       )
                     }
                     className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-white text-white border-black' : 'bg-white-600 text-black border-black-400 hover:bg-gray-200'
+                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
                     }`}
                   >
                     {size}

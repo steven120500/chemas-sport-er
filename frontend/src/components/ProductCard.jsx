@@ -26,7 +26,7 @@ export default function ProductCard({ product, onClick, user }) {
   if (user?.isSuperUser) {
     for (const size of sizesToCheck) {
       const stockQty = Number(product.stock?.[size] ?? 0);
-      const bodeQty  = Number(product.bodega?.[size] ?? 0);
+      const bodeQty = Number(product.bodega?.[size] ?? 0);
 
       if (stockQty === 0) stockAgotadas.push(size);
       if (stockQty === 1) stockQueda1.push(size);
@@ -59,22 +59,31 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* Oferta */}
       {hasDiscount && (
-        <span className="absolute etiqueta-oferta-verde bottom-44 -left-2 bg-green-600 text-white text-m font-bold px-3 py-1 shadow z-10 ">
-          Oferta
-        </span>
-      )}
+  <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 bg-green-600 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
+    Oferta
+  </span>
+)}
 
       {/* Imagen + decoraciones */}
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
-        
-        
-
         {/* Imagen del producto */}
         {(() => {
-          const H = 700;
+          // ✅ Altura dinámica según tamaño de pantalla
+          const screenWidth = window.innerWidth;
+          let H = 1000;
+
+          if (screenWidth >= 1024) {
+            H = 700; // escritorio
+          } else if (screenWidth >= 768) {
+            H = 1000; // tablet
+          } else {
+            H = 1000; // móvil
+          }
+
           const img320 = cldUrl(product.imageSrc, 320, H);
           const img640 = cldUrl(product.imageSrc, 640, H);
           const img960 = cldUrl(product.imageSrc, 960, H);
+
           return (
             <motion.img
               src={img640 || product.imageSrc}
