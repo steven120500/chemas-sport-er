@@ -22,6 +22,8 @@ export default function ProductCard({ product, onClick, user }) {
   const stockQueda1 = [];
   const bodegaAgotadas = [];
   const bodegaQueda1 = [];
+  const traspasosUrgentes = [];
+  const traspasosSugeridos = [];
 
   if (user?.isSuperUser) {
     for (const size of sizesToCheck) {
@@ -30,9 +32,15 @@ export default function ProductCard({ product, onClick, user }) {
 
       if (stockQty === 0) stockAgotadas.push(size);
       if (stockQty === 1) stockQueda1.push(size);
-
       if (bodeQty === 0) bodegaAgotadas.push(size);
       if (bodeQty === 1) bodegaQueda1.push(size);
+
+      // 👇 lógica traspaso
+      if (stockQty === 0 && bodeQty > 0) {
+        traspasosUrgentes.push({ talla: size, stock: stockQty, bodega: bodeQty });
+      } else if (stockQty === 1 && bodeQty > 0) {
+        traspasosSugeridos.push({ talla: size, stock: stockQty, bodega: bodeQty });
+      }
     }
   }
 
@@ -59,26 +67,18 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* Oferta */}
       {hasDiscount && (
-  <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 bg-green-600 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
-    Oferta
-  </span>
-)}
+        <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 bg-green-600 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
+          Oferta
+        </span>
+      )}
 
-      {/* Imagen + decoraciones */}
+      {/* Imagen */}
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
-        {/* Imagen del producto */}
         {(() => {
-          // ✅ Altura dinámica según tamaño de pantalla
           const screenWidth = window.innerWidth;
           let H = 1000;
-
-          if (screenWidth >= 1024) {
-            H = 700; // escritorio
-          } else if (screenWidth >= 768) {
-            H = 1000; // tablet
-          } else {
-            H = 1000; // móvil
-          }
+          if (screenWidth >= 1024) H = 700;
+          else if (screenWidth >= 768) H = 1000;
 
           const img320 = cldUrl(product.imageSrc, 320, H);
           const img640 = cldUrl(product.imageSrc, 640, H);
@@ -160,6 +160,37 @@ export default function ProductCard({ product, onClick, user }) {
                   </p>
                 )}
               </>
+            )}
+
+            {/* 🔸 NUEVAS CAJAS DE TRASPASO */}
+            {traspasosUrgentes.length > 0 && (
+              <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
+                <p className="font-bold text-red-700 mb-1">
+                  🚨 Traspasos urgentes a Tienda 1:
+                </p>
+                <ul className="list-disc pl-5 text-red-800">
+                  {traspasosUrgentes.map((t, i) => (
+                    <li key={i}>
+                      Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {traspasosSugeridos.length > 0 && (
+              <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
+                <p className="font-bold text-yellow-700 mb-1">
+                  📦 Traspasos sugeridos a Tienda 1:
+                </p>
+                <ul className="list-disc pl-5 text-yellow-800">
+                  {traspasosSugeridos.map((t, i) => (
+                    <li key={i}>
+                      Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}
