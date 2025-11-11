@@ -75,8 +75,8 @@ export default function FilterBar({
               className={`px-4 py-2 rounded-md transition whitespace-nowrap shadow-sm font-medium ${
                 isOffer
                   ? isActive
-                    ? "bg-green-600 text-white"
-                    : "bg-green-500 text-black border border-green-400 hover:bg-green-600 hover:text-white"
+                    ? "bg-green-600 etiqueta-oferta-verde text-white"
+                    : "bg-green-500 etiqueta-oferta-verde text-black border border-green-400 hover:bg-green-600 hover:text-white"
                   : isBall
                   ? isActive
                     ? "bg-black text-white border-black"

@@ -4,27 +4,34 @@ import History from '../models/History.js';
 import cloudinary from '../config/cloudinary.js';
 import multer from 'multer';
 
+
 const router = express.Router();
+
 
 /* ================= Multer (buffer en memoria, solo para POST) ================= */
 const storage = multer.memoryStorage();
 const upload  = multer({ storage });
 
+
 /* ================= Helpers ================= */
 
-// Tallas permitidas
-const ADULT_SIZES = ['S','M','L','XL','XXL','3XL','4XL'];
-const KID_SIZES   = ['16','18','20','22','24','26','28'];
-const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
+
+// Tallas permitidas (💥 se agregan BALONES)
+const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
+const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
+const BALL_SIZES  = ['3', '4', '5']; // ⚽️ tallas de balón
+const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
+
 
 // Quién hizo el cambio
 function whoDidIt(req) {
   return req.user?.name || req.user?.email || req.headers['x-user'] || req.body.user || 'Sistema';
 }
 
+
 // Dif de stock/bodega (para historial)
 function diffInv(label, prev = {}, next = {}) {
-  const sizes = new Set([...(Object.keys(prev||{})), ...(Object.keys(next||{}))]);
+  const sizes = new Set([...(Object.keys(prev || {})), ...(Object.keys(next || {}))]);
   const out = [];
   for (const s of sizes) {
     const a = Number(prev?.[s] ?? 0);
@@ -34,17 +41,20 @@ function diffInv(label, prev = {}, next = {}) {
   return out;
 }
 
+
 // Diferencias legibles de producto (para historial)
 function diffProduct(prev, next) {
   const ch = [];
   if (prev.name  !== next.name)  ch.push(`nombre: "${prev.name}" -> "${next.name}"`);
   if (prev.price !== next.price) ch.push(`precio: ${prev.price} -> ${next.price}`);
-  if (prev.discountPrice !== next.discountPrice) ch.push(`descuento: ${prev.discountPrice} -> ${next.discountPrice}`);
+  if (prev.discountPrice !== next.discountPrice)
+    ch.push(`descuento: ${prev.discountPrice} -> ${next.discountPrice}`);
   if (prev.type  !== next.type)  ch.push(`tipo: "${prev.type}" -> "${next.type}"`);
-  ch.push(...diffInv('Tienda #1',  prev.stock,  next.stock));
+  ch.push(...diffInv('Tienda #1', prev.stock, next.stock));
   ch.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
   return ch;
 }
+
 
 // Sube 1 buffer a Cloudinary
 function uploadToCloudinary(buffer) {
@@ -57,10 +67,12 @@ function uploadToCloudinary(buffer) {
   });
 }
 
+
 // Sanitiza inventario (stock/bodega)
 function sanitizeInv(obj) {
   const clean = {};
   for (const [size, qty] of Object.entries(obj || {})) {
+    // 💥 ahora permite también tallas de balones
     if (!ALL_SIZES.has(String(size))) continue;
     const n = Math.max(0, Math.trunc(Number(qty) || 0));
     clean[size] = n;
@@ -68,7 +80,9 @@ function sanitizeInv(obj) {
   return clean;
 }
 
+
 /* ================= Rutas ================= */
+
 
 /** Crear producto */
 router.post('/', upload.any(), async (req, res) => {
@@ -80,10 +94,13 @@ router.post('/', upload.any(), async (req, res) => {
       return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
+
     const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images   = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
 
+
+    // Stock
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
@@ -92,6 +109,8 @@ router.post('/', upload.any(), async (req, res) => {
     } catch { stock = {}; }
     const cleanStock = sanitizeInv(stock);
 
+
+    // Bodega
     let bodega = {};
     try {
       if (typeof req.body.bodega === 'string') bodega = JSON.parse(req.body.bodega);
@@ -99,16 +118,18 @@ router.post('/', upload.any(), async (req, res) => {
     } catch { bodega = {}; }
     const cleanBodega = sanitizeInv(bodega);
 
+
     const product = await Product.create({
-      name : String(req.body.name || '').trim(),
+      name:  String(req.body.name || '').trim(),
       price: Number(req.body.price),
-      discountPrice: Number(req.body.discountPrice) || 0, // 🟡 nuevo campo
-      type : String(req.body.type || '').trim(),
+      discountPrice: Number(req.body.discountPrice) || 0,
+      type:  String(req.body.type || '').trim(),
       stock: cleanStock,
       bodega: cleanBodega,
       imageSrc,
       images,
     });
+
 
     try {
       await History.create({
@@ -122,6 +143,7 @@ router.post('/', upload.any(), async (req, res) => {
       console.warn('No se pudo guardar historial (create):', e.message);
     }
 
+
     res.status(201).json(product);
   } catch (err) {
     console.error('POST /api/products error:', err);
@@ -129,11 +151,13 @@ router.post('/', upload.any(), async (req, res) => {
   }
 });
 
+
 /** Actualizar producto */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
+
 
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
@@ -144,6 +168,7 @@ router.put('/:id', async (req, res) => {
       nextStock = sanitizeInv(incomingStock);
     }
 
+
     let incomingBodega = req.body.bodega;
     if (typeof incomingBodega === 'string') {
       try { incomingBodega = JSON.parse(incomingBodega); } catch { incomingBodega = undefined; }
@@ -153,23 +178,29 @@ router.put('/:id', async (req, res) => {
       nextBodega = sanitizeInv(incomingBodega);
     }
 
+
     const update = {
-      name : typeof req.body.name  === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
-      type : typeof req.body.type  === 'string' ? req.body.type.trim().slice(0,40)  : prev.type,
+      name: typeof req.body.name === 'string' ? req.body.name.trim().slice(0,150) : prev.name,
+      type: typeof req.body.type === 'string' ? req.body.type.trim().slice(0,40) : prev.type,
       price: Number.isFinite(Number(req.body.price)) ? Math.trunc(Number(req.body.price)) : prev.price,
-      discountPrice: Number.isFinite(Number(req.body.discountPrice)) ? Math.trunc(Number(req.body.discountPrice)) : prev.discountPrice, // 🟡 nuevo
+      discountPrice: Number.isFinite(Number(req.body.discountPrice))
+        ? Math.trunc(Number(req.body.discountPrice))
+        : prev.discountPrice,
       stock: nextStock,
       bodega: nextBodega,
     };
 
-    if (req.body.imageSrc  !== undefined) update.imageSrc  = req.body.imageSrc  || '';
+
+    if (req.body.imageSrc !== undefined)  update.imageSrc  = req.body.imageSrc  || '';
     if (req.body.imageSrc2 !== undefined) update.imageSrc2 = req.body.imageSrc2 || '';
-    if (req.body.imageAlt  !== undefined) update.imageAlt  = req.body.imageAlt  || '';
+    if (req.body.imageAlt !== undefined)  update.imageAlt  = req.body.imageAlt  || '';
+
 
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
     }
+
 
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
@@ -181,8 +212,7 @@ router.put('/:id', async (req, res) => {
           normalized.push({ public_id: up.public_id, url: up.secure_url });
         } else if (typeof raw === 'string') {
           const found = prevList.find(i => i.url === raw);
-          if (found) normalized.push({ public_id: found.public_id || null, url: found.url });
-          else       normalized.push({ public_id: null, url: raw });
+          normalized.push(found ? found : { public_id: null, url: raw });
         } else if (raw && typeof raw === 'object' && raw.url) {
           normalized.push({ public_id: raw.public_id || null, url: raw.url });
         }
@@ -193,23 +223,18 @@ router.put('/:id', async (req, res) => {
           try { await cloudinary.uploader.destroy(old.public_id); } catch {}
         }
       }
-      update.images    = normalized;
+      update.images = normalized;
       update.imageSrc  = normalized[0]?.url || '';
       update.imageSrc2 = normalized[1]?.url || '';
-    } else {
-      if (req.body.imageSrc !== undefined || req.body.imageSrc2 !== undefined) {
-        const imgs = [update.imageSrc, update.imageSrc2]
-          .filter(Boolean)
-          .map(url => ({ url, public_id: (prev.images || []).find(i => i.url === url)?.public_id || null }));
-        update.images = imgs;
-      }
     }
+
 
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     );
+
 
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
@@ -226,6 +251,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+
     res.json(updated);
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
@@ -233,11 +259,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+
 /** Eliminar producto */
 router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+
 
     for (const img of product.images || []) {
       if (img.public_id) {
@@ -245,7 +273,9 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
+
     await product.deleteOne();
+
 
     try {
       await History.create({
@@ -259,12 +289,14 @@ router.delete('/:id', async (req, res) => {
       console.warn('No se pudo guardar historial (delete):', e.message);
     }
 
+
     res.json({ message: 'Producto eliminado' });
   } catch (err) {
     console.error('DELETE /api/products/:id error:', err);
     res.status(500).json({ error: 'Error al eliminar producto' });
   }
 });
+
 
 /** Salud */
 router.get('/health', async (_req, res) => {
@@ -276,6 +308,7 @@ router.get('/health', async (_req, res) => {
   }
 });
 
+
 /** Listado paginado con filtros */
 router.get('/', async (req, res) => {
   try {
@@ -285,32 +318,37 @@ router.get('/', async (req, res) => {
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
 
+
     const find = {};
+
 
     // 🔎 Búsqueda por nombre
     if (q) find.name = { $regex: q, $options: 'i' };
+
 
     // 🔥 Filtro especial para ofertas
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
       find.$expr = { $lt: ['$discountPrice', '$price'] };
-    } 
-    // Tipo normal
-    else if (type) {
+    } else if (type) {
       find.type = type;
     }
 
-    // ⬇️ Filtro por tallas
+
+    // ⬇️ Filtro por tallas (incluye balones)
     if (sizes) {
       const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
       if (arr.length) {
         find.$or = arr.map(size => ({
-          [`stock.${size}`]: { $gt: 0 }
+          [`stock.${size}`]: { $gt: 0 },
         }));
       }
     }
 
-    const projection = 'name price discountPrice type imageSrc images stock bodega createdAt'; // 🟡 se agrega discountPrice
+
+    const projection =
+      'name price discountPrice type imageSrc images stock bodega createdAt';
+
 
     const [items, total] = await Promise.all([
       Product.find(find)
@@ -322,7 +360,9 @@ router.get('/', async (req, res) => {
       Product.countDocuments(find),
     ]);
 
+
     res.set('Cache-Control', 'public, max-age=20');
+
 
     res.json({
       items,
@@ -336,5 +376,6 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
+
 
 export default router;

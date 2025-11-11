@@ -340,17 +340,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         </select>
 
 
-        {/* Checkbox NUEVO */}
-        <label className="flex items-center gap-2 mb-4 select-none">
-          <input
-            type="checkbox"
-            checked={isNew}
-            onChange={(e) => setIsNew(e.target.checked)}
-          />
-          <span className="text-sm">
-            Mostrar etiqueta <strong>NUEVO</strong>
-          </span>
-        </label>
+        
 
 
         {/* Selector de inventario */}
