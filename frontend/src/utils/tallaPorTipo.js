@@ -10,6 +10,7 @@ export const tallaPorTipo = {
   NBA: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
   MLB: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
   NFL: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
+  Balón: ['3', '4', '5'],
 };
   export default tallaPorTipo;
   

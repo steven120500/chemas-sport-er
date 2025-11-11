@@ -1,21 +1,25 @@
 // src/components/FilterBar.jsx
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 
+
+// 🔹 Incluimos “Balones” como nueva categoría visible
 const filterOptions = [
-  'Todos',
-  'Player',
-  'Fan',
-  'Mujer',
-  'Nacional',
-  'Abrigos',
-  'Retro',
-  'Niño',
-  'F1',
-  'NBA',
-  'MLB',
-  'NFL',
-  'Ofertas', // ✅ nuevo botón
+  "Todos",
+  "Player",
+  "Fan",
+  "Mujer",
+  "Niño",
+  "Nacional",
+  "Abrigos",
+  "Retro",
+  "F1",
+  "NBA",
+  "MLB",
+  "NFL",
+  "Balones", // ⚽ nueva categoría
+  "Ofertas", // ✅ botón ofertas
 ];
+
 
 export default function FilterBar({
   searchTerm,
@@ -40,13 +44,16 @@ export default function FilterBar({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+
+
         <button
           onClick={onToggleTallas}
-          className="px-3 py-2  rounded-md bg-black text-white text-sm font-medium hover:bg-gray-600 whitespace-nowrap"
+          className="px-3 py-2 rounded-md bg-black text-white text-sm font-medium hover:bg-gray-600 whitespace-nowrap"
         >
           Filtrar por talla
         </button>
       </motion.div>
+
 
       {/* Botones de filtros */}
       <motion.div
@@ -56,21 +63,29 @@ export default function FilterBar({
         transition={{ delay: 0.2 }}
       >
         {filterOptions.map((label) => {
-          const isActive = filterType === label || (label === 'Todos' && filterType === '');
-          const isOffer = label === 'Ofertas';
+          const isActive =
+            filterType === label || (label === "Todos" && filterType === "");
+          const isOffer = label === "Ofertas";
+          const isBall = label === "Balones";
+
+
           return (
             <button
               key={label}
               className={`px-4 py-2 rounded-md transition whitespace-nowrap shadow-sm font-medium ${
                 isOffer
                   ? isActive
-                    ? 'bg-green-500 etiqueta-oferta-verde text-white'
-                  : 'bg-green-500 etiqueta-oferta-verde text-black border border-green-300 hover:bg-black hover:text-white'
+                    ? "bg-green-600 text-white"
+                    : "bg-green-500 text-black border border-green-400 hover:bg-green-600 hover:text-white"
+                  : isBall
+                  ? isActive
+                    ? "bg-black text-white border-black"
+                    : "bg-white text-black border border-black hover:bg-white hover:text-black"
                   : isActive
-                  ? 'bg-black text-white border-black'
-                  : 'bg-white text-black border border-black  hover:text-gray-600'
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-black border border-black hover:text-gray-600"
               }`}
-              onClick={() => setFilterType(label === 'Todos' ? '' : label)}
+              onClick={() => setFilterType(label === "Todos" ? "" : label)}
             >
               {label}
             </button>
