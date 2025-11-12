@@ -1,13 +1,18 @@
 import mongoose from "mongoose";
 
 
-// ===== Tallas =====
-const ADULT_SIZES = ['S','M','L','XL','XXL','3XL','4XL'];
-const KID_SIZES   = ['16','18','20','22','24','26','28'];
-const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES]);
+/* =========================
+   TALLAS PERMITIDAS
+   ========================= */
+const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
+const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
+const BALL_SIZES  = ['3', '4', '5']; // ⚽️ nuevas tallas para balones
+const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
 
 
-// ===== Validadores =====
+/* =========================
+   VALIDADORES
+   ========================= */
 
 
 // Acepta: null/undefined | dataURL base64 | URL http(s) (Cloudinary)
@@ -29,22 +34,23 @@ const imageAnyValidator = {
 };
 
 
-// stock y bodega deben ser { talla: cantidad>=0 } con tallas válidas
+// ✅ Validador flexible: solo revisa que sean números enteros >= 0
 const stockValidator = {
   validator(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
     for (const [size, qty] of Object.entries(obj)) {
-      if (!ALL_SIZES.has(String(size))) return false;
       const n = Number(qty);
       if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) return false;
     }
     return true;
   },
-  message: 'Inventario inválido. Debe ser un objeto { talla: cantidad>=0 } con tallas válidas.'
+  message: 'Inventario inválido. Debe ser un objeto { talla: cantidad>=0 }.'
 };
 
 
-// ===== Sub-esquema para imágenes (Cloudinary) =====
+/* =========================
+   SUB-ESQUEMA DE IMÁGENES
+   ========================= */
 const ImageSchema = new mongoose.Schema(
   {
     public_id: { type: String, trim: true },  // id en Cloudinary
@@ -54,42 +60,56 @@ const ImageSchema = new mongoose.Schema(
 );
 
 
-// ===== Schema principal =====
+/* =========================
+   SCHEMA PRINCIPAL
+   ========================= */
 const productSchema = new mongoose.Schema(
   {
+    // Nombre del producto
     name:  { type: String, required: true, trim: true, maxlength: 150 },
+
+
+    // Precio base
     price: { type: Number, required: true, min: 0 },
 
 
-    // 🟡 Nuevo campo: precio con descuento
+    // 💰 Precio con descuento (opcional)
     discountPrice: { type: Number, default: 0, min: 0 },
 
 
-    // Compatibilidad con el front (principal para cards/listas)
+    // Imagen principal (para cards/listas)
     imageSrc: { type: String, trim: true, maxlength: 600, validate: imageAnyValidator },
 
 
-    // Nuevo: arreglo de imágenes subidas a Cloudinary
+    // Galería de imágenes (Cloudinary)
     images: { type: [ImageSchema], default: [] },
 
 
-    // Stock por talla (visible en la tienda)
-    stock: { type: Object, required: true, validate: stockValidator },
+    // Inventario visible (Tienda #1)
+    stock: { type: Object, required: true, default: {}, validate: stockValidator },
 
 
-    // Nuevo: inventario de bodega (invisible al cliente, solo admins)
+    // Inventario oculto (Tienda #2 / bodega)
     bodega: { type: Object, default: {}, validate: stockValidator },
 
 
-    // Tipo de producto (ej. Player, Fan, Mujer, Niño...)
-    type: { type: String, required: true, trim: true, maxlength: 40 }
+    // Tipo de producto (Player, Fan, Mujer, Niño, Balón, etc.)
+    type: { type: String, required: true, trim: true, maxlength: 40 },
+
+
+    // Texto alternativo para SEO/accesibilidad
+    imageAlt: { type: String, trim: true, maxlength: 150 }
   },
   { timestamps: true }
 );
 
 
-// ===== Hooks =====
-// Redondea precio a entero si viene con decimales
+/* =========================
+   HOOKS Y LIMPIEZAS
+   ========================= */
+
+
+// Redondea precio y descuento a enteros
 productSchema.pre('validate', function (next) {
   if (typeof this.price === 'number' && Number.isFinite(this.price)) {
     this.price = Math.trunc(this.price);
@@ -101,14 +121,18 @@ productSchema.pre('validate', function (next) {
 });
 
 
-// ===== Índices =====
+/* =========================
+   ÍNDICES
+   ========================= */
 productSchema.index({ createdAt: -1 });
 productSchema.index({ name: 1 });
 productSchema.index({ type: 1 });
 productSchema.index({ price: 1, createdAt: -1 });
 
 
-// ===== Limpieza de salida JSON/Objeto =====
+/* =========================
+   SALIDA JSON LIMPIA
+   ========================= */
 productSchema.set('toJSON', {
   virtuals: false,
   versionKey: false,

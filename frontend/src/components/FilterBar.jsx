@@ -16,7 +16,7 @@ const filterOptions = [
   "NBA",
   "MLB",
   "NFL",
-  "Balones", // ⚽ nueva categoría
+  "Balón", // ⚽ nueva categoría
   "Ofertas", // ✅ botón ofertas
 ];
 
