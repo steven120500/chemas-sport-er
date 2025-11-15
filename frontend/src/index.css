@@ -131,3 +131,55 @@ button:focus-visible {
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
   box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
 }
+/* === ANIMACIÓN DE BRILLO SOBRE HEADER === */
+
+
+@keyframes shineSweep {
+  0% {
+    transform: translateX(-120%) skewX(-25deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(150%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+
+/* Overlay animado que cruza el header */
+.header-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.0),
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.0)
+  );
+  animation: shineSweep 2s ease-in-out;
+  pointer-events: none;
+}
+
+
+/* === ANIMACIÓN DE BRILLO SOBRE EL LOGO === */
+
+
+@keyframes logoGlow {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.8);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+
+.logo-shine {
+  animation: logoGlow 2s ease-in-out;
+}
