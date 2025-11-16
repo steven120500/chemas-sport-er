@@ -71,7 +71,7 @@ export default function Header({
 
 
         {/* Usuario */}
-        <div className="flex items-center">
+        <div className="flex items-center z-50">
           {user ? (
             <UserDropDown
               isSuperUser={isSuperUser}
