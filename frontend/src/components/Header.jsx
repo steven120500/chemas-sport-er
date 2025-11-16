@@ -79,6 +79,11 @@ export default function Header({
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
               onViewHistory={() => setShowHistoryModal(true)}
+              canSeeHistory={
+                user?.isSuperUser || user?.roles?.includes("history")
+              }
+
+
             />
           ) : (
             <button
