@@ -39,7 +39,7 @@ export default function Header({
 
   return (
     <header
-      className="relative shadow-md px-2 sm:px-6 py-10 sm:py-40 overflow-hidden min-h-[260px]"
+      className="relative shadow-md px-2 sm:px-6 py-10 sm:py-40 z-0 min-h-[260px]"
       style={{
         backgroundImage: `url(${fondoHeader})`,
         backgroundSize: "cover",
@@ -71,7 +71,7 @@ export default function Header({
 
 
         {/* Usuario */}
-        <div className="flex items-center z-50">
+        <div className="flex items-center z-999">
           {user ? (
             <UserDropDown
               isSuperUser={isSuperUser}
