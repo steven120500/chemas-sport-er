@@ -1,6 +1,6 @@
 // src/components/ProductCard.jsx
 import { motion } from "framer-motion";
-
+import { FaFire } from "react-icons/fa";
 
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
@@ -87,10 +87,12 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* 🟧 ⭐ POPULAR ⭐ */}
       {product.isPopular === true && (
-        <span className="absolute etiqueta-popular-naranja top-2 right-2 z-10 text-white font-bold text-xs sm:text-sm px-2 py-1 rounded">
-          Popular
-        </span>
-      )}
+  <span className="absolute etiqueta-popular-naranja top-2 right-2 z-10 text-white font-bold text-xs sm:text-sm px-2 py-1 rounded flex items-center justify-center">
+    <FaFire size={16} color="white" />
+  </span>
+)}
+
+
 
 
       {/* Imagen */}
