@@ -328,6 +328,7 @@ router.delete('/:id', async (req, res) => {
 
 
 /* =============================== GET LIST ============================== */
+/*  ⭐⭐⭐ AQUI ESTÁ EL ÚNICO CAMBIO NECESARIO ⭐⭐⭐  */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -346,7 +347,11 @@ router.get('/', async (req, res) => {
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
       find.$expr = { $lt: ['$discountPrice', '$price'] };
-    } else if (type) {
+    }
+    else if (type === 'Populares') {
+      find.isPopular = true;   // ← ← ← ⭐⭐⭐ ESTA ES LA LÍNEA CLAVE
+    }
+    else if (type) {
       find.type = type;
     }
 
@@ -360,7 +365,7 @@ router.get('/', async (req, res) => {
 
 
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular popularCountHistory';
 
 
     const [items, total] = await Promise.all([
