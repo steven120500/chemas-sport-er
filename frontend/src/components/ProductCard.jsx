@@ -110,7 +110,7 @@ export default function ProductCard({ product, onClick, user }) {
     src="/Bola.png"          // o "/arbol.png" si preferís
     alt="navidad"
     className="
-      w-20 h-20          /* tamaño en celular */
+      w-26 h-26          /* tamaño en celular */
       sm:w-24 sm:h-24    /* tablet */
       md:w-40 md:h-40    /* desktop: tu tamaño ideal */
       object-contain
