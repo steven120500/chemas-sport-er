@@ -85,12 +85,43 @@ export default function ProductCard({ product, onClick, user }) {
       )}
 
 
-      {/* 🟧 ⭐ POPULAR ⭐ */}
-      {product.isPopular === true && (
-  <span className="absolute etiqueta-popular-naranja top-2 right-2 z-10 text-white font-bold text-xs sm:text-sm px-2 py-1 rounded flex items-center justify-center">
+    {/* 🟧 POPULAR (llama encima) */}
+{product.isPopular === true && (
+  <span
+    className="absolute etiqueta-popular-naranja top-2 right-2 z-30
+               flex items-center justify-center px-2 py-1 rounded"
+  >
     <FaFire size={16} color="white" />
   </span>
 )}
+
+
+{/* 🎄 Sticker navideño (siempre visible, debajo de Popular) */}
+<span
+  className="
+    absolute
+    md:-right-6
+    -right-3
+    z-20
+    pointer-events-none select-none
+  "
+>
+  <img
+    src="/Bola.png"          // o "/arbol.png" si preferís
+    alt="navidad"
+    className="
+      w-20 h-20          /* tamaño en celular */
+      sm:w-24 sm:h-24    /* tablet */
+      md:w-40 md:h-40    /* desktop: tu tamaño ideal */
+      object-contain
+      drop-shadow-xl
+      
+    "
+    draggable="false"
+  />
+</span>
+
+
 
 
 
