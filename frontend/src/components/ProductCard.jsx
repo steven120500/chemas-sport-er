@@ -12,10 +12,9 @@ const cldUrl = (url, w, h) => {
 };
 
 
-// 🔹 Tallas
 const ADULT_SIZES = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
-const BALL_SIZES = ["3", "4", "5"]; // ⚽ Balones
+const BALL_SIZES = ["3", "4", "5"];
 
 
 export default function ProductCard({ product, onClick, user }) {
@@ -23,15 +22,9 @@ export default function ProductCard({ product, onClick, user }) {
   const isBalon = product.type === "Balón" || product.type === "Balones";
 
 
-  // 🔸 Definimos tallas según tipo
-  const sizesToCheck = isBalon
-    ? BALL_SIZES
-    : isNino
-    ? KID_SIZES
-    : ADULT_SIZES;
+  const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 
 
-  // --- Cálculo de avisos para superadmin ---
   const stockAgotadas = [];
   const stockQueda1 = [];
   const bodegaAgotadas = [];
@@ -52,7 +45,6 @@ export default function ProductCard({ product, onClick, user }) {
       if (bodeQty === 1) bodegaQueda1.push(size);
 
 
-      // 👇 lógica traspaso
       if (stockQty === 0 && bodeQty > 0) {
         traspasosUrgentes.push({ talla: size, stock: stockQty, bodega: bodeQty });
       } else if (stockQty === 1 && bodeQty > 0) {
@@ -75,26 +67,28 @@ export default function ProductCard({ product, onClick, user }) {
       className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
       onClick={() => onClick(product)}
     >
-      {/* Tipo */}
+      {/* 🔸 Tipo */}
       {product.type && (
         <div className="absolute top-2 left-2 z-10">
-          <div
-            className={`text-white text-xs font-semibold px-3 py-1 rounded-full shadow ${
-              isBalon
-                ? "bg-black text-black"
-                : "bg-black"
-            }`}
-          >
+          <div className="text-white text-xs font-semibold px-3 py-1 rounded-full shadow bg-black">
             {product.type}
           </div>
         </div>
       )}
 
 
-      {/* Oferta */}
+      {/* 🟩 Oferta */}
       {hasDiscount && (
-        <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 bg-green-600 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
+        <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
           Oferta
+        </span>
+      )}
+
+
+      {/* 🟧 ⭐ POPULAR ⭐ */}
+      {product.isPopular === true && (
+        <span className="absolute etiqueta-popular-naranja top-2 right-2 z-10 text-white font-bold text-xs sm:text-sm px-2 py-1 rounded">
+          Popular
         </span>
       )}
 
@@ -157,51 +151,38 @@ export default function ProductCard({ product, onClick, user }) {
         )}
 
 
-        {/* Avisos SOLO superadmin */}
+        {/* Avisos superadmin */}
         {user?.isSuperUser && (
           <div className="mt-3 text-xs sm:text-sm text-left w-full px-2">
-            {/* STOCK */}
             {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
               <>
                 <p className="font-bold text-black">Tienda #1</p>
                 {stockAgotadas.length > 0 && (
-                  <p className="text-red-600">
-                    Agotado {stockAgotadas.join(" ")}
-                  </p>
+                  <p className="text-red-600">Agotado {stockAgotadas.join(" ")}</p>
                 )}
                 {stockQueda1.length > 0 && (
-                  <p className="text-green-600">
-                    Queda 1 {stockQueda1.join(" ")}
-                  </p>
+                  <p className="text-green-600">Queda 1 {stockQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
 
-            {/* BODEGA */}
             {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
               <>
                 <p className="font-bold text-black mt-2">Tienda #2</p>
                 {bodegaAgotadas.length > 0 && (
-                  <p className="text-red-600">
-                    Agotado {bodegaAgotadas.join(" ")}
-                  </p>
+                  <p className="text-red-600">Agotado {bodegaAgotadas.join(" ")}</p>
                 )}
                 {bodegaQueda1.length > 0 && (
-                  <p className="text-green-600">
-                    Queda 1 {bodegaQueda1.join(" ")}
-                  </p>
+                  <p className="text-green-600">Queda 1 {bodegaQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
 
-            {/* 🔸 NUEVAS CAJAS DE TRASPASO */}
             {traspasosUrgentes.length > 0 && (
               <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
-                <p className="font-bold text-red-700 mb-1">
-                  🚨 Traspasos urgentes a Tienda 1:
-                </p>
+                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes a Tienda 1:</p>
                 <ul className="list-disc pl-5 text-red-800">
                   {traspasosUrgentes.map((t, i) => (
                     <li key={i}>
@@ -215,9 +196,7 @@ export default function ProductCard({ product, onClick, user }) {
 
             {traspasosSugeridos.length > 0 && (
               <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
-                <p className="font-bold text-yellow-700 mb-1">
-                  📦 Traspasos sugeridos a Tienda 1:
-                </p>
+                <p className="font-bold text-yellow-700 mb-1">📦 Traspasos sugeridos:</p>
                 <ul className="list-disc pl-5 text-yellow-800">
                   {traspasosSugeridos.map((t, i) => (
                     <li key={i}>

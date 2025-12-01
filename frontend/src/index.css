@@ -183,3 +183,46 @@ button:focus-visible {
 .logo-shine {
   animation: logoGlow 2s ease-in-out;
 }
+
+
+.etiqueta-popular-naranja {
+  display: inline-block;
+  background: linear-gradient(
+    110deg,
+    #7a2e00 0%,     /* naranja oscuro */
+    #ff8c00 40%,    /* naranja medio */
+    #ffc27a 50%,    /* reflejo claro */
+    #ff8c00 60%,    /* vuelta al medio */
+    #7a2e00 100%    /* oscuro */
+  );
+  background-size: 200% 100%;
+  animation: reflejoNaranja 3s linear infinite;
+  animation-delay: 1s;
+
+
+  color: #ffffff;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  letter-spacing: 1px;
+
+
+  text-shadow: 0 0 6px rgba(255, 200, 120, 0.8);
+  box-shadow: 0 0 10px rgba(255, 140, 0, 0.6);
+}
+
+
+/* ANIMACIÓN BRILLANTE */
+@keyframes reflejoNaranja {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+
+
+

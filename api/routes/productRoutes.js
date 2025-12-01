@@ -167,7 +167,7 @@ router.put('/:id', async (req, res) => {
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
 
-    // Stock
+    // --- STOCK ---
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
       try { incomingStock = JSON.parse(incomingStock); } catch {}
@@ -175,12 +175,21 @@ router.put('/:id', async (req, res) => {
     const nextStock = incomingStock ? sanitizeInv(incomingStock) : prev.stock;
 
 
-    // Bodega
+    // --- BODEGA ---
     let incomingBodega = req.body.bodega;
     if (typeof incomingBodega === 'string') {
       try { incomingBodega = JSON.parse(incomingBodega); } catch {}
     }
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
+
+
+    // --- DIFERENCIAS (RESTAS) ---
+    let restadas = 0;
+    for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
+      const before = Number(prev.stock?.[size] ?? 0);
+      const after  = Number(nextStock?.[size] ?? 0);
+      if (before > after) restadas += (before - after);
+    }
 
 
     const update = {
@@ -195,7 +204,7 @@ router.put('/:id', async (req, res) => {
     };
 
 
-    // Imágenes
+    // --- IMÁGENES ---
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -226,13 +235,42 @@ router.put('/:id', async (req, res) => {
     }
 
 
-    const updated = await Product.findByIdAndUpdate(
+    // --- ACTUALIZACIÓN ---
+    let updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     );
 
 
+    // --- REGISTRAR RESTAS ---
+    if (restadas > 0) {
+      updated.popularCountHistory.push({
+        date: new Date().toISOString(),
+        quantity: restadas
+      });
+    }
+
+
+    // --- EVALUAR POPULAR POR MES ---
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+
+    const totalMonth = updated.popularCountHistory
+      .filter(entry => {
+        const d = new Date(entry.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((sum, e) => sum + e.quantity, 0);
+
+
+    updated.isPopular = totalMonth >= 10;
+    await updated.save();
+
+
+    // --- HISTORIAL ---
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
       await History.create({
@@ -240,7 +278,7 @@ router.put('/:id', async (req, res) => {
         action: 'actualizó producto',
         item: `${updated.name} (${updated.type})`,
         date: new Date(),
-        details: changes.join(' | '),
+        details: changes.join(' | ')
       });
     }
 
@@ -322,13 +360,13 @@ router.get('/', async (req, res) => {
 
 
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular';
 
 
     const [items, total] = await Promise.all([
       Product.find(find)
         .select(projection)
-        .sort({ name: 1 })  // ORDEN A–Z 🔥
+        .sort({ name: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
