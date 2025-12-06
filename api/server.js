@@ -5,7 +5,7 @@ import compression from 'compression';
 import connectDB from './config/db.js';
 
 
-import attachUser from './middlewares/attachUser.js';   // ⭐ IMPORTANTE
+import attachUser from './middleware/attachUser.js';   // ⭐ IMPORTANTE
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
