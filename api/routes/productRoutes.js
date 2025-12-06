@@ -338,6 +338,7 @@ router.delete('/:id', async (req, res) => {
 
 
 /* =============================== GET LIST ============================== */
+/* =============================== GET LIST ============================== */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -350,16 +351,23 @@ router.get('/', async (req, res) => {
     const find = {};
 
 
-    /* ⭐ NUEVO: FILTRAR OCULTOS PARA CLIENTES */
-    const isAdmin = req.headers["x-admin"] === "true";
-    if (!isAdmin) {
+    /* ⭐ USAR EL USUARIO REAL DEL TOKEN ⭐ */
+    const user = req.user || {};
+    const isSuper = user.isSuperUser === true;
+    const canSeeHidden = isSuper || (user.roles || []).includes("edit") || (user.roles || []).includes("ver_ocultos");
+
+
+    /* ⭐ SI NO ES SUPERADMIN NI TIENE PERMISO, NO VE HIDDEN ⭐ */
+    if (!canSeeHidden) {
       find.hidden = { $ne: true };
     }
 
 
+    /* Buscador */
     if (q) find.name = { $regex: q, $options: 'i' };
 
 
+    /* Filtros de tipo */
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
       find.$expr = { $lt: ['$discountPrice', '$price'] };
@@ -372,6 +380,7 @@ router.get('/', async (req, res) => {
     }
 
 
+    /* Filtro por tallas */
     if (sizes) {
       const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
       if (arr.length) {
