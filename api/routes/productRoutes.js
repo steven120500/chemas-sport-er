@@ -138,6 +138,10 @@ router.post('/', upload.any(), async (req, res) => {
       bodega: cleanBodega,
       images,
       imageSrc,
+
+
+      /* ⭐ NUEVO PARA OCULTAR */
+      hidden: req.body.hidden === 'true' || req.body.hidden === true
     });
 
 
@@ -202,6 +206,12 @@ router.put('/:id', async (req, res) => {
       stock: nextStock,
       bodega: nextBodega,
     };
+
+
+    /* ⭐ NUEVO PARA OCULTAR AL EDITAR */
+    if (req.body.hidden !== undefined) {
+      update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
+    }
 
 
     // --- IMÁGENES ---
@@ -328,7 +338,6 @@ router.delete('/:id', async (req, res) => {
 
 
 /* =============================== GET LIST ============================== */
-/*  ⭐⭐⭐ AQUI ESTÁ EL ÚNICO CAMBIO NECESARIO ⭐⭐⭐  */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -341,6 +350,13 @@ router.get('/', async (req, res) => {
     const find = {};
 
 
+    /* ⭐ NUEVO: FILTRAR OCULTOS PARA CLIENTES */
+    const isAdmin = req.headers["x-admin"] === "true";
+    if (!isAdmin) {
+      find.hidden = { $ne: true };
+    }
+
+
     if (q) find.name = { $regex: q, $options: 'i' };
 
 
@@ -349,7 +365,7 @@ router.get('/', async (req, res) => {
       find.$expr = { $lt: ['$discountPrice', '$price'] };
     }
     else if (type === 'Populares') {
-      find.isPopular = true;   // ← ← ← ⭐⭐⭐ ESTA ES LA LÍNEA CLAVE
+      find.isPopular = true;
     }
     else if (type) {
       find.type = type;
@@ -365,7 +381,7 @@ router.get('/', async (req, res) => {
 
 
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular popularCountHistory';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory';
 
 
     const [items, total] = await Promise.all([

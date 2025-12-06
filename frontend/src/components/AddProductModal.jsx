@@ -87,7 +87,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [stock, setStock] = useState({});
   const [bodega, setBodega] = useState({});
   const [mode, setMode] = useState("stock");
-  const [isNew, setIsNew] = useState(false); // ✅ NUEVO campo
+
+
+  const [isNew, setIsNew] = useState(false);   // ya existía
+  const [hidden, setHidden] = useState(false); // ⭐ NUEVO CAMPO
+
+
   const [loading, setLoading] = useState(false);
 
 
@@ -107,7 +112,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   }, []);
 
 
-  // ✅ Incluimos tallas de balón directamente si el tipo es Balón
+  // incluye tallas de balón si aplica
   const tallas = useMemo(() => {
     const tipos = { ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"] };
     return tipos[type] || [];
@@ -117,6 +122,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const handleFiles = async (filesLike) => {
     const files = Array.from(filesLike).slice(0, MAX_IMAGES - images.length);
     if (files.length === 0) return;
+
+
     try {
       setLoading(true);
       const converted = [];
@@ -129,6 +136,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         const previewUrl = URL.createObjectURL(blob);
         converted.push({ blob, previewUrl });
       }
+
+
       if (converted.length) {
         setImages((prev) => [...prev, ...converted].slice(0, MAX_IMAGES));
         toast.success("Imágenes optimizadas a WebP");
@@ -185,7 +194,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         return;
       }
       if (discountPrice && Number(discountPrice) > Number(price)) {
-        toast.error("El descuento no puede ser mayor al precio original.");
+        toast.error("El descuento no puede ser mayor al precio.");
         return;
       }
       if (!images.length) {
@@ -200,7 +209,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("price", String(price).trim());
       if (discountPrice) formData.append("discountPrice", String(discountPrice).trim());
       formData.append("type", type.trim());
-      formData.append("isNew", isNew ? "true" : "false"); // ✅ NUEVO
+
+
+      formData.append("isNew", isNew ? "true" : "false");
+      formData.append("hidden", hidden ? "true" : "false"); // ⭐ AQUI SE ENVÍA
+
+
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
 
@@ -227,7 +241,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       const data = await res.json();
       onAdd?.(data);
       onCancel?.();
-      toast.success("Producto agregado correctamente ✅");
+      toast.success("Producto agregado correctamente");
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Error guardando el producto");
@@ -243,7 +257,9 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6"
     >
       <div className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
-        {/* Botón cerrar */}
+
+
+        {/* Cerrar */}
         <button
           onClick={onCancel}
           className="absolute top-6 right-2 bg-black text-white rounded p-1"
@@ -255,16 +271,20 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         <h2 className="text-lg font-semibold mb-4">Agregar producto</h2>
 
 
-        {/* Carga de imágenes */}
+        {/* ======= IMÁGENES ======= */}
         <p className="text-gray-500 mb-2">
-          Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para seleccionar (se convertirán a WebP)
+          Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para seleccionar.
         </p>
 
 
         <div className="flex gap-2 justify-center flex-wrap mb-3">
           {images.map((img, i) => (
             <div key={`preview-${i}`} className="relative">
-              <img src={img.previewUrl} alt={`preview-${i}`} className="w-24 h-24 object-cover rounded" />
+              <img
+                src={img.previewUrl}
+                alt={`preview-${i}`}
+                className="w-24 h-24 object-cover rounded"
+              />
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -299,7 +319,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         )}
 
 
-        {/* Campos principales */}
+        {/* ======= CAMPOS ======= */}
         <input
           type="text"
           placeholder="Nombre del producto"
@@ -340,12 +360,22 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         </select>
 
 
-        
+        {/* ======= NUEVO CHECKBOX HIDDEN ======= */}
+        <label className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={hidden}
+            onChange={(e) => setHidden(e.target.checked)}
+          />
+          <span className="text-sm font-medium">Ocultar este producto</span>
+        </label>
 
 
-        {/* Selector de inventario */}
+        {/* ======= SELECTOR DE INVENTARIO ======= */}
         <div className="mb-3">
-          <label className="block text-xs text-gray-500 mb-1">Inventario a editar</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            Inventario a editar
+          </label>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
@@ -357,7 +387,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         </div>
 
 
-        {/* Grid de tallas */}
+        {/* ======= TALLAS ======= */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {tallas.map((size) => (
             <label key={size} className="text-center">
@@ -374,7 +404,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         </div>
 
 
-        {/* Botones */}
+        {/* ======= BOTONES ======= */}
         <div className="flex gap-2">
           <button
             type="button"
@@ -384,6 +414,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           >
             {loading ? "Agregando..." : "Agregar producto"}
           </button>
+
+
           <button
             type="button"
             onClick={onCancel}

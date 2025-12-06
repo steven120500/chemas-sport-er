@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 
 
-
-
 /* =========================
    TALLAS PERMITIDAS
    ========================= */
@@ -10,8 +8,6 @@ const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
-
-
 
 
 /* =========================
@@ -48,8 +44,6 @@ const stockValidator = {
 };
 
 
-
-
 /* =========================
    SUB-ESQUEMA DE IMÁGENES
    ========================= */
@@ -60,8 +54,6 @@ const ImageSchema = new mongoose.Schema(
   },
   { _id: false }
 );
-
-
 
 
 /* =========================
@@ -107,12 +99,19 @@ const productSchema = new mongoose.Schema(
     isPopular: {
       type: Boolean,
       default: false
+    },
+
+
+    /* =========================
+       NUEVO CAMPO PARA OCULTAR PRODUCTOS
+       ========================= */
+    hidden: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }
 );
-
-
 
 
 /* =========================
@@ -129,8 +128,6 @@ productSchema.pre('validate', function (next) {
 });
 
 
-
-
 /* =========================
    ÍNDICES
    ========================= */
@@ -138,8 +135,6 @@ productSchema.index({ createdAt: -1 });
 productSchema.index({ name: 1 });
 productSchema.index({ type: 1 });
 productSchema.index({ price: 1, createdAt: -1 });
-
-
 
 
 /* =========================
@@ -159,8 +154,6 @@ productSchema.set('toJSON', {
 productSchema.set('toObject', { virtuals: false, versionKey: false });
 productSchema.set('minimize', true);
 productSchema.set('strictQuery', true);
-
-
 
 
 export default mongoose.model('Product', productSchema);

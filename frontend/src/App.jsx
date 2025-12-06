@@ -240,27 +240,25 @@ function App() {
   const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
 
 
-  // ⭐⭐⭐ AQUI ESTA EL CAMBIO NECESARIO PARA POPULARES ⭐⭐⭐
+  /* ⭐⭐⭐ AQUI SE AÑADE LA LÓGICA DE OCULTAR ⭐⭐⭐ */
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
 
 
-    // Ofertas
+    // ⛔ OCULTAR SI EL USUARIO NO TIENE PERMISOS (edit)
+    if (!canEdit && product.hidden === true) return false;
+
+
     if (filterType === 'Ofertas') {
-      return (
-        Number(product.discountPrice) > 0 &&
-        matchName
-      );
+      return (Number(product.discountPrice) > 0 && matchName);
     }
 
 
-    // ⭐ POPULARES ⭐
     if (filterType === 'Populares') {
       return product.isPopular === true && matchName;
     }
 
 
-    // Tipo normal
     const matchType = filterType ? product.type === filterType : true;
 
 
@@ -299,7 +297,6 @@ function App() {
       <div ref={pageTopRef} />
 
 
-      {/* Modales */}
       {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
       {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
       {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
@@ -354,7 +351,6 @@ function App() {
       />
 
 
-      {/* Tallas */}
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
           <div className="w-full text-center">
@@ -417,7 +413,6 @@ function App() {
       </div>
 
 
-      {/* Productos */}
       <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product) => (
