@@ -99,10 +99,20 @@ function App() {
   };
 
 
+  /* ============================================================
+     ⭐ AQUÍ ESTÁ EL CAMBIO IMPORTANTE  
+     ============================================================ */
   const fetchProducts = async (opts = {}) => {
     const p = opts.page ?? page;
     const q = (opts.q ?? searchTerm).trim();
     const tp = (opts.type ?? filterType).trim();
+
+
+    const isAdmin =
+      user?.isSuperUser ||
+      user?.roles?.includes("edit") ||
+      user?.roles?.includes("add") ||
+      user?.roles?.includes("delete");
 
 
     setLoading(true);
@@ -116,7 +126,13 @@ function App() {
       });
 
 
-      const res = await fetch(`${API_BASE}/api/products?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
+        headers: {
+          "x-admin": isAdmin ? "true" : "false"
+        }
+      });
+
+
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
 
@@ -131,6 +147,9 @@ function App() {
       setLoading(false);
     }
   };
+
+
+  // ============================================================
 
 
   const fetchAllForCounts = async () => {
@@ -240,17 +259,18 @@ function App() {
   const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
 
 
-  /* ⭐⭐⭐ AQUI SE AÑADE LA LÓGICA DE OCULTAR ⭐⭐⭐ */
+  /* ============================================================
+     FILTRADO DE PRODUCTOS (incluye ocultos para admin)
+     ============================================================ */
   const filteredProducts = products.filter((product) => {
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
 
 
-    // ⛔ OCULTAR SI EL USUARIO NO TIENE PERMISOS (edit)
     if (!canEdit && product.hidden === true) return false;
 
 
     if (filterType === 'Ofertas') {
-      return (Number(product.discountPrice) > 0 && matchName);
+      return Number(product.discountPrice) > 0 && matchName;
     }
 
 
