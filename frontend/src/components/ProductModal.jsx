@@ -53,7 +53,7 @@ export default function ProductModal({
   const [invMode, setInvMode] = useState("stock");
 
 
-  // 🔥 NUEVO CAMPO
+  // NUEVO: ocultar producto
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
 
 
@@ -61,10 +61,10 @@ export default function ProductModal({
   const [editedBodega, setEditedBodega] = useState(product.bodega || {});
   const [editedName, setEditedName] = useState(product?.name || "");
   const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
-  const [editedDiscountPrice, setEditedDiscountPrice] = useState(
-    product?.discountPrice ?? 0
-  );
+  const [editedDiscountPrice, setEditedDiscountPrice] = useState(product?.discountPrice ?? 0);
   const [editedType, setEditedType] = useState(product?.type || "Player");
+
+
   const [loading, setLoading] = useState(false);
 
 
@@ -81,9 +81,9 @@ export default function ProductModal({
   const [localImages, setLocalImages] = useState(
     galleryFromProduct.map((src) => ({ src, isNew: false }))
   );
+
+
   const [idx, setIdx] = useState(0);
-
-
   const hasMany = localImages.length > 1;
   const currentSrc = localImages[idx]?.src || "";
 
@@ -96,7 +96,7 @@ export default function ProductModal({
     setEditedType(product?.type || "Player");
     setEditedStock({ ...(product?.stock || {}) });
     setEditedBodega({ ...(product?.bodega || {}) });
-    setEditedHidden(product?.hidden || false); // ← ← AGREGADO
+    setEditedHidden(product?.hidden || false);
 
 
     setLocalImages(
@@ -106,12 +106,8 @@ export default function ProductModal({
             isNew: false,
           }))
         : [
-            ...(product?.imageSrc
-              ? [{ src: product.imageSrc, isNew: false }]
-              : []),
-            ...(product?.imageSrc2
-              ? [{ src: product.imageSrc2, isNew: false }]
-              : []),
+            ...(product?.imageSrc ? [{ src: product.imageSrc, isNew: false }] : []),
+            ...(product?.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
           ]
     );
     setIdx(0);
@@ -120,142 +116,110 @@ export default function ProductModal({
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto";
-    };
+    return () => (document.body.style.overflow = "auto");
   }, []);
 
 
-  // ================================
+  // ===========================
   // GUARDAR CAMBIOS
-  // ================================
+  // ===========================
   const handleSave = async () => {
     if (loading) return;
 
 
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
-      toast.error("No se encontró un ID válido del producto");
+      toast.error("ID inválido");
       return;
     }
 
 
     try {
       setLoading(true);
+
+
       const displayName = user?.username || user?.email || "ChemaSportER";
 
 
-      const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
-      const discountInt = Math.max(
-        0,
-        parseInt(editedDiscountPrice, 10) || 0
-      );
-
-
-      const clean = (obj) =>
-        Object.fromEntries(
-          Object.entries(obj || {}).map(([k, v]) => [
-            k,
-            Math.max(0, parseInt(v, 10) || 0),
-          ])
-        );
-
-
-      // PAYLOAD COMPLETO
       const payload = {
-        name: (editedName || "").trim(),
-        price: priceInt,
-        discountPrice: discountInt,
-        type: (editedType || "").trim(),
-        stock: clean(editedStock),
-        bodega: clean(editedBodega),
-
-
-        // imágenes
+        name: editedName.trim(),
+        price: Math.max(0, parseInt(editedPrice, 10) || 0),
+        discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0),
+        type: editedType.trim(),
+        stock: editedStock,
+        bodega: editedBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
-        imageSrc:
-          typeof localImages[0]?.src === "string" ? localImages[0].src : null,
+        imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
 
 
-        // NUEVO CAMPO OCULTAR
-        hidden: editedHidden,
+        hidden: editedHidden, // ← NUEVO
       };
 
 
-      const res = await fetch(
-        `${API_BASE}/api/products/${encodeURIComponent(id)}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user": displayName,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user": displayName,
+          "x-admin": canEdit || user?.isSuperUser ? "true" : "false", // ← CLAVE
+        },
+        body: JSON.stringify(payload),
+      });
 
 
-      if (!res.ok) throw new Error(`Error al actualizar (${res.status})`);
+      if (!res.ok) throw new Error("Error al actualizar");
 
 
       const updated = await res.json();
-      setViewProduct(updated);
-      setIsEditing(false);
       onUpdate?.(updated);
+      setIsEditing(false);
     } catch (err) {
-      console.error(err);
-      toast.error("Hubo un problema al actualizar el producto");
+      toast.error("Error al actualizar el producto");
     } finally {
       setLoading(false);
     }
   };
 
 
-  // ===============================
+  // ===========================
   // ELIMINAR
-  // ===============================
+  // ===========================
   const handleDelete = async () => {
     if (loading) return;
+
+
     const id = product?._id || product?.id;
-    if (!id || !isLikelyObjectId(id)) {
-      toast.error("ID inválido");
-      return;
-    }
+
+
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || "ChemaSportER";
 
 
-      const res = await fetch(
-        `${API_BASE}/api/products/${encodeURIComponent(id)}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user": displayName,
-          },
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user": displayName,
+          "x-admin": canDelete || user?.isSuperUser ? "true" : "false",
+        },
+      });
 
 
       if (!res.ok) throw new Error("Error al eliminar");
 
 
       onUpdate?.(null, id);
-      onClose?.();
+      onClose();
     } catch (err) {
-      toast.error("No se pudo eliminar el producto");
+      toast.error("No se pudo eliminar");
     } finally {
       setLoading(false);
     }
   };
 
 
-  // ===================================
-  // UI
-  // ===================================
-  const isNino =
-    (isEditing ? editedType : viewProduct?.type) === "Niño";
+  const isNino = (isEditing ? editedType : viewProduct?.type) === "Niño";
   const isBalon =
     (isEditing ? editedType : viewProduct?.type) === "Balón" ||
     (isEditing ? editedType : viewProduct?.type) === "Balones";
@@ -268,40 +232,32 @@ export default function ProductModal({
     : TALLAS_ADULTO;
 
 
-  const displayUrl = currentSrc
-    ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W)
-    : "";
+  const displayUrl = currentSrc ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W) : "";
 
 
-  const getInventoryToShow = () => {
-    if (isEditing)
-      return invMode === "stock" ? editedStock : editedBodega;
-    return invMode === "stock"
-      ? viewProduct?.stock || {}
-      : viewProduct?.bodega || {};
-  };
+  const getInventoryToShow = () =>
+    isEditing ? (invMode === "stock" ? editedStock : editedBodega) : invMode === "stock"
+    ? viewProduct?.stock || {}
+    : viewProduct?.bodega || {};
 
 
-  const hasDiscount =
-    product.discountPrice !== undefined &&
-    product.discountPrice !== null &&
-    Number(product.discountPrice) > 0;
+  const hasDiscount = Number(product.discountPrice) > 0;
 
 
-  const getTotalBySize = (size) => {
-    const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0;
-    const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0;
-    return a + b;
-  };
+  const getTotalBySize = (size) =>
+    (viewProduct?.stock?.[size] ?? 0) + (viewProduct?.bodega?.[size] ?? 0);
 
 
+  // ===========================
+  // UI PRINCIPAL DEL MODAL
+  // ===========================
   return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
         className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
       >
-        {/* BOTÓN CERRAR */}
+        {/* CERRAR */}
         <button
           onClick={onClose}
           className="absolute top-6 right-2 bg-black text-white rounded p-1"
@@ -314,38 +270,22 @@ export default function ProductModal({
         <div className="mt-12 mb-2 text-center">
           {isEditing && canEdit ? (
             <>
-              <label className="block text-xs text-gray-500 mb-1">
-                Tipo
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Tipo</label>
               <select
                 value={editedType}
                 onChange={(e) => setEditedType(e.target.value)}
                 className="w-full px-3 py-2 border rounded mb-3"
               >
                 {[
-                  "Player",
-                  "Fan",
-                  "Mujer",
-                  "Nacional",
-                  "Abrigos",
-                  "Retro",
-                  "Niño",
-                  "F1",
-                  "NBA",
-                  "MLB",
-                  "NFL",
-                  "Balón",
+                  "Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro",
+                  "Niño", "F1", "NBA", "MLB", "NFL", "Balón"
                 ].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
 
 
-              <label className="block text-xs text-gray-500 mb-1">
-                Nombre
-              </label>
+              <label className="block text-xs text-gray-500 mb-1">Nombre</label>
               <input
                 type="text"
                 className="text-center border-b-2 w-full font-semibold"
@@ -372,46 +312,42 @@ export default function ProductModal({
                 type="number"
                 className="text-center border-b-2 w-full font-semibold text-2xl text-green-600"
                 value={editedDiscountPrice}
-                onChange={(e) =>
-                  setEditedDiscountPrice(e.target.value)
-                }
+                onChange={(e) => setEditedDiscountPrice(e.target.value)}
               />
 
 
-              {/* 🔥 CHECKBOX NUEVO */}
+              {/* CHECKBOX OCULTAR */}
               <label className="flex items-center gap-2 mt-4 text-sm font-semibold">
                 <input
                   type="checkbox"
                   checked={editedHidden}
                   onChange={(e) => setEditedHidden(e.target.checked)}
                 />
-                Ocultar este producto de los clientes
+                Ocultar este producto
               </label>
             </>
           ) : (
             <>
-              <span className="block text-xs uppercase tracking-wide text-gray-500 font-semibold">
+              <span className="block text-xs uppercase text-gray-500 font-semibold">
                 {viewProduct?.type}
               </span>
-              <h2 className="text-xl font-extrabold">
-                {viewProduct?.name}
-              </h2>
+              <h2 className="text-xl font-extrabold">{viewProduct?.name}</h2>
             </>
           )}
         </div>
 
 
-        {/* GALERÍA */}
+        {/* IMAGEN */}
         {!isEditing ? (
           <div className="relative mb-4 flex items-center justify-center">
             {displayUrl ? (
               <img
                 src={displayUrl}
-                alt={viewProduct?.name || "Producto"}
+                alt={viewProduct?.name}
                 className="rounded-lg max-h-[400px] object-contain"
               />
             ) : (
-              <div className="h-[300px] w-full grid place-items-center text-gray-400">
+              <div className="h-[300px] grid place-items-center text-gray-400">
                 Sin imagen
               </div>
             )}
@@ -423,13 +359,15 @@ export default function ProductModal({
                   onClick={() =>
                     setIdx((i) => (i - 1 + localImages.length) % localImages.length)
                   }
-                  className="absolute left-0 z-10 bg-black text-white px-3 py-1 rounded-full"
+                  className="absolute left-0 bg-black text-white px-3 py-1 rounded-full"
                 >
                   <FaChevronLeft />
                 </button>
+
+
                 <button
                   onClick={() => setIdx((i) => (i + 1) % localImages.length)}
-                  className="absolute right-0 z-10 bg-black text-white px-3 py-1 rounded-full"
+                  className="absolute right-0 bg-black text-white px-3 py-1 rounded-full"
                 >
                   <FaChevronRight />
                 </button>
@@ -439,36 +377,36 @@ export default function ProductModal({
         ) : (
           <div className="flex gap-4 justify-center flex-wrap mb-4">
             {localImages.map((img, i) => {
-              const thumbUrl = img?.src
-                ? transformCloudinary(img.src, THUMB_MAX_W)
-                : "";
+              const thumb = img?.src ? transformCloudinary(img.src, THUMB_MAX_W) : "";
               return (
                 <div key={i} className="relative">
                   <img
-                    src={thumbUrl || img.src}
-                    alt={`img-${i}`}
+                    src={thumb || img.src}
+                    alt=""
                     className="h-48 rounded object-contain"
                   />
                   <button
-                    onClick={() => handleImageRemove(i)}
+                    onClick={() =>
+                      setLocalImages((prev) => prev.filter((_, x) => x !== i))
+                    }
                     className="absolute top-0 right-0 bg-black text-white rounded-full p-1 text-sm"
                   >
                     <FaTimes />
                   </button>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageChange(e, i)}
-                  />
                 </div>
               );
             })}
+
+
             {localImages.length < 2 && (
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) =>
-                  handleImageChange(e, localImages.length)
+                  setLocalImages([
+                    ...localImages,
+                    { src: URL.createObjectURL(e.target.files[0]), isNew: true },
+                  ])
                 }
               />
             )}
@@ -489,7 +427,7 @@ export default function ProductModal({
                 </p>
               </>
             ) : (
-              <p className="text-xl font-extrabold text-black">
+              <p className="text-xl font-extrabold">
                 ₡{Number(viewProduct.price).toLocaleString("de-DE")}
               </p>
             )}
@@ -499,17 +437,19 @@ export default function ProductModal({
 
         {/* SELECTOR TIENDA */}
         {canEdit && (
-          <div className="mt-4 mb-2 flex items-center justify-center gap-2">
+          <div className="mt-4 mb-2 flex justify-center gap-2">
             <button
-              className={`px-3 py-1 rounded border text-sm ${
+              className={`px-3 py-1 border rounded ${
                 invMode === "stock" ? "bg-black text-white" : ""
               }`}
               onClick={() => setInvMode("stock")}
             >
               Tienda #1
             </button>
+
+
             <button
-              className={`px-3 py-1 rounded border text-sm ${
+              className={`px-3 py-1 border rounded ${
                 invMode === "bodega" ? "bg-black text-white" : ""
               }`}
               onClick={() => setInvMode("bodega")}
@@ -520,72 +460,62 @@ export default function ProductModal({
         )}
 
 
-        {/* TALLAS */}
+        {/* INVENTARIO */}
         <div className="mb-4">
-          <p className="text-center font-semibold mb-4">
-            Stock por talla:
-          </p>
+          <p className="text-center font-semibold mb-4">Stock por talla:</p>
           <div className="grid grid-cols-3 gap-2">
-            {tallasVisibles.map((size) => {
-              if (canEdit) {
-                const inv = getInventoryToShow();
-                return (
-                  <div
-                    key={size}
-                    className="text-center bg-white border rounded p-2"
-                  >
-                    <label className="block text-sm font-medium">
-                      {size}
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full border border-gray-300 rounded px-1 text-center"
-                        value={inv[size] ?? ""}
-                        onChange={(e) => handleStockChange(size, e.target.value)}
-                      />
-                    ) : (
-                      <p className="text-xs">
-                        {inv[size] || 0} disponibles
-                      </p>
-                    )}
-                  </div>
-                );
-              } else {
-                const total = getTotalBySize(size);
-                return (
-                  <div
-                    key={size}
-                    className="text-center bg-white border rounded p-2"
-                  >
-                    <label className="block text-sm font-medium">
-                      {size}
-                    </label>
-                    <p className="text-xs">{total} disponibles</p>
-                  </div>
-                );
-              }
+            {tallasVisibles.map((t) => {
+              const inv = getInventoryToShow();
+              return (
+                <div key={t} className="text-center border rounded p-2">
+                  <label className="block font-medium text-sm">{t}</label>
+
+
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full text-center border rounded"
+                      value={inv[t] ?? ""}
+                      onChange={(e) =>
+                        invMode === "stock"
+                          ? setEditedStock((p) => ({
+                              ...p,
+                              [t]: parseInt(e.target.value, 10) || 0,
+                            }))
+                          : setEditedBodega((p) => ({
+                              ...p,
+                              [t]: parseInt(e.target.value, 10) || 0,
+                            }))
+                      }
+                    />
+                  ) : (
+                    <p className="text-xs">
+                      {getTotalBySize(t)} disponibles
+                    </p>
+                  )}
+                </div>
+              );
             })}
           </div>
         </div>
 
 
-        {/* BOTONES */}
-        <div className="mt-2 border-t pt-4">
-          <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
+        {/* ACCIONES */}
+        <div className="mt-4 border-t pt-4">
+          <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
             {canEdit && isEditing ? (
               <button
-                className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded font-bold"
                 onClick={handleSave}
                 disabled={loading}
+                className="col-span-2 bg-green-600 text-black py-2 rounded font-bold"
               >
                 {loading ? "Guardando..." : "Guardar"}
               </button>
             ) : canEdit ? (
               <button
-                className="bg-green-700 text-white px-3 py-2 text-sm rounded font-bold"
                 onClick={() => setIsEditing(true)}
+                className="bg-green-700 text-white py-2 rounded font-bold"
               >
                 Editar
               </button>
@@ -594,44 +524,40 @@ export default function ProductModal({
 
             {canDelete && (
               <button
-                className="bg-red-600 text-white px-3 py-2 text-sm rounded font-bold"
-                onClick={() => {
-                  toastHOT(
-                    (t) => (
-                      <span>
-                        ¿Seguro que quieres eliminar?
-                        <div className="mt-2 flex gap-2 justify-end">
-                          <button
-                            onClick={() => {
-                              toastHOT.dismiss(t.id);
-                              handleDelete();
-                            }}
-                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                          >
-                            Sí
-                          </button>
-                          <button
-                            onClick={() => toastHOT.dismiss(t.id)}
-                            className="bg-gray-200 px-3 py-1 rounded text-sm"
-                          >
-                            No
-                          </button>
-                        </div>
-                      </span>
-                    ),
-                    { duration: 6000 }
-                  );
-                }}
-                disabled={loading}
+                onClick={() =>
+                  toastHOT((t) => (
+                    <span>
+                      ¿Seguro que deseas eliminar?
+                      <div className="flex gap-2 mt-2 justify-end">
+                        <button
+                          onClick={() => {
+                            toastHOT.dismiss(t.id);
+                            handleDelete();
+                          }}
+                          className="bg-red-600 text-white px-3 py-1 rounded"
+                        >
+                          Sí
+                        </button>
+                        <button
+                          onClick={() => toastHOT.dismiss(t.id)}
+                          className="bg-gray-300 px-3 py-1 rounded"
+                        >
+                          No
+                        </button>
+                      </div>
+                    </span>
+                  ))
+                }
+                className="bg-red-600 text-white py-2 rounded font-bold"
               >
-                {loading ? "Eliminando..." : "Eliminar"}
+                Eliminar
               </button>
             )}
 
 
             <button
-              className="bg-black text-white px-3 py-2 text-sm rounded font-bold col-span-2 mt-2"
               onClick={onClose}
+              className="col-span-2 bg-black text-white py-2 rounded font-bold mt-2"
             >
               Cerrar
             </button>
