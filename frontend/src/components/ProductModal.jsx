@@ -37,7 +37,14 @@ function isLikelyObjectId(v) {
 }
 
 
-export default function ProductModal({ product, onClose, onUpdate, canEdit, canDelete, user }) {
+export default function ProductModal({
+  product,
+  onClose,
+  onUpdate,
+  canEdit,
+  canDelete,
+  user,
+}) {
   const modalRef = useRef(null);
 
 
@@ -46,30 +53,34 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   const [invMode, setInvMode] = useState("stock");
 
 
-  // 🔥🔥🔥 AGREGADO (NUEVO) — Manejo de ocultar
-  const [editedHidden, setEditedHidden] = useState(product.hidden || false);
-
-
   const [editedStock, setEditedStock] = useState(product.stock || {});
   const [editedBodega, setEditedBodega] = useState(product.bodega || {});
   const [editedName, setEditedName] = useState(product?.name || "");
   const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
-  const [editedDiscountPrice, setEditedDiscountPrice] = useState(product?.discountPrice ?? 0);
+  const [editedDiscountPrice, setEditedDiscountPrice] = useState(
+    product?.discountPrice ?? 0
+  );
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [loading, setLoading] = useState(false);
 
 
-  // 📸 Galería
+  // ⭐ NUEVO: estado para ocultar
+  const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
+
+
+  // Galería
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
-      return product.images.map(i => (typeof i === "string" ? i : i?.url)).filter(Boolean);
+      return product.images
+        .map((i) => (typeof i === "string" ? i : i?.url))
+        .filter(Boolean);
     }
     return [product?.imageSrc, product?.imageSrc2].filter(Boolean);
   }, [product]);
 
 
   const [localImages, setLocalImages] = useState(
-    galleryFromProduct.map(src => ({ src, isNew: false }))
+    galleryFromProduct.map((src) => ({ src, isNew: false }))
   );
   const [idx, setIdx] = useState(0);
   const hasMany = localImages.length > 1;
@@ -86,26 +97,30 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
     setEditedBodega({ ...(product?.bodega || {}) });
 
 
-    // 🔥🔥🔥 AGREGADO — actualizar hidden cuando product cambie
-    setEditedHidden(product.hidden || false);
+    // 🔥 sincronizar hidden cuando cambie el producto
+    setEditedHidden(product?.hidden || false);
 
 
     setLocalImages(
       product?.images?.length
-        ? product.images.map(img => ({
+        ? product.images.map((img) => ({
             src: typeof img === "string" ? img : img.url,
             isNew: false,
           }))
         : [
-            ...(product?.imageSrc ? [{ src: product.imageSrc, isNew: false }] : []),
-            ...(product?.imageSrc2 ? [{ src: product.imageSrc2, isNew: false }] : []),
+            ...(product?.imageSrc
+              ? [{ src: product.imageSrc, isNew: false }]
+              : []),
+            ...(product?.imageSrc2
+              ? [{ src: product.imageSrc2, isNew: false }]
+              : []),
           ]
     );
     setIdx(0);
   }, [product]);
 
 
- useEffect(() => {
+  useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
@@ -129,10 +144,11 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
 
       const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
-      const discountInt = Math.max(0, parseInt(editedDiscountPrice, 10) || 0);
-
-
-      const clean = obj =>
+      const discountInt = Math.max(
+        0,
+        parseInt(editedDiscountPrice, 10) || 0
+      );
+      const clean = (obj) =>
         Object.fromEntries(
           Object.entries(obj || {}).map(([k, v]) => [
             k,
@@ -148,7 +164,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         type: (editedType || "").trim(),
         stock: clean(editedStock),
         bodega: clean(editedBodega),
-        images: localImages.map(i => i?.src).filter(Boolean),
+        images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc:
           typeof localImages[0]?.src === "string" ? localImages[0].src : null,
         imageSrc2:
@@ -156,7 +172,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         imageAlt: (editedName || "").trim(),
 
 
-        // 🔥🔥🔥 AGREGADO PARA GUARDAR EL OCULTO
+        // ⭐ AQUÍ SE ENVÍA EL OCULTO AL BACKEND
         hidden: editedHidden,
       };
 
@@ -201,23 +217,14 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || "ChemaSportER";
-
-
       const res = await fetch(
         `${API_BASE}/api/products/${encodeURIComponent(id)}`,
         {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user": displayName,
-          },
+          headers: { "Content-Type": "application/json", "x-user": displayName },
         }
       );
-
-
       if (!res.ok) throw new Error("Error al eliminar");
-
-
       onUpdate?.(null, id);
       onClose?.();
     } catch (err) {
@@ -230,9 +237,12 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
   const handleStockChange = (size, value) => {
     if (invMode === "stock") {
-      setEditedStock(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+      setEditedStock((prev) => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
     } else {
-      setEditedBodega(prev => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
+      setEditedBodega((prev) => ({
+        ...prev,
+        [size]: parseInt(value, 10) || 0,
+      }));
     }
   };
 
@@ -240,17 +250,13 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   const handleImageChange = (e, index) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-
     if (!ACCEPTED_TYPES.includes(file.type)) {
       toast.error("Formato de imagen no soportado");
       return;
     }
-
-
     const reader = new FileReader();
     reader.onload = () => {
-      setLocalImages(prev => {
+      setLocalImages((prev) => {
         const copy = prev.slice();
         if (index >= copy.length)
           copy.push({ src: reader.result, isNew: true });
@@ -263,8 +269,8 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
   };
 
 
-  const handleImageRemove = index => {
-    setLocalImages(prev => {
+  const handleImageRemove = (index) => {
+    setLocalImages((prev) => {
       const copy = prev.slice();
       copy.splice(index, 1);
       return copy;
@@ -294,7 +300,8 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
 
   const getInventoryToShow = () => {
-    if (isEditing) return invMode === "stock" ? editedStock : editedBodega;
+    if (isEditing)
+      return invMode === "stock" ? editedStock : editedBodega;
     return invMode === "stock"
       ? viewProduct?.stock || {}
       : viewProduct?.bodega || {};
@@ -307,12 +314,14 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
     Number(product.discountPrice) > 0;
 
 
-  const getTotalBySize = size => {
+  const getTotalBySize = (size) => {
     const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0;
     const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0;
     return a + b;
   };
- return (
+
+
+  return (
     <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div
         ref={modalRef}
@@ -332,10 +341,12 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         <div className="mt-12 mb-2 text-center">
           {isEditing && canEdit ? (
             <>
-              <label className="block text-xs text-gray-500 mb-1">Tipo</label>
+              <label className="block text-xs text-gray-500 mb-1">
+                Tipo
+              </label>
               <select
                 value={editedType}
-                onChange={e => setEditedType(e.target.value)}
+                onChange={(e) => setEditedType(e.target.value)}
                 className="w-full px-3 py-2 border rounded mb-3"
               >
                 {[
@@ -351,7 +362,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                   "MLB",
                   "NFL",
                   "Balón",
-                ].map(t => (
+                ].map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -359,12 +370,14 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
               </select>
 
 
-              <label className="block text-xs text-gray-500 mb-1">Nombre</label>
+              <label className="block text-xs text-gray-500 mb-1">
+                Nombre
+              </label>
               <input
                 type="text"
                 className="text-center border-b-2 w-full font-semibold"
                 value={editedName}
-                onChange={e => setEditedName(e.target.value)}
+                onChange={(e) => setEditedName(e.target.value)}
               />
 
 
@@ -375,7 +388,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                 type="number"
                 className="text-center border-b-2 w-full font-semibold text-2xl"
                 value={editedPrice}
-                onChange={e => setEditedPrice(e.target.value)}
+                onChange={(e) => setEditedPrice(e.target.value)}
               />
 
 
@@ -386,7 +399,9 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                 type="number"
                 className="text-center border-b-2 w-full font-semibold text-2xl text-green-600"
                 value={editedDiscountPrice}
-                onChange={e => setEditedDiscountPrice(e.target.value)}
+                onChange={(e) =>
+                  setEditedDiscountPrice(e.target.value)
+                }
               />
             </>
           ) : (
@@ -394,7 +409,9 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
               <span className="block text-xs uppercase tracking-wide text-gray-500 font-semibold">
                 {viewProduct?.type}
               </span>
-              <h2 className="text-xl font-extrabold">{viewProduct?.name}</h2>
+              <h2 className="text-xl font-extrabold">
+                {viewProduct?.name}
+              </h2>
             </>
           )}
         </div>
@@ -421,17 +438,22 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
               <>
                 <button
                   onClick={() =>
-                    setIdx(i => (i - 1 + localImages.length) % localImages.length)
+                    setIdx(
+                      (i) =>
+                        (i - 1 + localImages.length) %
+                        localImages.length
+                    )
                   }
                   className="absolute left-0 z-10 bg-black text-white px-3 py-1 rounded-full"
                 >
                   <FaChevronLeft />
                 </button>
-
-
                 <button
                   onClick={() =>
-                    setIdx(i => (i + 1) % localImages.length)
+                    setIdx(
+                      (i) =>
+                        (i + 1) % localImages.length
+                    )
                   }
                   className="absolute right-0 z-10 bg-black text-white px-3 py-1 rounded-full"
                 >
@@ -446,8 +468,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
               const thumbUrl = img?.src
                 ? transformCloudinary(img.src, THUMB_MAX_W)
                 : "";
-
-
               return (
                 <div key={i} className="relative">
                   <img
@@ -456,8 +476,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                     className="h-48 rounded object-contain"
                     loading="lazy"
                   />
-
-
                   <button
                     onClick={() => handleImageRemove(i)}
                     className="absolute top-0 right-0 bg-black text-white rounded-full p-1 text-sm"
@@ -465,23 +483,21 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                   >
                     <FaTimes />
                   </button>
-
-
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={e => handleImageChange(e, i)}
+                    onChange={(e) =>
+                      handleImageChange(e, i)
+                    }
                   />
                 </div>
               );
             })}
-
-
             {localImages.length < 2 && (
               <input
                 type="file"
                 accept="image/*"
-                onChange={e =>
+                onChange={(e) =>
                   handleImageChange(e, localImages.length)
                 }
               />
@@ -490,7 +506,7 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         )}
 
 
-       {/* Precio */}
+        {/* Precio */}
         {!isEditing && (
           <div className="mt-2 text-center">
             {hasDiscount ? (
@@ -499,7 +515,9 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
                   ₡{Number(viewProduct.price).toLocaleString("de-DE")}
                 </p>
                 <p className="text-xl font-extrabold text-green-600">
-                  ₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}
+                  ₡{Number(viewProduct.discountPrice).toLocaleString(
+                    "de-DE"
+                  )}
                 </p>
               </>
             ) : (
@@ -522,8 +540,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
             >
               Tienda #1
             </button>
-
-
             <button
               className={`px-3 py-1 rounded border text-sm ${
                 invMode === "bodega" ? "bg-black text-white" : ""
@@ -538,55 +554,64 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
 
         {/* Tallas */}
         <div className="mb-4">
-          <p className="text-center font-semibold mb-4">Stock por talla:</p>
-
-
+          <p className="text-center font-semibold mb-4">
+            Stock por talla:
+          </p>
           <div className="grid grid-cols-3 gap-2">
-            {tallasVisibles.map(size => {
+            {tallasVisibles.map((size) => {
               if (canEdit) {
                 const inv = getInventoryToShow();
                 return (
-                  <div key={size} className="text-center bg-white border rounded p-2">
-                    <label className="block text-sm font-medium">{size}</label>
-
-
+                  <div
+                    key={size}
+                    className="text-center bg-white border rounded p-2"
+                  >
+                    <label className="block text-sm font-medium">
+                      {size}
+                    </label>
                     {isEditing ? (
                       <input
                         type="number"
                         min="0"
                         className="w-full border border-gray-300 rounded px-1 text-center"
                         value={inv[size] ?? ""}
-                        onChange={e => handleStockChange(size, e.target.value)}
+                        onChange={(e) =>
+                          handleStockChange(size, e.target.value)
+                        }
                       />
                     ) : (
-                      <p className="text-xs">{inv[size] || 0} disponibles</p>
+                      <p className="text-xs">
+                        {inv[size] || 0} disponibles
+                      </p>
                     )}
                   </div>
                 );
+              } else {
+                const total = getTotalBySize(size);
+                return (
+                  <div
+                    key={size}
+                    className="text-center bg-white border rounded p-2"
+                  >
+                    <label className="block text-sm font-medium">
+                      {size}
+                    </label>
+                    <p className="text-xs">{total} disponibles</p>
+                  </div>
+                );
               }
-
-
-              const total = getTotalBySize(size);
-              return (
-                <div key={size} className="text-center bg-white border rounded p-2">
-                  <label className="block text-sm font-medium">{size}</label>
-                  <p className="text-xs">{total} disponibles</p>
-                </div>
-              );
             })}
           </div>
         </div>
 
 
-        {/* ⭐⭐⭐ CHECKBOX OCULTAR PRODUCTO ⭐⭐⭐ */}
+        {/* ⭐ CHECKBOX OCULTAR PRODUCTO */}
         {canEdit && isEditing && (
           <div className="mt-4 mb-4 flex items-center gap-3 p-3 bg-gray-100 rounded-lg border">
             <input
               type="checkbox"
-              checked={viewProduct.hidden === true}
-              onChange={e =>
-                setViewProduct(prev => ({ ...prev, hidden: e.target.checked }))
-              }
+              checked={editedHidden}
+              onChange={(e) => setEditedHidden(e.target.checked)}
             />
             <label className="text-sm font-semibold">
               Ocultar este producto para los clientes
@@ -598,9 +623,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
         {/* Acciones */}
         <div className="mt-2 border-t pt-4">
           <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
-
-
-            {/* GUARDAR */}
             {canEdit && isEditing ? (
               <button
                 className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded font-bold"
@@ -619,33 +641,35 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
             ) : null}
 
 
-            {/* ELIMINAR */}
             {canDelete && (
               <button
                 className="bg-red-600 text-white px-3 py-2 text-sm rounded font-bold"
                 onClick={() => {
-                  toastHOT(t => (
-                    <span>
-                      ¿Seguro que quieres eliminar?
-                      <div className="mt-2 flex gap-2 justify-end">
-                        <button
-                          onClick={() => {
-                            toastHOT.dismiss(t.id);
-                            handleDelete();
-                          }}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                        >
-                          Sí
-                        </button>
-                        <button
-                          onClick={() => toastHOT.dismiss(t.id)}
-                          className="bg-gray-200 px-3 py-1 rounded text-sm"
-                        >
-                          No
-                        </button>
-                      </div>
-                    </span>
-                  ), { duration: 6000 });
+                  toastHOT(
+                    (t) => (
+                      <span>
+                        ¿Seguro que quieres eliminar?
+                        <div className="mt-2 flex gap-2 justify-end">
+                          <button
+                            onClick={() => {
+                              toastHOT.dismiss(t.id);
+                              handleDelete();
+                            }}
+                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          >
+                            Sí
+                          </button>
+                          <button
+                            onClick={() => toastHOT.dismiss(t.id)}
+                            className="bg-gray-200 px-3 py-1 rounded text-sm"
+                          >
+                            No
+                          </button>
+                        </div>
+                      </span>
+                    ),
+                    { duration: 6000 }
+                  );
                 }}
                 disabled={loading}
               >
@@ -654,7 +678,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
             )}
 
 
-            {/* CERRAR */}
             <button
               className="bg-black text-white px-3 py-2 text-sm rounded font-bold col-span-2 mt-2"
               onClick={onClose}
@@ -663,8 +686,6 @@ export default function ProductModal({ product, onClose, onUpdate, canEdit, canD
             </button>
           </div>
         </div>
-
-
       </div>
     </div>
   );
