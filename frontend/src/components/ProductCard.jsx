@@ -155,7 +155,7 @@ export default function ProductCard({ product, onClick, user }) {
         {isAdmin && product.hidden && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-30
                           flex items-center justify-center">
-            <span className="text-white text-lg sm:text-xl md:text-2xl font-bold text-center px-3">
+            <span className="text-gray-600 text-lg sm:text-xl md:text-2xl font-bold text-center px-3">
               No visible para el cliente
             </span>
           </div>
