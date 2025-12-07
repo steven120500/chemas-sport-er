@@ -140,7 +140,6 @@ router.post('/', upload.any(), async (req, res) => {
       imageSrc,
 
 
-      /* ⭐ NUEVO PARA OCULTAR */
       hidden: req.body.hidden === 'true' || req.body.hidden === true
     });
 
@@ -171,7 +170,6 @@ router.put('/:id', async (req, res) => {
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
 
-    // --- STOCK ---
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
       try { incomingStock = JSON.parse(incomingStock); } catch {}
@@ -179,7 +177,6 @@ router.put('/:id', async (req, res) => {
     const nextStock = incomingStock ? sanitizeInv(incomingStock) : prev.stock;
 
 
-    // --- BODEGA ---
     let incomingBodega = req.body.bodega;
     if (typeof incomingBodega === 'string') {
       try { incomingBodega = JSON.parse(incomingBodega); } catch {}
@@ -187,7 +184,6 @@ router.put('/:id', async (req, res) => {
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
 
 
-    // --- DIFERENCIAS (RESTAS) ---
     let restadas = 0;
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
       const before = Number(prev.stock?.[size] ?? 0);
@@ -208,13 +204,13 @@ router.put('/:id', async (req, res) => {
     };
 
 
-    /* ⭐ NUEVO PARA OCULTAR AL EDITAR */
+    // actualizar hidden
     if (req.body.hidden !== undefined) {
       update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
     }
 
 
-    // --- IMÁGENES ---
+    // Manejo de imágenes
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -245,7 +241,6 @@ router.put('/:id', async (req, res) => {
     }
 
 
-    // --- ACTUALIZACIÓN ---
     let updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
@@ -253,7 +248,6 @@ router.put('/:id', async (req, res) => {
     );
 
 
-    // --- REGISTRAR RESTAS ---
     if (restadas > 0) {
       updated.popularCountHistory.push({
         date: new Date().toISOString(),
@@ -262,16 +256,11 @@ router.put('/:id', async (req, res) => {
     }
 
 
-    // --- EVALUAR POPULAR POR MES ---
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-
     const totalMonth = updated.popularCountHistory
       .filter(entry => {
         const d = new Date(entry.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       })
       .reduce((sum, e) => sum + e.quantity, 0);
 
@@ -280,7 +269,6 @@ router.put('/:id', async (req, res) => {
     await updated.save();
 
 
-    // --- HISTORIAL ---
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
       await History.create({
@@ -338,7 +326,6 @@ router.delete('/:id', async (req, res) => {
 
 
 /* =============================== GET LIST ============================== */
-/* =============================== GET LIST ============================== */
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -351,27 +338,44 @@ router.get('/', async (req, res) => {
     const find = {};
 
 
-    /* ⭐ USAR EL USUARIO REAL DEL TOKEN ⭐ */
+    /* =====================================================
+       🔥 CONTROL DE OCULTOS (SUPERADMIN, ROLES, HEADER)
+       ===================================================== */
     const user = req.user || {};
-    const isSuper = user.isSuperUser === true;
-    const canSeeHidden = isSuper || (user.roles || []).includes("edit") || (user.roles || []).includes("ver_ocultos");
+    let canSeeHidden = false;
 
 
-    /* ⭐ SI NO ES SUPERADMIN NI TIENE PERMISO, NO VE HIDDEN ⭐ */
+    // 1. Por token
+    if (
+      user.isSuperUser ||
+      (user.roles || []).includes("edit") ||
+      (user.roles || []).includes("ver_ocultos")
+    ) {
+      canSeeHidden = true;
+    }
+
+
+    // 2. Por header desde frontend
+    if (req.headers["x-admin"] === "true") {
+      canSeeHidden = true;
+    }
+
+
+    // 3. Si NO puede ver ocultos → filtrarlos
     if (!canSeeHidden) {
       find.hidden = { $ne: true };
     }
 
 
-    /* Buscador */
+    /* Filtro buscador */
     if (q) find.name = { $regex: q, $options: 'i' };
 
 
-    /* Filtros de tipo */
+    /* Filtro tipo */
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
       find.$expr = { $lt: ['$discountPrice', '$price'] };
-    }
+    } 
     else if (type === 'Populares') {
       find.isPopular = true;
     }

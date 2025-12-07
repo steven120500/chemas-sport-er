@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { FaFire } from "react-icons/fa";
 
+
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
   if (!url.includes("res.cloudinary.com")) return url;
@@ -18,6 +19,10 @@ const BALL_SIZES = ["3", "4", "5"];
 
 
 export default function ProductCard({ product, onClick, user }) {
+  const isAdmin =
+    user?.isSuperUser || user?.roles?.includes("edit");
+
+
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
 
@@ -64,12 +69,14 @@ export default function ProductCard({ product, onClick, user }) {
     <motion.div
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.97 }}
-      className="relative bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full"
+      className={`relative rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full
+        ${isAdmin && product.hidden ? "opacity-60 grayscale" : "bg-white"}
+      `}
       onClick={() => onClick(product)}
     >
       {/* 🔸 Tipo */}
       {product.type && (
-        <div className="absolute top-2 left-2 z-10">
+        <div className="absolute top-2 left-2 z-20">
           <div className="text-white text-xs font-semibold px-3 py-1 rounded-full shadow bg-black">
             {product.type}
           </div>
@@ -85,45 +92,31 @@ export default function ProductCard({ product, onClick, user }) {
       )}
 
 
-    {/* 🟧 POPULAR (llama encima) */}
-{product.isPopular === true && (
-  <span
-    className="absolute etiqueta-popular-naranja top-2 right-2 z-30
-               flex items-center justify-center px-2 py-1 rounded"
-  >
-    <FaFire size={16} color="white" />
-  </span>
-)}
+      {/* 🔥 Popular */}
+      {product.isPopular === true && (
+        <span
+          className="absolute etiqueta-popular-naranja top-2 right-2 z-30
+                     flex items-center justify-center px-2 py-1 rounded"
+        >
+          <FaFire size={16} color="white" />
+        </span>
+      )}
 
 
-{/* 🎄 Sticker navideño (siempre visible, debajo de Popular) */}
-<span
-  className="
-    absolute
-    md:-right-6
-    -right-3
-    z-20
-    pointer-events-none select-none
-  "
->
-  <img
-    src="/Bola.png"          // o "/arbol.png" si preferís
-    alt="navidad"
-    className="
-      w-24 h-24          /* tamaño en celular */
-      sm:w-24 sm:h-24    /* tablet */
-      md:w-40 md:h-40    /* desktop: tu tamaño ideal */
-      object-contain
-      drop-shadow-xl
-      
-    "
-    draggable="false"
-  />
-</span>
-
-
-
-
+      {/* Sticker navideño */}
+      <span className="absolute md:-right-6 -right-3 z-20 pointer-events-none select-none">
+        <img
+          src="/Bola.png"
+          alt="navidad"
+          className="
+            w-24 h-24
+            sm:w-24 sm:h-24
+            md:w-40 md:h-40
+            object-contain drop-shadow-xl
+          "
+          draggable="false"
+        />
+      </span>
 
 
       {/* Imagen */}
@@ -153,10 +146,15 @@ export default function ProductCard({ product, onClick, user }) {
               className="w-full h-full object-cover object-center"
               loading="lazy"
               decoding="async"
-              fetchpriority="low"
             />
           );
         })()}
+
+
+        {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
+        {isAdmin && product.hidden && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-30"></div>
+        )}
       </div>
 
 
@@ -215,7 +213,7 @@ export default function ProductCard({ product, onClick, user }) {
 
             {traspasosUrgentes.length > 0 && (
               <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
-                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes a Tienda 1:</p>
+                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes:</p>
                 <ul className="list-disc pl-5 text-red-800">
                   {traspasosUrgentes.map((t, i) => (
                     <li key={i}>
