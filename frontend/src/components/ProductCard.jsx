@@ -153,7 +153,12 @@ export default function ProductCard({ product, onClick, user }) {
 
         {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
         {isAdmin && product.hidden && (
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-30"></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-30
+                          flex items-center justify-center">
+            <span className="text-white text-lg sm:text-xl md:text-2xl font-bold text-center px-3">
+              No visible para el cliente
+            </span>
+          </div>
         )}
       </div>
 
@@ -185,6 +190,7 @@ export default function ProductCard({ product, onClick, user }) {
         {/* Avisos superadmin */}
         {user?.isSuperUser && (
           <div className="mt-3 text-xs sm:text-sm text-left w-full px-2">
+            {/* INVENTARIO */}
             {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
               <>
                 <p className="font-bold text-black">Tienda #1</p>
