@@ -103,20 +103,7 @@ export default function ProductCard({ product, onClick, user }) {
       )}
 
 
-      {/* Sticker navideño */}
-      <span className="absolute md:-right-6 -right-3 z-20 pointer-events-none select-none">
-        <img
-          src="/Bola.png"
-          alt="navidad"
-          className="
-            w-24 h-24
-            sm:w-24 sm:h-24
-            md:w-40 md:h-40
-            object-contain drop-shadow-xl
-          "
-          draggable="false"
-        />
-      </span>
+      
 
 
       {/* Imagen */}
