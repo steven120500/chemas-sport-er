@@ -383,15 +383,17 @@ router.get('/', async (req, res) => {
       find.type = type;
     }
 
-
+    
     /* Filtro por tallas */
-    if (sizes) {
-      const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
-      if (arr.length) {
-        find.$or = arr.map(size => ({ [`stock.${size}`]: { $gt: 0 } }));
-      }
+if (sizes) {
+  const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
+  if (arr.length) {
+    find.$or = arr.flatMap(size => ([
+      { [`stock.${size}`]: { $gt: 0 } },
+      { [`bodega.${size}`]: { $gt: 0 } },
+      ]));
     }
-
+  }
 
     const projection =
       'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory';

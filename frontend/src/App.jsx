@@ -262,42 +262,35 @@ function App() {
   /* ============================================================
      FILTRADO DE PRODUCTOS (incluye ocultos para admin)
      ============================================================ */
-  const filteredProducts = products.filter((product) => {
-    const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-
-
-    if (!canEdit && product.hidden === true) return false;
-
-
-    if (filterType === 'Ofertas') {
-      return Number(product.discountPrice) > 0 && matchName;
-    }
-
-
-    if (filterType === 'Populares') {
-      return product.isPopular === true && matchName;
-    }
-
-
-    const matchType = filterType ? product.type === filterType : true;
-
-
-    if (filterSizes.length === allSizes.length) return matchName && matchType;
-
-
-    const matchSizes =
-      filterSizes.length > 0
-        ? filterSizes.some((size) =>
-            Object.entries(product.stock || {}).some(
-              ([s, qty]) =>
-                s.toLowerCase() === size.toLowerCase() && Number(qty) > 0
-            )
-          )
-        : true;
-
-
-    return matchName && matchType && matchSizes;
-  });
+     const filteredProducts = products.filter((product) => {
+      const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+      // ⛔ ocultos solo visibles para admin/editor
+      if (!canEdit && product.hidden === true) return false;
+    
+      if (filterType === 'Ofertas') {
+        return Number(product.discountPrice) > 0 && matchName;
+      }
+    
+      if (filterType === 'Populares') {
+        return product.isPopular === true && matchName;
+      }
+    
+      const matchType = filterType ? product.type === filterType : true;
+    
+      if (filterSizes.length === allSizes.length) return matchName && matchType;
+    
+      const matchSizes =
+        filterSizes.length > 0
+          ? filterSizes.some((size) => {
+              const stockQty = Number(product.stock?.[size] ?? 0);
+              const bodegaQty = Number(product.bodega?.[size] ?? 0);
+              return stockQty + bodegaQty > 0;
+            })
+          : true;
+    
+      return matchName && matchType && matchSizes;
+    });
 
 
   const tallasAdulto = ['S','M','L','XL','XXL','3XL','4XL'];
