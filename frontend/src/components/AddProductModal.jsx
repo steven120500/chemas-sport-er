@@ -241,7 +241,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       const data = await res.json();
       onAdd?.(data);
       onCancel?.();
-      toast.success("Producto agregado correctamente");
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Error guardando el producto");
