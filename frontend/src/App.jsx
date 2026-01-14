@@ -11,7 +11,7 @@ import Footer from './components/Footer';
 import FloatingWhatsapp from './components/FloatingWhatsapp';
 import LoadingOverlay from './components/LoadingOverlay';
 import tallaPorTipo from './utils/tallaPorTipo';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
@@ -20,12 +20,9 @@ import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 import Medidas from './components/Medidas';
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import Cantidad from './components/Cantidad';
 
-
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
-
 
 function buildPages(page, pages) {
   const out = new Set([1, pages, page, page - 1, page - 2, page + 1, page + 2]);
@@ -34,22 +31,21 @@ function buildPages(page, pages) {
     .sort((a, b) => a - b);
 }
 
-
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
-
 
 function App() {
   const [products, setProducts] = useState([]);
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // ✅ ESTADOS PARA EL MODAL Y SU ANIMACIÓN
   const [selectedProduct, setSelectedProduct] = useState(null);
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterSizes, setFilterSizes] = useState([]);
   const [showSizes, setShowSizes] = useState(false);
-
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -58,12 +54,10 @@ function App() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMedidas, setShowMedidas] = useState(false);
 
-
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [total, setTotal] = useState(0);
   const pages = Math.max(1, Math.ceil(total / limit));
-
 
   const anyModalOpen =
     !!selectedProduct ||
@@ -74,7 +68,6 @@ function App() {
     showHistoryModal ||
     showMedidas;
 
-
   const [user, setUser] = useState(() => {
     try {
       const storedUser = localStorage.getItem('user');
@@ -84,13 +77,11 @@ function App() {
     }
   });
 
-
   const isSuperUser = user?.isSuperUser || false;
   const canSeeHistory = user?.isSuperUser || user?.roles?.includes('history');
   const canAdd = user?.isSuperUser || user?.roles?.includes('add');
   const canEdit = user?.isSuperUser || user?.roles?.includes('edit');
   const canDelete = user?.isSuperUser || user?.roles?.includes('delete');
-
 
   const handleLogout = () => {
     setUser(null);
@@ -98,22 +89,16 @@ function App() {
     toast.success('Sesión cerrada correctamente');
   };
 
-
-  /* ============================================================
-     ⭐ AQUÍ ESTÁ EL CAMBIO IMPORTANTE  
-     ============================================================ */
   const fetchProducts = async (opts = {}) => {
     const p = opts.page ?? page;
     const q = (opts.q ?? searchTerm).trim();
     const tp = (opts.type ?? filterType).trim();
-
 
     const isAdmin =
       user?.isSuperUser ||
       user?.roles?.includes("edit") ||
       user?.roles?.includes("add") ||
       user?.roles?.includes("delete");
-
 
     setLoading(true);
     try {
@@ -125,17 +110,14 @@ function App() {
         ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
       });
 
-
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
         headers: {
           "x-admin": isAdmin ? "true" : "false"
         }
       });
 
-
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
-
 
       setProducts(json.items);
       setTotal(json.total);
@@ -148,55 +130,36 @@ function App() {
     }
   };
 
-
-  // ============================================================
-
-
   const fetchAllForCounts = async () => {
     try {
       let pageN = 1;
       const pageSize = 200;
       const acc = [];
-
-
       while (true) {
         const params = new URLSearchParams({
           page: String(pageN),
           limit: String(pageSize),
           t: Date.now().toString(),
         });
-
-
         const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
           cache: 'no-store',
         });
-
-
         if (!res.ok) throw new Error("HTTP " + res.status);
         const json = await res.json();
-
-
         acc.push(...json.items);
         if (acc.length >= json.total) break;
-
-
         pageN += 1;
         await new Promise((r) => setTimeout(r, 100));
       }
-
-
       setAllProductsForCounts(acc);
     } catch {
       setAllProductsForCounts([]);
     }
   };
 
-
   const pageTopRef = useRef(null);
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
-
-
     if (pageTopRef.current) {
       pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
     } else {
@@ -204,26 +167,25 @@ function App() {
     }
   }, [page, searchTerm, filterType, filterSizes]);
 
-
   useEffect(() => {
     if (products.length > 0) fetchAllForCounts();
   }, [products]);
-
 
   const refreshCounts = () => {
     setTimeout(() => fetchAllForCounts(), 600);
   };
 
-
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
-      setSelectedProduct(null);
+      // ✅ ANIMACIÓN AL ELIMINAR
+      setIsModalOpen(false); 
+      setTimeout(() => setSelectedProduct(null), 300);
+      
       toast.success('Producto eliminado correctamente');
       refreshCounts();
       return;
     }
-
 
     setProducts((prev) =>
       prev.map((p) =>
@@ -231,18 +193,15 @@ function App() {
       )
     );
 
-
     setSelectedProduct((prev) =>
       prev && getPid(prev) === getPid(updatedProduct)
         ? { ...prev, ...updatedProduct }
         : prev
     );
 
-
     toast.success('Producto actualizado correctamente');
     refreshCounts();
   };
-
 
   const handleLoginClick = () => setShowLogin(true);
   const handleLoginSuccess = (userData) => {
@@ -251,35 +210,22 @@ function App() {
     toast.success('Bienvenido');
   };
 
-
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
 
-
   const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
 
-
-  /* ============================================================
-     FILTRADO DE PRODUCTOS (incluye ocultos para admin)
-     ============================================================ */
-     const filteredProducts = products.filter((product) => {
+  const filteredProducts = products.filter((product) => {
       const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-      // ⛔ ocultos solo visibles para admin/editor
       if (!canEdit && product.hidden === true) return false;
-    
       if (filterType === 'Ofertas') {
         return Number(product.discountPrice) > 0 && matchName;
       }
-    
       if (filterType === 'Populares') {
         return product.isPopular === true && matchName;
       }
-    
       const matchType = filterType ? product.type === filterType : true;
-    
       if (filterSizes.length === allSizes.length) return matchName && matchType;
-    
       const matchSizes =
         filterSizes.length > 0
           ? filterSizes.some((size) => {
@@ -288,10 +234,8 @@ function App() {
               return stockQty + bodegaQty > 0;
             })
           : true;
-    
       return matchName && matchType && matchSizes;
     });
-
 
   const tallasAdulto = ['S','M','L','XL','XXL','3XL','4XL'];
   const tallasNino = [
@@ -304,26 +248,21 @@ function App() {
     { size:'28', label:'28 (Talla 14/16)' },
   ];
 
-
   return (
     <>
       <div ref={pageTopRef} />
-
 
       {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
       {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
       {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
       {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
 
-
       <TopBanner />
       {loading && <LoadingOverlay message="Cargando productos..." />}
-
 
       {!loading && allProductsForCounts?.length > 0 && (
         <Cantidad products={allProductsForCounts} isSuperUser={isSuperUser} />
       )}
-
 
       {!anyModalOpen && (
         <Header
@@ -343,7 +282,6 @@ function App() {
         />
       )}
 
-
       {canAdd && !anyModalOpen && (
         <button
           className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
@@ -354,7 +292,6 @@ function App() {
         </button>
       )}
 
-
       <FilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -363,9 +300,9 @@ function App() {
         onToggleTallas={() => setShowSizes(!showSizes)}
       />
 
-
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
+          {/* ... (Sección de tallas igual que antes) ... */}
           <div className="w-full text-center">
             <h3 className="font-semibold mb-2">Adulto</h3>
             <div className="flex flex-wrap justify-center gap-2">
@@ -389,12 +326,10 @@ function App() {
               })}
             </div>
           </div>
-
-
           <div className="w-full text-center">
             <h3 className="font-semibold mb-2">Niño (Talla Costa Rica)</h3>
             <div className="flex flex-wrap justify-center gap-2">
-              {tallasNino.map(({ size, label }) => {
+               {tallasNino.map(({ size, label }) => {
                 const isActive = filterSizes.includes(size);
                 return (
                   <button
@@ -417,7 +352,6 @@ function App() {
         </div>
       )}
 
-
       <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
         <span className="text-sm sm:text-base">¿Querés saber tu talla?</span>
         <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight">
@@ -425,14 +359,17 @@ function App() {
         </button>
       </div>
 
-
       <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product) => (
             <ProductCard
               key={getPid(product)}
               product={product}
-              onClick={() => setSelectedProduct(product)}
+              onClick={() => {
+                // ✅ AQUÍ ACTIVAMOS LA ENTRADA
+                setSelectedProduct(product);
+                setTimeout(() => setIsModalOpen(true), 10);
+              }}
               user={user}
             />
           ))
@@ -445,19 +382,22 @@ function App() {
         )}
       </div>
 
-
       {selectedProduct && (
         <ProductModal
           key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
           product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
+          isOpen={isModalOpen} // ✅ PASAMOS EL ESTADO DE ANIMACIÓN
+          onClose={() => {
+            // ✅ ANIMACIÓN DE SALIDA
+            setIsModalOpen(false);
+            setTimeout(() => setSelectedProduct(null), 300);
+          }}
           onUpdate={handleProductUpdate}
           canEdit={canEdit}
           canDelete={canDelete}
           user={user}
         />
       )}
-
 
       {showAddModal && (
         <AddProductModal
@@ -473,7 +413,6 @@ function App() {
         />
       )}
 
-
       {showLogin && (
         <LoginModal
           isOpen={showLogin}
@@ -488,7 +427,7 @@ function App() {
         />
       )}
 
-
+      {/* Paginación */}
       {pages > 1 && (
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
@@ -496,12 +435,9 @@ function App() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-              title="Anterior"
             >
               <FaChevronLeft />
             </button>
-
-
             {(() => {
               const nums = buildPages(page, pages);
               return nums.map((n, i) => {
@@ -522,20 +458,16 @@ function App() {
                 );
               });
             })()}
-
-
             <button
               onClick={() => setPage((p) => Math.min(pages, p + 1))}
               disabled={page === pages}
               className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-              title="Siguiente"
             >
               <FaChevronRight />
             </button>
           </nav>
         </div>
       )}
-
 
       <Footer />
       {!anyModalOpen && <FloatingWhatsapp />}
@@ -544,6 +476,5 @@ function App() {
     </>
   );
 }
-
 
 export default App;

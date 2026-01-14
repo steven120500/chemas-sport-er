@@ -3,19 +3,15 @@ import { toast } from "react-toastify";
 import { FaTimes, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
-
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
-
 
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
 const TALLAS_BALON = ["3", "4", "5"];
 const ACCEPTED_TYPES = ["image/png", "image/jpg", "image/jpeg", "image/heic"];
 
-
 const MODAL_IMG_MAX_W = 800;
 const THUMB_MAX_W = 240;
-
 
 function transformCloudinary(url, maxW) {
   try {
@@ -31,14 +27,13 @@ function transformCloudinary(url, maxW) {
   }
 }
 
-
 function isLikelyObjectId(v) {
   return typeof v === "string" && /^[0-9a-fA-F]{24}$/.test(v);
 }
 
-
 export default function ProductModal({
   product,
+  isOpen, // ✅ ÚNICO CAMBIO: Recibimos la prop para animar
   onClose,
   onUpdate,
   canEdit,
@@ -47,11 +42,9 @@ export default function ProductModal({
 }) {
   const modalRef = useRef(null);
 
-
   const [viewProduct, setViewProduct] = useState(product);
   const [isEditing, setIsEditing] = useState(false);
   const [invMode, setInvMode] = useState("stock");
-
 
   const [editedStock, setEditedStock] = useState(product.stock || {});
   const [editedBodega, setEditedBodega] = useState(product.bodega || {});
@@ -63,10 +56,8 @@ export default function ProductModal({
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [loading, setLoading] = useState(false);
 
-
   // ⭐ NUEVO: estado para ocultar
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
-
 
   // Galería
   const galleryFromProduct = useMemo(() => {
@@ -78,14 +69,12 @@ export default function ProductModal({
     return [product?.imageSrc, product?.imageSrc2].filter(Boolean);
   }, [product]);
 
-
   const [localImages, setLocalImages] = useState(
     galleryFromProduct.map((src) => ({ src, isNew: false }))
   );
   const [idx, setIdx] = useState(0);
   const hasMany = localImages.length > 1;
   const currentSrc = localImages[idx]?.src || "";
-
 
   useEffect(() => {
     setViewProduct(product);
@@ -96,10 +85,8 @@ export default function ProductModal({
     setEditedStock({ ...(product?.stock || {}) });
     setEditedBodega({ ...(product?.bodega || {}) });
 
-
     // 🔥 sincronizar hidden cuando cambie el producto
     setEditedHidden(product?.hidden || false);
-
 
     setLocalImages(
       product?.images?.length
@@ -119,14 +106,12 @@ export default function ProductModal({
     setIdx(0);
   }, [product]);
 
-
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
     };
   }, []);
-
 
   // Guardar cambios
   const handleSave = async () => {
@@ -137,11 +122,9 @@ export default function ProductModal({
       return;
     }
 
-
     try {
       setLoading(true);
       const displayName = user?.username || user?.email || "ChemaSportER";
-
 
       const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
       const discountInt = Math.max(
@@ -155,7 +138,6 @@ export default function ProductModal({
             Math.max(0, parseInt(v, 10) || 0),
           ])
         );
-
 
       const payload = {
         name: (editedName || "").trim(),
@@ -171,11 +153,9 @@ export default function ProductModal({
           typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: (editedName || "").trim(),
 
-
         // ⭐ AQUÍ SE ENVÍA EL OCULTO AL BACKEND
         hidden: editedHidden,
       };
-
 
       const res = await fetch(
         `${API_BASE}/api/products/${encodeURIComponent(id)}`,
@@ -189,9 +169,7 @@ export default function ProductModal({
         }
       );
 
-
       if (!res.ok) throw new Error(`Error al actualizar (${res.status})`);
-
 
       const updated = await res.json();
       setViewProduct(updated);
@@ -204,7 +182,6 @@ export default function ProductModal({
       setLoading(false);
     }
   };
-
 
   // Eliminar producto
   const handleDelete = async () => {
@@ -234,7 +211,6 @@ export default function ProductModal({
     }
   };
 
-
   const handleStockChange = (size, value) => {
     if (invMode === "stock") {
       setEditedStock((prev) => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
@@ -245,7 +221,6 @@ export default function ProductModal({
       }));
     }
   };
-
 
   const handleImageChange = (e, index) => {
     const file = e.target.files?.[0];
@@ -268,7 +243,6 @@ export default function ProductModal({
     reader.readAsDataURL(file);
   };
 
-
   const handleImageRemove = (index) => {
     setLocalImages((prev) => {
       const copy = prev.slice();
@@ -278,7 +252,6 @@ export default function ProductModal({
     setIdx(0);
   };
 
-
   // Determinar tipo de tallas
   const isNino =
     (isEditing ? editedType : viewProduct?.type) === "Niño";
@@ -286,18 +259,15 @@ export default function ProductModal({
     (isEditing ? editedType : viewProduct?.type) === "Balón" ||
     (isEditing ? editedType : viewProduct?.type) === "Balones";
 
-
   const tallasVisibles = isBalon
     ? TALLAS_BALON
     : isNino
     ? TALLAS_NINO
     : TALLAS_ADULTO;
 
-
   const displayUrl = currentSrc
     ? transformCloudinary(currentSrc, MODAL_IMG_MAX_W)
     : "";
-
 
   const getInventoryToShow = () => {
     if (isEditing)
@@ -307,12 +277,10 @@ export default function ProductModal({
       : viewProduct?.bodega || {};
   };
 
-
   const hasDiscount =
     product.discountPrice !== undefined &&
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
-
 
   const getTotalBySize = (size) => {
     const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0;
@@ -320,12 +288,21 @@ export default function ProductModal({
     return a + b;
   };
 
-
   return (
-    <div className="mt-10 mb-16 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
+    // ✅ MANTENEMOS TUS CLASES EXACTAS (mt-10 mb-16 py-6) Y SOLO AGREGAMOS LA TRANSICIÓN DE FONDO
+    <div 
+        className={`mt-10 mb-16 fixed inset-0 z-50 flex items-center justify-center py-6 transition-colors duration-300 ${
+            isOpen ? "bg-black/40 visible" : "bg-black/0 invisible"
+        }`}
+        onClick={onClose}
+    >
       <div
         ref={modalRef}
-        className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400"
+        onClick={(e) => e.stopPropagation()} 
+        // ✅ MANTENEMOS TUS CLASES DE SCROLL (max-h-screen, overflow-y-auto) Y SOLO AGREGAMOS SCALE/OPACITY
+        className={`relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 transition-all duration-300 transform ${
+            isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        }`}
       >
         {/* Botón cerrar */}
         <button
@@ -335,7 +312,6 @@ export default function ProductModal({
         >
           <FaTimes size={30} />
         </button>
-
 
         {/* Encabezado */}
         <div className="mt-12 mb-2 text-center">
@@ -369,7 +345,6 @@ export default function ProductModal({
                 ))}
               </select>
 
-
               <label className="block text-xs text-gray-500 mb-1">
                 Nombre
               </label>
@@ -380,7 +355,6 @@ export default function ProductModal({
                 onChange={(e) => setEditedName(e.target.value)}
               />
 
-
               <label className="block text-xs text-gray-500 mb-1 mt-4">
                 Precio normal
               </label>
@@ -390,7 +364,6 @@ export default function ProductModal({
                 value={editedPrice}
                 onChange={(e) => setEditedPrice(e.target.value)}
               />
-
 
               <label className="block text-xs text-gray-500 mb-1 mt-4">
                 Precio con descuento
@@ -416,7 +389,6 @@ export default function ProductModal({
           )}
         </div>
 
-
         {/* Galería */}
         {!isEditing ? (
           <div className="relative mb-4 flex items-center justify-center">
@@ -432,7 +404,6 @@ export default function ProductModal({
                 Sin imagen
               </div>
             )}
-
 
             {hasMany && (
               <>
@@ -505,7 +476,6 @@ export default function ProductModal({
           </div>
         )}
 
-
         {/* Precio */}
         {!isEditing && (
           <div className="mt-2 text-center">
@@ -528,7 +498,6 @@ export default function ProductModal({
           </div>
         )}
 
-
         {/* Selector de tienda */}
         {canEdit && (
           <div className="mt-4 mb-2 flex items-center justify-center gap-2">
@@ -550,7 +519,6 @@ export default function ProductModal({
             </button>
           </div>
         )}
-
 
         {/* Tallas */}
         <div className="mb-4">
@@ -604,7 +572,6 @@ export default function ProductModal({
           </div>
         </div>
 
-
         {/* ⭐ CHECKBOX OCULTAR PRODUCTO */}
         {canEdit && isEditing && (
           <div className="mt-4 mb-4 flex items-center gap-3 p-3 bg-gray-100 rounded-lg border">
@@ -618,7 +585,6 @@ export default function ProductModal({
             </label>
           </div>
         )}
-
 
         {/* Acciones */}
         <div className="mt-2 border-t pt-4">
@@ -639,7 +605,6 @@ export default function ProductModal({
                 Editar
               </button>
             ) : null}
-
 
             {canDelete && (
               <button
@@ -676,7 +641,6 @@ export default function ProductModal({
                 {loading ? "Eliminando..." : "Eliminar"}
               </button>
             )}
-
 
             <button
               className="bg-black text-white px-3 py-2 text-sm rounded font-bold col-span-2 mt-2"
