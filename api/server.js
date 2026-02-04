@@ -29,7 +29,9 @@ app.use(compression());
 app.use(cors({
   origin: [
     'https://chemasport-er.onrender.com',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    "https://chemasporter.com",           // Dominio nuevo
+    "https://www.chemasporter.com"
   ],
 }));
 
