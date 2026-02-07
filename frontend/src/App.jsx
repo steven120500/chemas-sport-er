@@ -102,7 +102,6 @@ function App() {
 
     setLoading(true);
     try {
-      // ✅ LOGICA DE PARÁMETROS CORREGIDA PARA ENVIAR 'SORT'
       const params = new URLSearchParams({
         page: String(p),
         limit: String(limit),
@@ -110,14 +109,13 @@ function App() {
         ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
       });
 
+      // ✅ LÓGICA CORREGIDA PARA FILTROS
       if (tp === 'Nuevo') {
-        // Si es Nuevo, le pedimos al backend que ordene descendente
+        // Si es "Nuevo", NO enviamos type (porque no es categoría), enviamos sort=desc
         params.append('sort', 'desc');
-      } else if (tp === 'Ofertas' || tp === 'Populares') {
-        // Ofertas y Populares se filtran en Frontend (traemos todo lo de la página)
-        // No enviamos 'type' porque no son categorías reales
       } else if (tp) {
-        // Si es una categoría normal (Nacional, Retro, etc.), enviamos type
+        // Si es "Ofertas", "Populares" o cualquier otra categoría, SÍ enviamos type
+        // El backend ya sabe que type="Ofertas" filtra por precio, etc.
         params.append('type', tp);
       }
 
@@ -226,9 +224,13 @@ function App() {
 
   const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
 
+  // Lógica de filtrado en frontend (para búsquedas y tallas)
   const filteredProducts = products.filter((product) => {
       const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!canEdit && product.hidden === true) return false;
+      
+      // NOTA: Para Ofertas, Populares y Categorías normales, el Backend ya nos mandó los datos filtrados.
+      // Aquí solo reforzamos y aplicamos filtros de Talla o Búsqueda por nombre.
       
       if (filterType === 'Ofertas') {
         return Number(product.discountPrice) > 0 && matchName;
@@ -236,7 +238,7 @@ function App() {
       if (filterType === 'Populares') {
         return product.isPopular === true && matchName;
       }
-      // Si es Nuevo, el Backend ya nos mandó los datos ordenados, así que aquí solo filtramos por nombre
+      // Si es "Nuevo", solo filtramos por nombre (el orden ya viene del backend)
       if (filterType === 'Nuevo') {
         return matchName;
       }

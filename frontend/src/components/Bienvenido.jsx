@@ -35,7 +35,7 @@ const Bienvenido = ({ onNavigate }) => {
       img2: '/Nacional2.png', 
       filter: 'Nacional', 
       delay: 'delay-100',
-      size: 'p-16 md:p-24' // Tamaño GRANDE
+      size: 'p-16 md:p-40' // Tamaño GRANDE
     },
     { 
       id: 'populares',   
@@ -44,7 +44,7 @@ const Bienvenido = ({ onNavigate }) => {
       img2: '/Player2.png',   
       filter: 'Populares', // Filtra por isPopular: true
       delay: 'delay-200',
-      size: 'p-16 md:p-24' // Tamaño MEDIANO/PEQUEÑO (para que no se vea gigante)
+      size: 'p-16 md:p-40' // Tamaño MEDIANO/PEQUEÑO (para que no se vea gigante)
     },
     { 
       id: 'retro',    
@@ -53,7 +53,7 @@ const Bienvenido = ({ onNavigate }) => {
       img2: '/Retro2.png',    
       filter: 'Retro', 
       delay: 'delay-300',
-      size: 'p-16 md:p-24' // Tamaño GRANDE
+      size: 'p-16 md:p-40' // Tamaño GRANDE
     },
     { 
       id: 'nuevo',      
@@ -62,7 +62,7 @@ const Bienvenido = ({ onNavigate }) => {
       img2: '/Fan2.png',      
       filter: 'Nuevo', // Filtra por orden de llegada (Id más nuevo)
       delay: 'delay-400',
-      size: 'p-16 md:p-24' // Tamaño GRANDE
+      size: 'p-16 md:p-40' // Tamaño GRANDE
     },
   ];
 
