@@ -4,24 +4,19 @@ import History from '../models/History.js';
 import cloudinary from '../config/cloudinary.js';
 import multer from 'multer';
 
-
 const router = express.Router();
-
 
 /* ======================= Multer (Memoria) ======================= */
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-
 /* =========================== Helpers ============================ */
-
 
 // Tallas permitidas (incluye BALONES)
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
-
 
 // Identificar quién hizo el cambio
 function whoDidIt(req) {
@@ -31,7 +26,6 @@ function whoDidIt(req) {
          req.body.user ||
          'Sistema';
 }
-
 
 // Mostrar cambios de inventario
 function diffInv(label, prev = {}, next = {}) {
@@ -45,7 +39,6 @@ function diffInv(label, prev = {}, next = {}) {
   return out;
 }
 
-
 // Mostrar cambios generales
 function diffProduct(prev, next) {
   const changes = [];
@@ -55,14 +48,11 @@ function diffProduct(prev, next) {
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
 
-
   changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
   changes.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
 
-
   return changes;
 }
-
 
 // Subir 1 imagen a Cloudinary
 function uploadToCloudinary(buffer) {
@@ -75,7 +65,6 @@ function uploadToCloudinary(buffer) {
   });
 }
 
-
 // Limpieza de inventario
 function sanitizeInv(obj) {
   const clean = {};
@@ -87,7 +76,6 @@ function sanitizeInv(obj) {
   return clean;
 }
 
-
 /* ========================= Crear Producto ========================= */
 router.post('/', upload.any(), async (req, res) => {
   try {
@@ -95,16 +83,13 @@ router.post('/', upload.any(), async (req, res) => {
       f.fieldname === 'images' || f.fieldname === 'image'
     );
 
-
     if (!files.length) {
       return res.status(400).json({ error: 'No se enviaron imágenes' });
     }
 
-
     const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
-
 
     // Stock
     let stock = {};
@@ -114,9 +99,7 @@ router.post('/', upload.any(), async (req, res) => {
       else if (typeof req.body.stock === 'object') stock = req.body.stock;
     } catch { stock = {}; }
 
-
     const cleanStock = sanitizeInv(stock);
-
 
     // Bodega
     let bodega = {};
@@ -125,9 +108,7 @@ router.post('/', upload.any(), async (req, res) => {
       else if (typeof req.body.bodega === 'object') bodega = req.body.bodega;
     } catch { bodega = {}; }
 
-
     const cleanBodega = sanitizeInv(bodega);
-
 
     const product = await Product.create({
       name: String(req.body.name || '').trim(),
@@ -139,10 +120,8 @@ router.post('/', upload.any(), async (req, res) => {
       images,
       imageSrc,
 
-
       hidden: req.body.hidden === 'true' || req.body.hidden === true
     });
-
 
     await History.create({
       user: whoDidIt(req),
@@ -152,9 +131,7 @@ router.post('/', upload.any(), async (req, res) => {
       details: `imagen: ${imageSrc} | descuento: ${product.discountPrice}`,
     });
 
-
     res.status(201).json(product);
-
 
   } catch (err) {
     console.error('POST /api/products error:', err);
@@ -162,13 +139,11 @@ router.post('/', upload.any(), async (req, res) => {
   }
 });
 
-
 /* ======================== Actualizar Producto ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
-
 
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
@@ -176,13 +151,11 @@ router.put('/:id', async (req, res) => {
     }
     const nextStock = incomingStock ? sanitizeInv(incomingStock) : prev.stock;
 
-
     let incomingBodega = req.body.bodega;
     if (typeof incomingBodega === 'string') {
       try { incomingBodega = JSON.parse(incomingBodega); } catch {}
     }
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
-
 
     let restadas = 0;
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
@@ -190,7 +163,6 @@ router.put('/:id', async (req, res) => {
       const after  = Number(nextStock?.[size] ?? 0);
       if (before > after) restadas += (before - after);
     }
-
 
     const update = {
       name: req.body.name?.trim() || prev.name,
@@ -203,12 +175,10 @@ router.put('/:id', async (req, res) => {
       bodega: nextBodega,
     };
 
-
     // actualizar hidden
     if (req.body.hidden !== undefined) {
       update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
     }
-
 
     // Manejo de imágenes
     let incomingImages = req.body.images;
@@ -216,15 +186,12 @@ router.put('/:id', async (req, res) => {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
     }
 
-
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
       const normalized = [];
 
-
       for (const raw of incomingImages.slice(0, 2)) {
         if (!raw) continue;
-
 
         if (typeof raw === 'string' && raw.startsWith('data:')) {
           const up = await cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' });
@@ -235,11 +202,9 @@ router.put('/:id', async (req, res) => {
         }
       }
 
-
       update.images = normalized;
       update.imageSrc = normalized[0]?.url || '';
     }
-
 
     let updated = await Product.findByIdAndUpdate(
       req.params.id,
@@ -247,14 +212,12 @@ router.put('/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
 
-
     if (restadas > 0) {
       updated.popularCountHistory.push({
         date: new Date().toISOString(),
         quantity: restadas
       });
     }
-
 
     const now = new Date();
     const totalMonth = updated.popularCountHistory
@@ -264,10 +227,8 @@ router.put('/:id', async (req, res) => {
       })
       .reduce((sum, e) => sum + e.quantity, 0);
 
-
     updated.isPopular = totalMonth >= 10;
     await updated.save();
-
 
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
@@ -280,9 +241,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-
     res.json(updated);
-
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
@@ -290,21 +249,17 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-
 /* ========================== Eliminar Producto ========================= */
 router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
 
-
     for (const img of product.images || []) {
       if (img.public_id) await cloudinary.uploader.destroy(img.public_id);
     }
 
-
     await product.deleteOne();
-
 
     await History.create({
       user: whoDidIt(req),
@@ -314,16 +269,13 @@ router.delete('/:id', async (req, res) => {
       details: `imagenes borradas: ${(product.images || []).length}`,
     });
 
-
     res.json({ message: 'Producto eliminado' });
-
 
   } catch (err) {
     console.error('DELETE /api/products/:id error:', err);
     res.status(500).json({ error: 'Error al eliminar producto' });
   }
 });
-
 
 /* =============================== GET LIST ============================== */
 router.get('/', async (req, res) => {
@@ -333,10 +285,11 @@ router.get('/', async (req, res) => {
     const q     = (req.query.q || '').trim();
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
-
+    
+    // ✅ 1. LEEMOS EL PARÁMETRO DE ORDENAMIENTO
+    const sortParam = req.query.sort; 
 
     const find = {};
-
 
     /* =====================================================
        🔥 CONTROL DE OCULTOS (SUPERADMIN, ROLES, HEADER)
@@ -344,8 +297,6 @@ router.get('/', async (req, res) => {
     const user = req.user || {};
     let canSeeHidden = false;
 
-
-    // 1. Por token
     if (
       user.isSuperUser ||
       (user.roles || []).includes("edit") ||
@@ -354,22 +305,16 @@ router.get('/', async (req, res) => {
       canSeeHidden = true;
     }
 
-
-    // 2. Por header desde frontend
     if (req.headers["x-admin"] === "true") {
       canSeeHidden = true;
     }
 
-
-    // 3. Si NO puede ver ocultos → filtrarlos
     if (!canSeeHidden) {
       find.hidden = { $ne: true };
     }
 
-
     /* Filtro buscador */
     if (q) find.name = { $regex: q, $options: 'i' };
-
 
     /* Filtro tipo */
     if (type === 'Ofertas') {
@@ -382,36 +327,37 @@ router.get('/', async (req, res) => {
     else if (type) {
       find.type = type;
     }
-
     
     /* Filtro por tallas */
-if (sizes) {
-  const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
-  if (arr.length) {
-    find.$or = arr.flatMap(size => ([
-      { [`stock.${size}`]: { $gt: 0 } },
-      { [`bodega.${size}`]: { $gt: 0 } },
-      ]));
+    if (sizes) {
+      const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
+      if (arr.length) {
+        find.$or = arr.flatMap(size => ([
+          { [`stock.${size}`]: { $gt: 0 } },
+          { [`bodega.${size}`]: { $gt: 0 } },
+        ]));
+      }
     }
-  }
 
     const projection =
       'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory';
 
+    // ✅ 2. DEFINIMOS EL OBJETO DE ORDENAMIENTO
+    // Si ?sort=desc, ordenamos por _id invertido (más nuevo primero)
+    // Si no, ordenamos alfabéticamente por nombre
+    const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([
       Product.find(find)
         .select(projection)
-        .sort({ name: 1 })
+        .sort(sortOptions) // ✅ 3. APLICAMOS EL ORDEN AQUÍ
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       Product.countDocuments(find),
     ]);
 
-
     res.set('Cache-Control', 'public, max-age=20');
-
 
     res.json({
       items,
@@ -421,12 +367,10 @@ if (sizes) {
       limit,
     });
 
-
   } catch (err) {
     console.error('GET /api/products error:', err);
     res.status(500).json({ error: 'Error al obtener los productos' });
   }
 });
-
 
 export default router;

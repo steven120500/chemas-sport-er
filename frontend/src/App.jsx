@@ -102,13 +102,24 @@ function App() {
 
     setLoading(true);
     try {
+      // ✅ LOGICA DE PARÁMETROS CORREGIDA PARA ENVIAR 'SORT'
       const params = new URLSearchParams({
         page: String(p),
         limit: String(limit),
         ...(q ? { q } : {}),
-        ...(tp ? { type: tp } : {}),
         ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
       });
+
+      if (tp === 'Nuevo') {
+        // Si es Nuevo, le pedimos al backend que ordene descendente
+        params.append('sort', 'desc');
+      } else if (tp === 'Ofertas' || tp === 'Populares') {
+        // Ofertas y Populares se filtran en Frontend (traemos todo lo de la página)
+        // No enviamos 'type' porque no son categorías reales
+      } else if (tp) {
+        // Si es una categoría normal (Nacional, Retro, etc.), enviamos type
+        params.append('type', tp);
+      }
 
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
         headers: {
@@ -159,11 +170,9 @@ function App() {
 
   const pageTopRef = useRef(null);
   
-  // Efecto del scroll al cambiar de página
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
     if (pageTopRef.current) {
-      // Ajustamos el scrollMarginTop para que el Header flotante no tape el contenido
       pageTopRef.current.style.scrollMarginTop = '100px'; 
       pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
     } else {
@@ -220,12 +229,18 @@ function App() {
   const filteredProducts = products.filter((product) => {
       const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!canEdit && product.hidden === true) return false;
+      
       if (filterType === 'Ofertas') {
         return Number(product.discountPrice) > 0 && matchName;
       }
       if (filterType === 'Populares') {
         return product.isPopular === true && matchName;
       }
+      // Si es Nuevo, el Backend ya nos mandó los datos ordenados, así que aquí solo filtramos por nombre
+      if (filterType === 'Nuevo') {
+        return matchName;
+      }
+
       const matchType = filterType ? product.type === filterType : true;
       if (filterSizes.length === allSizes.length) return matchName && matchType;
       const matchSizes =
@@ -252,8 +267,6 @@ function App() {
 
   return (
     <>
-      {/* ❌ 1. ELIMINÉ EL REF DE AQUÍ ARRIBA PARA QUE NO SUBA AL TOPE */}
-      
       {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
       {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
       {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
@@ -299,7 +312,6 @@ function App() {
         setPage(1);
       }} />
 
-      {/* ✅ 2. MOVÍ EL REF AQUÍ ABAJO. AL CAMBIAR DE PÁGINA SCROLLEA HASTA AQUÍ */}
       <div ref={pageTopRef} />
 
       {showSizes && (
