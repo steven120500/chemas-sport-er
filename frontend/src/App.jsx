@@ -21,7 +21,6 @@ import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 import Medidas from './components/Medidas';
 import Cantidad from './components/Cantidad';
-// ✅ 1. IMPORTAMOS EL COMPONENTE NUEVO
 import Bienvenido from './components/Bienvenido';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -40,7 +39,6 @@ function App() {
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // ✅ ESTADOS PARA EL MODAL Y SU ANIMACIÓN
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -160,9 +158,13 @@ function App() {
   };
 
   const pageTopRef = useRef(null);
+  
+  // Efecto del scroll al cambiar de página
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
     if (pageTopRef.current) {
+      // Ajustamos el scrollMarginTop para que el Header flotante no tape el contenido
+      pageTopRef.current.style.scrollMarginTop = '100px'; 
       pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -180,10 +182,8 @@ function App() {
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
-      // ✅ ANIMACIÓN AL ELIMINAR
       setIsModalOpen(false); 
       setTimeout(() => setSelectedProduct(null), 300);
-      
       toast.success('Producto eliminado correctamente');
       refreshCounts();
       return;
@@ -252,8 +252,8 @@ function App() {
 
   return (
     <>
-      <div ref={pageTopRef} />
-
+      {/* ❌ 1. ELIMINÉ EL REF DE AQUÍ ARRIBA PARA QUE NO SUBA AL TOPE */}
+      
       {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
       {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
       {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
@@ -294,17 +294,16 @@ function App() {
         </button>
       )}
 
-      
-
-      {/* ✅ 2. AQUÍ AGREGAMOS EL COMPONENTE DE BIENVENIDA */}
       <Bienvenido onNavigate={(type) => {
         setFilterType(type);
         setPage(1);
       }} />
 
+      {/* ✅ 2. MOVÍ EL REF AQUÍ ABAJO. AL CAMBIAR DE PÁGINA SCROLLEA HASTA AQUÍ */}
+      <div ref={pageTopRef} />
+
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
-          {/* ... (Sección de tallas igual que antes) ... */}
           <div className="w-full text-center">
             <h3 className="font-semibold mb-2">Adulto</h3>
             <div className="flex flex-wrap justify-center gap-2">
@@ -369,7 +368,6 @@ function App() {
         onToggleTallas={() => setShowSizes(!showSizes)}
       />
 
-      {/* ✅ 3. AGREGAMOS EL ID AQUI PARA QUE EL SCROLL FUNCIONE */}
       <div id="products-section" className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product) => (
@@ -377,7 +375,6 @@ function App() {
               key={getPid(product)}
               product={product}
               onClick={() => {
-                // ✅ AQUÍ ACTIVAMOS LA ENTRADA
                 setSelectedProduct(product);
                 setTimeout(() => setIsModalOpen(true), 10);
               }}
@@ -397,9 +394,8 @@ function App() {
         <ProductModal
           key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
           product={selectedProduct}
-          isOpen={isModalOpen} // ✅ PASAMOS EL ESTADO DE ANIMACIÓN
+          isOpen={isModalOpen}
           onClose={() => {
-            // ✅ ANIMACIÓN DE SALIDA
             setIsModalOpen(false);
             setTimeout(() => setSelectedProduct(null), 300);
           }}
@@ -438,7 +434,6 @@ function App() {
         />
       )}
 
-      {/* Paginación */}
       {pages > 1 && (
         <div className="mt-8 flex flex-col items-center gap-3">
           <nav className="flex items-center justify-center gap-2">
