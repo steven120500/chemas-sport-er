@@ -21,6 +21,8 @@ import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 import Medidas from './components/Medidas';
 import Cantidad from './components/Cantidad';
+// ✅ 1. IMPORTAMOS EL COMPONENTE NUEVO
+import Bienvenido from './components/Bienvenido';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -292,13 +294,13 @@ function App() {
         </button>
       )}
 
-      <FilterBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filterType={filterType}
-        setFilterType={(t) => { setFilterType(t); setPage(1); }}
-        onToggleTallas={() => setShowSizes(!showSizes)}
-      />
+      
+
+      {/* ✅ 2. AQUÍ AGREGAMOS EL COMPONENTE DE BIENVENIDA */}
+      <Bienvenido onNavigate={(type) => {
+        setFilterType(type);
+        setPage(1);
+      }} />
 
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
@@ -359,7 +361,16 @@ function App() {
         </button>
       </div>
 
-      <div className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+      <FilterBar
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterType={filterType}
+        setFilterType={(t) => { setFilterType(t); setPage(1); }}
+        onToggleTallas={() => setShowSizes(!showSizes)}
+      />
+
+      {/* ✅ 3. AGREGAMOS EL ID AQUI PARA QUE EL SCROLL FUNCIONE */}
+      <div id="products-section" className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product) => (
             <ProductCard

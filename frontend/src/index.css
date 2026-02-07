@@ -225,4 +225,24 @@ button:focus-visible {
 
 
 
+/* =================================================================
+   ESTILO MINIMALISTA "LUXURY"
+   ================================================================= */
 
+/* 1. ANIMACIÓN DE ENTRADA (CASCADA SUAVE HACIA ARRIBA) */
+@keyframes fade-up-enter {
+  0% { opacity: 0; transform: translateY(40px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-enter {
+  opacity: 0; /* Oculto al inicio */
+  /* Usamos una curva bezier para que se sienta premium y suave */
+  animation: fade-up-enter 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Retrasos escalonados para el efecto cascada */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.3s; }
+.delay-300 { animation-delay: 0.5s; }
+.delay-400 { animation-delay: 0.7s; }
