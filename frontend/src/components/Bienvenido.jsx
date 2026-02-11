@@ -16,7 +16,7 @@ const Bienvenido = ({ onNavigate }) => {
       id: 'populares',   
       label: 'POPULARES',
       buttonText: 'Ver Populares',
-      img: '/Player.png',   
+      img: '/Player2.png',   
       filter: 'Populares'
     },
     { 
@@ -62,7 +62,7 @@ const Bienvenido = ({ onNavigate }) => {
   return (
     <div 
       // CAMBIO 1: Altura "min-h-[105vh]" para que sea más largo y "pb-20" para espacio abajo
-      className="relative w-full min-h-[105vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-20"
+      className="relative w-full h-sreen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-40"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
