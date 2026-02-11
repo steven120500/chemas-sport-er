@@ -1,21 +1,54 @@
 import React, { useState, useEffect } from 'react';
 
 const Bienvenido = ({ onNavigate }) => {
-  // Estado para controlar el cambio de imágenes (Imagen 1 vs Imagen 2)
-  const [showSecondary, setShowSecondary] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [animating, setAnimating] = useState(false);
 
-  // Efecto: Cambia las imágenes automáticamente cada 4 segundos
+  const categories = [
+    { 
+      id: 'nacional', 
+      label: 'NACIONAL', 
+      buttonText: 'Ver Nacional',
+      img: '/Nacional.png', 
+      filter: 'Nacional'
+    },
+    { 
+      id: 'populares',   
+      label: 'POPULARES',
+      buttonText: 'Ver Populares',
+      img: '/Player.png',   
+      filter: 'Populares'
+    },
+    { 
+      id: 'retro',    
+      label: 'RETRO',
+      buttonText: 'Ver Retro',
+      img: '/Retro.png',    
+      filter: 'Retro'
+    },
+    { 
+      id: 'nuevo',      
+      label: 'LO NUEVO',
+      buttonText: 'Ver Lo Nuevo',
+      img: '/Fan.png',      
+      filter: 'Nuevo'
+    },
+  ];
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setShowSecondary(prev => !prev);
-    }, 4000); 
+      setAnimating(true);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % categories.length);
+        setAnimating(false);
+      }, 500);
+    }, 5000);
+
     return () => clearInterval(interval);
-  }, []);
-  
-  // Manejador de navegación y scroll suave
+  }, [categories.length]);
+
   const handleFilter = (category) => {
     if (onNavigate) onNavigate(category);
-    // Pequeño delay para asegurar que la App recibe el cambio antes de bajar
     setTimeout(() => {
       const section = document.getElementById('products-section') || document.getElementById('filter-bar');
       if (section) {
@@ -24,121 +57,79 @@ const Bienvenido = ({ onNavigate }) => {
     }, 100);
   };
 
-  // =====================================================================
-  // CONFIGURACIÓN DE CATEGORÍAS
-  // =====================================================================
-  const categories = [
-    { 
-      id: 'nacional', 
-      label: 'NACIONAL', 
-      img1: '/Nacional.png', 
-      img2: '/Nacional2.png', 
-      filter: 'Nacional', 
-      delay: 'delay-100',
-      size: 'p-16 md:p-40' // Tamaño GRANDE
-    },
-    { 
-      id: 'populares',   
-      label: 'POPULARES', // Etiqueta comercial
-      img1: '/Player.png', 
-      img2: '/Player2.png',   
-      filter: 'Populares', // Filtra por isPopular: true
-      delay: 'delay-200',
-      size: 'p-16 md:p-40' // Tamaño MEDIANO/PEQUEÑO (para que no se vea gigante)
-    },
-    { 
-      id: 'retro',    
-      label: 'RETRO',    
-      img1: '/Retro.png', 
-      img2: '/Retro2.png',    
-      filter: 'Retro', 
-      delay: 'delay-300',
-      size: 'p-16 md:p-40' // Tamaño GRANDE
-    },
-    { 
-      id: 'nuevo',      
-      label: 'LO NUEVO', // Etiqueta comercial
-      img1: '/Fan.png', 
-      img2: '/Fan2.png',      
-      filter: 'Nuevo', // Filtra por orden de llegada (Id más nuevo)
-      delay: 'delay-400',
-      size: 'p-16 md:p-40' // Tamaño GRANDE
-    },
-  ];
+  const currentCat = categories[currentIndex];
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans">
+    <div 
+      // CAMBIO 1: Altura "min-h-[105vh]" para que sea más largo y "pb-20" para espacio abajo
+      className="relative w-full min-h-[105vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-20"
+      style={{
+        backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
+      }}
+    >
       
-      {/* GRID DE 4 COLUMNAS (2 en Móvil) */}
-      <div className="w-full h-full grid grid-cols-2 md:grid-cols-4 z-10">
+      {/* Fondo estático para asegurar responsive */}
+      <div className="absolute inset-0 -z-10 bg-[url('/FondoMovil.jpg')] md:bg-[url('/FondoCompu.jpg')] bg-cover bg-center"></div>
+      
+      {/* Sombra oscura general */}
+      <div className="absolute inset-0 bg-black/40 z-0"></div>
+
+      {/* --- CONTENIDO PRINCIPAL --- */}
+      <div className="relative z-0 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4">
         
-        {categories.map((cat) => (
-          <div 
-            key={cat.id}
-            onClick={() => handleFilter(cat.filter)}
-            className={`
-              relative group cursor-pointer 
-              /* Bordes blancos sutiles */
-              border-r border-white/25 last:border-r-0 border-b border-white/25 md:border-b-0
-              flex flex-col items-center justify-center
-              bg-black transition-all duration-700 ease-out
-              hover:bg-zinc-950 overflow-hidden
-              animate-enter ${cat.delay}
-            `}
+        {/* Contenedor Camiseta + Botón */}
+        <div className={`
+            relative w-full flex justify-center items-center
+            transition-all duration-500 ease-in-out transform
+            ${animating ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'}
+        `}>
+          
+          {/* CAMISETA */}
+          <img 
+            src={currentCat.img} 
+            alt={currentCat.label}
+            className="w-[90%] md:w-[600px] h-auto object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]"
+          />
+          
+          {/* CAMBIO 2: POSICIÓN DEL BOTÓN 
+             - Mobile: bottom-0 right-4 (Esquina inferior derecha de la imagen)
+             - PC: md:bottom-20 md:-right-10 (Flotando al costado derecho, fuera de la camiseta)
+          */}
+          <button
+            onClick={() => handleFilter(currentCat.filter)}
+            className="
+              absolute 
+              bottom-0  
+              md:bottom-20  
+              bg-black text-white 
+              px-8 py-3 md:px-10 md:py-4 
+              rounded-full font-bold text-lg md:text-xl 
+              shadow-[0_10px_30px_rgba(0,0,0,0.5)] 
+              border border-white/10
+              hover:bg-zinc-900 hover:scale-105 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] 
+              transition-all duration-300
+            "
           >
-            {/* CONTENEDOR DE IMAGEN (Con tamaño personalizado) */}
-            <div className={`
-              relative w-full aspect-square flex items-center justify-center
-              ${cat.size}
-            `}>
-              
-              {/* Círculo Gris de Fondo al Hover */}
-              <div className="absolute w-[90%] h-[90%] rounded-full bg-zinc-800/50 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 transition-all duration-500 ease-out"></div>
-
-              {/* --- IMAGEN 1 (Principal) --- */}
-              <img 
-                src={cat.img1} 
-                alt={cat.label}
-                className={`
-                  absolute inset-0 m-auto w-full h-full object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.8)] z-20
-                  filter grayscale-[100%] transition-all duration-1000 ease-in-out
-                  /* Efectos al pasar el mouse: Color + Zoom Grande + Rotación */
-                  group-hover:grayscale-0 group-hover:scale-[1.6] group-hover:-rotate-6
-                  /* Lógica de visibilidad (Crossfade) */
-                  ${showSecondary ? 'opacity-0' : 'opacity-80 group-hover:opacity-100'}
-                `}
-              />
-
-              {/* --- IMAGEN 2 (Secundaria) --- */}
-              <img 
-                src={cat.img2} 
-                alt={cat.label}
-                className={`
-                  absolute inset-0 m-auto w-full h-full object-contain drop-shadow-[0_30px_50px_rgba(0,0,0,0.8)] z-20
-                  filter grayscale-[100%] transition-all duration-1000 ease-in-out
-                  group-hover:grayscale-0 group-hover:scale-[1.6] group-hover:-rotate-6
-                  /* Lógica de visibilidad (Crossfade inversa) */
-                  ${showSecondary ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'}
-                `}
-              />
-
-            </div>
-
-            {/* ETIQUETA INFERIOR */}
-            <div className="absolute bottom-6 md:bottom-12 flex flex-col items-center z-30">
-              <span className="text-white font-black text-sm md:text-xl tracking-[0.2em] uppercase mb-2 group-hover:text-zinc-300 transition-colors duration-500">
-                {cat.label}
-              </span>
-              {/* Línea decorativa animada */}
-              <div className="h-[1px] w-8 bg-white/30 group-hover:w-16 group-hover:bg-zinc-300 transition-all duration-500"></div>
-            </div>
-
-          </div>
-        ))}
+            {currentCat.buttonText}
+          </button>
+        </div>
 
       </div>
+
+      {/* Indicadores de página (Puntitos) - Opcional, los dejé por si quieres navegación visual sutil */}
+      <div className="absolute bottom-10 flex gap-3 z-20">
+        {categories.map((_, index) => (
+          <div 
+            key={index}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              index === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'
+            }`}
+          ></div>
+        ))}
+      </div>
+    
     </div>
   );
 };
 
-export default Bienvenido;  
+export default Bienvenido;
