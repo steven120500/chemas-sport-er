@@ -62,7 +62,7 @@ const Bienvenido = ({ onNavigate }) => {
   return (
     <div 
       // CAMBIO 1: Altura "min-h-[105vh]" para que sea más largo y "pb-20" para espacio abajo
-      className="relative w-full h-sreen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-40"
+      className="relative w-full h-sreen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-10 sm:pb-40"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
@@ -116,17 +116,7 @@ const Bienvenido = ({ onNavigate }) => {
 
       </div>
 
-      {/* Indicadores de página (Puntitos) - Opcional, los dejé por si quieres navegación visual sutil */}
-      <div className="absolute bottom-10 flex gap-3 z-20">
-        {categories.map((_, index) => (
-          <div 
-            key={index}
-            className={`h-1.5 rounded-full transition-all duration-500 ${
-              index === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'
-            }`}
-          ></div>
-        ))}
-      </div>
+      
     
     </div>
   );
