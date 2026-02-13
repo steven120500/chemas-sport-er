@@ -109,13 +109,10 @@ function App() {
         ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
       });
 
-      // ✅ LÓGICA CORREGIDA PARA FILTROS
       if (tp === 'Nuevo') {
-        // Si es "Nuevo", NO enviamos type (porque no es categoría), enviamos sort=desc
         params.append('sort', 'desc');
       } else if (tp) {
-        // Si es "Ofertas", "Populares" o cualquier otra categoría, SÍ enviamos type
-        // El backend ya sabe que type="Ofertas" filtra por precio, etc.
+        // Aquí pasamos 'Balon' (singular) si viene desde Bienvenido
         params.append('type', tp);
       }
 
@@ -222,40 +219,7 @@ function App() {
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
 
-  const allSizes = ['S','M','L','XL','XXL','3XL','4XL','16','18','20','22','24','26','28'];
-
-  // Lógica de filtrado en frontend (para búsquedas y tallas)
-  const filteredProducts = products.filter((product) => {
-      const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (!canEdit && product.hidden === true) return false;
-      
-      // NOTA: Para Ofertas, Populares y Categorías normales, el Backend ya nos mandó los datos filtrados.
-      // Aquí solo reforzamos y aplicamos filtros de Talla o Búsqueda por nombre.
-      
-      if (filterType === 'Ofertas') {
-        return Number(product.discountPrice) > 0 && matchName;
-      }
-      if (filterType === 'Populares') {
-        return product.isPopular === true && matchName;
-      }
-      // Si es "Nuevo", solo filtramos por nombre (el orden ya viene del backend)
-      if (filterType === 'Nuevo') {
-        return matchName;
-      }
-
-      const matchType = filterType ? product.type === filterType : true;
-      if (filterSizes.length === allSizes.length) return matchName && matchType;
-      const matchSizes =
-        filterSizes.length > 0
-          ? filterSizes.some((size) => {
-              const stockQty = Number(product.stock?.[size] ?? 0);
-              const bodegaQty = Number(product.bodega?.[size] ?? 0);
-              return stockQty + bodegaQty > 0;
-            })
-          : true;
-      return matchName && matchType && matchSizes;
-    });
-
+  // LISTAS DE TALLAS
   const tallasAdulto = ['S','M','L','XL','XXL','3XL','4XL'];
   const tallasNino = [
     { size:'16', label:'16 (Talla 2)' },
@@ -266,6 +230,32 @@ function App() {
     { size:'26', label:'26 (Talla 12)' },
     { size:'28', label:'28 (Talla 14/16)' },
   ];
+  const tallasBalon = ['3', '4', '5']; // Tallas específicas de balones
+  
+  // Array completo para el filtro
+  const allSizes = [...tallasAdulto, '16','18','20','22','24','26','28', ...tallasBalon];
+
+  const filteredProducts = products.filter((product) => {
+      const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!canEdit && product.hidden === true) return false;
+      
+      if (filterType === 'Ofertas') return Number(product.discountPrice) > 0 && matchName;
+      if (filterType === 'Populares') return product.isPopular === true && matchName;
+      if (filterType === 'Nuevo') return matchName;
+
+      const matchType = filterType ? product.type === filterType : true;
+      if (filterSizes.length === 0) return matchName && matchType; // Si no hay filtro de talla, pasa directo
+
+      // Lógica de Tallas
+      const matchSizes = filterSizes.some((size) => {
+        const stockQty = Number(product.stock?.[size] ?? 0);
+        const bodegaQty = Number(product.bodega?.[size] ?? 0);
+        return stockQty + bodegaQty > 0;
+      });
+
+      return matchName && matchType && matchSizes;
+    });
+
 
   return (
     <>
@@ -316,54 +306,91 @@ function App() {
 
       <div ref={pageTopRef} />
 
+      {/* =========================================================================
+          SECCIÓN DE TALLAS INTELIGENTE
+          - Si el filtro es "Balon", muestra SOLO tallas de balón.
+          - Si NO es "Balon", muestra ropa (Adulto/Niño).
+          ========================================================================= */}
       {showSizes && (
         <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
-          <div className="w-full text-center">
-            <h3 className="font-semibold mb-2">Adulto</h3>
-            <div className="flex flex-wrap justify-center gap-2">
-              {tallasAdulto.map((size) => {
-                const isActive = filterSizes.includes(size);
-                return (
-                  <button
-                    key={size}
-                    onClick={() =>
-                      setFilterSizes((prev) =>
-                        isActive ? prev.filter((s) => s !== size) : [...prev, size]
-                      )
-                    }
-                    className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                );
-              })}
+          
+          {filterType === 'Balon' ? (
+             /* SOLO MUESTRA ESTO SI ESTAMOS VIENDO BALONES */
+             <div className="w-full text-center animate-enter">
+              <h3 className="font-semibold mb-2">Tamaño de Balón</h3>
+              <div className="flex flex-wrap justify-center gap-2">
+                 {tallasBalon.map((size) => {
+                  const isActive = filterSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      onClick={() =>
+                        setFilterSizes((prev) =>
+                          isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                        )
+                      }
+                      className={`px-3 py-1 rounded-md border ${
+                        isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          <div className="w-full text-center">
-            <h3 className="font-semibold mb-2">Niño (Talla Costa Rica)</h3>
-            <div className="flex flex-wrap justify-center gap-2">
-               {tallasNino.map(({ size, label }) => {
-                const isActive = filterSizes.includes(size);
-                return (
-                  <button
-                    key={size}
-                    onClick={() =>
-                      setFilterSizes((prev) =>
-                        isActive ? prev.filter((s) => s !== size) : [...prev, size]
-                      )
-                    }
-                    className={`px-3 py-1 rounded-md border ${
-                      isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          ) : (
+            /* SI NO SON BALONES, MUESTRA ROPA */
+            <>
+              <div className="w-full text-center">
+                <h3 className="font-semibold mb-2">Adulto</h3>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {tallasAdulto.map((size) => {
+                    const isActive = filterSizes.includes(size);
+                    return (
+                      <button
+                        key={size}
+                        onClick={() =>
+                          setFilterSizes((prev) =>
+                            isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                          )
+                        }
+                        className={`px-3 py-1 rounded-md border ${
+                          isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="w-full text-center">
+                <h3 className="font-semibold mb-2">Niño (Talla Costa Rica)</h3>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {tallasNino.map(({ size, label }) => {
+                    const isActive = filterSizes.includes(size);
+                    return (
+                      <button
+                        key={size}
+                        onClick={() =>
+                          setFilterSizes((prev) =>
+                            isActive ? prev.filter((s) => s !== size) : [...prev, size]
+                          )
+                        }
+                        className={`px-3 py-1 rounded-md border ${
+                          isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
       )}
 

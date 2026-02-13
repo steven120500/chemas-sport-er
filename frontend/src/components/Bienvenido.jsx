@@ -34,11 +34,11 @@ const Bienvenido = ({ onNavigate }) => {
       filter: 'Nuevo'
     },
     { 
-      id: 'balones',      
-      label: 'BALONES',
-      buttonText: 'Ver Balones',
+      id: 'balón',      
+      label: 'BALÓN',
+      buttonText: 'Ver Balón',
       img: '/Bola.png',      
-      filter: 'Balones'
+      filter: 'Balón'
     },
   ];
 
@@ -72,7 +72,7 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <div 
-      className="relative w-full  h-[100vh] md:h-[110vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans mb-30 pb-10 sm:pb-40"
+      className="relative w-full  h-screen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans mb-30 pb-10 sm:pb-40"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
