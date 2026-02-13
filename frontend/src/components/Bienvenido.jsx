@@ -33,16 +33,27 @@ const Bienvenido = ({ onNavigate }) => {
       img: '/Fan.png',      
       filter: 'Nuevo'
     },
+    { 
+      id: 'balones',      
+      label: 'BALONES',
+      buttonText: 'Ver Balones',
+      img: '/Bola.png',      
+      filter: 'Balones'
+    },
   ];
 
   useEffect(() => {
+    // Ciclo de 6 segundos en total
     const interval = setInterval(() => {
-      setAnimating(true);
+      setAnimating(true); // 1. Inicia transición (Sale Camiseta, Entra Logo)
+      
+      // Le damos 1.5 segundos al logo para lucirse suavemente
       setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % categories.length);
-        setAnimating(false);
-      }, 500);
-    }, 5000);
+        setCurrentIndex((prev) => (prev + 1) % categories.length); // 2. Cambia datos
+        setAnimating(false); // 3. Termina transición (Sale Logo, Entra Nueva Camiseta)
+      }, 1500); 
+      
+    }, 6000); 
 
     return () => clearInterval(interval);
   }, [categories.length]);
@@ -61,46 +72,66 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <div 
-      // CAMBIO 1: Altura "min-h-[105vh]" para que sea más largo y "pb-20" para espacio abajo
-      className="relative w-full h-sreen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-10 sm:pb-40"
+      className="relative w-full  h-[100vh] md:h-[110vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans mb-30 pb-10 sm:pb-40"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
     >
       
-      {/* Fondo estático para asegurar responsive */}
       <div className="absolute inset-0 -z-10 bg-[url('/FondoMovil.jpg')] md:bg-[url('/FondoCompu.jpg')] bg-cover bg-center"></div>
-      
-      {/* Sombra oscura general */}
       <div className="absolute inset-0 bg-black/40 z-0"></div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-0 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4">
+      <div className="relative z-10 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4 mt-10 md:mt-0">
         
-        {/* Contenedor Camiseta + Botón */}
+        {/* =======================================================
+            1. LOGO ANIMADO (Transición Suave)
+           ======================================================= */}
+        <div className={`
+          absolute z-20 flex justify-center items-center
+          /* duration-1000 hace que tarde 1 segundo en aparecer/desaparecer (muy suave) */
+          transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+          ${animating 
+            ? 'opacity-100 scale-110 rotate-0'   // Al aparecer: Tamaño normal, sin rotación
+            : 'opacity-0 scale-50 -rotate-12'}   // Al desaparecer: Se encoge y gira un poquito
+        `}>
+          <img 
+            src="/logo.png" 
+            alt="ChemaSport Logo"
+            className="w-32 md:w-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+          />
+        </div>
+
+        {/* =======================================================
+            2. CAMISETA + BOTÓN
+           ======================================================= */}
         <div className={`
             relative w-full flex justify-center items-center
-            transition-all duration-500 ease-in-out transform
-            ${animating ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'}
+            transition-all duration-1000 ease-in-out transform
+            ${animating ? 'opacity-0 scale-95 blur-xl' : 'opacity-100 scale-100 blur-0'}
         `}>
           
-          {/* CAMISETA */}
           <img 
             src={currentCat.img} 
             alt={currentCat.label}
-            className="w-[90%] md:w-[600px] h-auto object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]"
+            className={`
+              object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]
+              ${currentCat.id === 'balones' ? 'w-[70%] md:w-[450px]' : 'w-[90%] md:w-[600px]'}
+              h-auto
+            `}
           />
           
-          {/* CAMBIO 2: POSICIÓN DEL BOTÓN 
-             - Mobile: bottom-0 right-4 (Esquina inferior derecha de la imagen)
-             - PC: md:bottom-20 md:-right-10 (Flotando al costado derecho, fuera de la camiseta)
-          */}
+          {/* BOTÓN FLOTANTE */}
           <button
             onClick={() => handleFilter(currentCat.filter)}
             className="
               absolute 
-              bottom-0  
-              md:bottom-20  
+              /* MÓVIL */
+              bottom-0 right-2 
+              
+              /* PC: Acercado más a la camiseta (right-4) */
+              md:bottom-20 md:right-4 
+              
               bg-black text-white 
               px-8 py-3 md:px-10 md:py-4 
               rounded-full font-bold text-lg md:text-xl 
@@ -116,8 +147,6 @@ const Bienvenido = ({ onNavigate }) => {
 
       </div>
 
-      
-    
     </div>
   );
 };
