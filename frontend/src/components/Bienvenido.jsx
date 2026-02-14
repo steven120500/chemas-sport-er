@@ -86,13 +86,13 @@ const Bienvenido = ({ onNavigate }) => {
       <div className="absolute inset-0 bg-black/40 z-0"></div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-10 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4 mt-10 md:mt-0">
+      <div className="relative z-0 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4 mt-10 md:mt-0">
         
         {/* =======================================================
             1. LOGO ANIMADO (Transición Suave)
            ======================================================= */}
         <div className={`
-          absolute z-20 flex justify-center items-center
+          absolute z-0 flex justify-center items-center
           transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]
           ${animating 
             ? 'opacity-100 scale-110 rotate-0'   // Al aparecer
@@ -122,8 +122,8 @@ const Bienvenido = ({ onNavigate }) => {
               
               /* 🔥 AQUÍ ESTÁ EL CAMBIO DE TAMAÑOS 🔥 */
               ${currentCat.id === 'balon' 
-                  ? 'w-24 md:w-[350px]'   /* Balón: Pequeño (45%) */
-                  : 'w-40 md:w-[600px]'   /* Camisetas: Grandes (80%) */
+                  ? 'w-24 md:w-80'   /* Balón: Pequeño (45%) */
+                  : 'w-40 md:w-96'   /* Camisetas: Grandes (80%) */
               }
               
               h-auto

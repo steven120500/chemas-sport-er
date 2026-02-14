@@ -1,5 +1,6 @@
 import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
@@ -112,7 +113,6 @@ function App() {
       if (tp === 'Nuevo') {
         params.append('sort', 'desc');
       } else if (tp) {
-        // Aquí pasamos 'Balon' (singular) si viene desde Bienvenido
         params.append('type', tp);
       }
 
@@ -219,7 +219,6 @@ function App() {
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
 
-  // LISTAS DE TALLAS
   const tallasAdulto = ['S','M','L','XL','XXL','3XL','4XL'];
   const tallasNino = [
     { size:'16', label:'16 (Talla 2)' },
@@ -230,9 +229,7 @@ function App() {
     { size:'26', label:'26 (Talla 12)' },
     { size:'28', label:'28 (Talla 14/16)' },
   ];
-  const tallasBalon = ['3', '4', '5']; // Tallas específicas de balones
-  
-  // Array completo para el filtro
+  const tallasBalon = ['3', '4', '5']; 
   const allSizes = [...tallasAdulto, '16','18','20','22','24','26','28', ...tallasBalon];
 
   const filteredProducts = products.filter((product) => {
@@ -244,9 +241,8 @@ function App() {
       if (filterType === 'Nuevo') return matchName;
 
       const matchType = filterType ? product.type === filterType : true;
-      if (filterSizes.length === 0) return matchName && matchType; // Si no hay filtro de talla, pasa directo
+      if (filterSizes.length === 0) return matchName && matchType;
 
-      // Lógica de Tallas
       const matchSizes = filterSizes.some((size) => {
         const stockQty = Number(product.stock?.[size] ?? 0);
         const bodegaQty = Number(product.bodega?.[size] ?? 0);
@@ -255,7 +251,6 @@ function App() {
 
       return matchName && matchType && matchSizes;
     });
-
 
   return (
     <>
@@ -306,110 +301,108 @@ function App() {
 
       <div ref={pageTopRef} />
 
-      {/* =========================================================================
-          SECCIÓN DE TALLAS INTELIGENTE
-          - Si el filtro es "Balon", muestra SOLO tallas de balón.
-          - Si NO es "Balon", muestra ropa (Adulto/Niño).
-          ========================================================================= */}
-      {showSizes && (
-        <div className="px-4 mt-2 mb-4 flex flex-col gap-6 items-center">
-          
-          {filterType === 'Balon' ? (
-             /* SOLO MUESTRA ESTO SI ESTAMOS VIENDO BALONES */
-             <div className="w-full text-center animate-enter">
-              <h3 className="font-semibold mb-2">Tamaño de Balón</h3>
-              <div className="flex flex-wrap justify-center gap-2">
-                 {tallasBalon.map((size) => {
-                  const isActive = filterSizes.includes(size);
-                  return (
-                    <button
-                      key={size}
-                      onClick={() =>
-                        setFilterSizes((prev) =>
-                          isActive ? prev.filter((s) => s !== size) : [...prev, size]
-                        )
-                      }
-                      className={`px-3 py-1 rounded-md border ${
-                        isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
+      <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
+        
+        {/* 1. SECCIÓN DE TALLAS DESPLEGABLE */}
+        <AnimatePresence>
+          {showSizes && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
+            >
+              <div className="flex flex-col gap-6 items-center p-6">
+                
+                {filterType === 'Balon' ? (
+                   <div className="w-full text-center">
+                    <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
+                    <div className="flex flex-wrap justify-center gap-2">
+                       {tallasBalon.map((size) => {
+                        const isActive = filterSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                            className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                              isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-full text-center">
+                      <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {tallasAdulto.map((size) => {
+                          const isActive = filterSizes.includes(size);
+                          return (
+                            <button
+                              key={size}
+                              onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="w-full text-center">
+                      <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {tallasNino.map(({ size, label }) => {
+                          const isActive = filterSizes.includes(size);
+                          return (
+                            <button
+                              key={size}
+                              onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+                
               </div>
-            </div>
-          ) : (
-            /* SI NO SON BALONES, MUESTRA ROPA */
-            <>
-              <div className="w-full text-center">
-                <h3 className="font-semibold mb-2">Adulto</h3>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {tallasAdulto.map((size) => {
-                    const isActive = filterSizes.includes(size);
-                    return (
-                      <button
-                        key={size}
-                        onClick={() =>
-                          setFilterSizes((prev) =>
-                            isActive ? prev.filter((s) => s !== size) : [...prev, size]
-                          )
-                        }
-                        className={`px-3 py-1 rounded-md border ${
-                          isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="w-full text-center">
-                <h3 className="font-semibold mb-2">Niño (Talla Costa Rica)</h3>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {tallasNino.map(({ size, label }) => {
-                    const isActive = filterSizes.includes(size);
-                    return (
-                      <button
-                        key={size}
-                        onClick={() =>
-                          setFilterSizes((prev) =>
-                            isActive ? prev.filter((s) => s !== size) : [...prev, size]
-                          )
-                        }
-                        className={`px-3 py-1 rounded-md border ${
-                          isActive ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-gray-200'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
+            </motion.div>
           )}
+        </AnimatePresence>
 
+        {/* 2. BOTÓN DE MEDIDAS (AHORA AFUERA, SIEMPRE VISIBLE) */}
+        <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
+          <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
+          <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
+            VER MEDIDAS
+          </button>
         </div>
-      )}
 
-      <div className="px-4 mt-2 mb-4 flex items-center justify-center gap-3">
-        <span className="text-sm sm:text-base">¿Querés saber tu talla?</span>
-        <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-2 py-1 rounded hover:bg-gray-800 font-semibold tracking-tight">
-          Medidas
-        </button>
+        {/* 3. BARRA DE FILTROS (Buscador + Carrusel) */}
+        <FilterBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterType={filterType}
+          setFilterType={(t) => { setFilterType(t); setPage(1); }}
+          onToggleTallas={() => setShowSizes(!showSizes)}
+        />
       </div>
 
-      <FilterBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filterType={filterType}
-        setFilterType={(t) => { setFilterType(t); setPage(1); }}
-        onToggleTallas={() => setShowSizes(!showSizes)}
-      />
-
-      <div id="products-section" className="px-4 grid grid-cols-2 gap-y-6 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+      {/* GRID DE PRODUCTOS */}
+      <div id="products-section" className="px-4 grid grid-cols-2 gap-y-8 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product) => (
             <ProductCard

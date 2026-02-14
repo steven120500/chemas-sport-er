@@ -246,3 +246,12 @@ button:focus-visible {
 .delay-200 { animation-delay: 0.3s; }
 .delay-300 { animation-delay: 0.5s; }
 .delay-400 { animation-delay: 0.7s; }
+
+/* Ocultar barra de scroll pero permitir deslizar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
