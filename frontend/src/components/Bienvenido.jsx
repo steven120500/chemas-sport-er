@@ -34,11 +34,11 @@ const Bienvenido = ({ onNavigate }) => {
       filter: 'Nuevo'
     },
     { 
-      id: 'balón',      
+      id: 'balon',      
       label: 'BALÓN',
       buttonText: 'Ver Balón',
-      img: '/Bola.png',      
-      filter: 'Balón'
+      img: '/Bola.png', // Asegúrate que el nombre coincida con tu archivo (bola.png o Bola.png)     
+      filter: 'Balon'   // Usamos Singular para que coincida con la lógica de App.js
     },
   ];
 
@@ -72,7 +72,12 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <div 
-      className="relative w-full  h-screen bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans mb-30 pb-10 sm:pb-40"
+      /* AJUSTE CLAVE DE ALTURA:
+         - h-[75vh] en móvil: Deja ver el buscador abajo.
+         - md:h-[85vh] en PC: Deja ver el buscador abajo.
+         - pb-16: Espacio para que la camiseta no choque abajo.
+      */
+      className="relative w-full h-[75vh] md:h-[85vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-16"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
@@ -89,11 +94,10 @@ const Bienvenido = ({ onNavigate }) => {
            ======================================================= */}
         <div className={`
           absolute z-20 flex justify-center items-center
-          /* duration-1000 hace que tarde 1 segundo en aparecer/desaparecer (muy suave) */
           transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]
           ${animating 
-            ? 'opacity-100 scale-110 rotate-0'   // Al aparecer: Tamaño normal, sin rotación
-            : 'opacity-0 scale-50 -rotate-12'}   // Al desaparecer: Se encoge y gira un poquito
+            ? 'opacity-100 scale-110 rotate-0'   // Al aparecer
+            : 'opacity-0 scale-50 -rotate-12'}   // Al desaparecer
         `}>
           <img 
             src="/logo.png" 
@@ -116,7 +120,7 @@ const Bienvenido = ({ onNavigate }) => {
             alt={currentCat.label}
             className={`
               object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]
-              ${currentCat.id === 'balones' ? 'w-[70%] md:w-[450px]' : 'w-[90%] md:w-[600px]'}
+              ${currentCat.id === 'balon' ? 'w-[70%] md:w-[450px]' : 'w-[90%] md:w-[600px]'}
               h-auto
             `}
           />
@@ -126,10 +130,10 @@ const Bienvenido = ({ onNavigate }) => {
             onClick={() => handleFilter(currentCat.filter)}
             className="
               absolute 
-              /* MÓVIL */
+              /* MÓVIL: Abajo a la derecha */
               bottom-0 right-2 
               
-              /* PC: Acercado más a la camiseta (right-4) */
+              /* PC: Acercado más a la camiseta */
               md:bottom-20 md:right-4 
               
               bg-black text-white 
