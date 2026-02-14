@@ -34,11 +34,11 @@ const Bienvenido = ({ onNavigate }) => {
       filter: 'Nuevo'
     },
     { 
-      id: 'balon',      
+      id: 'balón',      
       label: 'BALÓN',
       buttonText: 'Ver Balón',
       img: '/Bola.png', // Asegúrate que coincida con el nombre real en public     
-      filter: 'Balon'
+      filter: 'Balón'
     },
   ];
 
