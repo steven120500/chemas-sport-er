@@ -36,7 +36,7 @@ const Bienvenido = ({ onNavigate }) => {
     { 
       id: 'balón',      
       label: 'BALÓN',
-      buttonText: 'Ver Balón',
+      buttonText: 'Ver Balones',
       img: '/Bola.png', // Asegúrate que coincida con el nombre real en public     
       filter: 'Balón'
     },

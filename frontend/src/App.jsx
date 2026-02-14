@@ -240,7 +240,12 @@ function App() {
       if (filterType === 'Populares') return product.isPopular === true && matchName;
       if (filterType === 'Nuevo') return matchName;
 
-      const matchType = filterType ? product.type === filterType : true;
+      // 🔥 CORRECCIÓN 1: Match flexible para Balones (con/sin tilde, singular/plural)
+      const matchType = filterType 
+        ? (product.type === filterType) || 
+          (filterType === 'Balon' && (product.type === 'Balón' || product.type === 'Balones'))
+        : true;
+
       if (filterSizes.length === 0) return matchName && matchType;
 
       const matchSizes = filterSizes.some((size) => {
@@ -301,7 +306,18 @@ function App() {
 
       <div ref={pageTopRef} />
 
+      {/* 3. BARRA DE FILTROS */}
+      <FilterBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterType={filterType}
+          setFilterType={(t) => { setFilterType(t); setPage(1); }}
+          onToggleTallas={() => setShowSizes(!showSizes)}
+        />
+      
+
       <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
+
         
         {/* 1. SECCIÓN DE TALLAS DESPLEGABLE */}
         <AnimatePresence>
@@ -315,7 +331,8 @@ function App() {
             >
               <div className="flex flex-col gap-6 items-center p-6">
                 
-                {filterType === 'Balon' ? (
+                {/* 🔥 CORRECCIÓN 2: Renderizado flexible para Balones */}
+                {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
                    <div className="w-full text-center">
                     <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -383,7 +400,7 @@ function App() {
           )}
         </AnimatePresence>
 
-        {/* 2. BOTÓN DE MEDIDAS (AHORA AFUERA, SIEMPRE VISIBLE) */}
+        {/* 2. BOTÓN DE MEDIDAS (SIEMPRE VISIBLE) */}
         <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
           <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
           <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
@@ -391,14 +408,7 @@ function App() {
           </button>
         </div>
 
-        {/* 3. BARRA DE FILTROS (Buscador + Carrusel) */}
-        <FilterBar
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          filterType={filterType}
-          setFilterType={(t) => { setFilterType(t); setPage(1); }}
-          onToggleTallas={() => setShowSizes(!showSizes)}
-        />
+        
       </div>
 
       {/* GRID DE PRODUCTOS */}

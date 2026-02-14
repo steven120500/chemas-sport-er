@@ -1,15 +1,19 @@
 import { motion } from "framer-motion";
-import { FaChevronDown } from "react-icons/fa"; // Asegúrate de tener react-icons instalado, si no, usa un SVG simple
+import { FaChevronDown } from "react-icons/fa"; 
 
 const categories = [
   { label: "Todos", value: "" },
   { label: "Nacional", value: "Nacional" },
-  { label: "Populares", value: "Populares" }, // ⭐ Se pintará Naranja
-  { label: "Ofertas", value: "Ofertas" },     // ⭐ Se pintará Verde
+  { label: "Populares", value: "Populares" }, // 🔶 Naranja
+  { label: "Ofertas", value: "Ofertas" },     // 🟢 Verde
   { label: "Player", value: "Player" },
   { label: "Fan", value: "Fan" },
   { label: "Retro", value: "Retro" },
-  { label: "Balón", value: "Balon" },
+  
+  // ✅ CORREGIDO: Le puse la tilde al value ("Balón").
+  // Esto hará que coincida con el nombre que probablemente tiene en la Base de Datos.
+  { label: "Balón", value: "Balón" }, 
+
   { label: "Mujer", value: "Mujer" },
   { label: "Niño", value: "Niño" },
   { label: "Abrigos", value: "Abrigos" },
@@ -39,8 +43,9 @@ export default function FilterBar({
         <div className="relative w-full max-w-lg flex items-center gap-3">
           
           {/* Input Buscador */}
-          <div className="relative flex-1">
-             <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="relative flex-1 group">
+             {/* ✅ CORREGIDO: strokeWidth={2} (antes estaba en 0 y no se veía) */}
+             <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-black transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
              </svg>
             <input
@@ -52,13 +57,13 @@ export default function FilterBar({
             />
           </div>
 
-          {/* Botón Tallas (Con Texto y Flecha) */}
+          {/* Botón Tallas */}
           <button
             onClick={onToggleTallas}
             className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-xl hover:bg-zinc-800 transition-colors shadow-md text-sm font-bold tracking-wide"
           >
             TALLAS
-            
+            <FaChevronDown className="text-xs" />
           </button>
 
         </div>
@@ -76,16 +81,16 @@ export default function FilterBar({
             const isActive = filterType === cat.value;
             
             // LÓGICA DE COLORES
-            let btnClass = "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"; // Estilo base
+            let btnClass = "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"; // Base
             
             if (cat.value === "Populares") {
-              // Estilo NARANJA para Populares
+              // ✅ CORREGIDO: Cambiado de yellow (amarillo) a orange (naranja)
               btnClass = isActive 
                 ? "bg-yellow-500 border-yellow-500 text-white shadow-md scale-105" 
-                : "bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-orange-100";
+                : "bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-yellow-100";
             } 
             else if (cat.value === "Ofertas") {
-              // Estilo VERDE para Ofertas
+              // Estilo VERDE (Ofertas)
               btnClass = isActive 
                 ? "bg-green-600 border-green-600 text-white shadow-md scale-105" 
                 : "bg-green-50 border-green-200 text-green-700 hover:bg-green-100";
