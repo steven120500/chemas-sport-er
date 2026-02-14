@@ -37,8 +37,8 @@ const Bienvenido = ({ onNavigate }) => {
       id: 'balon',      
       label: 'BALÓN',
       buttonText: 'Ver Balón',
-      img: '/Bola.png', // Asegúrate que el nombre coincida con tu archivo (bola.png o Bola.png)     
-      filter: 'Balon'   // Usamos Singular para que coincida con la lógica de App.js
+      img: '/Bola.png', // Asegúrate que coincida con el nombre real en public     
+      filter: 'Balon'
     },
   ];
 
@@ -72,10 +72,9 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <div 
-      /* AJUSTE CLAVE DE ALTURA:
-         - h-[75vh] en móvil: Deja ver el buscador abajo.
-         - md:h-[85vh] en PC: Deja ver el buscador abajo.
-         - pb-16: Espacio para que la camiseta no choque abajo.
+      /* ALTURA CONTROLADA:
+         - h-[75vh]: En celular deja espacio abajo para el buscador.
+         - md:h-[85vh]: En PC también deja espacio.
       */
       className="relative w-full h-[75vh] md:h-[85vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-16"
       style={{
@@ -120,7 +119,13 @@ const Bienvenido = ({ onNavigate }) => {
             alt={currentCat.label}
             className={`
               object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]
-              ${currentCat.id === 'balon' ? 'w-[70%] md:w-[450px]' : 'w-[90%] md:w-[600px]'}
+              
+              /* 🔥 AQUÍ ESTÁ EL CAMBIO DE TAMAÑOS 🔥 */
+              ${currentCat.id === 'balon' 
+                  ? 'w-24 md:w-[350px]'   /* Balón: Pequeño (45%) */
+                  : 'w-40 md:w-[600px]'   /* Camisetas: Grandes (80%) */
+              }
+              
               h-auto
             `}
           />
@@ -137,7 +142,7 @@ const Bienvenido = ({ onNavigate }) => {
               md:bottom-20 md:right-4 
               
               bg-black text-white 
-              px-8 py-3 md:px-10 md:py-4 
+              px-6 py-2 md:px-10 md:py-4 
               rounded-full font-bold text-lg md:text-xl 
               shadow-[0_10px_30px_rgba(0,0,0,0.5)] 
               border border-white/10
