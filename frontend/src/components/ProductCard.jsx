@@ -2,7 +2,6 @@
 import { motion } from "framer-motion";
 import { FaFire } from "react-icons/fa";
 
-
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
   if (!url.includes("res.cloudinary.com")) return url;
@@ -12,23 +11,18 @@ const cldUrl = (url, w, h) => {
   );
 };
 
-
 const ADULT_SIZES = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 const BALL_SIZES = ["3", "4", "5"];
-
 
 export default function ProductCard({ product, onClick, user }) {
   const isAdmin =
     user?.isSuperUser || user?.roles?.includes("edit");
 
-
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
 
-
   const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
-
 
   const stockAgotadas = [];
   const stockQueda1 = [];
@@ -37,18 +31,23 @@ export default function ProductCard({ product, onClick, user }) {
   const traspasosUrgentes = [];
   const traspasosSugeridos = [];
 
+  // ⭐ NUEVO: Variable para calcular el stock total
+  let totalInventory = 0;
 
-  if (user?.isSuperUser) {
-    for (const size of sizesToCheck) {
-      const stockQty = Number(product.stock?.[size] ?? 0);
-      const bodeQty = Number(product.bodega?.[size] ?? 0);
+  // Modificamos el ciclo para que sume el inventario para TODOS (clientes y admins)
+  for (const size of sizesToCheck) {
+    const stockQty = Number(product.stock?.[size] ?? 0);
+    const bodeQty = Number(product.bodega?.[size] ?? 0);
 
+    // Sumamos al total general
+    totalInventory += (stockQty + bodeQty);
 
+    // Las advertencias detalladas siguen siendo solo para los admins
+    if (user?.isSuperUser) {
       if (stockQty === 0) stockAgotadas.push(size);
       if (stockQty === 1) stockQueda1.push(size);
       if (bodeQty === 0) bodegaAgotadas.push(size);
       if (bodeQty === 1) bodegaQueda1.push(size);
-
 
       if (stockQty === 0 && bodeQty > 0) {
         traspasosUrgentes.push({ talla: size, stock: stockQty, bodega: bodeQty });
@@ -58,19 +57,22 @@ export default function ProductCard({ product, onClick, user }) {
     }
   }
 
+  // ⭐ NUEVO: Si el inventario total es 0, está completamente agotado
+  const isTotalAgotado = totalInventory === 0;
 
   const hasDiscount =
     product.discountPrice !== undefined &&
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
 
-
   return (
     <motion.div
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.97 }}
+      // ⭐ NUEVO: Si está agotado lo hacemos ver un poquito "apagado" (grayscale)
       className={`relative rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : "bg-white"}
+        ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-80 grayscale-[30%]" : ""}
       `}
       onClick={() => onClick(product)}
     >
@@ -83,14 +85,12 @@ export default function ProductCard({ product, onClick, user }) {
         </div>
       )}
 
-
       {/* 🟩 Oferta */}
       {hasDiscount && (
         <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
           Oferta
         </span>
       )}
-
 
       {/* 🔥 Popular */}
       {product.isPopular === true && (
@@ -102,10 +102,6 @@ export default function ProductCard({ product, onClick, user }) {
         </span>
       )}
 
-
-      
-
-
       {/* Imagen */}
       <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
         {(() => {
@@ -114,11 +110,9 @@ export default function ProductCard({ product, onClick, user }) {
           if (screenWidth >= 1024) H = 700;
           else if (screenWidth >= 768) H = 1000;
 
-
           const img320 = cldUrl(product.imageSrc, 320, H);
           const img640 = cldUrl(product.imageSrc, 640, H);
           const img960 = cldUrl(product.imageSrc, 960, H);
-
 
           return (
             <motion.img
@@ -137,25 +131,33 @@ export default function ProductCard({ product, onClick, user }) {
           );
         })()}
 
+        {/* 🟥 OVERLAY SI ESTÁ AGOTADO (Visible para todos) */}
+        {isTotalAgotado && (
+          <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-20 flex items-center justify-center">
+            <div className="bg-black text-white border-2 border-white px-6 py-2 rounded-lg transform -rotate-12 shadow-xl">
+              <span className="text-xl md:text-2xl font-black tracking-widest uppercase drop-shadow-md">
+                Agotado
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
         {isAdmin && product.hidden && (
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-30
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30
                           flex items-center justify-center">
-            <span className="text-gray-600 text-lg sm:text-xl md:text-2xl font-bold text-center px-3">
+            <span className="text-white text-lg sm:text-xl md:text-2xl font-bold text-center px-3 drop-shadow-md">
               No visible para el cliente
             </span>
           </div>
         )}
       </div>
 
-
       {/* Info */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
         <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-gray-900 line-clamp-2">
           {product.name}
         </h3>
-
 
         {/* Precio */}
         {hasDiscount ? (
@@ -173,7 +175,6 @@ export default function ProductCard({ product, onClick, user }) {
           </p>
         )}
 
-
         {/* Avisos superadmin */}
         {user?.isSuperUser && (
           <div className="mt-3 text-xs sm:text-sm text-left w-full px-2">
@@ -190,7 +191,6 @@ export default function ProductCard({ product, onClick, user }) {
               </>
             )}
 
-
             {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
               <>
                 <p className="font-bold text-black mt-2">Tienda #2</p>
@@ -202,7 +202,6 @@ export default function ProductCard({ product, onClick, user }) {
                 )}
               </>
             )}
-
 
             {traspasosUrgentes.length > 0 && (
               <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
@@ -216,7 +215,6 @@ export default function ProductCard({ product, onClick, user }) {
                 </ul>
               </div>
             )}
-
 
             {traspasosSugeridos.length > 0 && (
               <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
