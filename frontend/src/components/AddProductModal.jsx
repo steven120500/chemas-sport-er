@@ -5,12 +5,10 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import tallaPorTipo from "../utils/tallaPorTipo";
 
-
 const API_BASE = import.meta.env.VITE_API_BASE || "https://chemas-sport-er-backend.onrender.com";
 const MAX_IMAGES = 2;
 const MAX_WIDTH = 1000;
 const QUALITY = 0.75;
-
 
 // ===== Helpers =====
 async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) {
@@ -21,7 +19,6 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     reader.readAsDataURL(file);
   });
 
-
   const img = await new Promise((resolve, reject) => {
     const i = new Image();
     i.onload = () => resolve(i);
@@ -29,14 +26,12 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     i.src = dataUrl;
   });
 
-
   const canvas = document.createElement("canvas");
   const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
   canvas.width = Math.round(img.width * ratio);
   canvas.height = Math.round(img.height * ratio);
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
 
   const blob = await new Promise((resolve) => {
     const tryType = "image/webp";
@@ -47,22 +42,18 @@ async function convertToWebpBlob(file, maxWidth = MAX_WIDTH, quality = QUALITY) 
     );
   });
 
-
   if (!blob) throw new Error("No se pudo convertir la imagen");
   return blob;
 }
 
-
 async function srcToBlob(src) {
   if (!src) throw new Error("Imagen sin src");
-
 
   if (src.startsWith("blob:") || src.startsWith("http")) {
     const r = await fetch(src);
     if (!r.ok) throw new Error("No se pudo leer blob/url");
     return await r.blob();
   }
-
 
   if (src.startsWith("data:")) {
     const [meta, data] = src.split(",");
@@ -73,10 +64,8 @@ async function srcToBlob(src) {
     return new Blob([u8], { type: mime });
   }
 
-
   throw new Error("Formato de imagen no soportado");
 }
-
 
 export default function AddProductModal({ onAdd, onCancel, user }) {
   const [images, setImages] = useState([]);
@@ -88,17 +77,14 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [bodega, setBodega] = useState({});
   const [mode, setMode] = useState("stock");
 
-
-  const [isNew, setIsNew] = useState(false);   // ya existía
-  const [hidden, setHidden] = useState(false); // ⭐ NUEVO CAMPO
-
+  const [isNew, setIsNew] = useState(false);   
+  const [hidden, setHidden] = useState(false); 
+  const [isMundial2026, setIsMundial2026] = useState(false); // ⭐ NUEVO ESTADO: Mundial 2026
 
   const [loading, setLoading] = useState(false);
 
-
   const fileInputRef = useRef(null);
   const modalRef = useRef(null);
-
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -111,18 +97,14 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     };
   }, []);
 
-
-  // incluye tallas de balón si aplica
   const tallas = useMemo(() => {
     const tipos = { ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"] };
     return tipos[type] || [];
   }, [type]);
 
-
   const handleFiles = async (filesLike) => {
     const files = Array.from(filesLike).slice(0, MAX_IMAGES - images.length);
     if (files.length === 0) return;
-
 
     try {
       setLoading(true);
@@ -137,7 +119,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         converted.push({ blob, previewUrl });
       }
 
-
       if (converted.length) {
         setImages((prev) => [...prev, ...converted].slice(0, MAX_IMAGES));
         toast.success("Imágenes optimizadas a WebP");
@@ -150,14 +131,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     }
   };
 
-
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     await handleFiles([file]);
     e.target.value = "";
   };
-
 
   const handleRemoveImage = (index) => {
     setImages((prev) => {
@@ -169,25 +148,20 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     });
   };
 
-
   const visibleInv = mode === "stock" ? stock : bodega;
   const setVisibleInv = mode === "stock" ? setStock : setBodega;
-
 
   const handleInvChange = (size, value) => {
     const n = Math.max(0, parseInt(value, 10) || 0);
     setVisibleInv((prev) => ({ ...prev, [size]: n }));
   };
 
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
 
-
     try {
       setLoading(true);
-
 
       if (!name.trim() || !price || !type.trim()) {
         toast.error("Completá nombre, precio y tipo.");
@@ -202,7 +176,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         return;
       }
 
-
       const displayName = user?.username || "ChemaSportER";
       const formData = new FormData();
       formData.append("name", name.trim());
@@ -210,20 +183,17 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       if (discountPrice) formData.append("discountPrice", String(discountPrice).trim());
       formData.append("type", type.trim());
 
-
       formData.append("isNew", isNew ? "true" : "false");
-      formData.append("hidden", hidden ? "true" : "false"); // ⭐ AQUI SE ENVÍA
-
+      formData.append("hidden", hidden ? "true" : "false"); 
+      formData.append("isMundial2026", isMundial2026 ? "true" : "false"); // ⭐ SE ENVÍA MUNDIAL 2026
 
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
-
 
       for (let i = 0; i < images.length; i++) {
         const blob = images[i].blob || (await srcToBlob(images[i].src));
         formData.append("images", blob, `product-${i}.webp`);
       }
-
 
       const res = await fetch(`${API_BASE}/api/products`, {
         method: "POST",
@@ -231,12 +201,10 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         body: formData,
       });
 
-
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(`Error al guardar producto (${res.status}). ${txt || ""}`.trim());
       }
-
 
       const data = await res.json();
       onAdd?.(data);
@@ -249,14 +217,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     }
   };
 
-
   return (
     <div
       ref={modalRef}
       className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6"
     >
       <div className="relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
-
 
         {/* Cerrar */}
         <button
@@ -266,15 +232,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           <FaTimes size={30} />
         </button>
 
-
         <h2 className="text-lg font-semibold mb-4">Agregar producto</h2>
 
-
         {/* ======= IMÁGENES ======= */}
-        <p className="text-gray-500 mb-2">
+        <p className="text-gray-500 mb-2 text-sm">
           Arrastrá y soltá hasta {MAX_IMAGES} imagen(es) o hacé clic para seleccionar.
         </p>
-
 
         <div className="flex gap-2 justify-center flex-wrap mb-3">
           {images.map((img, i) => (
@@ -282,14 +245,14 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <img
                 src={img.previewUrl}
                 alt={`preview-${i}`}
-                className="w-24 h-24 object-cover rounded"
+                className="w-24 h-24 object-cover rounded shadow-sm"
               />
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemoveImage(i);
                 }}
-                className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full px-1"
+                className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 shadow-md"
               >
                 ✕
               </button>
@@ -297,13 +260,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           ))}
         </div>
 
-
         {images.length < MAX_IMAGES && (
           <div className="mb-4">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 p-2 rounded w-full text-center"
+              className="border-2 border-dashed border-gray-300 p-3 rounded-lg w-full text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
             >
               Seleccionar imagen
             </button>
@@ -317,39 +279,35 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           </div>
         )}
 
-
         {/* ======= CAMPOS ======= */}
         <input
           type="text"
           placeholder="Nombre del producto"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-3 text-sm focus:ring-black focus:border-black"
         />
-
 
         <input
           type="text"
           placeholder="Precio (₡)"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-3 text-sm focus:ring-black focus:border-black"
         />
-
 
         <input
           type="text"
           placeholder="Precio con descuento (opcional)"
           value={discountPrice}
           onChange={(e) => setDiscountPrice(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-3 text-sm focus:ring-black focus:border-black"
         />
-
 
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded mb-3"
+          className="w-full px-4 py-2 border border-gray-300 rounded mb-4 text-sm focus:ring-black focus:border-black"
         >
           {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"] }).map((t) => (
             <option key={t} value={t}>
@@ -358,71 +316,86 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           ))}
         </select>
 
+        {/* ======= OPCIONES EXTRAS (Checkboxes) ======= */}
+        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4">
+          <p className="text-xs text-gray-500 font-semibold mb-2 uppercase tracking-wider">Opciones Adicionales</p>
+          
+          <div className="flex flex-col gap-2">
+            {/* Ocultar */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hidden}
+                onChange={(e) => setHidden(e.target.checked)}
+                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+              />
+              <span className="text-sm font-medium text-gray-700">Ocultar este producto (No visible al público)</span>
+            </label>
 
-        {/* ======= NUEVO CHECKBOX HIDDEN ======= */}
-        <label className="flex items-center gap-2 mb-3">
-          <input
-            type="checkbox"
-            checked={hidden}
-            onChange={(e) => setHidden(e.target.checked)}
-          />
-          <span className="text-sm font-medium">Ocultar este producto</span>
-        </label>
-
+            {/* ⭐ NUEVO: Mundial 2026 */}
+            <label className="flex items-center gap-2 cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                checked={isMundial2026}
+                onChange={(e) => setIsMundial2026(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-bold text-blue-800">Torneo: Mundial 2026</span>
+            </label>
+          </div>
+        </div>
 
         {/* ======= SELECTOR DE INVENTARIO ======= */}
         <div className="mb-3">
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-gray-500 font-semibold mb-1 uppercase tracking-wider">
             Inventario a editar
           </label>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded"
+            className="w-full px-4 py-2 border border-gray-300 rounded text-sm focus:ring-black focus:border-black bg-white"
           >
             <option value="stock">Tienda #1</option>
             <option value="bodega">Tienda #2</option>
           </select>
         </div>
 
-
         {/* ======= TALLAS ======= */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-2 mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
           {tallas.map((size) => (
             <label key={size} className="text-center">
-              <span className="block mb-1 text-sm font-medium">{size}</span>
+              <span className="block mb-1 text-xs font-bold text-gray-600">{size}</span>
               <input
                 type="number"
                 min="0"
                 value={visibleInv[size] ?? ""}
                 onChange={(e) => handleInvChange(size, e.target.value)}
-                className="w-full px-2 py-1 border border-gray-300 rounded text-center"
+                className="w-full px-1 py-1 border border-gray-300 rounded text-center text-sm focus:ring-black focus:border-black"
               />
             </label>
           ))}
         </div>
 
-
         {/* ======= BOTONES ======= */}
-        <div className="flex gap-2">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 transition text-sm font-medium"
+          >
+            Cancelar
+          </button>
+          
           <button
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-1 bg-black text-white py-2 rounded hover:bg-gray-800 transition disabled:opacity-60"
+            className="flex-1 bg-black text-white py-2 rounded shadow-md hover:bg-gray-800 transition disabled:opacity-60 text-sm font-bold"
           >
-            {loading ? "Agregando..." : "Agregar producto"}
-          </button>
-
-
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded"
-          >
-            Cancelar
+            {loading ? "Agregando..." : "Agregar Producto"}
           </button>
         </div>
+        
       </div>
     </div>
   );

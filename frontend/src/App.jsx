@@ -239,6 +239,9 @@ function App() {
       if (filterType === 'Ofertas') return Number(product.discountPrice) > 0 && matchName;
       if (filterType === 'Populares') return product.isPopular === true && matchName;
       if (filterType === 'Nuevo') return matchName;
+      
+      // 🔥 NUEVO: Filtro para Mundial 2026
+      if (filterType === 'Mundial 2026') return product.isMundial2026 === true && matchName;
 
       // 🔥 CORRECCIÓN 1: Match flexible para Balones (con/sin tilde, singular/plural)
       const matchType = filterType 

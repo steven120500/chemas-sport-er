@@ -3,17 +3,15 @@ import { FaChevronDown } from "react-icons/fa";
 
 const categories = [
   { label: "Todos", value: "" },
+  
   { label: "Nacional", value: "Nacional" },
+  { label: "Mundial 2026", value: "Mundial 2026" }, // ⭐ NUEVO: Agregado Mundial 2026
   { label: "Populares", value: "Populares" }, // 🔶 Naranja
   { label: "Ofertas", value: "Ofertas" },     // 🟢 Verde
   { label: "Player", value: "Player" },
   { label: "Fan", value: "Fan" },
   { label: "Retro", value: "Retro" },
-  
-  // ✅ CORREGIDO: Le puse la tilde al value ("Balón").
-  // Esto hará que coincida con el nombre que probablemente tiene en la Base de Datos.
   { label: "Balón", value: "Balón" }, 
-
   { label: "Mujer", value: "Mujer" },
   { label: "Niño", value: "Niño" },
   { label: "Abrigos", value: "Abrigos" },
@@ -31,7 +29,8 @@ export default function FilterBar({
   onToggleTallas,
 }) {
   return (
-    <div className="w-full flex flex-col gap-5 mb-6 mt-2 px-4 md:px-0">
+
+    <div className="w-full flex flex-col gap-5 pt-6 mb-6 mt-6 px-4 md:px-0">
       
       {/* 1. BARRA DE BÚSQUEDA + BOTÓN TALLAS */}
       <motion.div
@@ -44,9 +43,9 @@ export default function FilterBar({
           
           {/* Input Buscador */}
           <div className="relative flex-1 group">
-             {/* ✅ CORREGIDO: strokeWidth={2} (antes estaba en 0 y no se veía) */}
+             {/* 🔧 CORREGIDO: strokeWidth={2} para que se vea la lupa (estaba en 0) */}
              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-black transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
              </svg>
             <input
               type="text"
@@ -71,7 +70,7 @@ export default function FilterBar({
 
       {/* 2. CARRUSEL DE CATEGORÍAS (Scroll Horizontal) */}
       <motion.div
-        className="w-full overflow-x-auto pb-2 scrollbar-hide mask-fade"
+        className="w-full overflow-x-auto pt-3 pb-2 scrollbar-hide mask-fade"
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
@@ -83,8 +82,14 @@ export default function FilterBar({
             // LÓGICA DE COLORES
             let btnClass = "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"; // Base
             
-            if (cat.value === "Populares") {
-              // ✅ CORREGIDO: Cambiado de yellow (amarillo) a orange (naranja)
+            if (cat.value === "Mundial 2026") {
+              // ⭐ NUEVO ESTILO: Azul/Celeste para Mundial 2026
+              btnClass = isActive 
+                ? "bg-blue-600 border-blue-600 text-white shadow-md scale-105" 
+                : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100";
+            }
+            else if (cat.value === "Populares") {
+              // 🔧 CORREGIDO: Cambiado de yellow a orange para que sea naranja de verdad
               btnClass = isActive 
                 ? "bg-yellow-500 border-yellow-500 text-white shadow-md scale-105" 
                 : "bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-yellow-100";

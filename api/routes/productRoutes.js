@@ -47,6 +47,10 @@ function diffProduct(prev, next) {
   if (prev.discountPrice !== next.discountPrice)
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
+  
+  // ⭐ NUEVO: Registrar en historial si se cambió el Mundial 2026
+  if (prev.isMundial2026 !== next.isMundial2026) 
+    changes.push(`Mundial 2026: ${prev.isMundial2026 ? 'Sí' : 'No'} → ${next.isMundial2026 ? 'Sí' : 'No'}`);
 
   changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
   changes.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
@@ -120,7 +124,10 @@ router.post('/', upload.any(), async (req, res) => {
       images,
       imageSrc,
 
-      hidden: req.body.hidden === 'true' || req.body.hidden === true
+      hidden: req.body.hidden === 'true' || req.body.hidden === true,
+      
+      // ⭐ NUEVO: Atrapar el checkbox del Mundial 2026
+      isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true
     });
 
     await History.create({
@@ -175,9 +182,14 @@ router.put('/:id', async (req, res) => {
       bodega: nextBodega,
     };
 
-    // actualizar hidden
+    // actualizar hidden y Mundial 2026
     if (req.body.hidden !== undefined) {
       update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
+    }
+    
+    // ⭐ NUEVO: Actualizar el check del mundial en la base de datos
+    if (req.body.isMundial2026 !== undefined) {
+      update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     }
 
     // Manejo de imágenes
@@ -324,6 +336,10 @@ router.get('/', async (req, res) => {
     else if (type === 'Populares') {
       find.isPopular = true;
     }
+    // ⭐ NUEVO: Filtro para decirle a la Base de Datos que traiga los del Mundial
+    else if (type === 'Mundial 2026') {
+      find.isMundial2026 = true;
+    }
     else if (type) {
       find.type = type;
     }
@@ -339,12 +355,11 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // ⭐ NUEVO: Agregamos isMundial2026 a los datos que se devuelven al frontend
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026';
 
     // ✅ 2. DEFINIMOS EL OBJETO DE ORDENAMIENTO
-    // Si ?sort=desc, ordenamos por _id invertido (más nuevo primero)
-    // Si no, ordenamos alfabéticamente por nombre
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([

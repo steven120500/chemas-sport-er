@@ -33,7 +33,7 @@ function isLikelyObjectId(v) {
 
 export default function ProductModal({
   product,
-  isOpen, // ✅ ÚNICO CAMBIO: Recibimos la prop para animar
+  isOpen, 
   onClose,
   onUpdate,
   canEdit,
@@ -56,8 +56,9 @@ export default function ProductModal({
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [loading, setLoading] = useState(false);
 
-  // ⭐ NUEVO: estado para ocultar
+  // Estados extras (Oculto y Mundial 2026)
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
+  const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false); // ⭐ NUEVO ESTADO
 
   // Galería
   const galleryFromProduct = useMemo(() => {
@@ -85,8 +86,9 @@ export default function ProductModal({
     setEditedStock({ ...(product?.stock || {}) });
     setEditedBodega({ ...(product?.bodega || {}) });
 
-    // 🔥 sincronizar hidden cuando cambie el producto
+    // 🔥 sincronizar hidden y mundial 2026 cuando cambie el producto
     setEditedHidden(product?.hidden || false);
+    setEditedIsMundial2026(product?.isMundial2026 || false); // ⭐ SINCRONIZAR AQUÍ
 
     setLocalImages(
       product?.images?.length
@@ -153,8 +155,9 @@ export default function ProductModal({
           typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: (editedName || "").trim(),
 
-        // ⭐ AQUÍ SE ENVÍA EL OCULTO AL BACKEND
+        // ⭐ AQUÍ SE ENVÍAN AL BACKEND
         hidden: editedHidden,
+        isMundial2026: editedIsMundial2026, 
       };
 
       const res = await fetch(
@@ -252,7 +255,6 @@ export default function ProductModal({
     setIdx(0);
   };
 
-  // Determinar tipo de tallas
   const isNino =
     (isEditing ? editedType : viewProduct?.type) === "Niño";
   const isBalon =
@@ -289,7 +291,6 @@ export default function ProductModal({
   };
 
   return (
-    // ✅ MANTENEMOS TUS CLASES EXACTAS (mt-10 mb-16 py-6) Y SOLO AGREGAMOS LA TRANSICIÓN DE FONDO
     <div 
         className={`mt-10 mb-16 fixed inset-0 z-50 flex items-center justify-center py-6 transition-colors duration-300 ${
             isOpen ? "bg-black/40 visible" : "bg-black/0 invisible"
@@ -299,12 +300,10 @@ export default function ProductModal({
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()} 
-        // ✅ MANTENEMOS TUS CLASES DE SCROLL (max-h-screen, overflow-y-auto) Y SOLO AGREGAMOS SCALE/OPACITY
         className={`relative bg-white p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 transition-all duration-300 transform ${
             isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
-        {/* Botón cerrar */}
         <button
           onClick={onClose}
           className="absolute top-6 right-2 bg-black text-white rounded p-1"
@@ -313,7 +312,6 @@ export default function ProductModal({
           <FaTimes size={30} />
         </button>
 
-        {/* Encabezado */}
         <div className="mt-12 mb-2 text-center">
           {isEditing && canEdit ? (
             <>
@@ -389,7 +387,6 @@ export default function ProductModal({
           )}
         </div>
 
-        {/* Galería */}
         {!isEditing ? (
           <div className="relative mb-4 flex items-center justify-center">
             {displayUrl ? (
@@ -476,7 +473,6 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* Precio */}
         {!isEditing && (
           <div className="mt-2 text-center">
             {hasDiscount ? (
@@ -498,7 +494,6 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* Selector de tienda */}
         {canEdit && (
           <div className="mt-4 mb-2 flex items-center justify-center gap-2">
             <button
@@ -520,7 +515,6 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* Tallas */}
         <div className="mb-4">
           <p className="text-center font-semibold mb-4">
             Stock por talla:
@@ -572,21 +566,37 @@ export default function ProductModal({
           </div>
         </div>
 
-        {/* ⭐ CHECKBOX OCULTAR PRODUCTO */}
+        {/* ⭐ CHECKBOXES EXTRAS (OCULTAR Y MUNDIAL 2026) */}
         {canEdit && isEditing && (
-          <div className="mt-4 mb-4 flex items-center gap-3 p-3 bg-gray-100 rounded-lg border">
-            <input
-              type="checkbox"
-              checked={editedHidden}
-              onChange={(e) => setEditedHidden(e.target.checked)}
-            />
-            <label className="text-sm font-semibold">
-              Ocultar este producto para los clientes
+          <div className="mt-4 mb-4 flex flex-col gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Opciones Adicionales</p>
+            
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editedHidden}
+                onChange={(e) => setEditedHidden(e.target.checked)}
+                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Ocultar este producto (No visible al público)
+              </span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editedIsMundial2026}
+                onChange={(e) => setEditedIsMundial2026(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm font-bold text-blue-800">
+                Torneo: Mundial 2026
+              </span>
             </label>
           </div>
         )}
 
-        {/* Acciones */}
         <div className="mt-2 border-t pt-4">
           <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
             {canEdit && isEditing ? (
