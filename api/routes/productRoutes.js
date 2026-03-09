@@ -48,9 +48,13 @@ function diffProduct(prev, next) {
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
   
-  // ⭐ NUEVO: Registrar en historial si se cambió el Mundial 2026
-  if (prev.isMundial2026 !== next.isMundial2026) 
-    changes.push(`Mundial 2026: ${prev.isMundial2026 ? 'Sí' : 'No'} → ${next.isMundial2026 ? 'Sí' : 'No'}`);
+  // 🔥 CORRECCIÓN: Convertir ambos a booleano estricto para evitar el "No -> No"
+  const prevMundial = Boolean(prev.isMundial2026);
+  const nextMundial = Boolean(next.isMundial2026);
+  
+  if (prevMundial !== nextMundial) {
+    changes.push(`Mundial 2026: ${prevMundial ? 'Sí' : 'No'} → ${nextMundial ? 'Sí' : 'No'}`);
+  }
 
   changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
   changes.push(...diffInv('Tienda #2', prev.bodega, next.bodega));

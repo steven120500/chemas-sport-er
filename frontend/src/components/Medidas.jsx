@@ -30,14 +30,8 @@ export default function Medidas({ open, onClose, currentType = "Todos" }) {
     { key: "Player",   label: "Player",   img: playerImg },
     { key: "Fan",      label: "Fan",      img: fanImg },
     { key: "Niño",     label: "Niño",     img: ninoImg },
-    { key: "Mujer",    label: "Mujer",    img: mujerImg },
     { key: "Nacional", label: "Nacional", img: nacionalImg },
-    { key: "Abrigos",  label: "Abrigos",  img: abrigosImg },
     { key: "Retro",    label: "Retro",    img: retroImg },
-    { key: "F1",       label: "F1",       img: f1Img },
-    { key: "NBA",      label: "NBA",      img: nbaImg },
-    { key: "MLB",      label: "MLB",      img: mlbImg },
-    { key: "NFL",      label: "NFL",      img: nflImg },
   ];
 
   const sections = currentType && currentType !== "Todos"
