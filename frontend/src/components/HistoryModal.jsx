@@ -13,6 +13,20 @@ function ymdLocal(d = new Date()){
   return `${y}-${m}-${dd}`;  // YYYY-MM-DD en tu zona horaria
 }
 
+// ⭐ LISTA FIJA DE USUARIOS (Extraída de tus capturas)
+const BASE_USERS = [
+  "Alisson", 
+  "Angie", 
+  "ChemaSportER", // Agrego la versión sin espacio por si acaso
+  "Ema", 
+  "Johan", 
+  "Johanna", 
+  "Jose", 
+  "JuanPa", 
+  "Stef", 
+  "Stefanie"
+];
+
 export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,6 +34,9 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
   const [q, setQ] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => ymdLocal());
+  
+  const [selectedUser, setSelectedUser] = useState("");
+  const [selectedStore, setSelectedStore] = useState("");
 
   const storedUser = useMemo(() => {
     try {
@@ -32,10 +49,15 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
   // Asegura que al ABRIR el modal, la fecha sea hoy local
   useEffect(() => {
-    if (open) setSelectedDate(ymdLocal());
+    if (open) {
+      setSelectedDate(ymdLocal());
+      setSelectedUser("");
+      setSelectedStore("");
+      setQ("");
+    }
   }, [open]);
 
-  // Carga historial cuando cambia fecha o se abre
+  // Carga historial
   useEffect(() => {
     if (!open) return;
     let aborted = false;
@@ -49,8 +71,8 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         const params = new URLSearchParams({
           page: "1",
           limit: "500",
-          date: selectedDate,          // 👈 ya NO sumamos +1
-          _: String(Date.now()),       // evita cache
+          date: selectedDate,          
+          _: String(Date.now()), 
         });
 
         const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
@@ -126,18 +148,41 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     ), { duration: 6000 });
   }
 
+  // ⭐ COMBINAR USUARIOS BASE CON LOS DEL HISTORIAL (Ordenados alfabéticamente)
+  const uniqueUsers = useMemo(() => {
+    const usersFromLogs = logs.map(l => l.user).filter(Boolean);
+    return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
+  }, [logs]);
+
+  // Filtrado
   const filteredLogs = useMemo(() => {
+    let result = logs;
+
     const term = q.trim().toLowerCase();
-    if (!term) return logs;
-    return logs.filter((log) => String(log.item || "").toLowerCase().includes(term));
-  }, [logs, q]);
+    if (term) {
+      result = result.filter((log) => String(log.item || "").toLowerCase().includes(term));
+    }
+
+    if (selectedUser) {
+      result = result.filter((log) => log.user === selectedUser);
+    }
+
+    if (selectedStore) {
+      result = result.filter((log) => {
+        const details = String(log.details || "");
+        return details.includes(selectedStore);
+      });
+    }
+
+    return result;
+  }, [logs, q, selectedUser, selectedStore]);
 
   if (!open) return null;
 
   return (
     <div className="mt-32 mb-24 fixed inset-0 z-50 bg-black/40 flex items-center justify-center py-6">
       <div className="relative bg-white pt-15 p-6 rounded-lg shadow-md max-w-md w-full max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400">
-        {/* Header con calendario dentro */}
+        
         <div className="flex items-center gap-2 pb-4 border-b">
           <h2 className="text-lg font-semibold flex-1">Historial</h2>
 
@@ -158,54 +203,84 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
           </button>
         </div>
 
-        {/* Controles secundarios */}
-        <div className="flex flex-wrap items-center gap-2 py-3">
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por producto..."
-            className="border rounded px-3 py-2 flex-1 min-w-[220px]"
-          />
+        <div className="flex flex-col gap-3 py-4 border-b border-gray-100 mb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por producto..."
+              className="border rounded px-3 py-2 flex-1 min-w-[220px] text-sm"
+            />
 
-          {isSuperUser && (
-            <button
-              onClick={askClear}
-              disabled={loading}
-              className="ml-auto bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 disabled:opacity-50"
+            {isSuperUser && (
+              <button
+                onClick={askClear}
+                disabled={loading}
+                className="ml-auto bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 disabled:opacity-50 text-sm font-semibold"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="border rounded px-2 py-1 text-sm flex-1 bg-gray-50 focus:ring-black"
             >
-              Limpiar
-            </button>
-          )}
+              <option value="">Todos los usuarios</option>
+              {/* ⭐ AQUÍ SE DIBUJAN TODOS LOS USUARIOS */}
+              {uniqueUsers.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStore}
+              onChange={(e) => setSelectedStore(e.target.value)}
+              className="border rounded px-2 py-1 text-sm flex-1 bg-gray-50 focus:ring-black"
+            >
+              <option value="">Todas las tiendas</option>
+              <option value="Tienda #1">Tienda #1</option>
+              <option value="Tienda #2">Tienda #2</option>
+            </select>
+          </div>
         </div>
 
-        {/* Body */}
         <div className="py-2">
-          {loading && <p className="text-gray-500">Cargando...</p>}
-          {!loading && errMsg && <p className="text-red-600">{errMsg}</p>}
+          {loading && <p className="text-gray-500 text-center py-4">Cargando...</p>}
+          {!loading && errMsg && <p className="text-red-600 text-center py-4">{errMsg}</p>}
 
           {!loading && !errMsg && filteredLogs.length === 0 && (
-            <p className="text-gray-600">
-              {q ? <>No hay resultados para “{q}”.</> : <>No hay cambios registrados.</>}
+            <p className="text-gray-600 text-center py-4 bg-gray-50 rounded mt-2">
+              {q || selectedUser || selectedStore ? (
+                <>No hay resultados para estos filtros.</>
+              ) : (
+                <>No hay cambios registrados este día.</>
+              )}
             </p>
           )}
 
           {!loading && !errMsg && filteredLogs.length > 0 && (
             <ul className="space-y-3 mt-2">
               {filteredLogs.map((log, idx) => (
-                <li key={log._id || idx} className="border rounded p-3 text-sm">
+                <li key={log._id || idx} className="border rounded p-3 text-sm hover:shadow-sm transition-shadow">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <strong>{log.user || "Desconocido"}</strong>
-                    <span className="text-gray-700">{log.action || "acción"}</span>
+                    <strong className="text-black">{log.user || "Desconocido"}</strong>
+                    <span className="text-gray-600 font-medium bg-gray-100 px-2 py-0.5 rounded text-xs">
+                      {log.action || "acción"}
+                    </span>
                   </div>
 
-                  <em className="text-gray-700 block">{log.item || "—"}</em>
-                  <small className="text-gray-500 block mt-1">
+                  <em className="text-gray-800 font-semibold block mt-1">{log.item || "—"}</em>
+                  <small className="text-gray-400 block mt-1">
                     {log.date ? new Date(log.date).toLocaleString() : ""}
                   </small>
 
                   {log.details && (
-                    <pre className="mt-2 bg-gray-50 p-2 rounded text-[11px] overflow-x-auto">
+                    <pre className="mt-2 bg-gray-50 border border-gray-100 p-2 rounded text-[11px] overflow-x-auto text-gray-700 font-mono whitespace-pre-wrap">
                       {typeof log.details === "string"
                         ? log.details
                         : JSON.stringify(log.details, null, 2)}
