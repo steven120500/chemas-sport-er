@@ -1,4 +1,3 @@
-// src/components/ProductCard.jsx
 import { motion } from "framer-motion";
 import { FaFire } from "react-icons/fa";
 
@@ -31,18 +30,14 @@ export default function ProductCard({ product, onClick, user }) {
   const traspasosUrgentes = [];
   const traspasosSugeridos = [];
 
-  // ⭐ NUEVO: Variable para calcular el stock total
   let totalInventory = 0;
 
-  // Modificamos el ciclo para que sume el inventario para TODOS (clientes y admins)
   for (const size of sizesToCheck) {
     const stockQty = Number(product.stock?.[size] ?? 0);
     const bodeQty = Number(product.bodega?.[size] ?? 0);
 
-    // Sumamos al total general
     totalInventory += (stockQty + bodeQty);
 
-    // Las advertencias detalladas siguen siendo solo para los admins
     if (user?.isSuperUser) {
       if (stockQty === 0) stockAgotadas.push(size);
       if (stockQty === 1) stockQueda1.push(size);
@@ -57,7 +52,6 @@ export default function ProductCard({ product, onClick, user }) {
     }
   }
 
-  // ⭐ NUEVO: Si el inventario total es 0, está completamente agotado
   const isTotalAgotado = totalInventory === 0;
 
   const hasDiscount =
@@ -65,25 +59,38 @@ export default function ProductCard({ product, onClick, user }) {
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
 
+  // ⭐ NUEVO: Lógica para saber si tiene 5 días o menos de creado
+  const isNuevo = product.createdAt 
+    ? (new Date() - new Date(product.createdAt)) <= (5 * 24 * 60 * 60 * 1000) 
+    : false;
+
   return (
     <motion.div
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.97 }}
-      // ⭐ NUEVO: Si está agotado lo hacemos ver un poquito "apagado" (grayscale)
       className={`relative rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : "bg-white"}
         ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-80 grayscale-[30%]" : ""}
       `}
       onClick={() => onClick(product)}
     >
-      {/* 🔸 Tipo */}
-      {product.type && (
-        <div className="absolute top-2 left-2 z-20">
+      
+      {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS (Tipo y Nuevo) */}
+      <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 items-start">
+        {/* 🔸 Tipo */}
+        {product.type && (
           <div className="text-white text-xs font-semibold px-3 py-1 rounded-full shadow bg-black">
             {product.type}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* 🌟 Etiqueta Nuevo */}
+        {isNuevo && (
+          <div className="etiqueta-nuevo text-white text-xs font-bold px-3 py-1 rounded-full shadow-md bg-purple-600">
+            ¡Nuevo!
+          </div>
+        )}
+      </div>
 
       {/* 🟩 Oferta */}
       {hasDiscount && (

@@ -255,3 +255,13 @@ button:focus-visible {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.etiqueta-nuevo {
+  /* Puedes agregarle un pequeño latido o brillito aquí si quieres */
+  animation: pulse-soft 2s infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
