@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { toast } from "react-toastify";
-import { FaTimes, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaTimes, FaChevronLeft, FaChevronRight, FaStore, FaWarehouse } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -56,11 +56,9 @@ export default function ProductModal({
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [loading, setLoading] = useState(false);
 
-  // Estados extras (Oculto y Mundial 2026)
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
-  const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false); // ⭐ NUEVO ESTADO
+  const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
 
-  // Galería
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
       return product.images
@@ -86,9 +84,8 @@ export default function ProductModal({
     setEditedStock({ ...(product?.stock || {}) });
     setEditedBodega({ ...(product?.bodega || {}) });
 
-    // 🔥 sincronizar hidden y mundial 2026 cuando cambie el producto
     setEditedHidden(product?.hidden || false);
-    setEditedIsMundial2026(product?.isMundial2026 || false); // ⭐ SINCRONIZAR AQUÍ
+    setEditedIsMundial2026(product?.isMundial2026 || false); 
 
     setLocalImages(
       product?.images?.length
@@ -115,7 +112,6 @@ export default function ProductModal({
     };
   }, []);
 
-  // Guardar cambios
   const handleSave = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -154,8 +150,6 @@ export default function ProductModal({
         imageSrc2:
           typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: (editedName || "").trim(),
-
-        // ⭐ AQUÍ SE ENVÍAN AL BACKEND
         hidden: editedHidden,
         isMundial2026: editedIsMundial2026, 
       };
@@ -186,7 +180,6 @@ export default function ProductModal({
     }
   };
 
-  // Eliminar producto
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -306,22 +299,22 @@ export default function ProductModal({
       >
         <button
           onClick={onClose}
-          className="absolute top-6 right-2 bg-black text-white rounded p-1"
+          className="absolute top-6 right-2 bg-black text-white rounded p-1 z-10 hover:bg-red-600 transition-colors"
           title="Cerrar"
         >
-          <FaTimes size={30} />
+          <FaTimes size={24} />
         </button>
 
-        <div className="mt-12 mb-2 text-center">
+        <div className="mt-8 mb-4 text-center">
           {isEditing && canEdit ? (
             <>
-              <label className="block text-xs text-gray-500 mb-1">
+              <label className="block text-xs text-gray-500 mb-1 font-bold uppercase tracking-wide">
                 Tipo
               </label>
               <select
                 value={editedType}
                 onChange={(e) => setEditedType(e.target.value)}
-                className="w-full px-3 py-2 border rounded mb-3"
+                className="w-full px-3 py-2 border border-gray-300 rounded mb-3 bg-gray-50 focus:ring-black focus:border-black font-semibold text-center"
               >
                 {[
                   "Player",
@@ -343,44 +336,47 @@ export default function ProductModal({
                 ))}
               </select>
 
-              <label className="block text-xs text-gray-500 mb-1">
+              <label className="block text-xs text-gray-500 mb-1 font-bold uppercase tracking-wide">
                 Nombre
               </label>
               <input
                 type="text"
-                className="text-center border-b-2 w-full font-semibold"
+                className="text-center border-b-2 border-gray-300 w-full font-bold text-lg focus:border-black outline-none pb-1"
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
               />
 
-              <label className="block text-xs text-gray-500 mb-1 mt-4">
-                Precio normal
-              </label>
-              <input
-                type="number"
-                className="text-center border-b-2 w-full font-semibold text-2xl"
-                value={editedPrice}
-                onChange={(e) => setEditedPrice(e.target.value)}
-              />
-
-              <label className="block text-xs text-gray-500 mb-1 mt-4">
-                Precio con descuento
-              </label>
-              <input
-                type="number"
-                className="text-center border-b-2 w-full font-semibold text-2xl text-green-600"
-                value={editedDiscountPrice}
-                onChange={(e) =>
-                  setEditedDiscountPrice(e.target.value)
-                }
-              />
+              <div className="flex justify-between gap-4 mt-4">
+                  <div className="w-1/2">
+                    <label className="block text-xs text-gray-500 mb-1 font-bold uppercase tracking-wide">
+                        Precio
+                    </label>
+                    <input
+                        type="number"
+                        className="text-center border border-gray-300 rounded p-2 w-full font-bold text-lg focus:border-black outline-none"
+                        value={editedPrice}
+                        onChange={(e) => setEditedPrice(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-1/2">
+                    <label className="block text-xs text-green-600 mb-1 font-bold uppercase tracking-wide">
+                        Descuento
+                    </label>
+                    <input
+                        type="number"
+                        className="text-center border border-green-300 bg-green-50 rounded p-2 w-full font-bold text-lg text-green-700 focus:border-green-600 outline-none"
+                        value={editedDiscountPrice}
+                        onChange={(e) => setEditedDiscountPrice(e.target.value)}
+                    />
+                  </div>
+              </div>
             </>
           ) : (
             <>
-              <span className="block text-xs uppercase tracking-wide text-gray-500 font-semibold">
+              <span className="inline-block bg-black text-white px-3 py-1 rounded-full text-xs font-bold mb-2">
                 {viewProduct?.type}
               </span>
-              <h2 className="text-xl font-extrabold">
+              <h2 className="text-xl md:text-2xl font-black text-gray-800 leading-tight">
                 {viewProduct?.name}
               </h2>
             </>
@@ -388,17 +384,17 @@ export default function ProductModal({
         </div>
 
         {!isEditing ? (
-          <div className="relative mb-4 flex items-center justify-center">
+          <div className="relative mb-6 flex items-center justify-center bg-gray-50 rounded-lg p-2">
             {displayUrl ? (
               <img
                 src={displayUrl}
                 alt={viewProduct?.name || "Producto"}
-                className="rounded-lg max-h-[400px] object-contain"
+                className="rounded-lg max-h-[350px] object-contain drop-shadow-md"
                 loading="lazy"
               />
             ) : (
-              <div className="h-[300px] w-full grid place-items-center text-gray-400">
-                Sin imagen
+              <div className="h-[300px] w-full grid place-items-center text-gray-400 bg-gray-100 rounded-lg">
+                <span className="font-semibold">Sin imagen</span>
               </div>
             )}
 
@@ -412,9 +408,9 @@ export default function ProductModal({
                         localImages.length
                     )
                   }
-                  className="absolute left-0 z-10 bg-black text-white px-3 py-1 rounded-full"
+                  className="absolute left-2 z-10 bg-black/70 hover:bg-black text-white p-2 rounded-full transition-colors"
                 >
-                  <FaChevronLeft />
+                  <FaChevronLeft size={18} />
                 </button>
                 <button
                   onClick={() =>
@@ -423,241 +419,298 @@ export default function ProductModal({
                         (i + 1) % localImages.length
                     )
                   }
-                  className="absolute right-0 z-10 bg-black text-white px-3 py-1 rounded-full"
+                  className="absolute right-2 z-10 bg-black/70 hover:bg-black text-white p-2 rounded-full transition-colors"
                 >
-                  <FaChevronRight />
+                  <FaChevronRight size={18} />
                 </button>
+                
+                {/* Indicador de imagen */}
+                <div className="absolute bottom-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                    {idx + 1} / {localImages.length}
+                </div>
               </>
             )}
           </div>
         ) : (
-          <div className="flex gap-4 justify-center flex-wrap mb-4">
+          <div className="flex gap-4 justify-center flex-wrap mb-6 bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300">
             {localImages.map((img, i) => {
               const thumbUrl = img?.src
                 ? transformCloudinary(img.src, THUMB_MAX_W)
                 : "";
               return (
-                <div key={i} className="relative">
+                <div key={i} className="relative group">
                   <img
                     src={thumbUrl || img.src}
                     alt={`img-${i}`}
-                    className="h-48 rounded object-contain"
+                    className="h-32 w-32 object-cover rounded shadow-sm"
                     loading="lazy"
                   />
                   <button
                     onClick={() => handleImageRemove(i)}
-                    className="absolute top-0 right-0 bg-black text-white rounded-full p-1 text-sm"
+                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1.5 shadow-md hover:bg-red-700 transition-transform transform hover:scale-110"
                     title="Quitar"
                   >
-                    <FaTimes />
+                    <FaTimes size={12} />
                   </button>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      handleImageChange(e, i)
-                    }
-                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-1 rounded-b">
+                      <label className="text-white text-xs cursor-pointer hover:underline font-semibold">
+                          Cambiar
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleImageChange(e, i)}
+                          />
+                      </label>
+                  </div>
                 </div>
               );
             })}
             {localImages.length < 2 && (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  handleImageChange(e, localImages.length)
-                }
-              />
+              <label className="h-32 w-32 flex flex-col items-center justify-center border-2 border-dashed border-gray-400 text-gray-500 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+                <span className="text-2xl mb-1">+</span>
+                <span className="text-xs font-semibold">Agregar Foto</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleImageChange(e, localImages.length)}
+                />
+              </label>
             )}
           </div>
         )}
 
         {!isEditing && (
-          <div className="mt-2 text-center">
+          <div className="mb-6 text-center">
             {hasDiscount ? (
-              <>
-                <p className="line-through text-gray-400">
-                  ₡{Number(viewProduct.price).toLocaleString("de-DE")}
-                </p>
-                <p className="text-xl font-extrabold text-green-600">
-                  ₡{Number(viewProduct.discountPrice).toLocaleString(
-                    "de-DE"
-                  )}
-                </p>
-              </>
+              <div className="flex flex-col items-center justify-center">
+                  <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full mb-1 uppercase tracking-wider">
+                      En Oferta
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <p className="line-through text-gray-400 text-lg">
+                        ₡{Number(viewProduct.price).toLocaleString("de-DE")}
+                    </p>
+                    <p className="text-3xl font-black text-green-600 drop-shadow-sm">
+                        ₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}
+                    </p>
+                  </div>
+              </div>
             ) : (
-              <p className="text-xl font-extrabold text-black">
+              <p className="text-3xl font-black text-black">
                 ₡{Number(viewProduct.price).toLocaleString("de-DE")}
               </p>
             )}
           </div>
         )}
 
-        {canEdit && (
-          <div className="mt-4 mb-2 flex items-center justify-center gap-2">
-            <button
-              className={`px-3 py-1 rounded border text-sm ${
-                invMode === "stock" ? "bg-black text-white" : ""
-              }`}
-              onClick={() => setInvMode("stock")}
-            >
-              Tienda #1
-            </button>
-            <button
-              className={`px-3 py-1 rounded border text-sm ${
-                invMode === "bodega" ? "bg-black text-white" : ""
-              }`}
-              onClick={() => setInvMode("bodega")}
-            >
-              Tienda #2
-            </button>
-          </div>
-        )}
+        {/* ⭐ SECCIÓN DE INVENTARIO MEJORADA */}
+        <div className="mb-6 border-t pt-4">
+            
+            {/* Si NO somos admin editando, mostramos vista normal */}
+            {!canEdit || !isEditing ? (
+                <>
+                    <p className="text-center text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">
+                        Disponibilidad
+                    </p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {tallasVisibles.map((size) => {
+                            const total = getTotalBySize(size);
+                            const isAgotado = total === 0;
+                            return (
+                                <div
+                                    key={size}
+                                    className={`text-center border rounded p-2 transition-colors ${
+                                        isAgotado ? 'bg-gray-50 border-gray-200' : 'bg-white border-black shadow-sm'
+                                    }`}
+                                >
+                                    <label className={`block text-base font-black ${isAgotado ? 'text-gray-400' : 'text-black'}`}>
+                                        {size}
+                                    </label>
+                                    <p className={`text-xs mt-1 font-semibold ${
+                                        isAgotado ? 'text-red-500' : total === 1 ? 'text-orange-500' : 'text-green-600'
+                                    }`}>
+                                        {isAgotado ? 'Agotado' : `${total} disp.`}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
+            ) : (
+                /* 🔥 MODO EDICIÓN DE INVENTARIO SÚPER CLARO */
+                <div className="bg-gray-50 rounded-xl p-4 border-2 border-dashed border-gray-300">
+                    <p className="text-center font-black text-gray-800 uppercase tracking-widest mb-3 text-sm">
+                        Modificando Inventario
+                    </p>
+                    
+                    {/* Botones de Tienda Gigantes */}
+                    <div className="flex gap-2 mb-4">
+                        <button
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                                invMode === "stock" 
+                                ? "bg-black border-black text-white shadow-lg transform scale-[1.02]" 
+                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
+                            }`}
+                            onClick={() => setInvMode("stock")}
+                        >
+                            <FaStore size={20} className="mb-1" />
+                            <span className="font-bold text-sm">Tienda #1</span>
+                        </button>
+                        
+                        <button
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                                invMode === "bodega" 
+                                ? "bg-indigo-600 border-indigo-600 text-white shadow-lg transform scale-[1.02]" 
+                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
+                            }`}
+                            onClick={() => setInvMode("bodega")}
+                        >
+                            <FaWarehouse size={20} className="mb-1" />
+                            <span className="font-bold text-sm">Tienda #2</span>
+                        </button>
+                    </div>
 
-        <div className="mb-4">
-          <p className="text-center font-semibold mb-4">
-            Stock por talla:
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {tallasVisibles.map((size) => {
-              if (canEdit) {
-                const inv = getInventoryToShow();
-                return (
-                  <div
-                    key={size}
-                    className="text-center bg-white border rounded p-2"
-                  >
-                    <label className="block text-sm font-medium">
-                      {size}
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full border border-gray-300 rounded px-1 text-center"
-                        value={inv[size] ?? ""}
-                        onChange={(e) =>
-                          handleStockChange(size, e.target.value)
-                        }
-                      />
-                    ) : (
-                      <p className="text-xs">
-                        {inv[size] || 0} disponibles
-                      </p>
-                    )}
-                  </div>
-                );
-              } else {
-                const total = getTotalBySize(size);
-                return (
-                  <div
-                    key={size}
-                    className="text-center bg-white border rounded p-2"
-                  >
-                    <label className="block text-sm font-medium">
-                      {size}
-                    </label>
-                    <p className="text-xs">{total} disponibles</p>
-                  </div>
-                );
-              }
-            })}
-          </div>
+                    {/* Contenedor de tallas coloreado según tienda */}
+                    <div className={`p-4 rounded-lg border-2 shadow-inner transition-colors duration-300 ${
+                        invMode === "stock" ? "bg-gray-100 border-gray-300" : "bg-indigo-50 border-indigo-200"
+                    }`}>
+                        <div className="flex items-center justify-center mb-4 text-sm font-bold">
+                            Estás editando: 
+                            <span className={`ml-2 px-2 py-1 rounded text-white ${invMode === "stock" ? "bg-black" : "bg-indigo-600"}`}>
+                                {invMode === "stock" ? "TIENDA #1" : "TIENDA #2 (BODEGA)"}
+                            </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                            {tallasVisibles.map((size) => {
+                                const inv = getInventoryToShow();
+                                const currentVal = inv[size] ?? 0;
+                                return (
+                                    <div key={size} className="relative">
+                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-white px-2 rounded-full border border-gray-300 text-xs font-bold text-gray-700 shadow-sm z-10">
+                                            {size}
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className={`w-full h-12 pt-3 border-2 rounded-lg text-center font-black text-lg focus:outline-none transition-colors ${
+                                                invMode === "stock" 
+                                                ? "focus:border-black text-black" 
+                                                : "focus:border-indigo-500 text-indigo-900"
+                                            } ${currentVal === 0 ? 'bg-white opacity-60' : 'bg-white shadow-sm'}`}
+                                            value={currentVal === 0 ? "" : currentVal}
+                                            placeholder="0"
+                                            onChange={(e) => handleStockChange(size, e.target.value)}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
 
-        {/* ⭐ CHECKBOXES EXTRAS (OCULTAR Y MUNDIAL 2026) */}
         {canEdit && isEditing && (
-          <div className="mt-4 mb-4 flex flex-col gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Opciones Adicionales</p>
+          <div className="mb-6 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-200">
+            <p className="text-xs text-yellow-800 font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                ⚙️ Opciones del Sistema
+            </p>
             
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editedHidden}
-                onChange={(e) => setEditedHidden(e.target.checked)}
-                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Ocultar este producto (No visible al público)
-              </span>
-            </label>
+            <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-yellow-100 rounded transition-colors">
+                <div className="relative flex items-center">
+                    <input
+                        type="checkbox"
+                        checked={editedHidden}
+                        onChange={(e) => setEditedHidden(e.target.checked)}
+                        className="sr-only"
+                    />
+                    <div className={`w-10 h-6 rounded-full transition-colors ${editedHidden ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedHidden ? 'transform translate-x-4' : ''}`}></div>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-800">Ocultar Producto</span>
+                    <span className="text-xs text-gray-500">Nadie podrá verlo en la tienda.</span>
+                </div>
+                </label>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editedIsMundial2026}
-                onChange={(e) => setEditedIsMundial2026(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm font-bold text-blue-800">
-                Torneo: Mundial 2026
-              </span>
-            </label>
+                <label className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-yellow-100 rounded transition-colors">
+                <div className="relative flex items-center">
+                    <input
+                        type="checkbox"
+                        checked={editedIsMundial2026}
+                        onChange={(e) => setEditedIsMundial2026(e.target.checked)}
+                        className="sr-only"
+                    />
+                    <div className={`w-10 h-6 rounded-full transition-colors ${editedIsMundial2026 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsMundial2026 ? 'transform translate-x-4' : ''}`}></div>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-800">Torneo: Mundial 2026</span>
+                    <span className="text-xs text-gray-500">Aparecerá en el filtro especial.</span>
+                </div>
+                </label>
+            </div>
           </div>
         )}
 
-        <div className="mt-2 border-t pt-4">
-          <div className="mb-10 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto">
+        <div className="mt-4 border-t border-gray-200 pt-6 pb-2">
+          <div className="flex flex-col gap-3 max-w-sm mx-auto">
             {canEdit && isEditing ? (
               <button
-                className="col-span-2 bg-green-600 text-black px-3 py-2 text-sm rounded font-bold"
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-base rounded-lg font-black shadow-lg transition-transform transform hover:-translate-y-1"
                 onClick={handleSave}
                 disabled={loading}
               >
-                {loading ? "Guardando..." : "Guardar"}
+                {loading ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
               </button>
             ) : canEdit ? (
               <button
-                className="bg-green-700 text-white px-3 py-2 text-sm rounded font-bold"
+                className="w-full bg-black hover:bg-gray-800 text-white py-3 text-base rounded-lg font-black shadow-md transition-colors"
                 onClick={() => setIsEditing(true)}
               >
-                Editar
+                MODIFICAR PRODUCTO
               </button>
             ) : null}
 
             {canDelete && (
               <button
-                className="bg-red-600 text-white px-3 py-2 text-sm rounded font-bold"
+                className="w-full bg-white border-2 border-red-500 text-red-600 hover:bg-red-50 py-2 text-sm rounded-lg font-bold transition-colors"
                 onClick={() => {
                   toastHOT(
                     (t) => (
-                      <span>
-                        ¿Seguro que quieres eliminar?
-                        <div className="mt-2 flex gap-2 justify-end">
+                      <div className="text-center">
+                        <p className="font-bold text-gray-800 mb-2">¿Eliminar este producto permanentemente?</p>
+                        <div className="flex gap-2 justify-center">
                           <button
                             onClick={() => {
                               toastHOT.dismiss(t.id);
                               handleDelete();
                             }}
-                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
                           >
-                            Sí
+                            Eliminar
                           </button>
                           <button
                             onClick={() => toastHOT.dismiss(t.id)}
-                            className="bg-gray-200 px-3 py-1 rounded text-sm"
+                            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-bold hover:bg-gray-300"
                           >
-                            No
+                            Cancelar
                           </button>
                         </div>
-                      </span>
+                      </div>
                     ),
                     { duration: 6000 }
                   );
                 }}
                 disabled={loading}
               >
-                {loading ? "Eliminando..." : "Eliminar"}
+                ELIMINAR PRODUCTO
               </button>
             )}
-
-            <button
-              className="bg-black text-white px-3 py-2 text-sm rounded font-bold col-span-2 mt-2"
-              onClick={onClose}
-            >
-              Cerrar
-            </button>
           </div>
         </div>
       </div>
