@@ -34,27 +34,22 @@ const Bienvenido = ({ onNavigate }) => {
       filter: 'Nuevo'
     },
     { 
-      id: 'balón',      
+      id: 'balon', // Corregido: sin tilde para coincidir con la lógica
       label: 'BALÓN',
       buttonText: 'Ver Balones',
-      img: '/Bola.png', // Asegúrate que coincida con el nombre real en public     
+      img: '/Bola.png',     
       filter: 'Balón'
     },
   ];
 
   useEffect(() => {
-    // Ciclo de 6 segundos en total
     const interval = setInterval(() => {
-      setAnimating(true); // 1. Inicia transición (Sale Camiseta, Entra Logo)
-      
-      // Le damos 1.5 segundos al logo para lucirse suavemente
+      setAnimating(true);
       setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % categories.length); // 2. Cambia datos
-        setAnimating(false); // 3. Termina transición (Sale Logo, Entra Nueva Camiseta)
+        setCurrentIndex((prev) => (prev + 1) % categories.length);
+        setAnimating(false);
       }, 1500); 
-      
     }, 6000); 
-
     return () => clearInterval(interval);
   }, [categories.length]);
 
@@ -72,82 +67,67 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <div 
-      /* ALTURA CONTROLADA:
-         - h-[75vh]: En celular deja espacio abajo para el buscador.
-         - md:h-[85vh]: En PC también deja espacio.
-      */
       className="relative w-full h-[75vh] md:h-[85vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-16"
       style={{
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
       }}
     >
-      
-      <div className="absolute inset-0 -z-10 bg-[url('/FondoMovil.jpg')] md:bg-[url('/FondoCompu.jpg')] bg-cover bg-center"></div>
       <div className="absolute inset-0 bg-black/40 z-0"></div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-0 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4 mt-10 md:mt-0">
+      <div className="relative z-10 flex flex-col justify-center items-center w-full max-w-4xl px-4">
         
-        {/* =======================================================
-            1. LOGO ANIMADO (Transición Suave)
-           ======================================================= */}
+        {/* 1. LOGO ANIMADO (Fijo al centro) */}
         <div className={`
-          absolute z-0 flex justify-center items-center
+          absolute flex justify-center items-center pointer-events-none
           transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]
-          ${animating 
-            ? 'opacity-100 scale-110 rotate-0'   // Al aparecer
-            : 'opacity-0 scale-50 -rotate-12'}   // Al desaparecer
+          ${animating ? 'opacity-100 scale-110' : 'opacity-0 scale-50'}
         `}>
           <img 
             src="/logo.png" 
-            alt="ChemaSport Logo"
+            alt="Logo"
             className="w-32 md:w-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
           />
         </div>
 
-        {/* =======================================================
-            2. CAMISETA + BOTÓN
-           ======================================================= */}
+        {/* 2. CONTENEDOR FIJO DE IMAGEN + BOTÓN */}
         <div className={`
-            relative w-full flex justify-center items-center
-            transition-all duration-1000 ease-in-out transform
-            ${animating ? 'opacity-0 scale-95 blur-xl' : 'opacity-100 scale-100 blur-0'}
+            relative flex justify-center items-center
+            transition-all duration-1000 ease-in-out
+            /* Mantenemos una altura mínima fija para que nada salte al cambiar de imagen */
+            h-[45vh] md:h-[60vh] w-full
+            ${animating ? 'opacity-0 blur-xl scale-95' : 'opacity-100 blur-0 scale-100'}
         `}>
           
-          <img 
-            src={currentCat.img} 
-            alt={currentCat.label}
-            className={`
-              object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]
-              
-              /* 🔥 AQUÍ ESTÁ EL CAMBIO DE TAMAÑOS 🔥 */
-              ${currentCat.id === 'balon' 
-                  ? 'w-24 md:w-80'   /* Balón: Pequeño (45%) */
-                  : 'w-40 md:w-96'   /* Camisetas: Grandes (80%) */
-              }
-              
-              h-auto
-            `}
-          />
+          {/* Imagen con tamaño controlado */}
+          <div className="flex justify-center items-center w-full h-full">
+            <img 
+              src={currentCat.img} 
+              alt={currentCat.label}
+              className={`
+                object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)]
+                transition-all duration-500
+                /* Tamaños estrictos para evitar saltos */
+                ${currentCat.id === 'balon' 
+                    ? 'h-[60%] md:h-[75%]' 
+                    : 'h-full w-auto'
+                }
+              `}
+            />
+          </div>
           
-          {/* BOTÓN FLOTANTE */}
+          {/* BOTÓN FLOTANTE (Posicionamiento fijo relativo al contenedor) */}
           <button
             onClick={() => handleFilter(currentCat.filter)}
             className="
               absolute 
-              /* MÓVIL: Abajo a la derecha */
-              bottom-0 right-2 
-              
-              /* PC: Acercado más a la camiseta */
-              md:bottom-20 md:right-4 
-              
+              bottom-0 right-0 md:right-10
               bg-black text-white 
               px-6 py-2 md:px-10 md:py-4 
               rounded-full font-bold text-lg md:text-xl 
-              shadow-[0_10px_30px_rgba(0,0,0,0.5)] 
-              border border-white/10
-              hover:bg-zinc-900 hover:scale-105 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] 
-              transition-all duration-300
+              shadow-2xl border border-white/10
+              hover:bg-zinc-900 hover:scale-105 transition-all duration-300
+              whitespace-nowrap z-20
             "
           >
             {currentCat.buttonText}
@@ -155,7 +135,6 @@ const Bienvenido = ({ onNavigate }) => {
         </div>
 
       </div>
-
     </div>
   );
 };
