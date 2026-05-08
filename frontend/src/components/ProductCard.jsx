@@ -85,8 +85,19 @@ export default function ProductCard({ product, onClick, user }) {
       onClick={() => onClick(product)}
     >
       
+      
+        {/* 🏆 Etiqueta Mundial */}
+        {isMundial && (
+          <div className="text-black text-center text-xs bottom-3 -left-2 font-extrabold px-3 py-1  shadow-md bg-gradient-to-r from-yellow-300 to-yellow-500 border border-yellow-200">
+            Mundial 2026
+          </div>
+        )}
+      
+
+
+
       {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS */}
-      <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 items-start">
+      <div className="absolute top-7 left-2 z-20 flex flex-col gap-2 items-start">
         
         {/* 🔸 Tipo */}
         {product.type && (
@@ -102,12 +113,7 @@ export default function ProductCard({ product, onClick, user }) {
           </div>
         )}
 
-        {/* 🏆 Etiqueta Mundial */}
-        {isMundial && (
-          <div className="text-black text-xs font-extrabold px-3 py-1 rounded-full shadow-md bg-gradient-to-r from-yellow-300 to-yellow-500 border border-yellow-200">
-            Mundial 2026
-          </div>
-        )}
+        
       </div>
 
       {/* 🟩 Oferta */}

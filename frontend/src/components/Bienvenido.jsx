@@ -79,7 +79,7 @@ const Bienvenido = ({ onNavigate }) => {
     <div 
       className="relative w-full h-[75vh] md:h-[85vh] bg-cover bg-center bg-no-repeat overflow-hidden flex flex-col justify-center items-center font-sans pb-16"
       style={{
-        backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.jpg' : '/FondoCompu.jpg'})`
+        backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.png' : '/FondoCompu.png'})`
       }}
     >
       <div className="absolute inset-0 bg-black/40 z-0"></div>
