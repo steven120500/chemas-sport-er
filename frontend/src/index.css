@@ -189,10 +189,10 @@ button:focus-visible {
   display: inline-block;
   background: linear-gradient(
     110deg,
-    #7a2e00 0%,     /* naranja oscuro */
-    #ff8c00 40%,    /* naranja medio */
-    #ffc27a 50%,    /* reflejo claro */
-    #ff8c00 60%,    /* vuelta al medio */
+    #7a1600 0%,     /* naranja oscuro */
+    #ff2600 40%,    /* naranja medio */
+    #bd120c 50%,    /* reflejo claro */
+    #941a07 60%,    /* vuelta al medio */
     #7a2e00 100%    /* oscuro */
   );
   background-size: 200% 100%;
@@ -264,4 +264,21 @@ button:focus-visible {
 @keyframes pulse-soft {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
+}
+
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 10s linear infinite;
 }

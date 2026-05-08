@@ -1,14 +1,11 @@
-// src/components/Header.jsx
-import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
-
 import { FaUser } from "react-icons/fa";
 import UserDropDown from "./UserDropDown";
 
 export default function Header({
   onLoginClick,
   onLogout,
-  onLogoClick, // callback para volver al inicio
+  onLogoClick, 
   user,
   canSeeHistory,
   isSuperUser,
@@ -16,33 +13,53 @@ export default function Header({
   setShowUserListModal,
   setShowHistoryModal,
 }) {
-  // 🟢 Estado que alterna entre blanco y negro
-  const [isDark, setIsDark] = useState(false);
-
-  // 🔁 Cambia cada 3 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsDark((prev) => !prev);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <header
-      className={`relative shadow-md px-2 sm:px-6 py-2 sm:py-6 overflow-hidden min-h-[260px] transition-all duration-1000 ${
-        isDark ? "bg-black" : "bg-white"
-      }`}
+      className="relative shadow-xl px-2 sm:px-6 py-2 sm:py-6 overflow-hidden min-h-[260px] animate-metal-shine"
+      style={{
+        background: 'linear-gradient(110deg, #b8860b 0%, #e6be8a 25%, #f7e7ce 50%, #e6be8a 75%, #b8860b 100%)',
+        backgroundSize: '200% auto',
+      }}
     >
-      {/* Fondo decorativo opcional */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-1000 ${
-          isDark ? "opacity-20" : "opacity-70"
-        }`}
-        style={{
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      ></div>
+      <style>
+        {`
+          /* Animación de reflejo metálico en el fondo */
+          @keyframes metalShine {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+          }
+          .animate-metal-shine {
+            animation: metalShine 8s linear infinite;
+          }
+
+          /* Efecto de destello de luz cruzando el header */
+          .shimmer-overlay::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(
+              to right,
+              transparent,
+              rgba(255, 255, 255, 0.4),
+              transparent
+            );
+            transform: skewX(-25deg);
+            animation: shimmer 5s infinite;
+          }
+
+          @keyframes shimmer {
+            0% { left: -150%; }
+            30% { left: 150%; }
+            100% { left: 150%; }
+          }
+        `}
+      </style>
+
+      {/* Capa de destello animado */}
+      <div className="absolute inset-0 shimmer-overlay pointer-events-none"></div>
 
       {/* Contenido principal */}
       <div className="relative z-10 flex items-center justify-between w-full">
@@ -55,16 +72,12 @@ export default function Header({
           <img
             src={logo}
             alt="Logo Chemas Sport"
-            className="h-14 sm:h-20 transition-transform duration-700 hover:scale-105"
+            className="h-14 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)]"
           />
         </button>
 
         {/* Título centrado */}
-        <h1
-          className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-700 ${
-            isDark ? "text-white" : "text-black"
-          }`}
-        >
+        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-black tracking-tighter text-black uppercase drop-shadow-md">
           ChemaSport ER
         </h1>
 
@@ -85,11 +98,7 @@ export default function Header({
             <button
               onClick={onLoginClick}
               title="Iniciar sesión / Registrarse"
-              className={`rounded-full p-3 shadow-lg transition-all duration-700 ${
-                isDark
-                  ? "bg-white text-black hover:bg-gray-200"
-                  : "bg-black text-white hover:bg-gray-800"
-              }`}
+              className="rounded-full p-3 shadow-2xl transition-all duration-300 bg-black text-white hover:bg-zinc-900 border border-yellow-500/50"
             >
               <FaUser size={18} />
             </button>

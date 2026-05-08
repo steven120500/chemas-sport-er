@@ -88,13 +88,13 @@ export default function FilterBar({
             }
             else if (cat.value === "Mundial 2026") {
               btnClass = isActive 
-                ? "bg-blue-600 border-blue-600 text-white shadow-md scale-105" 
-                : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100";
+                ? "bg-yellow-400 border-yellow-400 text-white shadow-md scale-105" 
+                : "bg-yellow-50 border-yellow-200 text-yellow-400 hover:bg-yellow-200";
             }
             else if (cat.value === "Populares") {
               btnClass = isActive 
-                ? "bg-yellow-500 border-yellow-500 text-white shadow-md scale-105" 
-                : "bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-yellow-100";
+                ? "bg-red-500 border-red-500 text-white shadow-md scale-105" 
+                : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100";
             } 
             else if (cat.value === "Ofertas") {
               btnClass = isActive 

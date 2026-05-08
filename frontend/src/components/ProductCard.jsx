@@ -15,11 +15,16 @@ const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 const BALL_SIZES = ["3", "4", "5"];
 
 export default function ProductCard({ product, onClick, user }) {
-  const isAdmin =
-    user?.isSuperUser || user?.roles?.includes("edit");
+  // 🔥 ESCUDO ANTI-PANTALLA BLANCA 🔥
+  if (!product) return null;
+
+  const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
 
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
+  
+  // 🔥 Lógica para detectar si es del mundial
+  const isMundial = product.isMundial2026 === true;
 
   const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 
@@ -59,27 +64,33 @@ export default function ProductCard({ product, onClick, user }) {
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
 
-  // ⭐ NUEVO: Lógica para saber si tiene 5 días o menos de creado
   const isNuevo = product.createdAt 
     ? (new Date() - new Date(product.createdAt)) <= (5 * 24 * 60 * 60 * 1000) 
     : false;
 
   return (
     <motion.div
-      whileHover={{ scale: 1.08 }}
+      whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.97 }}
-      className={`relative rounded-lg shadow-md hover:shadow-lg transition cursor-pointer overflow-hidden w-full
-        ${isAdmin && product.hidden ? "opacity-60 grayscale" : "bg-white"}
+      className={`relative rounded-lg transition cursor-pointer overflow-hidden w-full
+        ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
         ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-80 grayscale-[30%]" : ""}
+        
+        /* 🔥 ESTILO ESPECIAL MUNDIAL: Fondo NEGRO, Borde dorado y resplandor 🔥 */
+        ${isMundial 
+          ? "bg-black ring-2 ring-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
+          : "bg-white shadow-md hover:shadow-lg"
+        }
       `}
       onClick={() => onClick(product)}
     >
       
-      {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS (Tipo y Nuevo) */}
+      {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS */}
       <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 items-start">
+        
         {/* 🔸 Tipo */}
         {product.type && (
-          <div className="text-white text-xs font-semibold px-3 py-1 rounded-full shadow bg-black">
+          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-black text-yellow-400 border border-yellow-500/30' : 'bg-black text-white'}`}>
             {product.type}
           </div>
         )}
@@ -88,6 +99,13 @@ export default function ProductCard({ product, onClick, user }) {
         {isNuevo && (
           <div className="etiqueta-nuevo text-white text-xs font-bold px-3 py-1 rounded-full shadow-md bg-purple-600">
             ¡Nuevo!
+          </div>
+        )}
+
+        {/* 🏆 Etiqueta Mundial */}
+        {isMundial && (
+          <div className="text-black text-xs font-extrabold px-3 py-1 rounded-full shadow-md bg-gradient-to-r from-yellow-300 to-yellow-500 border border-yellow-200">
+            Mundial 2026
           </div>
         )}
       </div>
@@ -109,8 +127,8 @@ export default function ProductCard({ product, onClick, user }) {
         </span>
       )}
 
-      {/* Imagen */}
-      <div className="relative w-full h-[300px] bg-gray-100 overflow-hidden">
+      {/* Imagen (Fondo ultra oscuro si es mundial) */}
+      <div className={`relative w-full h-[300px] overflow-hidden ${isMundial ? 'bg-[#0a0a0a]' : 'bg-gray-100'}`}>
         {(() => {
           const screenWidth = window.innerWidth;
           let H = 1000;
@@ -138,7 +156,7 @@ export default function ProductCard({ product, onClick, user }) {
           );
         })()}
 
-        {/* 🟥 OVERLAY SI ESTÁ AGOTADO (Visible para todos) */}
+        {/* 🟥 OVERLAY SI ESTÁ AGOTADO */}
         {isTotalAgotado && (
           <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-20 flex items-center justify-center">
             <div className="bg-black text-white border-2 border-white px-6 py-2 rounded-lg transform -rotate-12 shadow-xl">
@@ -151,8 +169,7 @@ export default function ProductCard({ product, onClick, user }) {
 
         {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
         {isAdmin && product.hidden && (
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30
-                          flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30 flex items-center justify-center">
             <span className="text-white text-lg sm:text-xl md:text-2xl font-bold text-center px-3 drop-shadow-md">
               No visible para el cliente
             </span>
@@ -162,22 +179,25 @@ export default function ProductCard({ product, onClick, user }) {
 
       {/* Info */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
-        <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-gray-900 line-clamp-2">
+        
+        {/* 🔥 TÍTULO (Blanco si es Mundial) */}
+        <h3 className={`text-sm sm:text-base md:text-lg font-extrabold line-clamp-2 ${isMundial ? 'text-white' : 'text-gray-900'}`}>
           {product.name}
         </h3>
 
         {/* Precio */}
         {hasDiscount ? (
           <div className="mt-2 flex flex-col items-center">
-            <p className="text-sm sm:text-base line-through text-gray-700">
+            <p className={`text-sm sm:text-base line-through ${isMundial ? 'text-gray-400' : 'text-gray-700'}`}>
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-700">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-500">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-base sm:text-lg md:text-xl font-semibold text-black">
+          /* 🔥 PRECIO NORMAL (Blanco si es Mundial) */
+          <p className={`mt-2 text-base sm:text-lg md:text-xl font-bold ${isMundial ? 'text-white' : 'text-black'}`}>
             ₡{Number(product.price).toLocaleString("de-DE")}
           </p>
         )}
@@ -188,32 +208,32 @@ export default function ProductCard({ product, onClick, user }) {
             {/* INVENTARIO */}
             {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
               <>
-                <p className="font-bold text-black">Tienda #1</p>
+                <p className={`font-bold mt-2 ${isMundial ? 'text-white' : 'text-black'}`}>Tienda #1</p>
                 {stockAgotadas.length > 0 && (
-                  <p className="text-red-600">Agotado {stockAgotadas.join(" ")}</p>
+                  <p className="text-red-500">Agotado {stockAgotadas.join(" ")}</p>
                 )}
                 {stockQueda1.length > 0 && (
-                  <p className="text-green-600">Queda 1 {stockQueda1.join(" ")}</p>
+                  <p className="text-green-400">Queda 1 {stockQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
             {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
               <>
-                <p className="font-bold text-black mt-2">Tienda #2</p>
+                <p className={`font-bold mt-2 ${isMundial ? 'text-white' : 'text-black'}`}>Tienda #2</p>
                 {bodegaAgotadas.length > 0 && (
-                  <p className="text-red-600">Agotado {bodegaAgotadas.join(" ")}</p>
+                  <p className="text-red-500">Agotado {bodegaAgotadas.join(" ")}</p>
                 )}
                 {bodegaQueda1.length > 0 && (
-                  <p className="text-green-600">Queda 1 {bodegaQueda1.join(" ")}</p>
+                  <p className="text-green-400">Queda 1 {bodegaQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
             {traspasosUrgentes.length > 0 && (
-              <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
-                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes:</p>
-                <ul className="list-disc pl-5 text-red-800">
+              <div className="mt-3 bg-red-900/30 border-l-4 border-red-500 text-red-200 p-2 rounded">
+                <p className="font-bold text-red-400 mb-1">🚨 Traspasos urgentes:</p>
+                <ul className="list-disc pl-5">
                   {traspasosUrgentes.map((t, i) => (
                     <li key={i}>
                       Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
@@ -224,9 +244,9 @@ export default function ProductCard({ product, onClick, user }) {
             )}
 
             {traspasosSugeridos.length > 0 && (
-              <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
-                <p className="font-bold text-yellow-700 mb-1">📦 Traspasos sugeridos:</p>
-                <ul className="list-disc pl-5 text-yellow-800">
+              <div className="mt-2 bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-200 p-2 rounded">
+                <p className="font-bold text-yellow-400 mb-1">📦 Traspasos sugeridos:</p>
+                <ul className="list-disc pl-5">
                   {traspasosSugeridos.map((t, i) => (
                     <li key={i}>
                       Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
