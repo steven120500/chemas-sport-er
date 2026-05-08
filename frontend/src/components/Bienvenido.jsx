@@ -107,11 +107,7 @@ const Bienvenido = ({ onNavigate }) => {
             /* 🔥 DISEÑO ESPECIAL MUNDIAL 🔥 */
             <div className="relative flex justify-center items-center w-full h-full">
               {/* Copa de fondo garantizada que se vea (z-10 y left-[15%]) */}
-              <img 
-                src="/CopaMundial.png" 
-                className="absolute left-[15%] md:left-[28%] top-[-5%] w-24 md:w-40 opacity-95 drop-shadow-2xl z-10" 
-                alt="copa-fondo"
-              />
+            
               {/* Camiseta (z-20 para tapar la copa) */}
               <img 
                 src={currentCat.img} 

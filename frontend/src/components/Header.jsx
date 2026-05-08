@@ -7,7 +7,6 @@ export default function Header({
   onLogout,
   onLogoClick, 
   user,
-  canSeeHistory,
   isSuperUser,
   setShowRegisterUserModal,
   setShowUserListModal,
@@ -15,7 +14,7 @@ export default function Header({
 }) {
   return (
     <header
-      className="relative shadow-xl px-2 sm:px-6 py-2 sm:py-6 overflow-hidden min-h-[260px] animate-metal-shine"
+      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-metal-shine flex items-start sm:items-center"
       style={{
         background: 'linear-gradient(110deg, #b8860b 0%, #e6be8a 25%, #f7e7ce 50%, #e6be8a 75%, #b8860b 100%)',
         backgroundSize: '200% auto',
@@ -23,7 +22,6 @@ export default function Header({
     >
       <style>
         {`
-          /* Animación de reflejo metálico en el fondo */
           @keyframes metalShine {
             0% { background-position: 0% center; }
             100% { background-position: 200% center; }
@@ -32,7 +30,6 @@ export default function Header({
             animation: metalShine 8s linear infinite;
           }
 
-          /* Efecto de destello de luz cruzando el header */
           .shimmer-overlay::after {
             content: "";
             position: absolute;
@@ -61,27 +58,28 @@ export default function Header({
       {/* Capa de destello animado */}
       <div className="absolute inset-0 shimmer-overlay pointer-events-none"></div>
 
-      {/* Contenido principal */}
-      <div className="relative z-10 flex items-center justify-between w-full">
-        {/* Logo clickeable */}
+      {/* Contenedor Principal con Iconos en los extremos */}
+      <div className="relative z-20 flex items-center justify-between w-full h-fit">
+        {/* Logo a la Izquierda */}
         <button
           onClick={onLogoClick}
           className="focus:outline-none bg-transparent"
-          title="Volver al inicio"
         >
           <img
             src={logo}
             alt="Logo Chemas Sport"
-            className="h-14 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-[0_4px_6px_rgba(0,0,0,0.3)]"
+            className="h-12 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-lg"
           />
         </button>
 
-        {/* Título centrado */}
-        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-black tracking-tighter text-black uppercase drop-shadow-md">
-          ChemaSport ER
-        </h1>
+        {/* Título Centrado Absoluto (Funciona en PC y Celular) */}
+        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none px-4">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tighter text-black uppercase drop-shadow-md text-center pointer-events-auto">
+            ChemaSport ER
+          </h1>
+        </div>
 
-        {/* Usuario o botón de Login */}
+        {/* Botón Usuario / Dropdown a la Derecha */}
         <div className="flex items-center">
           {user ? (
             <UserDropDown
@@ -90,17 +88,14 @@ export default function Header({
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
               onViewHistory={() => setShowHistoryModal(true)}
-              canSeeHistory={
-                user?.isSuperUser || user?.roles?.includes("history")
-              }
+              canSeeHistory={user?.isSuperUser || user?.roles?.includes("history")}
             />
           ) : (
             <button
               onClick={onLoginClick}
-              title="Iniciar sesión / Registrarse"
-              className="rounded-full p-3 shadow-2xl transition-all duration-300 bg-black text-white hover:bg-zinc-900 border border-yellow-500/50"
+              className="rounded-full p-2.5 sm:p-3 shadow-2xl transition-all duration-300 bg-black text-white hover:bg-zinc-900 border border-yellow-500/50"
             >
-              <FaUser size={18} />
+              <FaUser size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           )}
         </div>
