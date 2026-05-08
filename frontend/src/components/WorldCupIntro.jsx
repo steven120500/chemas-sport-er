@@ -9,17 +9,18 @@ const WorldCupIntro = ({ onFinished }) => {
     // Bloqueamos el scroll
     document.body.style.overflow = 'hidden';
 
-    // Tiempos ajustados: más cómodos de leer, sin ser eternos
-    const t1 = setTimeout(() => setPhase(1), 100);   // 1. Sale la Copa casi al inicio
-    const t2 = setTimeout(() => setPhase(2), 800);   // 2. Entran CHEMA SPORT ER
-    const t3 = setTimeout(() => setPhase(3), 1500);  // 3. Sale "¡Que empiece el mundial!"
+    // Tiempos rápidos y dinámicos (3 segundos total)
+    const t1 = setTimeout(() => setPhase(1), 100);   // 1. Copa
+    const t2 = setTimeout(() => setPhase(2), 800);   // 2. CHEMA SPORT ER
+    const t3 = setTimeout(() => setPhase(3), 1500);  // 3. ¡Que empiece...!
     
-    const fadeTimer = setTimeout(() => setFadeIntro(true), 3200); // Empezamos a desvanecer
+    // 🔥 TIEMPOS REDUCIDOS 🔥
+    const fadeTimer = setTimeout(() => setFadeIntro(true), 2200); // Empieza a desvanecer
     const endTimer = setTimeout(() => {
       setVisible(false);
       document.body.style.overflow = 'auto';
       if (onFinished) onFinished();
-    }, 4000); // A los 4 segundos exactos liberamos la pantalla
+    }, 3000); // Fin al segundo 3
 
     return () => {
       document.body.style.overflow = 'auto';
@@ -51,6 +52,20 @@ const WorldCupIntro = ({ onFinished }) => {
             0% { transform: scale(0.5); opacity: 1; border-width: 15px; }
             100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
           }
+
+          /* ⭐ CSS para la ruedita de cargando ⭐ */
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .loader-spinner {
+            border: 3px solid #f3f3f3; /* Fondo gris claro */
+            border-top: 3px solid #b8860b; /* Color Oro ChemaSport */
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            animation: spin 1s linear infinite;
+          }
         `}
       </style>
 
@@ -81,9 +96,9 @@ const WorldCupIntro = ({ onFinished }) => {
       </div>
 
       {/* =========================================
-          SECCIÓN INFERIOR: TEXTOS
+          SECCIÓN INFERIOR: TEXTOS Y LOADER
           ========================================= */}
-      <div className="flex flex-col items-center text-center overflow-hidden w-full px-4">
+      <div className="flex flex-col items-center text-center overflow-hidden w-full px-4 relative">
         
         <h1 
           className="text-black text-6xl md:text-8xl font-black tracking-tighter uppercase transition-transform duration-[600ms] ease-out"
@@ -106,7 +121,7 @@ const WorldCupIntro = ({ onFinished }) => {
         </h1>
 
         <p 
-          className="mt-8 font-sans font-extrabold text-2xl md:text-4xl tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 drop-shadow-sm transition-all duration-[800ms]"
+          className="mt-8 font-sans font-extrabold text-2xl md:text-4xl tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 drop-shadow-sm transition-all duration-[800ms] mb-12"
           style={{ 
             transform: phase >= 3 ? 'translateY(0)' : 'translateY(20px)',
             opacity: phase >= 3 ? 1 : 0 
@@ -114,6 +129,14 @@ const WorldCupIntro = ({ onFinished }) => {
         >
             ¡Que empiece el mundial!
         </p>
+
+        {/* ⭐ RUEDITA DE CARGANDO (Siempre visible hasta el fadeout) ⭐ */}
+        <div className="absolute -bottom-2 flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-inner border border-gray-100">
+          <div className="loader-spinner"></div>
+          <span className="font-sans font-bold text-sm uppercase tracking-widest text-zinc-500">
+            Cargando productos  
+          </span>
+        </div>
 
       </div>
     </div>
