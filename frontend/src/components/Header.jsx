@@ -14,26 +14,32 @@ export default function Header({
 }) {
   return (
     <header
-      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-solid-color-cycle flex items-start sm:items-center"
+      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-smooth-color-cycle flex items-start sm:items-center"
     >
       <style>
         {`
-          /* 🔥 ANIMACIÓN DE COLORES SÓLIDOS (Sin colores intermedios) 🔥 */
-          @keyframes solidColorCycle {
-            /* Celeste Oscuro */
-            0%, 32% { background-color: #0e77c8; }
-            /* Salto a Verde */
-            33%, 65% { background-color: #0a9434; }
-            /* Salto a Rojo Oscuro */
-            66%, 99% { background-color: #7b1f09; }
-            /* Salto de vuelta a Celeste */
-            100% { background-color: #0e77c8; }
+          /* 🔥 ANIMACIÓN DE 4 COLORES CON TRANSICIÓN SUAVE 🔥 */
+          @keyframes smoothColorCycle {
+            /* Mantiene el Celeste y luego transiciona */
+            0%, 15%  { background-color: #0e77c8; } 
+            
+            /* Llega a Verde, se mantiene y luego transiciona */
+            25%, 40% { background-color: #0a9434; } 
+            
+            /* Llega a Rojo, se mantiene y luego transiciona */
+            50%, 65% { background-color: #7b1f09; } 
+            
+            /* Llega a Negro, se mantiene y luego transiciona */
+            75%, 90% { background-color: #000000; } 
+            
+            /* Regresa suavemente al Celeste para cerrar el ciclo sin cortes */
+            100%     { background-color: #0e77c8; } 
           }
 
-          .animate-solid-color-cycle {
-            /* Ciclo de 15 segundos (aprox. 5s por color) con cambio "step" */
-            animation: solidColorCycle 15s step-end infinite; 
-            background-color: #0e77c8; /* Color inicial */
+          .animate-smooth-color-cycle {
+            /* Ciclo de 20s en total usando ease-in-out para que el difuminado sea natural */
+            animation: smoothColorCycle 20s ease-in-out infinite; 
+            background-color: #000000; /* Color base por defecto */
           }
 
           /* Efecto de destello de luz sutil cruzando el header */
@@ -81,7 +87,8 @@ export default function Header({
 
         {/* Título Centrado Absoluto */}
         <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none px-4">
-          <h1 className="text-xl sm:text-3xl font-black tracking-tighter text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-center pointer-events-auto">
+          {/* 🔥 TÍTULO SIEMPRE BLANCO CON SOMBRA 🔥 */}
+          <h1 className="text-xl sm:text-3xl font-black tracking-tighter uppercase text-center pointer-events-auto text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             ChemaSport ER
           </h1>
         </div>
@@ -100,7 +107,7 @@ export default function Header({
           ) : (
             <button
               onClick={onLoginClick}
-              className="rounded-full p-2.5 sm:p-3 shadow-xl transition-all duration-300 bg-black text-white hover:bg-zinc-800 border-none"
+              className="rounded-full p-2.5 sm:p-3 shadow-xl transition-all duration-300 bg-white text-black hover:bg-zinc-200 border-none"
             >
               <FaUser size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
