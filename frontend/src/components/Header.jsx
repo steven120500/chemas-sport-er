@@ -14,22 +14,29 @@ export default function Header({
 }) {
   return (
     <header
-      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-metal-shine flex items-start sm:items-center"
-      style={{
-        background: 'linear-gradient(110deg, #b8860b 0%, #e6be8a 25%, #f7e7ce 50%, #e6be8a 75%, #b8860b 100%)',
-        backgroundSize: '200% auto',
-      }}
+      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-solid-color-cycle flex items-start sm:items-center"
     >
       <style>
         {`
-          @keyframes metalShine {
-            0% { background-position: 0% center; }
-            100% { background-position: 200% center; }
-          }
-          .animate-metal-shine {
-            animation: metalShine 8s linear infinite;
+          /* 🔥 ANIMACIÓN DE COLORES SÓLIDOS (Sin colores intermedios) 🔥 */
+          @keyframes solidColorCycle {
+            /* Celeste Oscuro */
+            0%, 32% { background-color: #0e77c8; }
+            /* Salto a Verde */
+            33%, 65% { background-color: #0a9434; }
+            /* Salto a Rojo Oscuro */
+            66%, 99% { background-color: #7b1f09; }
+            /* Salto de vuelta a Celeste */
+            100% { background-color: #0e77c8; }
           }
 
+          .animate-solid-color-cycle {
+            /* Ciclo de 15 segundos (aprox. 5s por color) con cambio "step" */
+            animation: solidColorCycle 15s step-end infinite; 
+            background-color: #0e77c8; /* Color inicial */
+          }
+
+          /* Efecto de destello de luz sutil cruzando el header */
           .shimmer-overlay::after {
             content: "";
             position: absolute;
@@ -44,7 +51,7 @@ export default function Header({
               transparent
             );
             transform: skewX(-25deg);
-            animation: shimmer 5s infinite;
+            animation: shimmer 6s infinite;
           }
 
           @keyframes shimmer {
@@ -68,13 +75,13 @@ export default function Header({
           <img
             src={logo}
             alt="Logo Chemas Sport"
-            className="h-12 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-lg"
+            className="h-12 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-md" 
           />
         </button>
 
-        {/* Título Centrado Absoluto (Funciona en PC y Celular) */}
+        {/* Título Centrado Absoluto */}
         <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none px-4">
-          <h1 className="text-xl sm:text-3xl font-black tracking-tighter text-black uppercase drop-shadow-md text-center pointer-events-auto">
+          <h1 className="text-xl sm:text-3xl font-black tracking-tighter text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-center pointer-events-auto">
             ChemaSport ER
           </h1>
         </div>
@@ -93,7 +100,7 @@ export default function Header({
           ) : (
             <button
               onClick={onLoginClick}
-              className="rounded-full p-2.5 sm:p-3 shadow-2xl transition-all duration-300 bg-black text-white hover:bg-zinc-900 border border-yellow-500/50"
+              className="rounded-full p-2.5 sm:p-3 shadow-xl transition-all duration-300 bg-black text-white hover:bg-zinc-800 border-none"
             >
               <FaUser size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>

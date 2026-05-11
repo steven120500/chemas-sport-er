@@ -3,8 +3,9 @@ import React, { useEffect, useState } from "react";
 function TopBanner() {
   const messages = [
     "STOCK DE +4000 CHEMAS",
-    "REGALAMOS CHEMAS LOS VIERNES EN NUESTRO CHEMAFEST",
-    "METODOS DE PAGO SINPE, TRANSFERENCIA, EFECTIVO Y PAGO CON TARJETA",
+    "REGALAMOS CHEMAS LOS VIERNES EN EL CHEMAFEST",
+    "METODOS DE PAGO SINPE, TRANSFERENCIA,",
+    "EFECTIVO Y PAGO CON TARJETA",
     "SOMOS CHEMASPORT ER",
   ];
   const [currentIndex, setCurrentIndex] = useState(0);

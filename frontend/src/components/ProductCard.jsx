@@ -72,36 +72,25 @@ export default function ProductCard({ product, onClick, user }) {
     <motion.div
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.97 }}
-      className={`relative rounded-lg transition cursor-pointer overflow-hidden w-full
+      className={`relative rounded-lg transition cursor-pointer overflow-hidden w-full bg-white
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
         ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-80 grayscale-[30%]" : ""}
         
-        /* 🔥 ESTILO ESPECIAL MUNDIAL: Fondo NEGRO, Borde dorado y resplandor 🔥 */
+        /* 🔥 ESTILO ESPECIAL MUNDIAL: Borde dorado y resplandor, fondo siempre blanco 🔥 */
         ${isMundial 
-          ? "bg-black ring-2 ring-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
-          : "bg-white shadow-md hover:shadow-lg"
+          ? "ring-2 ring-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
+          : "shadow-md hover:shadow-lg"
         }
       `}
       onClick={() => onClick(product)}
     >
       
-      
-        {/* 🏆 Etiqueta Mundial */}
-        {isMundial && (
-          <div className="text-black text-center text-xs bottom-3 -left-2 font-extrabold px-3 py-1  shadow-md bg-gradient-to-r from-yellow-300 to-yellow-500 border border-yellow-200">
-            Mundial 2026
-          </div>
-        )}
-      
-
-
-
       {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS */}
-      <div className="absolute top-7 left-2 z-20 flex flex-col gap-2 items-start">
+      <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 items-start">
         
         {/* 🔸 Tipo */}
         {product.type && (
-          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-black text-yellow-400 border border-yellow-500/30' : 'bg-black text-white'}`}>
+          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-yellow-400 text-black border border-yellow-500/30' : 'bg-black text-white'}`}>
             {product.type}
           </div>
         )}
@@ -112,13 +101,11 @@ export default function ProductCard({ product, onClick, user }) {
             ¡Nuevo!
           </div>
         )}
-
-        
       </div>
 
       {/* 🟩 Oferta */}
       {hasDiscount && (
-        <span className="absolute etiqueta-oferta-verde bottom-44 -right-2 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
+        <span className="absolute etiqueta-oferta-verde bottom-44 -left-2 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
           Oferta
         </span>
       )}
@@ -133,7 +120,7 @@ export default function ProductCard({ product, onClick, user }) {
         </span>
       )}
 
-      {/* Imagen (Fondo ultra oscuro si es mundial) */}
+      {/* Imagen (Fondo gris claro o ultra oscuro si es mundial) */}
       <div className={`relative w-full h-[300px] overflow-hidden ${isMundial ? 'bg-[#0a0a0a]' : 'bg-gray-100'}`}>
         {(() => {
           const screenWidth = window.innerWidth;
@@ -162,6 +149,16 @@ export default function ProductCard({ product, onClick, user }) {
           );
         })()}
 
+        {/* ⭐ Sticker para el Mundial (Esquina Inferior Derecha) ⭐ */}
+        {/* Ajustado: h-20 en móvil, h-32 en tablet, h-36/h-40 en desktop */}
+        {isMundial && (
+          <img
+            src="/sticker.png" 
+            alt="Sticker Mundial"
+            className="absolute bottom-2 right-2 md:bottom-1 md:right-4 h-16 sm:h-36 md:h-36 lg:h-36 w-auto object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)] z-10 transition-all duration-300"
+          />
+        )}
+
         {/* 🟥 OVERLAY SI ESTÁ AGOTADO */}
         {isTotalAgotado && (
           <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-20 flex items-center justify-center">
@@ -183,27 +180,27 @@ export default function ProductCard({ product, onClick, user }) {
         )}
       </div>
 
-      {/* Info */}
+      {/* Info - SIEMPRE CON FONDO BLANCO Y TEXTO OSCURO */}
       <div className="p-4 text-center flex flex-col items-center justify-between">
         
-        {/* 🔥 TÍTULO (Blanco si es Mundial) */}
-        <h3 className={`text-sm sm:text-base md:text-lg font-extrabold line-clamp-2 ${isMundial ? 'text-white' : 'text-gray-900'}`}>
+        {/* 🔥 TÍTULO (Siempre oscuro) */}
+        <h3 className="text-sm sm:text-base md:text-lg font-extrabold line-clamp-2 text-gray-900">
           {product.name}
         </h3>
 
         {/* Precio */}
         {hasDiscount ? (
           <div className="mt-2 flex flex-col items-center">
-            <p className={`text-sm sm:text-base line-through ${isMundial ? 'text-gray-400' : 'text-gray-700'}`}>
+            <p className="text-sm sm:text-base line-through text-gray-500">
               ₡{Number(product.price).toLocaleString("de-DE")}
             </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-500">
+            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-600">
               ₡{Number(product.discountPrice).toLocaleString("de-DE")}
             </p>
           </div>
         ) : (
-          /* 🔥 PRECIO NORMAL (Blanco si es Mundial) */
-          <p className={`mt-2 text-base sm:text-lg md:text-xl font-bold ${isMundial ? 'text-white' : 'text-black'}`}>
+          /* 🔥 PRECIO NORMAL (Siempre oscuro) */
+          <p className="mt-2 text-base sm:text-lg md:text-xl font-bold text-black">
             ₡{Number(product.price).toLocaleString("de-DE")}
           </p>
         )}
@@ -214,31 +211,31 @@ export default function ProductCard({ product, onClick, user }) {
             {/* INVENTARIO */}
             {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
               <>
-                <p className={`font-bold mt-2 ${isMundial ? 'text-white' : 'text-black'}`}>Tienda #1</p>
+                <p className="font-bold mt-2 text-black">Tienda #1</p>
                 {stockAgotadas.length > 0 && (
-                  <p className="text-red-500">Agotado {stockAgotadas.join(" ")}</p>
+                  <p className="text-red-600">Agotado {stockAgotadas.join(" ")}</p>
                 )}
                 {stockQueda1.length > 0 && (
-                  <p className="text-green-400">Queda 1 {stockQueda1.join(" ")}</p>
+                  <p className="text-green-600">Queda 1 {stockQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
             {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
               <>
-                <p className={`font-bold mt-2 ${isMundial ? 'text-white' : 'text-black'}`}>Tienda #2</p>
+                <p className="font-bold mt-2 text-black">Tienda #2</p>
                 {bodegaAgotadas.length > 0 && (
-                  <p className="text-red-500">Agotado {bodegaAgotadas.join(" ")}</p>
+                  <p className="text-red-600">Agotado {bodegaAgotadas.join(" ")}</p>
                 )}
                 {bodegaQueda1.length > 0 && (
-                  <p className="text-green-400">Queda 1 {bodegaQueda1.join(" ")}</p>
+                  <p className="text-green-600">Queda 1 {bodegaQueda1.join(" ")}</p>
                 )}
               </>
             )}
 
             {traspasosUrgentes.length > 0 && (
-              <div className="mt-3 bg-red-900/30 border-l-4 border-red-500 text-red-200 p-2 rounded">
-                <p className="font-bold text-red-400 mb-1">🚨 Traspasos urgentes:</p>
+              <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
+                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes:</p>
                 <ul className="list-disc pl-5">
                   {traspasosUrgentes.map((t, i) => (
                     <li key={i}>
@@ -250,8 +247,8 @@ export default function ProductCard({ product, onClick, user }) {
             )}
 
             {traspasosSugeridos.length > 0 && (
-              <div className="mt-2 bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-200 p-2 rounded">
-                <p className="font-bold text-yellow-400 mb-1">📦 Traspasos sugeridos:</p>
+              <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
+                <p className="font-bold text-yellow-700 mb-1">📦 Traspasos sugeridos:</p>
                 <ul className="list-disc pl-5">
                   {traspasosSugeridos.map((t, i) => (
                     <li key={i}>
