@@ -50,7 +50,6 @@ const Bienvenido = ({ onNavigate }) => {
   ];
 
   useEffect(() => {
-    // Volvemos a los 6 segundos normales
     const interval = setInterval(() => {
       setAnimating(true);
       setTimeout(() => {
@@ -70,8 +69,8 @@ const Bienvenido = ({ onNavigate }) => {
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 100);
-  };
-
+  }; 
+  
   const currentCat = categories[currentIndex];
   const isMundial = currentCat.filter === 'Mundial 2026';
 
@@ -82,7 +81,23 @@ const Bienvenido = ({ onNavigate }) => {
         backgroundImage: `url(${window.innerWidth < 768 ? '/FondoMovil.png' : '/FondoCompu.png'})`
       }}
     >
-      <div className="absolute inset-0 bg-black/40 z-0"></div>
+      {/* 🔥 AQUÍ ESTÁ EL CÓDIGO QUE FALTABA PARA DARLE COLOR AL BOTÓN 🔥 */}
+      <style>
+        {`
+          @keyframes btnColorCycle {
+            0%, 20%  { background-color: #0a9434; box-shadow: 0 0 20px rgba(10, 148, 52, 0.6); border-color: #0a9434; } /* Verde */
+            33%, 53% { background-color: #7b1f09; box-shadow: 0 0 20px rgba(123, 31, 9, 0.6); border-color: #7b1f09; } /* Rojo Oscuro */
+            66%, 86% { background-color: #0e77c8; box-shadow: 0 0 20px rgba(14, 119, 200, 0.6); border-color: #0e77c8; } /* Azul Celeste */
+            100%     { background-color: #0a9434; box-shadow: 0 0 20px rgba(10, 148, 52, 0.6); border-color: #0a9434; }
+          }
+          .animate-btn-colors {
+            animation: btnColorCycle 12s ease-in-out infinite;
+          }
+        `}
+      </style>
+
+      {/* CAPA OSCURA */}
+      <div className="absolute inset-0 bg-black/40 md:bg-black/65 z-0"></div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div className="relative z-0 flex-grow flex flex-col justify-center items-center w-full max-w-4xl px-4 mt-10 md:mt-0">
@@ -99,16 +114,13 @@ const Bienvenido = ({ onNavigate }) => {
         {/* 2. AREA DE IMAGEN */}
         <div className={`
             relative w-full flex justify-center items-center
+            h-[320px] md:h-[600px]
             transition-all duration-1000 ease-in-out transform
             ${animating ? 'opacity-0 scale-95 blur-xl' : 'opacity-100 scale-100 blur-0'}
         `}>
           
           {isMundial ? (
-            /* 🔥 DISEÑO ESPECIAL MUNDIAL 🔥 */
             <div className="relative flex justify-center items-center w-full h-full">
-              {/* Copa de fondo garantizada que se vea (z-10 y left-[15%]) */}
-            
-              {/* Camiseta (z-20 para tapar la copa) */}
               <img 
                 src={currentCat.img} 
                 className="relative z-20 w-40 md:w-96 object-contain drop-shadow-[0_35px_60px_rgba(0,0,0,0.8)] h-auto" 
@@ -116,7 +128,6 @@ const Bienvenido = ({ onNavigate }) => {
               />
             </div>
           ) : (
-            /* VISTA NORMAL PARA EL RESTO */
             <img 
               src={currentCat.img} 
               alt={currentCat.label}
@@ -128,7 +139,7 @@ const Bienvenido = ({ onNavigate }) => {
             />
           )}
           
-          {/* BOTÓN FLOTANTE */}
+          {/* BOTÓN FLOTANTE CON COLORES ANIMADOS */}
           <button
             onClick={() => handleFilter(currentCat.filter)}
             className={`
@@ -138,15 +149,11 @@ const Bienvenido = ({ onNavigate }) => {
               px-7 py-2.5 md:px-11 md:py-4 
               rounded-full font-black text-lg md:text-xl 
               transition-all duration-300 hover:scale-105
-              ${!isMundial ? 'bg-black text-white border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)]' : ''}
+              ${isMundial 
+                ? 'animate-btn-colors text-white border-2' 
+                : 'bg-black text-white border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)]'
+              }
             `}
-            /* 🔥 CAMBIO: yellow-400 (#facc15) oficial de Tailwind */
-            style={isMundial ? {
-              backgroundColor: '#facc15',
-              color: 'black',
-              border: '2px solid #eab308',
-              boxShadow: '0 0 20px rgba(250, 204, 21, 0.6)'
-            } : {}}
           >
             {currentCat.buttonText}
           </button>
