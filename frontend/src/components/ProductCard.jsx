@@ -90,7 +90,7 @@ export default function ProductCard({ product, onClick, user }) {
         
         {/* 🔸 Tipo */}
         {product.type && (
-          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-purple-700 text-black border ' : 'bg-black text-white'}`}>
+          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-purple-700 text-white border ' : 'bg-black text-white'}`}>
             {product.type}
           </div>
         )}

@@ -60,7 +60,7 @@ const WorldCupIntro = ({ onFinished }) => {
           }
           .loader-spinner {
             border: 3px solid #f3f3f3; /* Fondo gris claro */
-            border-top: 3px solid #b8860b; /* Color Oro ChemaSport */
+            border-top: 3px solid #2d107a; /* Color Oro ChemaSport */
             border-radius: 50%;
             width: 28px;
             height: 28px;
