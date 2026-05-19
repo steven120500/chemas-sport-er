@@ -121,7 +121,7 @@ const WorldCupIntro = ({ onFinished }) => {
         </h1>
 
         <p 
-          className="mt-8 font-sans font-extrabold text-2xl md:text-4xl tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 drop-shadow-sm transition-all duration-[800ms] mb-12"
+          className="mt-8 font-sans font-extrabold text-2xl md:text-4xl tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-400 to-purple-600 drop-shadow-sm transition-all duration-[800ms] mb-12"
           style={{ 
             transform: phase >= 3 ? 'translateY(0)' : 'translateY(20px)',
             opacity: phase >= 3 ? 1 : 0 

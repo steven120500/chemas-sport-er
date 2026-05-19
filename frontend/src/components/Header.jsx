@@ -1,99 +1,74 @@
+// src/components/Header.jsx
+import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
+
 import { FaUser } from "react-icons/fa";
 import UserDropDown from "./UserDropDown";
 
 export default function Header({
   onLoginClick,
   onLogout,
-  onLogoClick, 
+  onLogoClick, // callback para volver al inicio
   user,
+  canSeeHistory,
   isSuperUser,
   setShowRegisterUserModal,
   setShowUserListModal,
   setShowHistoryModal,
 }) {
+  // 🟢 Estado que alterna entre blanco y negro
+  const [isDark, setIsDark] = useState(false);
+
+  // 🔁 Cambia cada 3 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsDark((prev) => !prev);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header
-      className="relative shadow-xl px-4 sm:px-6 py-4 sm:py-6 overflow-hidden min-h-[220px] sm:min-h-[260px] animate-smooth-color-cycle flex items-start sm:items-center"
+      className={`relative shadow-md px-2 sm:px-6 py-2 sm:py-6 overflow-hidden min-h-[260px] transition-all duration-1000 ${
+        isDark ? "bg-black" : "bg-white"
+      }`}
     >
-      <style>
-        {`
-          /* 🔥 ANIMACIÓN DE 4 COLORES CON TRANSICIÓN SUAVE 🔥 */
-          @keyframes smoothColorCycle {
-            /* Mantiene el Celeste y luego transiciona */
-            0%, 15%  { background-color: #0e77c8; } 
-            
-            /* Llega a Verde, se mantiene y luego transiciona */
-            25%, 40% { background-color: #0a9434; } 
-            
-            /* Llega a Rojo, se mantiene y luego transiciona */
-            50%, 65% { background-color: #7b1f09; } 
-            
-            /* Llega a Negro, se mantiene y luego transiciona */
-            75%, 90% { background-color: #000000; } 
-            
-            /* Regresa suavemente al Celeste para cerrar el ciclo sin cortes */
-            100%     { background-color: #0e77c8; } 
-          }
+      {/* Fondo decorativo opcional */}
+      <div
+        className={`absolute inset-0 transition-opacity duration-1000 ${
+          isDark ? "opacity-20" : "opacity-70"
+        }`}
+        style={{
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      ></div>
 
-          .animate-smooth-color-cycle {
-            /* Ciclo de 20s en total usando ease-in-out para que el difuminado sea natural */
-            animation: smoothColorCycle 20s ease-in-out infinite; 
-            background-color: #000000; /* Color base por defecto */
-          }
-
-          /* Efecto de destello de luz sutil cruzando el header */
-          .shimmer-overlay::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: -150%;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(
-              to right,
-              transparent,
-              rgba(255, 255, 255, 0.4),
-              transparent
-            );
-            transform: skewX(-25deg);
-            animation: shimmer 6s infinite;
-          }
-
-          @keyframes shimmer {
-            0% { left: -150%; }
-            30% { left: 150%; }
-            100% { left: 150%; }
-          }
-        `}
-      </style>
-
-      {/* Capa de destello animado */}
-      <div className="absolute inset-0 shimmer-overlay pointer-events-none"></div>
-
-      {/* Contenedor Principal con Iconos en los extremos */}
-      <div className="relative z-20 flex items-center justify-between w-full h-fit">
-        {/* Logo a la Izquierda */}
+      {/* Contenido principal */}
+      <div className="relative z-10 flex items-center justify-between w-full">
+        {/* Logo clickeable */}
         <button
           onClick={onLogoClick}
           className="focus:outline-none bg-transparent"
+          title="Volver al inicio"
         >
           <img
             src={logo}
             alt="Logo Chemas Sport"
-            className="h-12 sm:h-20 transition-transform duration-300 hover:scale-110 drop-shadow-md" 
+            className="h-14 sm:h-20 transition-transform duration-700 hover:scale-105"
           />
         </button>
 
-        {/* Título Centrado Absoluto */}
-        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none px-4">
-          {/* 🔥 TÍTULO SIEMPRE BLANCO CON SOMBRA 🔥 */}
-          <h1 className="text-xl sm:text-3xl font-black tracking-tighter uppercase text-center pointer-events-auto text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            ChemaSport ER
-          </h1>
-        </div>
+        {/* Título centrado */}
+        <h1
+          className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-700 ${
+            isDark ? "text-white" : "text-black"
+          }`}
+        >
+          ChemaSport ER
+        </h1>
 
-        {/* Botón Usuario / Dropdown a la Derecha */}
+        {/* Usuario o botón de Login */}
         <div className="flex items-center">
           {user ? (
             <UserDropDown
@@ -102,14 +77,21 @@ export default function Header({
               onAddUser={() => setShowRegisterUserModal(true)}
               onViewUsers={() => setShowUserListModal(true)}
               onViewHistory={() => setShowHistoryModal(true)}
-              canSeeHistory={user?.isSuperUser || user?.roles?.includes("history")}
+              canSeeHistory={
+                user?.isSuperUser || user?.roles?.includes("history")
+              }
             />
           ) : (
             <button
               onClick={onLoginClick}
-              className="rounded-full p-2.5 sm:p-3 shadow-xl transition-all duration-300 bg-white text-black hover:bg-zinc-200 border-none"
+              title="Iniciar sesión / Registrarse"
+              className={`rounded-full p-3 shadow-lg transition-all duration-700 ${
+                isDark
+                  ? "bg-white text-black hover:bg-gray-200"
+                  : "bg-black text-white hover:bg-gray-800"
+              }`}
             >
-              <FaUser size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <FaUser size={18} />
             </button>
           )}
         </div>

@@ -78,7 +78,7 @@ export default function ProductCard({ product, onClick, user }) {
         
         /* 🔥 ESTILO ESPECIAL MUNDIAL: Borde dorado y resplandor, fondo siempre blanco 🔥 */
         ${isMundial 
-          ? "ring-2 ring-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
+          ? "ring-2 ring-purple-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
           : "shadow-md hover:shadow-lg"
         }
       `}
@@ -90,14 +90,14 @@ export default function ProductCard({ product, onClick, user }) {
         
         {/* 🔸 Tipo */}
         {product.type && (
-          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-yellow-400 text-black border border-yellow-500/30' : 'bg-black text-white'}`}>
+          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-purple-700 text-black border ' : 'bg-black text-white'}`}>
             {product.type}
           </div>
         )}
 
         {/* 🌟 Etiqueta Nuevo */}
         {isNuevo && (
-          <div className="etiqueta-nuevo text-white text-xs font-bold px-3 py-1 rounded-full shadow-md bg-purple-600">
+          <div className="etiqueta-nuevo text-white text-xs font-bold px-3 py-1 rounded-full shadow-md bg-yellow-600">
             ¡Nuevo!
           </div>
         )}

@@ -83,13 +83,13 @@ export default function FilterBar({
             if (cat.value === "Nuevo") {
               // ⭐ NUEVO ESTILO: Morado para "Nuevo"
               btnClass = isActive 
-                ? "bg-purple-600 border-purple-600 text-white shadow-md scale-105" 
-                : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100";
+                ? "bg-yellow-600 border-yellow-600 text-white shadow-md scale-105" 
+                : "bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100";
             }
             else if (cat.value === "Mundial 2026") {
               btnClass = isActive 
-                ? "bg-yellow-400 border-yellow-400 text-white shadow-md scale-105" 
-                : "bg-yellow-50 border-yellow-200 text-yellow-400 hover:bg-yellow-200";
+                ? "bg-purple-400 border-purple-400 text-white shadow-md scale-105" 
+                : "bg-purple-50 border-purple-200 text-purple-400 hover:bg-purple-200";
             }
             else if (cat.value === "Populares") {
               btnClass = isActive 
