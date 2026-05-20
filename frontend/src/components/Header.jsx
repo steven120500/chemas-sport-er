@@ -29,7 +29,7 @@ export default function Header({
 
   return (
     <header
-      className={`relative shadow-md px-2 sm:px-6 py-2 sm:py-6 overflow-hidden min-h-[260px] transition-all duration-1000 ${
+      className={`relative shadow-md px-2 sm:px-6 py-2 sm:py-6 z-50 min-h-[260px] transition-all duration-1000 ${
         isDark ? "bg-black" : "bg-white"
       }`}
     >

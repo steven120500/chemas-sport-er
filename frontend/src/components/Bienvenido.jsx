@@ -103,7 +103,7 @@ const Bienvenido = ({ onNavigate }) => {
       
       {/* 🖼️ CAPA SUPERIOR MORADA: Fase 2 (Ahora aparece en Móvil y Compu) */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-10 animate-fade-morado pointer-events-none"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0 animate-fade-morado pointer-events-none"
         style={{ backgroundImage: `url(${isMobile ? '/FondoMovil_Fase2.png' : '/FondoCompu_Fase2.png'})` }}
       ></div>
       
@@ -117,19 +117,19 @@ const Bienvenido = ({ onNavigate }) => {
           
           {/* 🏆 COPA: Viene de la Izquierda */}
           {/* 🔥 POSICIÓN 🔥 -> Mueve "left-[-30%]" o "top-[-5%]" o cambia su tamaño "w-[85%]" */}
-          <div className="absolute z-10 w-36 md:w-60 md:-left-6 left-3  top-[-5%] animate-fly-left">
+          <div className="absolute z-1 w-36 md:w-60 md:-left-6 left-3  top-[-5%] animate-fly-left">
             <img src="/CopaMundial.png" className="w-full h-auto object-contain opacity-100  drop-shadow-md" alt="Copa"/>
           </div>
           
           {/* 👕 CAMISETA: Viene de Abajo (Centro) */}
           {/* 🔥 POSICIÓN 🔥 -> Está centrada con "w-full", si quieres hacerla más pequeña reduce el w-[220px] del Contenedor Maestro de arriba */}
-          <div className="relative z-30 w-46 animate-fly-bottom">
+          <div className="relative z-10 w-46 animate-fly-bottom">
             <img src="/Mundial.png" className="w-full h-auto object-contain  drop-shadow-[0_35px_60px_rgba(0,0,0,0.9)]" alt="Camiseta Mundial"/>
           </div>
 
           {/* ⚽ BOLA: Viene de la Derecha */}
           {/* 🔥 POSICIÓN 🔥 -> Mueve "right-[-10%]" o "bottom-[0%]" o el tamaño "w-[40%]" */}
-          <div className="absolute z-40 w-40 md:w-56 md:-bottom-6 bottom-0 right-10 md:right-6 animate-fly-right">
+          <div className="absolute z-20 w-40 md:w-56 md:-bottom-6 bottom-0 right-10 md:right-6 animate-fly-right">
             <img src="/Bola.png" className="w-full h-auto object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.7)]" alt="Bola"/>
           </div>
 
