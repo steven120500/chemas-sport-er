@@ -48,12 +48,19 @@ function diffProduct(prev, next) {
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
   
-  // 🔥 CORRECCIÓN: Convertir ambos a booleano estricto para evitar el "No -> No"
+  // Convertir ambos a booleano estricto para evitar el "No -> No"
   const prevMundial = Boolean(prev.isMundial2026);
   const nextMundial = Boolean(next.isMundial2026);
   
   if (prevMundial !== nextMundial) {
     changes.push(`Mundial 2026: ${prevMundial ? 'Sí' : 'No'} → ${nextMundial ? 'Sí' : 'No'}`);
+  }
+
+  // 🔥 NUEVO: Registrar cambio de tienda en el historial
+  const prevTienda = prev.tienda || 'tienda_uno';
+  const nextTienda = next.tienda || 'tienda_uno';
+  if (prevTienda !== nextTienda) {
+    changes.push(`tienda: "${prevTienda}" → "${nextTienda}"`);
   }
 
   changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
@@ -130,8 +137,10 @@ router.post('/', upload.any(), async (req, res) => {
 
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
       
-      // ⭐ NUEVO: Atrapar el checkbox del Mundial 2026
-      isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true
+      isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
+
+      // ⭐ NUEVO: Guardar la tienda
+      tienda: req.body.tienda || 'tienda_uno'
     });
 
     await History.create({
@@ -139,7 +148,7 @@ router.post('/', upload.any(), async (req, res) => {
       action: 'creó producto',
       item: `${product.name} (${product.type})`,
       date: new Date(),
-      details: `imagen: ${imageSrc} | descuento: ${product.discountPrice}`,
+      details: `imagen: ${imageSrc} | descuento: ${product.discountPrice} | tienda: ${product.tienda}`,
     });
 
     res.status(201).json(product);
@@ -191,9 +200,13 @@ router.put('/:id', async (req, res) => {
       update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
     }
     
-    // ⭐ NUEVO: Actualizar el check del mundial en la base de datos
     if (req.body.isMundial2026 !== undefined) {
       update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
+    }
+
+    // ⭐ NUEVO: Actualizar tienda
+    if (req.body.tienda !== undefined) {
+      update.tienda = req.body.tienda;
     }
 
     // Manejo de imágenes
@@ -302,7 +315,6 @@ router.get('/', async (req, res) => {
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
     
-    // ✅ 1. LEEMOS EL PARÁMETRO DE ORDENAMIENTO
     const sortParam = req.query.sort; 
 
     const find = {};
@@ -340,7 +352,6 @@ router.get('/', async (req, res) => {
     else if (type === 'Populares') {
       find.isPopular = true;
     }
-    // ⭐ NUEVO: Filtro para decirle a la Base de Datos que traiga los del Mundial
     else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     }
@@ -359,17 +370,16 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // ⭐ NUEVO: Agregamos isMundial2026 a los datos que se devuelven al frontend
+    // ⭐ NUEVO: Se agrega "tienda" a la proyección para enviarla al Frontend
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 tienda';
 
-    // ✅ 2. DEFINIMOS EL OBJETO DE ORDENAMIENTO
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([
       Product.find(find)
         .select(projection)
-        .sort(sortOptions) // ✅ 3. APLICAMOS EL ORDEN AQUÍ
+        .sort(sortOptions) 
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),

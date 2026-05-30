@@ -58,6 +58,8 @@ export default function ProductModal({
 
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
+  // ⭐ NUEVO ESTADO: Tienda
+  const [editedTienda, setEditedTienda] = useState(product?.tienda || "tienda_uno");
 
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
@@ -86,6 +88,7 @@ export default function ProductModal({
 
     setEditedHidden(product?.hidden || false);
     setEditedIsMundial2026(product?.isMundial2026 || false); 
+    setEditedTienda(product?.tienda || "tienda_uno"); // ⭐ Resetear al abrir nuevo producto
 
     setLocalImages(
       product?.images?.length
@@ -152,6 +155,7 @@ export default function ProductModal({
         imageAlt: (editedName || "").trim(),
         hidden: editedHidden,
         isMundial2026: editedIsMundial2026, 
+        tienda: editedTienda, // ⭐ SE ENVÍA LA TIENDA EDITADA
       };
 
       const res = await fetch(
@@ -618,6 +622,21 @@ export default function ProductModal({
             <p className="text-xs text-yellow-800 font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                 ⚙️ Opciones del Sistema
             </p>
+            
+            {/* ⭐ SELECTOR DE TIENDA */}
+            <div className="mb-4 bg-purple-50 p-3 rounded-lg border border-purple-200">
+              <label className="block text-xs text-purple-700 font-semibold mb-2 uppercase tracking-wider">
+                Tienda de Destino (Visible en Filtros)
+              </label>
+              <select
+                value={editedTienda}
+                onChange={(e) => setEditedTienda(e.target.value)}
+                className="w-full px-4 py-2 border border-purple-300 rounded text-sm focus:ring-purple-600 focus:border-purple-600 bg-white font-semibold"
+              >
+                <option value="tienda_uno">Tienda Uno</option>
+                <option value="tienda_dos">Tienda Dos</option>
+              </select>
+            </div>
             
             <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-yellow-100 rounded transition-colors">

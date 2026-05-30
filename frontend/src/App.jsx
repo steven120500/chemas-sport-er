@@ -37,7 +37,7 @@ function buildPages(page, pages) {
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
 function App() {
-  const [showIntro, setShowIntro] = useState(true); // ⭐ ESTADO PARA EL INTRO
+  const [showIntro, setShowIntro] = useState(true); 
   const [products, setProducts] = useState([]);
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +49,9 @@ function App() {
   const [filterType, setFilterType] = useState('');
   const [filterSizes, setFilterSizes] = useState([]);
   const [showSizes, setShowSizes] = useState(false);
+
+  // ⭐ NUEVO ESTADO: Filtro de Tienda para Admin
+  const [tiendaFilter, setTiendaFilter] = useState('todos');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -238,17 +241,25 @@ function App() {
       const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!canEdit && product.hidden === true) return false;
       
-      if (filterType === 'Ofertas') return Number(product.discountPrice) > 0 && matchName;
-      if (filterType === 'Populares') return product.isPopular === true && matchName;
-      if (filterType === 'Nuevo') return matchName;
-      if (filterType === 'Mundial 2026') return product.isMundial2026 === true && matchName;
+      // 🔥 NUEVA LÓGICA DE TIENDA 🔥
+      let matchTienda = true;
+      if (isSuperUser && tiendaFilter !== "todos") {
+        // Asumimos tienda_uno si no tiene asignada para evitar que desaparezcan los productos viejos
+        const productTienda = product.tienda || "tienda_uno";
+        matchTienda = productTienda === tiendaFilter; 
+      }
+
+      if (filterType === 'Ofertas') return Number(product.discountPrice) > 0 && matchName && matchTienda;
+      if (filterType === 'Populares') return product.isPopular === true && matchName && matchTienda;
+      if (filterType === 'Nuevo') return matchName && matchTienda;
+      if (filterType === 'Mundial 2026') return product.isMundial2026 === true && matchName && matchTienda;
 
       const matchType = filterType 
         ? (product.type === filterType) || 
           (filterType === 'Balon' && (product.type === 'Balón' || product.type === 'Balones'))
         : true;
 
-      if (filterSizes.length === 0) return matchName && matchType;
+      if (filterSizes.length === 0) return matchName && matchType && matchTienda;
 
       const matchSizes = filterSizes.some((size) => {
         const stockQty = Number(product.stock?.[size] ?? 0);
@@ -256,7 +267,7 @@ function App() {
         return stockQty + bodegaQty > 0;
       });
 
-      return matchName && matchType && matchSizes;
+      return matchName && matchType && matchSizes && matchTienda;
     });
 
   return (
@@ -315,13 +326,40 @@ function App() {
 
         <div ref={pageTopRef} />
 
+        {/* ⭐ FILTRO DE INVENTARIO (SOLO SUPERUSUARIO) Arriba del buscador ⭐ */}
+        {isSuperUser && (
+          <div className="w-full max-w-7xl mx-auto px-4 mt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-purple-100/50 border border-purple-300 p-3 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-2 mb-2 sm:mb-0">
+                <span className="text-xl">🛠️</span>
+                <span className="text-sm font-black text-purple-900 uppercase tracking-tight">
+                  Filtro Administrador
+                </span>
+              </div>
+              
+              <select
+                value={tiendaFilter}
+                onChange={(e) => {
+                  setTiendaFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full sm:w-auto bg-white border-2 border-purple-400 text-purple-900 text-sm rounded-xl px-4 py-2 font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm transition-all"
+              >
+                <option value="todos">🏠 Todas las tiendas</option>
+                <option value="tienda_uno">🏬 Tienda Uno</option>
+                <option value="tienda_dos">🏪 Tienda Dos</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         <FilterBar
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             filterType={filterType}
             setFilterType={(t) => { setFilterType(t); setPage(1); }}
             onToggleTallas={() => setShowSizes(!showSizes)}
-          />
+        />
         
         <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
 
