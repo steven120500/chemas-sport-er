@@ -50,7 +50,7 @@ function App() {
   const [filterSizes, setFilterSizes] = useState([]);
   const [showSizes, setShowSizes] = useState(false);
 
-  // ⭐ NUEVO ESTADO: VISTA DE TIENDA ('todos', 'tienda1', 'tienda2')
+  // ⭐ ESTADO: VISTA DE TIENDA ('todos', 'tienda1', 'tienda2')
   const [storeView, setStoreView] = useState('todos');
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -112,7 +112,6 @@ function App() {
         page: String(p),
         limit: String(limit),
         ...(q ? { q } : {}),
-        // Si hay un filtro de tienda y filtro de talla, no usamos el del backend, lo hacemos en el frontend abajo
         ...(filterSizes.length && storeView === 'todos' ? { sizes: filterSizes.join(',') } : {}),
       });
 
@@ -237,37 +236,47 @@ function App() {
   ];
   const tallasBalon = ['3', '4', '5']; 
 
+  // 🔥 LÓGICA DE FILTRADO CORREGIDA 🔥
   const filteredProducts = products.filter((product) => {
-      const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (!canEdit && product.hidden === true) return false;
-      
-      // Filtros básicos
-      if (filterType === 'Ofertas' && !(Number(product.discountPrice) > 0)) return false;
-      if (filterType === 'Populares' && !product.isPopular) return false;
-      if (filterType === 'Mundial 2026' && !product.isMundial2026) return false;
-      
-      const matchType = filterType 
-        ? (product.type === filterType) || 
-          (filterType === 'Balon' && (product.type === 'Balón' || product.type === 'Balones'))
-        : true;
+    // 1. Validar si está oculto
+    if (!canEdit && product.hidden === true) return false;
 
-      // 🔥 LÓGICA DE TIENDA: Verificar tallas dependiendo de qué tienda estamos viendo
-      if (filterSizes.length > 0) {
-        const matchSizes = filterSizes.some((size) => {
-          const stockQty = Number(product.stock?.[size] ?? 0);
-          const bodegaQty = Number(product.bodega?.[size] ?? 0);
-          
-          if (isSuperUser) {
-            if (storeView === 'tienda1') return stockQty > 0;
-            if (storeView === 'tienda2') return bodegaQty > 0;
-          }
-          return (stockQty + bodegaQty) > 0;
-        });
-        if (!matchSizes) return false;
-      }
+    // 2. Buscador por nombre
+    const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchName) return false;
 
-      return matchName && matchType;
-    });
+    // 3. Verificación de Tienda y Tallas seleccionadas
+    if (filterSizes.length > 0) {
+      const matchSizes = filterSizes.some((size) => {
+        const stockQty = Number(product.stock?.[size] ?? 0);
+        const bodegaQty = Number(product.bodega?.[size] ?? 0);
+        
+        if (isSuperUser) {
+          if (storeView === 'tienda1') return stockQty > 0;
+          if (storeView === 'tienda2') return bodegaQty > 0;
+        }
+        return (stockQty + bodegaQty) > 0;
+      });
+      if (!matchSizes) return false;
+    }
+
+    // 4. Verificación de Categorías Especiales y Tipos
+    if (!filterType || filterType === 'Todos') return true;
+
+    // Filtros especiales (No son tipos)
+    if (filterType === 'Ofertas') return Number(product.discountPrice) > 0;
+    if (filterType === 'Populares') return product.isPopular === true;
+    if (filterType === 'Nuevo') return true; // El backend ya envía los nuevos ordenados
+    if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
+
+    // Filtros de tipo normal (Player, Fan, Retro, etc.)
+    if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
+      return product.type === 'Balón' || product.type === 'Balones';
+    }
+
+    // Si llega aquí, es un tipo normal (ej. 'Retro', 'Nacional')
+    return product.type === filterType;
+  });
 
   return (
     <>
@@ -328,7 +337,7 @@ function App() {
           <div className="w-full max-w-7xl mx-auto px-4 mt-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
               <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
-                📦 Vista de Inventario:
+                Vista de Inventario:
               </span>
               <div className="flex gap-2">
                 <button
@@ -497,7 +506,6 @@ function App() {
             canEdit={canEdit}
             canDelete={canDelete}
             user={user}
-            // ⭐ LE PASAMOS AL MODAL QUÉ TIENDA ESTAMOS VIENDO
             storeView={storeView}
           />
         )}

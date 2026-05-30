@@ -39,7 +39,7 @@ export default function ProductModal({
   canEdit,
   canDelete,
   user,
-  storeView = 'todos', // ⭐ RECIBE QUÉ TIENDA ESTAMOS VIENDO DESDE APP.JSX
+  storeView = 'todos',
 }) {
   const modalRef = useRef(null);
 
@@ -278,14 +278,13 @@ export default function ProductModal({
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
 
-  // ⭐ LÓGICA DE VISUALIZACIÓN POR TIENDA
   const getTotalBySize = (size) => {
-    const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0; // Tienda 1
-    const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0; // Tienda 2
+    const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0; 
+    const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0; 
     
     if (storeView === 'tienda1') return a;
     if (storeView === 'tienda2') return b;
-    return a + b; // Si está en "todos", suma los dos.
+    return a + b; 
   };
 
   return (
@@ -429,7 +428,6 @@ export default function ProductModal({
                   <FaChevronRight size={18} />
                 </button>
                 
-                {/* Indicador de imagen */}
                 <div className="absolute bottom-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
                     {idx + 1} / {localImages.length}
                 </div>
@@ -512,28 +510,32 @@ export default function ProductModal({
 
         <div className="mb-6 border-t pt-4">
             
-            {/* Si NO somos admin editando, mostramos vista normal */}
             {!canEdit || !isEditing ? (
                 <>
-                    {/* ⭐ MUESTRA DINÁMICAMENTE QUÉ TIENDA SE ESTÁ VIENDO */}
                     <p className="text-center text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">
                         Disponibilidad {storeView === 'tienda1' ? '(TIENDA #1)' : storeView === 'tienda2' ? '(TIENDA #2)' : ''}
                     </p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         {tallasVisibles.map((size) => {
                             const total = getTotalBySize(size);
                             const isAgotado = total === 0;
+                            const isTienda2 = storeView === 'tienda2';
+
                             return (
                                 <div
                                     key={size}
-                                    className={`text-center border rounded p-2 transition-colors ${
-                                        isAgotado ? 'bg-gray-50 border-gray-200' : 'bg-white border-black shadow-sm'
+                                    className={`text-center border-2 rounded-xl py-2 px-1 transition-colors ${
+                                        isAgotado 
+                                        ? 'bg-gray-50 border-gray-200 opacity-60' 
+                                        : isTienda2 
+                                            ? 'bg-purple-50 border-purple-300 shadow-sm'
+                                            : 'bg-white border-black shadow-sm'
                                     }`}
                                 >
-                                    <label className={`block text-base font-black ${isAgotado ? 'text-gray-400' : 'text-black'}`}>
+                                    <label className={`block text-lg font-black ${isAgotado ? 'text-gray-400' : isTienda2 ? 'text-purple-900' : 'text-black'}`}>
                                         {size}
                                     </label>
-                                    <p className={`text-xs mt-1 font-semibold ${
+                                    <p className={`text-xs mt-0.5 font-bold uppercase tracking-wider ${
                                         isAgotado ? 'text-red-500' : total === 1 ? 'text-orange-500' : 'text-green-600'
                                     }`}>
                                         {isAgotado ? 'Agotado' : `${total} disp.`}
@@ -544,18 +546,18 @@ export default function ProductModal({
                     </div>
                 </>
             ) : (
-                /* 🔥 MODO EDICIÓN DE INVENTARIO SÚPER CLARO */
-                <div className="bg-gray-50 rounded-xl p-4 border-2 border-dashed border-gray-300">
-                    <p className="text-center font-black text-gray-800 uppercase tracking-widest mb-3 text-sm">
+                /* 🔥 MODO EDICIÓN DE INVENTARIO (NUEVOS ESTILOS) */
+                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 shadow-sm">
+                    <p className="text-center font-black text-gray-800 uppercase tracking-widest mb-4 text-sm">
                         Modificando Inventario
                     </p>
                     
-                    {/* Botones de Tienda Gigantes */}
-                    <div className="flex gap-2 mb-4">
+                    {/* Botones de Tienda */}
+                    <div className="flex gap-2 mb-5">
                         <button
-                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
                                 invMode === "stock" 
-                                ? "bg-black border-black text-white shadow-lg transform scale-[1.02]" 
+                                ? "bg-black border-black text-white shadow-md transform scale-[1.02]" 
                                 : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
                             }`}
                             onClick={() => setInvMode("stock")}
@@ -565,10 +567,10 @@ export default function ProductModal({
                         </button>
                         
                         <button
-                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
                                 invMode === "bodega" 
-                                ? "bg-black border-black text-white shadow-lg transform scale-[1.02]" 
-                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
+                                ? "bg-purple-600 border-purple-600 text-white shadow-md transform scale-[1.02]" 
+                                : "bg-white border-gray-200 text-gray-500 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200"
                             }`}
                             onClick={() => setInvMode("bodega")}
                         >
@@ -578,29 +580,39 @@ export default function ProductModal({
                     </div>
 
                     {/* Contenedor de tallas */}
-                    <div className={`p-4 rounded-lg border-2 shadow-inner transition-colors duration-300 ${
-                        invMode === "stock" ? "bg-gray-100 border-gray-300" : "bg-gray-200 border-gray-400"
+                    <div className={`p-5 rounded-xl border-2 shadow-inner transition-colors duration-300 ${
+                        invMode === "stock" ? "bg-gray-100 border-gray-300" : "bg-purple-50 border-purple-300"
                     }`}>
-                        <div className="flex items-center justify-center mb-4 text-sm font-bold">
+                        <div className="flex items-center justify-center mb-6 text-sm font-bold text-gray-700">
                             Estás editando: 
-                            <span className={`ml-2 px-2 py-1 rounded text-white ${invMode === "stock" ? "bg-black" : "bg-gray-800"}`}>
+                            <span className={`ml-2 px-3 py-1 rounded-md text-white shadow-sm ${invMode === "stock" ? "bg-black" : "bg-purple-600"}`}>
                                 {invMode === "stock" ? "TIENDA #1" : "TIENDA #2 (BODEGA)"}
                             </span>
                         </div>
                         
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-3 gap-y-5">
                             {tallasVisibles.map((size) => {
                                 const inv = getInventoryToShow();
                                 const currentVal = inv[size] ?? 0;
+
+                                // Colores dinámicos para los inputs según la tienda seleccionada
+                                const inputColors = invMode === "stock" 
+                                    ? "focus:border-black focus:ring-black/20 text-black border-gray-300" 
+                                    : "focus:border-purple-600 focus:ring-purple-600/20 text-purple-900 border-purple-300";
+                                
+                                const labelColors = invMode === "stock"
+                                    ? "border-gray-300 text-gray-700"
+                                    : "border-purple-300 text-purple-800";
+
                                 return (
-                                    <div key={size} className="relative">
-                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-white px-2 rounded-full border border-gray-300 text-xs font-bold text-gray-700 shadow-sm z-10">
+                                    <div key={size} className="relative mt-2">
+                                        <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 bg-white px-3 py-0.5 rounded-full border text-xs font-black shadow-sm z-10 ${labelColors}`}>
                                             {size}
                                         </div>
                                         <input
                                             type="number"
                                             min="0"
-                                            className={`w-full h-12 pt-3 border-2 rounded-lg text-center font-black text-lg focus:outline-none transition-colors focus:border-black text-black ${currentVal === 0 ? 'bg-white opacity-60' : 'bg-white shadow-sm'}`}
+                                            className={`w-full h-14 pt-2 border-2 rounded-xl text-center font-black text-xl focus:outline-none focus:ring-4 transition-all ${inputColors} ${currentVal === 0 ? 'bg-white/80 opacity-70 hover:opacity-100 hover:bg-white' : 'bg-white shadow-md'}`}
                                             value={currentVal === 0 ? "" : currentVal}
                                             placeholder="0"
                                             onChange={(e) => handleStockChange(size, e.target.value)}
