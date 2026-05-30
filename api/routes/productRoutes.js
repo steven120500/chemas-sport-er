@@ -12,13 +12,11 @@ const upload = multer({ storage });
 
 /* =========================== Helpers ============================ */
 
-// Tallas permitidas (incluye BALONES)
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
 
-// Identificar quién hizo el cambio
 function whoDidIt(req) {
   return req.user?.name ||
          req.user?.email ||
@@ -27,7 +25,6 @@ function whoDidIt(req) {
          'Sistema';
 }
 
-// Mostrar cambios de inventario
 function diffInv(label, prev = {}, next = {}) {
   const sizes = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
   const out = [];
@@ -39,7 +36,6 @@ function diffInv(label, prev = {}, next = {}) {
   return out;
 }
 
-// Mostrar cambios generales
 function diffProduct(prev, next) {
   const changes = [];
   if (prev.name !== next.name) changes.push(`nombre: "${prev.name}" → "${next.name}"`);
@@ -48,7 +44,6 @@ function diffProduct(prev, next) {
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
   
-  // 🔥 CORRECCIÓN: Convertir ambos a booleano estricto para evitar el "No -> No"
   const prevMundial = Boolean(prev.isMundial2026);
   const nextMundial = Boolean(next.isMundial2026);
   
@@ -62,7 +57,6 @@ function diffProduct(prev, next) {
   return changes;
 }
 
-// Subir 1 imagen a Cloudinary
 function uploadToCloudinary(buffer) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -73,7 +67,6 @@ function uploadToCloudinary(buffer) {
   });
 }
 
-// Limpieza de inventario
 function sanitizeInv(obj) {
   const clean = {};
   for (const [size, qty] of Object.entries(obj || {})) {
@@ -99,7 +92,6 @@ router.post('/', upload.any(), async (req, res) => {
     const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
 
-    // Stock
     let stock = {};
     try {
       if (typeof req.body.stock === 'string') stock = JSON.parse(req.body.stock);
@@ -109,7 +101,6 @@ router.post('/', upload.any(), async (req, res) => {
 
     const cleanStock = sanitizeInv(stock);
 
-    // Bodega
     let bodega = {};
     try {
       if (typeof req.body.bodega === 'string') bodega = JSON.parse(req.body.bodega);
@@ -127,10 +118,7 @@ router.post('/', upload.any(), async (req, res) => {
       bodega: cleanBodega,
       images,
       imageSrc,
-
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
-      
-      // ⭐ NUEVO: Atrapar el checkbox del Mundial 2026
       isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true
     });
 
@@ -186,17 +174,14 @@ router.put('/:id', async (req, res) => {
       bodega: nextBodega,
     };
 
-    // actualizar hidden y Mundial 2026
     if (req.body.hidden !== undefined) {
       update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
     }
     
-    // ⭐ NUEVO: Actualizar el check del mundial en la base de datos
     if (req.body.isMundial2026 !== undefined) {
       update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     }
 
-    // Manejo de imágenes
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -301,15 +286,12 @@ router.get('/', async (req, res) => {
     const q     = (req.query.q || '').trim();
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
+    const storeView = (req.query.storeView || '').trim(); // 🔥 RECIBIMOS LA TIENDA
     
-    // ✅ 1. LEEMOS EL PARÁMETRO DE ORDENAMIENTO
     const sortParam = req.query.sort; 
 
     const find = {};
 
-    /* =====================================================
-       🔥 CONTROL DE OCULTOS (SUPERADMIN, ROLES, HEADER)
-       ===================================================== */
     const user = req.user || {};
     let canSeeHidden = false;
 
@@ -340,7 +322,6 @@ router.get('/', async (req, res) => {
     else if (type === 'Populares') {
       find.isPopular = true;
     }
-    // ⭐ NUEVO: Filtro para decirle a la Base de Datos que traiga los del Mundial
     else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     }
@@ -348,28 +329,35 @@ router.get('/', async (req, res) => {
       find.type = type;
     }
     
-    /* Filtro por tallas */
-    if (sizes) {
-      const arr = sizes.split(',').map(s => s.trim()).filter(Boolean);
-      if (arr.length) {
-        find.$or = arr.flatMap(size => ([
-          { [`stock.${size}`]: { $gt: 0 } },
-          { [`bodega.${size}`]: { $gt: 0 } },
-        ]));
-      }
+    /* 🔥 FILTRO MÁGICO DE BASE DE DATOS PARA EVITAR HUECOS 🔥 */
+    const allSizesArray = Array.from(ALL_SIZES);
+    const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    if (storeView === 'tienda1') {
+      // Solo devolver camisas que tengan al menos 1 talla en stock
+      const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
+      find.$or = checkSizes.map(size => ({ [`stock.${size}`]: { $gt: 0 } }));
+    } else if (storeView === 'tienda2') {
+      // Solo devolver camisas que tengan al menos 1 talla en bodega
+      const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
+      find.$or = checkSizes.map(size => ({ [`bodega.${size}`]: { $gt: 0 } }));
+    } else if (sizesArr.length > 0) {
+      // Vista normal (Todos), pero el usuario seleccionó tallas específicas
+      find.$or = sizesArr.flatMap(size => ([
+        { [`stock.${size}`]: { $gt: 0 } },
+        { [`bodega.${size}`]: { $gt: 0 } },
+      ]));
     }
 
-    // ⭐ NUEVO: Agregamos isMundial2026 a los datos que se devuelven al frontend
     const projection =
       'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026';
 
-    // ✅ 2. DEFINIMOS EL OBJETO DE ORDENAMIENTO
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([
       Product.find(find)
         .select(projection)
-        .sort(sortOptions) // ✅ 3. APLICAMOS EL ORDEN AQUÍ
+        .sort(sortOptions) 
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),

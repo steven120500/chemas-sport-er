@@ -108,11 +108,13 @@ function App() {
 
     setLoading(true);
     try {
+      // 🔥 AHORA LE ENVIAMOS LA TIENDA AL BACKEND PARA QUE NO HAYA HUECOS 🔥
       const params = new URLSearchParams({
         page: String(p),
         limit: String(limit),
         ...(q ? { q } : {}),
-        ...(filterSizes.length && storeView === 'todos' ? { sizes: filterSizes.join(',') } : {}),
+        ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
+        ...(isSuperUser && storeView !== 'todos' ? { storeView } : {})
       });
 
       if (tp === 'Nuevo') {
@@ -236,45 +238,24 @@ function App() {
   ];
   const tallasBalon = ['3', '4', '5']; 
 
-  // 🔥 LÓGICA DE FILTRADO CORREGIDA 🔥
+  // 🔥 LÓGICA DE FILTRADO LIMPIA (El backend ya hace el trabajo pesado) 🔥
   const filteredProducts = products.filter((product) => {
-    // 1. Validar si está oculto
     if (!canEdit && product.hidden === true) return false;
 
-    // 2. Buscador por nombre
     const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchName) return false;
 
-    // 3. Verificación de Tienda y Tallas seleccionadas
-    if (filterSizes.length > 0) {
-      const matchSizes = filterSizes.some((size) => {
-        const stockQty = Number(product.stock?.[size] ?? 0);
-        const bodegaQty = Number(product.bodega?.[size] ?? 0);
-        
-        if (isSuperUser) {
-          if (storeView === 'tienda1') return stockQty > 0;
-          if (storeView === 'tienda2') return bodegaQty > 0;
-        }
-        return (stockQty + bodegaQty) > 0;
-      });
-      if (!matchSizes) return false;
-    }
-
-    // 4. Verificación de Categorías Especiales y Tipos
     if (!filterType || filterType === 'Todos') return true;
 
-    // Filtros especiales (No son tipos)
     if (filterType === 'Ofertas') return Number(product.discountPrice) > 0;
     if (filterType === 'Populares') return product.isPopular === true;
-    if (filterType === 'Nuevo') return true; // El backend ya envía los nuevos ordenados
+    if (filterType === 'Nuevo') return true; 
     if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
 
-    // Filtros de tipo normal (Player, Fan, Retro, etc.)
     if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
       return product.type === 'Balón' || product.type === 'Balones';
     }
 
-    // Si llega aquí, es un tipo normal (ej. 'Retro', 'Nacional')
     return product.type === filterType;
   });
 
@@ -337,11 +318,11 @@ function App() {
           <div className="w-full max-w-7xl mx-auto px-4 mt-6">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
               <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
-                Vista de Inventario:
+                📦 Vista de Inventario:
               </span>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setStoreView('todos')}
+                  onClick={() => { setStoreView('todos'); setPage(1); }}
                   className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                     storeView === 'todos' 
                       ? 'bg-black text-white border-black shadow-md' 
@@ -351,7 +332,7 @@ function App() {
                   Todas
                 </button>
                 <button
-                  onClick={() => setStoreView('tienda1')}
+                  onClick={() => { setStoreView('tienda1'); setPage(1); }}
                   className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                     storeView === 'tienda1' 
                       ? 'bg-black text-white border-black shadow-md' 
@@ -361,7 +342,7 @@ function App() {
                   Tienda #1
                 </button>
                 <button
-                  onClick={() => setStoreView('tienda2')}
+                  onClick={() => { setStoreView('tienda2'); setPage(1); }}
                   className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                     storeView === 'tienda2' 
                       ? 'bg-black text-white border-black shadow-md' 
@@ -404,7 +385,10 @@ function App() {
                           return (
                             <button
                               key={size}
-                              onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                              onClick={() => {
+                                setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                setPage(1);
+                              }}
                               className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                                 isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                               }`}
@@ -425,7 +409,10 @@ function App() {
                             return (
                               <button
                                 key={size}
-                                onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                                onClick={() => {
+                                  setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                  setPage(1);
+                                }}
                                 className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                                   isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                 }`}
@@ -444,7 +431,10 @@ function App() {
                             return (
                               <button
                                 key={size}
-                                onClick={() => setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size])}
+                                onClick={() => {
+                                  setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                  setPage(1);
+                                }}
                                 className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                                   isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                 }`}
@@ -488,7 +478,9 @@ function App() {
             <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
               {filterSizes.length > 0
                 ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
-                : 'No tenemos productos disponibles en este momento.'}
+                : storeView !== 'todos'
+                  ? `No hay inventario disponible para la tienda seleccionada.`
+                  : 'No tenemos productos disponibles en este momento.'}
             </div>
           )}
         </div>
