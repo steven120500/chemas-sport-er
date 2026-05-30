@@ -39,6 +39,7 @@ export default function ProductModal({
   canEdit,
   canDelete,
   user,
+  storeView = 'todos', // ⭐ RECIBE QUÉ TIENDA ESTAMOS VIENDO DESDE APP.JSX
 }) {
   const modalRef = useRef(null);
 
@@ -58,8 +59,6 @@ export default function ProductModal({
 
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
-  // ⭐ NUEVO ESTADO: Tienda
-  const [editedTienda, setEditedTienda] = useState(product?.tienda || "tienda_uno");
 
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
@@ -88,7 +87,6 @@ export default function ProductModal({
 
     setEditedHidden(product?.hidden || false);
     setEditedIsMundial2026(product?.isMundial2026 || false); 
-    setEditedTienda(product?.tienda || "tienda_uno"); // ⭐ Resetear al abrir nuevo producto
 
     setLocalImages(
       product?.images?.length
@@ -155,7 +153,6 @@ export default function ProductModal({
         imageAlt: (editedName || "").trim(),
         hidden: editedHidden,
         isMundial2026: editedIsMundial2026, 
-        tienda: editedTienda, // ⭐ SE ENVÍA LA TIENDA EDITADA
       };
 
       const res = await fetch(
@@ -281,10 +278,14 @@ export default function ProductModal({
     product.discountPrice !== null &&
     Number(product.discountPrice) > 0;
 
+  // ⭐ LÓGICA DE VISUALIZACIÓN POR TIENDA
   const getTotalBySize = (size) => {
-    const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0;
-    const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0;
-    return a + b;
+    const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0; // Tienda 1
+    const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0; // Tienda 2
+    
+    if (storeView === 'tienda1') return a;
+    if (storeView === 'tienda2') return b;
+    return a + b; // Si está en "todos", suma los dos.
   };
 
   return (
@@ -509,14 +510,14 @@ export default function ProductModal({
           </div>
         )}
 
-        {/* ⭐ SECCIÓN DE INVENTARIO MEJORADA */}
         <div className="mb-6 border-t pt-4">
             
             {/* Si NO somos admin editando, mostramos vista normal */}
             {!canEdit || !isEditing ? (
                 <>
+                    {/* ⭐ MUESTRA DINÁMICAMENTE QUÉ TIENDA SE ESTÁ VIENDO */}
                     <p className="text-center text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">
-                        Disponibilidad
+                        Disponibilidad {storeView === 'tienda1' ? '(TIENDA #1)' : storeView === 'tienda2' ? '(TIENDA #2)' : ''}
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                         {tallasVisibles.map((size) => {
@@ -566,7 +567,7 @@ export default function ProductModal({
                         <button
                             className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
                                 invMode === "bodega" 
-                                ? "bg-indigo-600 border-indigo-600 text-white shadow-lg transform scale-[1.02]" 
+                                ? "bg-black border-black text-white shadow-lg transform scale-[1.02]" 
                                 : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
                             }`}
                             onClick={() => setInvMode("bodega")}
@@ -576,13 +577,13 @@ export default function ProductModal({
                         </button>
                     </div>
 
-                    {/* Contenedor de tallas coloreado según tienda */}
+                    {/* Contenedor de tallas */}
                     <div className={`p-4 rounded-lg border-2 shadow-inner transition-colors duration-300 ${
-                        invMode === "stock" ? "bg-gray-100 border-gray-300" : "bg-indigo-50 border-indigo-200"
+                        invMode === "stock" ? "bg-gray-100 border-gray-300" : "bg-gray-200 border-gray-400"
                     }`}>
                         <div className="flex items-center justify-center mb-4 text-sm font-bold">
                             Estás editando: 
-                            <span className={`ml-2 px-2 py-1 rounded text-white ${invMode === "stock" ? "bg-black" : "bg-indigo-600"}`}>
+                            <span className={`ml-2 px-2 py-1 rounded text-white ${invMode === "stock" ? "bg-black" : "bg-gray-800"}`}>
                                 {invMode === "stock" ? "TIENDA #1" : "TIENDA #2 (BODEGA)"}
                             </span>
                         </div>
@@ -599,11 +600,7 @@ export default function ProductModal({
                                         <input
                                             type="number"
                                             min="0"
-                                            className={`w-full h-12 pt-3 border-2 rounded-lg text-center font-black text-lg focus:outline-none transition-colors ${
-                                                invMode === "stock" 
-                                                ? "focus:border-black text-black" 
-                                                : "focus:border-indigo-500 text-indigo-900"
-                                            } ${currentVal === 0 ? 'bg-white opacity-60' : 'bg-white shadow-sm'}`}
+                                            className={`w-full h-12 pt-3 border-2 rounded-lg text-center font-black text-lg focus:outline-none transition-colors focus:border-black text-black ${currentVal === 0 ? 'bg-white opacity-60' : 'bg-white shadow-sm'}`}
                                             value={currentVal === 0 ? "" : currentVal}
                                             placeholder="0"
                                             onChange={(e) => handleStockChange(size, e.target.value)}
@@ -622,21 +619,6 @@ export default function ProductModal({
             <p className="text-xs text-yellow-800 font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                 ⚙️ Opciones del Sistema
             </p>
-            
-            {/* ⭐ SELECTOR DE TIENDA */}
-            <div className="mb-4 bg-purple-50 p-3 rounded-lg border border-purple-200">
-              <label className="block text-xs text-purple-700 font-semibold mb-2 uppercase tracking-wider">
-                Tienda de Destino (Visible en Filtros)
-              </label>
-              <select
-                value={editedTienda}
-                onChange={(e) => setEditedTienda(e.target.value)}
-                className="w-full px-4 py-2 border border-purple-300 rounded text-sm focus:ring-purple-600 focus:border-purple-600 bg-white font-semibold"
-              >
-                <option value="tienda_uno">Tienda Uno</option>
-                <option value="tienda_dos">Tienda Dos</option>
-              </select>
-            </div>
             
             <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-yellow-100 rounded transition-colors">

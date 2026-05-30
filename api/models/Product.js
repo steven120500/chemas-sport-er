@@ -100,15 +100,6 @@ const productSchema = new mongoose.Schema(
     isMundial2026: {
       type: Boolean,
       default: false
-    },
-
-    /* =========================
-       🔥 NUEVO CAMPO PARA TIENDA 🔥
-       ========================= */
-    tienda: {
-      type: String,
-      enum: ['tienda_uno', 'tienda_dos'],
-      default: 'tienda_uno'
     }
   },
   { timestamps: true }

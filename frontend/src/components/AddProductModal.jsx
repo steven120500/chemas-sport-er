@@ -79,9 +79,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
   const [isNew, setIsNew] = useState(false);   
   const [hidden, setHidden] = useState(false); 
-  const [isMundial2026, setIsMundial2026] = useState(false); 
-  // ⭐ NUEVO ESTADO: Tienda
-  const [tienda, setTienda] = useState("tienda_uno"); 
+  const [isMundial2026, setIsMundial2026] = useState(false); // ⭐ NUEVO ESTADO: Mundial 2026
 
   const [loading, setLoading] = useState(false);
 
@@ -187,9 +185,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
       formData.append("isNew", isNew ? "true" : "false");
       formData.append("hidden", hidden ? "true" : "false"); 
-      formData.append("isMundial2026", isMundial2026 ? "true" : "false"); 
-      // ⭐ SE ENVÍA EL CAMPO DE TIENDA AL BACKEND
-      formData.append("tienda", tienda);
+      formData.append("isMundial2026", isMundial2026 ? "true" : "false"); // ⭐ SE ENVÍA MUNDIAL 2026
 
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
@@ -336,7 +332,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <span className="text-sm font-medium text-gray-700">Ocultar este producto (No visible al público)</span>
             </label>
 
-            {/* Mundial 2026 */}
+            {/* ⭐ NUEVO: Mundial 2026 */}
             <label className="flex items-center gap-2 cursor-pointer mt-1">
               <input
                 type="checkbox"
@@ -349,33 +345,18 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
           </div>
         </div>
 
-        {/* ⭐ ======= SELECTOR DE TIENDA ======= ⭐ */}
-        <div className="mb-4 bg-purple-50 p-3 rounded-lg border border-purple-200">
-          <label className="block text-xs text-purple-700 font-semibold mb-2 uppercase tracking-wider">
-            Tienda de Destino (Visible en Filtros)
-          </label>
-          <select
-            value={tienda}
-            onChange={(e) => setTienda(e.target.value)}
-            className="w-full px-4 py-2 border border-purple-300 rounded text-sm focus:ring-purple-600 focus:border-purple-600 bg-white"
-          >
-            <option value="tienda_uno">Tienda Uno</option>
-            <option value="tienda_dos">Tienda Dos</option>
-          </select>
-        </div>
-
         {/* ======= SELECTOR DE INVENTARIO ======= */}
         <div className="mb-3">
           <label className="block text-xs text-gray-500 font-semibold mb-1 uppercase tracking-wider">
-            Inventario a editar (Cantidades)
+            Inventario a editar
           </label>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded text-sm focus:ring-black focus:border-black bg-white"
           >
-            <option value="stock">Inventario Tienda #1</option>
-            <option value="bodega">Inventario Tienda #2</option>
+            <option value="stock">Tienda #1</option>
+            <option value="bodega">Tienda #2</option>
           </select>
         </div>
 

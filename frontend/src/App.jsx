@@ -50,8 +50,8 @@ function App() {
   const [filterSizes, setFilterSizes] = useState([]);
   const [showSizes, setShowSizes] = useState(false);
 
-  // ⭐ NUEVO ESTADO: Filtro de Tienda para Admin
-  const [tiendaFilter, setTiendaFilter] = useState('todos');
+  // ⭐ NUEVO ESTADO: VISTA DE TIENDA ('todos', 'tienda1', 'tienda2')
+  const [storeView, setStoreView] = useState('todos');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -112,7 +112,8 @@ function App() {
         page: String(p),
         limit: String(limit),
         ...(q ? { q } : {}),
-        ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
+        // Si hay un filtro de tienda y filtro de talla, no usamos el del backend, lo hacemos en el frontend abajo
+        ...(filterSizes.length && storeView === 'todos' ? { sizes: filterSizes.join(',') } : {}),
       });
 
       if (tp === 'Nuevo') {
@@ -178,7 +179,7 @@ function App() {
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [page, searchTerm, filterType, filterSizes]);
+  }, [page, searchTerm, filterType, filterSizes, storeView]);
 
   useEffect(() => {
     if (products.length > 0) fetchAllForCounts();
@@ -235,49 +236,45 @@ function App() {
     { size:'28', label:'28 (Talla 14/16)' },
   ];
   const tallasBalon = ['3', '4', '5']; 
-  const allSizes = [...tallasAdulto, '16','18','20','22','24','26','28', ...tallasBalon];
 
   const filteredProducts = products.filter((product) => {
       const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!canEdit && product.hidden === true) return false;
       
-      // 🔥 NUEVA LÓGICA DE TIENDA 🔥
-      let matchTienda = true;
-      if (isSuperUser && tiendaFilter !== "todos") {
-        // Asumimos tienda_uno si no tiene asignada para evitar que desaparezcan los productos viejos
-        const productTienda = product.tienda || "tienda_uno";
-        matchTienda = productTienda === tiendaFilter; 
-      }
-
-      if (filterType === 'Ofertas') return Number(product.discountPrice) > 0 && matchName && matchTienda;
-      if (filterType === 'Populares') return product.isPopular === true && matchName && matchTienda;
-      if (filterType === 'Nuevo') return matchName && matchTienda;
-      if (filterType === 'Mundial 2026') return product.isMundial2026 === true && matchName && matchTienda;
-
+      // Filtros básicos
+      if (filterType === 'Ofertas' && !(Number(product.discountPrice) > 0)) return false;
+      if (filterType === 'Populares' && !product.isPopular) return false;
+      if (filterType === 'Mundial 2026' && !product.isMundial2026) return false;
+      
       const matchType = filterType 
         ? (product.type === filterType) || 
           (filterType === 'Balon' && (product.type === 'Balón' || product.type === 'Balones'))
         : true;
 
-      if (filterSizes.length === 0) return matchName && matchType && matchTienda;
+      // 🔥 LÓGICA DE TIENDA: Verificar tallas dependiendo de qué tienda estamos viendo
+      if (filterSizes.length > 0) {
+        const matchSizes = filterSizes.some((size) => {
+          const stockQty = Number(product.stock?.[size] ?? 0);
+          const bodegaQty = Number(product.bodega?.[size] ?? 0);
+          
+          if (isSuperUser) {
+            if (storeView === 'tienda1') return stockQty > 0;
+            if (storeView === 'tienda2') return bodegaQty > 0;
+          }
+          return (stockQty + bodegaQty) > 0;
+        });
+        if (!matchSizes) return false;
+      }
 
-      const matchSizes = filterSizes.some((size) => {
-        const stockQty = Number(product.stock?.[size] ?? 0);
-        const bodegaQty = Number(product.bodega?.[size] ?? 0);
-        return stockQty + bodegaQty > 0;
-      });
-
-      return matchName && matchType && matchSizes && matchTienda;
+      return matchName && matchType;
     });
 
   return (
     <>
-      {/* ⭐ 1. INTRO MUNDIALISTA (Aparece primero y sola) */}
       <AnimatePresence>
         {showIntro && <WorldCupIntro onFinished={() => setShowIntro(false)} />}
       </AnimatePresence>
 
-      {/* ⭐ 2. CONTENEDOR PRINCIPAL DE LA APP (Oculto mientras la intro está activa) */}
       <div className={showIntro ? "hidden" : "block min-h-screen bg-white"}>
         {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
         {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
@@ -326,29 +323,45 @@ function App() {
 
         <div ref={pageTopRef} />
 
-        {/* ⭐ FILTRO DE INVENTARIO (SOLO SUPERUSUARIO) Arriba del buscador ⭐ */}
+        {/* ⭐ BOTONES EN BLANCO Y NEGRO PARA SUPERUSUARIO ⭐ */}
         {isSuperUser && (
           <div className="w-full max-w-7xl mx-auto px-4 mt-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-purple-100/50 border border-purple-300 p-3 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-2 mb-2 sm:mb-0">
-                <span className="text-xl">🛠️</span>
-                <span className="text-sm font-black text-purple-900 uppercase tracking-tight">
-                  Filtro Administrador
-                </span>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
+              <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
+                📦 Vista de Inventario:
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStoreView('todos')}
+                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                    storeView === 'todos' 
+                      ? 'bg-black text-white border-black shadow-md' 
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                  }`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setStoreView('tienda1')}
+                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                    storeView === 'tienda1' 
+                      ? 'bg-black text-white border-black shadow-md' 
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                  }`}
+                >
+                  Tienda #1
+                </button>
+                <button
+                  onClick={() => setStoreView('tienda2')}
+                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                    storeView === 'tienda2' 
+                      ? 'bg-black text-white border-black shadow-md' 
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                  }`}
+                >
+                  Tienda #2
+                </button>
               </div>
-              
-              <select
-                value={tiendaFilter}
-                onChange={(e) => {
-                  setTiendaFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full sm:w-auto bg-white border-2 border-purple-400 text-purple-900 text-sm rounded-xl px-4 py-2 font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm transition-all"
-              >
-                <option value="todos">🏠 Todas las tiendas</option>
-                <option value="tienda_uno">🏬 Tienda Uno</option>
-                <option value="tienda_dos">🏪 Tienda Dos</option>
-              </select>
             </div>
           </div>
         )}
@@ -465,7 +478,7 @@ function App() {
           ) : (
             <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
               {filterSizes.length > 0
-                ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora.`
+                ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
                 : 'No tenemos productos disponibles en este momento.'}
             </div>
           )}
@@ -484,6 +497,8 @@ function App() {
             canEdit={canEdit}
             canDelete={canDelete}
             user={user}
+            // ⭐ LE PASAMOS AL MODAL QUÉ TIENDA ESTAMOS VIENDO
+            storeView={storeView}
           />
         )}
 
