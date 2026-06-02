@@ -218,6 +218,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+
+
       
       {/* 🔥 FONDO DIFUMINADO PREMIUM 🔥 */}
       <div
@@ -227,7 +229,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
 
       {/* 🔥 CAJA DEL MODAL 🔥 */}
       <div 
-        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col z-10 animate-fade-in-up overflow-hidden max-h-[95vh] sm:max-h-[90vh]"
+        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col z-10 animate-fade-in-up"
+        style={{ maxHeight: '85vh' }} // Forzamos una altura máxima estricta para garantizar el scroll
       >
         
         {/* 🔥 BOTÓN DE CERRAR 🔥 */}
