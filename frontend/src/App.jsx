@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
-import ProductModal from './components/ProductModal';
+import ProductScreen from './components/ProductScreen'; 
 import AddProductModal from './components/AddProductModal';
 import LoginModal from './components/LoginModal';
 import RegisterUserModal from './components/RegisterUserModal';
@@ -17,7 +17,6 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
 import TopBanner from './components/TopBanner';
-import UserDropdown from './components/UserDropDown';
 import UserListModal from './components/UserListModal';
 import HistoryModal from './components/HistoryModal';
 import Medidas from './components/Medidas';
@@ -43,14 +42,12 @@ function App() {
   const [loading, setLoading] = useState(true);
   
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterSizes, setFilterSizes] = useState([]);
   const [showSizes, setShowSizes] = useState(false);
 
-  // ⭐ ESTADO: VISTA DE TIENDA ('todos', 'tienda1', 'tienda2')
   const [storeView, setStoreView] = useState('todos');
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -66,7 +63,6 @@ function App() {
   const pages = Math.max(1, Math.ceil(total / limit));
 
   const anyModalOpen =
-    !!selectedProduct ||
     showAddModal ||
     showLogin ||
     showRegisterUserModal ||
@@ -108,7 +104,6 @@ function App() {
 
     setLoading(true);
     try {
-      // 🔥 AHORA LE ENVIAMOS LA TIENDA AL BACKEND PARA QUE NO HAYA HUECOS 🔥
       const params = new URLSearchParams({
         page: String(p),
         limit: String(limit),
@@ -173,14 +168,17 @@ function App() {
   const pageTopRef = useRef(null);
   
   useEffect(() => {
-    fetchProducts({ page, q: searchTerm, type: filterType });
-    if (pageTopRef.current) {
-      pageTopRef.current.style.scrollMarginTop = '100px'; 
-      pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Evitamos pedir la info del catálogo si estamos dentro de un producto
+    if (!selectedProduct) {
+        fetchProducts({ page, q: searchTerm, type: filterType });
+        if (pageTopRef.current) {
+        pageTopRef.current.style.scrollMarginTop = '100px'; 
+        pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
+        } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
-  }, [page, searchTerm, filterType, filterSizes, storeView]);
+  }, [page, searchTerm, filterType, filterSizes, storeView, selectedProduct]);
 
   useEffect(() => {
     if (products.length > 0) fetchAllForCounts();
@@ -193,8 +191,7 @@ function App() {
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
-      setIsModalOpen(false); 
-      setTimeout(() => setSelectedProduct(null), 300);
+      setSelectedProduct(null);
       toast.success('Producto eliminado correctamente');
       refreshCounts();
       return;
@@ -238,7 +235,6 @@ function App() {
   ];
   const tallasBalon = ['3', '4', '5']; 
 
-  // 🔥 LÓGICA DE FILTRADO LIMPIA (El backend ya hace el trabajo pesado) 🔥
   const filteredProducts = products.filter((product) => {
     if (!canEdit && product.hidden === true) return false;
 
@@ -265,243 +261,14 @@ function App() {
         {showIntro && <WorldCupIntro onFinished={() => setShowIntro(false)} />}
       </AnimatePresence>
 
-      <div className={showIntro ? "hidden" : "block min-h-screen bg-white"}>
-        {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
-        {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} />}
-        {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} roles={user?.roles || []} />}
-        {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
-
-        <TopBanner />
-        {loading && <LoadingOverlay message="Cargando productos..." />}
-
-        {!loading && allProductsForCounts?.length > 0 && (
-          <Cantidad products={allProductsForCounts} isSuperUser={isSuperUser} />
-        )}
-
-        {!anyModalOpen && (
-          <Header
-            onLoginClick={handleLoginClick}
-            onLogout={handleLogout}
-            onLogoClick={() => {
-              setFilterType('');
-              setSearchTerm('');
-              setPage(1);
-            }}
-            user={user}
-            isSuperUser={isSuperUser}
-            setShowRegisterUserModal={setShowRegisterUserModal}
-            setShowUserListModal={setShowUserListModal}
-            setShowHistoryModal={setShowHistoryModal}
-            canSeeHistory={canSeeHistory}
-          />
-        )}
-
-        {canAdd && !anyModalOpen && (
-          <button
-            className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
-            onClick={() => setShowAddModal(true)}
-            title="Añadir producto"
-          >
-            <FaPlus />
-          </button>
-        )}
-
-        <Bienvenido onNavigate={(type) => {
-          setFilterType(type);
-          setPage(1);
-        }} />
-
-        <div ref={pageTopRef} />
-
-        {/* ⭐ BOTONES EN BLANCO Y NEGRO PARA SUPERUSUARIO ⭐ */}
-        {isSuperUser && (
-          <div className="w-full max-w-7xl mx-auto px-4 mt-6">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
-              <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
-                📦 Vista de Inventario:
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setStoreView('todos'); setPage(1); }}
-                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                    storeView === 'todos' 
-                      ? 'bg-black text-white border-black shadow-md' 
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
-                  }`}
-                >
-                  Todas
-                </button>
-                <button
-                  onClick={() => { setStoreView('tienda1'); setPage(1); }}
-                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                    storeView === 'tienda1' 
-                      ? 'bg-black text-white border-black shadow-md' 
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
-                  }`}
-                >
-                  Tienda #1
-                </button>
-                <button
-                  onClick={() => { setStoreView('tienda2'); setPage(1); }}
-                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                    storeView === 'tienda2' 
-                      ? 'bg-black text-white border-black shadow-md' 
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
-                  }`}
-                >
-                  Tienda #2
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <FilterBar
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            filterType={filterType}
-            setFilterType={(t) => { setFilterType(t); setPage(1); }}
-            onToggleTallas={() => setShowSizes(!showSizes)}
-        />
+      {/* 🔥 Usamos flex-col y min-h-screen para que el Footer siempre quede al final 🔥 */}
+      <div className={showIntro ? "hidden" : "flex flex-col min-h-screen bg-white"}>
         
-        <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
-
-          <AnimatePresence>
-            {showSizes && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
-              >
-                <div className="flex flex-col gap-6 items-center p-6">
-                  {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
-                    <div className="w-full text-center">
-                      <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {tallasBalon.map((size) => {
-                          const isActive = filterSizes.includes(size);
-                          return (
-                            <button
-                              key={size}
-                              onClick={() => {
-                                setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                setPage(1);
-                              }}
-                              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                              }`}
-                            >
-                              {size}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-full text-center">
-                        <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {tallasAdulto.map((size) => {
-                            const isActive = filterSizes.includes(size);
-                            return (
-                              <button
-                                key={size}
-                                onClick={() => {
-                                  setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                  setPage(1);
-                                }}
-                                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                  isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                }`}
-                              >
-                                {size}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="w-full text-center">
-                        <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {tallasNino.map(({ size, label }) => {
-                            const isActive = filterSizes.includes(size);
-                            return (
-                              <button
-                                key={size}
-                                onClick={() => {
-                                  setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                  setPage(1);
-                                }}
-                                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                  isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                }`}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
-            <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
-            <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
-              VER MEDIDAS
-            </button>
-          </div>
-        </div>
-
-        <div id="products-section" className="px-4 grid grid-cols-2 gap-y-8 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
-          {filteredProducts.length > 0 ? (
-            filteredProducts.map((product, index) => (
-              <ProductCard
-                key={getPid(product)}
-                product={product}
-                index={index}
-                onClick={() => {
-                  setSelectedProduct(product);
-                  setTimeout(() => setIsModalOpen(true), 10);
-                }}
-                user={user}
-              />
-            ))
-          ) : (
-            <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
-              {filterSizes.length > 0
-                ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
-                : storeView !== 'todos'
-                  ? `No hay inventario disponible para la tienda seleccionada.`
-                  : 'No tenemos productos disponibles en este momento.'}
-            </div>
-          )}
-        </div>
-
-        {selectedProduct && (
-          <ProductModal
-            key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
-            product={selectedProduct}
-            isOpen={isModalOpen}
-            onClose={() => {
-              setIsModalOpen(false);
-              setTimeout(() => setSelectedProduct(null), 300);
-            }}
-            onUpdate={handleProductUpdate}
-            canEdit={canEdit}
-            canDelete={canDelete}
-            user={user}
-            storeView={storeView}
-          />
-        )}
-
+        {/* ================= MODALES GLOBALES ================= */}
+        {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
+        {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} currentUser={user} token={user?.token} />}
+        {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} />}
+        {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
         {showAddModal && (
           <AddProductModal
             user={user}
@@ -515,7 +282,6 @@ function App() {
             onCancel={() => setShowAddModal(false)}
           />
         )}
-
         {showLogin && (
           <LoginModal
             isOpen={showLogin}
@@ -529,52 +295,289 @@ function App() {
             onRegisterClick={handleRegisterClick}
           />
         )}
-
-        {pages > 1 && (
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <nav className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-              >
-                <FaChevronLeft />
-              </button>
-              {(() => {
-                const nums = buildPages(page, pages);
-                return nums.map((n, i) => {
-                  const prev = nums[i - 1];
-                  const showDots = i > 0 && n - prev > 1;
-                  return (
-                    <span key={n} className="flex">
-                      {showDots && <span className="px-2">…</span>}
-                      <button
-                        onClick={() => setPage(n)}
-                        className={`px-2 text-sm text-white py-0.5 bg-black rounded ${
-                          n === page ? 'bg-gray-600' : 'hover:bg-gray-300'
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    </span>
-                  );
-                });
-              })()}
-              <button
-                onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                disabled={page === pages}
-                className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-              >
-                <FaChevronRight />
-              </button>
-            </nav>
-          </div>
-        )}
-
-        <Footer />
-        {!anyModalOpen && <FloatingWhatsapp />}
         <ToastContainer />
         <Toaster position="top-center" reverseOrder={false} />
+
+        {/* ================= HEADER GLOBAL ================= */}
+        <TopBanner />
+        {!anyModalOpen && (
+          <Header
+            onLoginClick={handleLoginClick}
+            onLogout={handleLogout}
+            onLogoClick={() => {
+              setFilterType('');
+              setSearchTerm('');
+              setPage(1);
+              setSelectedProduct(null); // ⭐ CLAVE: Esto cierra el producto y te devuelve al catálogo
+            }}
+            user={user}
+            isSuperUser={isSuperUser}
+            setShowRegisterUserModal={setShowRegisterUserModal}
+            setShowUserListModal={setShowUserListModal}
+            setShowHistoryModal={setShowHistoryModal}
+            canSeeHistory={canSeeHistory}
+          />
+        )}
+
+        {/* ================= CONTENIDO PRINCIPAL ================= */}
+        <main className="flex-1 w-full relative">
+            {selectedProduct ? (
+            
+            <ProductScreen
+                key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
+                product={selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                onUpdate={handleProductUpdate}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                user={user}
+                storeView={storeView}
+            />
+
+            ) : (
+            <>
+                {loading && <LoadingOverlay message="Cargando productos..." />}
+
+                {!loading && allProductsForCounts?.length > 0 && (
+                <Cantidad products={allProductsForCounts} isSuperUser={isSuperUser} />
+                )}
+
+                {canAdd && !anyModalOpen && (
+                <button
+                    className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
+                    onClick={() => setShowAddModal(true)}
+                    title="Añadir producto"
+                >
+                    <FaPlus />
+                </button>
+                )}
+
+                <Bienvenido onNavigate={(type) => {
+                setFilterType(type);
+                setPage(1);
+                }} />
+
+                <div ref={pageTopRef} />
+
+                {/* BOTONES SUPERUSUARIO */}
+                {isSuperUser && (
+                <div className="w-full max-w-7xl mx-auto px-4 mt-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
+                    <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
+                        📦 Vista de Inventario:
+                    </span>
+                    <div className="flex gap-2">
+                        <button
+                        onClick={() => { setStoreView('todos'); setPage(1); }}
+                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'todos' 
+                            ? 'bg-black text-white border-black shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                        }`}
+                        >
+                        Todas
+                        </button>
+                        <button
+                        onClick={() => { setStoreView('tienda1'); setPage(1); }}
+                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'tienda1' 
+                            ? 'bg-black text-white border-black shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                        }`}
+                        >
+                        Tienda #1
+                        </button>
+                        <button
+                        onClick={() => { setStoreView('tienda2'); setPage(1); }}
+                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'tienda2' 
+                            ? 'bg-black text-white border-black shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                        }`}
+                        >
+                        Tienda #2
+                        </button>
+                    </div>
+                    </div>
+                </div>
+                )}
+
+                <FilterBar
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    filterType={filterType}
+                    setFilterType={(t) => { setFilterType(t); setPage(1); }}
+                    onToggleTallas={() => setShowSizes(!showSizes)}
+                />
+                
+                <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
+
+                <AnimatePresence>
+                    {showSizes && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
+                    >
+                        <div className="flex flex-col gap-6 items-center p-6">
+                        {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
+                            <div className="w-full text-center">
+                            <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
+                            <div className="flex flex-wrap justify-center gap-2">
+                                {tallasBalon.map((size) => {
+                                const isActive = filterSizes.includes(size);
+                                return (
+                                    <button
+                                    key={size}
+                                    onClick={() => {
+                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                        setPage(1);
+                                    }}
+                                    className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                    }`}
+                                    >
+                                    {size}
+                                    </button>
+                                );
+                                })}
+                            </div>
+                            </div>
+                        ) : (
+                            <>
+                            <div className="w-full text-center">
+                                <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                {tallasAdulto.map((size) => {
+                                    const isActive = filterSizes.includes(size);
+                                    return (
+                                    <button
+                                        key={size}
+                                        onClick={() => {
+                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                        setPage(1);
+                                        }}
+                                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {size}
+                                    </button>
+                                    );
+                                })}
+                                </div>
+                            </div>
+                            <div className="w-full text-center">
+                                <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                {tallasNino.map(({ size, label }) => {
+                                    const isActive = filterSizes.includes(size);
+                                    return (
+                                    <button
+                                        key={size}
+                                        onClick={() => {
+                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                        setPage(1);
+                                        }}
+                                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                    );
+                                })}
+                                </div>
+                            </div>
+                            </>
+                        )}
+                        </div>
+                    </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
+                    <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
+                    <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
+                    VER MEDIDAS
+                    </button>
+                </div>
+                </div>
+
+                <div id="products-section" className="px-4 grid grid-cols-2 gap-y-8 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
+                {filteredProducts.length > 0 ? (
+                    filteredProducts.map((product, index) => (
+                    <ProductCard
+                        key={getPid(product)}
+                        product={product}
+                        index={index}
+                        onClick={() => {
+                        setSelectedProduct(product);
+                        }}
+                        user={user}
+                    />
+                    ))
+                ) : (
+                    <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
+                    {filterSizes.length > 0
+                        ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
+                        : storeView !== 'todos'
+                        ? `No hay inventario disponible para la tienda seleccionada.`
+                        : 'No tenemos productos disponibles en este momento.'}
+                    </div>
+                )}
+                </div>
+
+                {pages > 1 && (
+                <div className="mt-8 mb-8 flex flex-col items-center gap-3">
+                    <nav className="flex items-center justify-center gap-2">
+                    <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
+                    >
+                        <FaChevronLeft />
+                    </button>
+                    {(() => {
+                        const nums = buildPages(page, pages);
+                        return nums.map((n, i) => {
+                        const prev = nums[i - 1];
+                        const showDots = i > 0 && n - prev > 1;
+                        return (
+                            <span key={n} className="flex">
+                            {showDots && <span className="px-2">…</span>}
+                            <button
+                                onClick={() => setPage(n)}
+                                className={`px-2 text-sm text-white py-0.5 bg-black rounded ${
+                                n === page ? 'bg-gray-600' : 'hover:bg-gray-300'
+                                }`}
+                            >
+                                {n}
+                            </button>
+                            </span>
+                        );
+                        });
+                    })()}
+                    <button
+                        onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                        disabled={page === pages}
+                        className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
+                    >
+                        <FaChevronRight />
+                    </button>
+                    </nav>
+                </div>
+                )}
+            </>
+            )}
+        </main>
+
+        {/* ================= FOOTER GLOBAL ================= */}
+        <Footer />
+        {!anyModalOpen && <FloatingWhatsapp />}
+        
       </div>
     </>
   );
