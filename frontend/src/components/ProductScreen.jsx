@@ -269,13 +269,13 @@ export default function ProductScreen({
                   <>
                     <button
                       onClick={() => setIdx((i) => (i - 1 + localImages.length) % localImages.length)}
-                      className="absolute left-4 z-10 bg-white backdrop-blur hover:bg-white text-black shadow-md p-4 rounded-full transition-all hover:scale-105"
+                      className="absolute left-4 z-10 bg-black backdrop-blur hover:bg-gray-800 text-white shadow-md p-4 rounded-full transition-all hover:scale-105"
                     >
                       <FaChevronLeft size={20} />
                     </button>
                     <button
                       onClick={() => setIdx((i) => (i + 1) % localImages.length)}
-                      className="absolute right-4 z-10 bg-white backdrop-blur hover:bg-white text-black shadow-md p-4 rounded-full transition-all hover:scale-105"
+                      className="absolute right-4 z-10 bg-black backdrop-blur hover:bg-gray-800 text-white shadow-md p-4 rounded-full transition-all hover:scale-105"
                     >
                       <FaChevronRight size={20} />
                     </button>

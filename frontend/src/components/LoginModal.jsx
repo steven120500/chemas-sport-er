@@ -74,28 +74,28 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-600"
+              className="absolute right-2 top-1 bg-white -translate-y-1/2 text-xs text-gray-600"
             >
               {showPassword ? 'No Mostrar' : 'Mostrar'}
             </button>
           </div>
 
+          <div className="flex flex-col gap-3 mt-8">
           <button
             type="submit"
-            className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+            className="w-full bg-black hover:bg-gray-900 text-white py-4 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
           >
             {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
           </button>
 
-        
-
           <button
             type="button"
             onClick={onClose}
-            className="bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400 transition"
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-4 text-sm rounded-2xl font-bold tracking-widest uppercase transition-colors"
           >
             Cancelar
           </button>
+          </div>
         </form>
       </div>
     </div>

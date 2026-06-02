@@ -42,6 +42,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   
   const [selectedProduct, setSelectedProduct] = useState(null);
+  
+  // ⭐ ESTADO PARA RECORDAR DÓNDE ESTABA EL SCROLL ⭐
+  const [savedScroll, setSavedScroll] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -168,17 +171,16 @@ function App() {
   const pageTopRef = useRef(null);
   
   useEffect(() => {
-    // Evitamos pedir la info del catálogo si estamos dentro de un producto
-    if (!selectedProduct) {
-        fetchProducts({ page, q: searchTerm, type: filterType });
-        if (pageTopRef.current) {
-        pageTopRef.current.style.scrollMarginTop = '100px'; 
-        pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
-        } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+    // ⭐ Le quitamos el if(!selectedProduct) para que solo se active cuando cambias de página o filtros
+    fetchProducts({ page, q: searchTerm, type: filterType });
+    if (pageTopRef.current) {
+      pageTopRef.current.style.scrollMarginTop = '100px'; 
+      pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [page, searchTerm, filterType, filterSizes, storeView, selectedProduct]);
+    // ⭐ Eliminamos selectedProduct de aquí para que no haga scroll raro al volver
+  }, [page, searchTerm, filterType, filterSizes, storeView]);
 
   useEffect(() => {
     if (products.length > 0) fetchAllForCounts();
@@ -192,6 +194,8 @@ function App() {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
       setSelectedProduct(null);
+      // ⭐ Restaura el scroll también si eliminas el producto
+      setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
       toast.success('Producto eliminado correctamente');
       refreshCounts();
       return;
@@ -261,7 +265,6 @@ function App() {
         {showIntro && <WorldCupIntro onFinished={() => setShowIntro(false)} />}
       </AnimatePresence>
 
-      {/* 🔥 Usamos flex-col y min-h-screen para que el Footer siempre quede al final 🔥 */}
       <div className={showIntro ? "hidden" : "flex flex-col min-h-screen bg-white"}>
         
         {/* ================= MODALES GLOBALES ================= */}
@@ -308,7 +311,7 @@ function App() {
               setFilterType('');
               setSearchTerm('');
               setPage(1);
-              setSelectedProduct(null); // ⭐ CLAVE: Esto cierra el producto y te devuelve al catálogo
+              setSelectedProduct(null); 
             }}
             user={user}
             isSuperUser={isSuperUser}
@@ -326,7 +329,11 @@ function App() {
             <ProductScreen
                 key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
                 product={selectedProduct}
-                onClose={() => setSelectedProduct(null)}
+                onClose={() => {
+                  setSelectedProduct(null);
+                  // ⭐ AL VOLVER, RESTAURAMOS EL SCROLL AL PIXEL EXACTO ⭐
+                  setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
+                }}
                 onUpdate={handleProductUpdate}
                 canEdit={canEdit}
                 canDelete={canDelete}
@@ -514,7 +521,9 @@ function App() {
                         product={product}
                         index={index}
                         onClick={() => {
-                        setSelectedProduct(product);
+                          // ⭐ AL ABRIR UN PRODUCTO, GUARDAMOS EN QUÉ PIXEL ESTÁBAMOS ⭐
+                          setSavedScroll(window.scrollY);
+                          setSelectedProduct(product);
                         }}
                         user={user}
                     />
