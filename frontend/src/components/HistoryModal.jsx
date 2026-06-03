@@ -1,17 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes, FaFilter, FaMinusCircle, FaHistory } from "react-icons/fa";
+import { FaTimes, FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt } from "react-icons/fa";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 /* --- utilidades de fecha local --- */
 function pad2(n){ return n < 10 ? `0${n}` : `${n}`; }
-function ymdLocal(d = new Date()){
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth() + 1);
-  const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;  // YYYY-MM-DD
-}
 function ymLocal(d = new Date()){
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
@@ -37,11 +31,15 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
-  // ⭐ Pestaña activa ('history' = Historial Diario, 'count' = Conteo Mensual)
+  // ⭐ Pestaña activa ('history' = Historial Diario/Rango, 'count' = Conteo Mensual)
   const [activeTab, setActiveTab] = useState("history");
 
   const [q, setQ] = useState("");
-  const [selectedDate, setSelectedDate] = useState(() => ymdLocal());
+  
+  // ⭐ RANGOS DE FECHA (Inician vacíos para mostrar todo por defecto)
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal()); 
   
   const [selectedUser, setSelectedUser] = useState("");
@@ -60,7 +58,9 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
   useEffect(() => {
     if (open) {
-      setSelectedDate(ymdLocal());
+      // Al abrir el modal, reseteamos todo
+      setStartDate("");
+      setEndDate("");
       setSelectedMonth(ymLocal());
       setSelectedUser("");
       setSelectedStore("");
@@ -74,7 +74,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return () => { document.body.style.overflow = "auto"; };
   }, [open]);
 
-  // 🔥 Petición al Backend inteligente según la pestaña activa 🔥
+  // 🔥 Petición al Backend: Trae un lote grande para filtrar localmente 🔥
   useEffect(() => {
     if (!open) return;
     let aborted = false;
@@ -85,16 +85,19 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       try {
         const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
         
-        // Si es historial, mandamos el día exacto. Si es conteo mensual, mandamos vacío para traer un lote grande.
-        const targetDateQuery = activeTab === "history" ? selectedDate : "";
-
         const params = new URLSearchParams({
           page: "1",
-          // Traemos 500 registros para un día, o 3000 para abarcar todo el mes en el conteo
-          limit: activeTab === "history" ? "500" : "3000", 
-          ...(targetDateQuery ? { date: targetDateQuery } : {}),          
+          limit: "3000", // Lote amplio para asegurar que los rangos funcionen bien localmente
           _: String(Date.now()), 
         });
+
+        // ⭐ Enviamos los rangos exactos al backend a través de los Query Params ⭐
+        if (activeTab === "history") {
+          if (startDate) params.append("startDate", startDate);
+          if (endDate) params.append("endDate", endDate);
+        } else if (activeTab === "count") {
+          if (selectedMonth) params.append("month", selectedMonth);
+        }
 
         const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
           headers: {
@@ -103,6 +106,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
             "x-roles": roles,
           },
         });
+        
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
@@ -124,7 +128,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     })();
 
     return () => { aborted = true; };
-  }, [open, selectedDate, activeTab, storedUser]); // Se quitó selectedMonth de las dependencias para evitar recargas innecesarias al backend
+  }, [open, storedUser, activeTab, startDate, endDate, selectedMonth]); // Escuchamos cambios en las fechas para volver a jalar datos
 
   async function doClear() {
     if (!isSuperUser) return;
@@ -150,13 +154,13 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     if (!isSuperUser || loading) return;
     toastHOT((t) => (
       <div className="text-center p-1">
-        <p className="font-black text-gray-800 mb-3 text-sm sm:text-base">¿Eliminar todo el historial?</p>
+        <p className="font-black text-gray-800 mb-3 text-sm sm:text-base">¿Eliminar TODO el historial permanentemente?</p>
         <div className="mt-2 flex gap-2 justify-center">
           <button
             onClick={() => { toastHOT.dismiss(t.id); doClear(); }}
             className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-700 uppercase tracking-wider"
           >
-            Eliminar
+            Eliminar Todo
           </button>
           <button
             onClick={() => toastHOT.dismiss(t.id)}
@@ -169,14 +173,35 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     ), { duration: 6000 });
   }
 
+  const clearFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setSelectedUser("");
+    setSelectedStore("");
+    setQ("");
+    toastHOT.success("Filtros limpiados", { duration: 1500 });
+  };
+
   const uniqueUsers = useMemo(() => {
     const usersFromLogs = logs.map(l => l.user).filter(Boolean);
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
-  // Filtrado de la lista de Historial Diario (Pestaña 1)
+  // ⭐ Filtrado Local de Seguridad y Búsqueda Instantánea ⭐
   const filteredLogs = useMemo(() => {
     let result = logs;
+
+    // Filtro salvavidas por si tu backend aún no procesa 'startDate' y 'endDate'
+    result = result.filter(log => {
+      if (!log.date) return false;
+      const d = new Date(log.date);
+      const logYMD = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      
+      if (startDate && logYMD < startDate) return false;
+      if (endDate && logYMD > endDate) return false;
+      
+      return true;
+    });
 
     const term = q.trim().toLowerCase();
     if (term) {
@@ -195,14 +220,13 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
 
     return result;
-  }, [logs, q, selectedUser, selectedStore]);
+  }, [logs, q, selectedUser, selectedStore, startDate, endDate]);
 
 
   // ⭐ Lógica Matemática Local para Contar Camisetas Restadas (Pestaña 2) ⭐
   const restasMensuales = useMemo(() => {
     const counts = {};
     
-    // Inicializar la lista fija de tus trabajadores en 0
     BASE_USERS.forEach(user => {
       counts[user] = 0;
     });
@@ -210,20 +234,17 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     logs.forEach(log => {
       if (!log.date) return;
       
-      // Extraemos el mes exacto del registro actual ("YYYY-MM")
       const d = new Date(log.date);
       const logMonth = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
       
-      // 🔥 FILTRO ESTRICTO: Si el registro no es del mes que elegiste, se ignora
+      // Filtro salvavidas para asegurar que solo contemos el mes actual
       if (logMonth !== selectedMonth) return;
 
       const isUpdate = log.action && String(log.action).toLowerCase().includes("actualiz");
       
-      // Analizamos los logs de cambios de stock e inventario
       if (isUpdate && log.details) {
         const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details);
         
-        // Soporta la flecha unicode "→" y la normal "->"
         const regex = /(\d+)\s*(?:->|→)\s*(\d+)/g;
         let match;
         let restasEnEsteLog = 0;
@@ -232,7 +253,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
           const valorViejo = parseInt(match[1], 10) || 0;
           const valorNuevo = parseInt(match[2], 10) || 0;
           
-          // Si el valor nuevo es MENOR, significa que se restaron camisetas del stock
           if (valorViejo > valorNuevo) {
             restasEnEsteLog += (valorViejo - valorNuevo);
           }
@@ -249,12 +269,11 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       }
     });
 
-    // Ordenar de mayor cantidad de restas a menor
     return Object.entries(counts)
       .map(([user, count]) => ({ user, count }))
       .sort((a, b) => b.count - a.count);
       
-  }, [logs, selectedMonth]); // Re-calcula instantáneamente cuando cambias de mes
+  }, [logs, selectedMonth]); 
 
 
   if (!open) return null;
@@ -268,9 +287,9 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         onClick={onClose}
       />
 
-<div 
+      <div 
         className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col z-10 animate-fade-in-up"
-        style={{ maxHeight: '85vh' }} // Forzamos una altura máxima estricta para garantizar el scroll
+        style={{ maxHeight: '85vh' }} 
       >
         {/* BOTÓN DE CERRAR */}
         <button
@@ -302,7 +321,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                   : "text-gray-500 hover:text-black"
               }`}
             >
-              <FaHistory /> Historial Diario
+              <FaHistory /> Historial Detallado
             </button>
             <button
               onClick={() => setActiveTab("count")}
@@ -321,11 +340,11 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 px-6 sm:px-8 pb-6 sm:pb-8 min-h-0">
           
           {/* =========================================
-              VISTA 1: HISTORIAL DIARIO (DÍA A DÍA)
+              VISTA 1: HISTORIAL CON RANGO DE FECHAS
           ========================================= */}
           {activeTab === "history" && (
             <div className="animate-fade-in-up">
-              {/* FILTROS DIARIOS */}
+              {/* FILTROS DIARIOS/RANGO */}
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 mb-6 flex flex-col gap-3">
                 <div className="flex gap-2">
                   <input
@@ -349,45 +368,78 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
                 {showFilters && (
                   <div className="flex flex-col gap-3 mt-1 pt-3 border-t border-gray-200 animate-fade-in-up">
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value || ymdLocal())}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
-                    />
-
+                    
+                    {/* SELECTORES DE RANGO DE FECHAS */}
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <select
-                        value={selectedUser}
-                        onChange={(e) => setSelectedUser(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
-                      >
-                        <option value="">Todos los usuarios</option>
-                        {uniqueUsers.map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={selectedStore}
-                        onChange={(e) => setSelectedStore(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
-                      >
-                        <option value="">Todas las tiendas</option>
-                        <option value="Tienda #1">Tienda #1</option>
-                        <option value="Tienda #2">Tienda #2</option>
-                      </select>
+                        <div className="w-full">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Desde Fecha</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                            />
+                        </div>
+                        <div className="w-full">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Hasta Fecha</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                            />
+                        </div>
                     </div>
 
-                    {isSuperUser && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="w-full">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Usuario</label>
+                        <select
+                          value={selectedUser}
+                          onChange={(e) => setSelectedUser(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Todos</option>
+                          {uniqueUsers.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="w-full">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tienda</label>
+                        <select
+                          value={selectedStore}
+                          onChange={(e) => setSelectedStore(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Todas</option>
+                          <option value="Tienda #1">Tienda #1</option>
+                          <option value="Tienda #2">Tienda #2</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* BOTONES DE ACCIÓN (Limpiar Filtros y Borrar Todo) */}
+                    <div className="flex flex-col sm:flex-row gap-3 mt-1">
                       <button
-                        onClick={askClear}
-                        disabled={loading}
-                        className="w-full bg-red-50 text-red-600 border border-red-100 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50 mt-1"
+                        onClick={clearFilters}
+                        className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
                       >
-                        Limpiar Historial de Fecha
+                        Limpiar Filtros
                       </button>
-                    )}
+                      
+                      {isSuperUser && (
+                        <button
+                          onClick={askClear}
+                          disabled={loading}
+                          className="w-full bg-red-50 text-red-600 border border-red-100 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50"
+                        >
+                          Borrar Historial
+                        </button>
+                      )}
+                    </div>
+
                   </div>
                 )}
               </div>
@@ -399,29 +451,41 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
                 {!loading && !errMsg && filteredLogs.length === 0 && (
                   <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100">
-                    <p className="text-gray-500 font-bold uppercase tracking-wide text-xs">No hay cambios registrados este día</p>
+                    <p className="text-gray-500 font-bold uppercase tracking-wide text-xs">No hay cambios registrados con estos filtros.</p>
                   </div>
                 )}
 
                 {!loading && !errMsg && filteredLogs.length > 0 && (
                   <ul className="space-y-4">
-                    {filteredLogs.map((log, idx) => (
-                      <li key={log._id || idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start gap-2 mb-2">
-                          <strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong>
-                        
-                        </div>
-                        <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
-                        <small className="text-gray-400 block mt-1 font-semibold text-xs">
-                          {log.date ? new Date(log.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
-                        </small>
-                        {log.details && (
-                          <pre className="mt-3 bg-gray-50 border border-gray-100 p-3 rounded-xl text-[11px] overflow-x-auto text-gray-600 font-mono whitespace-pre-wrap shadow-inner">
-                            {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
-                          </pre>
-                        )}
-                      </li>
-                    ))}
+                    {filteredLogs.map((log, idx) => {
+                       // Extraemos fecha y hora limpias
+                       const logDateObj = log.date ? new Date(log.date) : null;
+                       const dateStr = logDateObj ? `${pad2(logDateObj.getDate())}/${pad2(logDateObj.getMonth()+1)}/${logDateObj.getFullYear()}` : "";
+                       const timeStr = logDateObj ? logDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
+
+                       return (
+                        <li key={log._id || idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow">
+                          
+                          <div className="mb-2">
+                            <strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong>
+                          </div>
+                          
+                          <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
+                          
+                          {/* Mostramos fecha y hora del evento */}
+                          <small className="flex items-center gap-1.5 text-gray-400 block mt-1.5 font-semibold text-xs">
+                            <FaCalendarAlt size={10} className="mb-0.5" />
+                            {dateStr} — {timeStr}
+                          </small>
+
+                          {log.details && (
+                            <pre className="mt-3 bg-gray-50 border border-gray-100 p-3 rounded-xl text-[11px] overflow-x-auto text-gray-600 font-mono whitespace-pre-wrap shadow-inner">
+                              {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

@@ -10,58 +10,56 @@ function getRoles(req) {
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 }
 function isSuper(req) {
-  // header "x-super":"true" o flag en req.user (si lo agregas por middleware)
   return req.user?.isSuperUser || req.headers['x-super'] === 'true';
 }
 
-/* ---------- helper: rango por día en hora local de Costa Rica ---------- */
-/**
- * Devuelve un filtro { $gte: startUTC, $lt: endUTC } correspondiente al día
- * 'YYYY-MM-DD' en hora local de Costa Rica (UTC-6, sin DST).
- *
- * Ej.: si dateStr = '2025-08-25', el rango cubre
- *  2025-08-25 00:00:00.000 (CR)  ->  2025-08-25 23:59:59.999 (CR),
- * expresado en UTC para guardar/consultar en Mongo.
- */
-function crDayRange(dateStr) {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
-
-  // Costa Rica es UTC-6 todo el año
-  const CR_OFFSET_MIN = 6 * 60;
-
+/* ---------- helper: Inicio de día en Costa Rica (UTC-6) ---------- */
+function getStartOfCRDay(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  // 00:00 CR equivale a +6h UTC
-  const startUTC = new Date(Date.UTC(y, m - 1, d, CR_OFFSET_MIN / 60, 0, 0, 0));
-  // Fin del día CR: sumar 24h y restar 1 ms
-  const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000);
-
-  return { $gte: startUTC, $lt: endUTC };
+  // 00:00 CR equivale a +6h en UTC
+  return new Date(Date.UTC(y, m - 1, d, 6, 0, 0, 0));
 }
 
 router.get('/', async (req, res) => {
   try {
-    const { date, page = '1', limit = '200', q = '' } = req.query;
+    // 1. Recibimos los nuevos parámetros del frontend
+    const { date, startDate, endDate, month, page = '1', limit = '200', q = '' } = req.query;
 
-    // Si no viene date, usamos el día de hoy en CR
-    let usedDate = date;
-    if (!usedDate) {
-      const now = new Date();
-      // Formatear hoy local (del servidor) como YYYY-MM-DD
-      const y = now.getUTCFullYear();
-      const m = String(now.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(now.getUTCDate()).padStart(2, '0');
-      usedDate = `${y}-${m}-${d}`;
+    const find = {};
+
+    // 2. Lógica de Filtros por Fechas (Respetando Hora de Costa Rica)
+    if (startDate || endDate) {
+      find.date = {};
+      if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        find.date.$gte = getStartOfCRDay(startDate); // Desde las 00:00 CR
+      }
+      if (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        const end = getStartOfCRDay(endDate);
+        end.setDate(end.getDate() + 1); // Hasta las 23:59:59 (sumando 1 día exacto)
+        find.date.$lt = end;
+      }
+    } 
+    else if (month && /^\d{4}-\d{2}$/.test(month)) {
+      // Si el frontend manda un mes entero (ej: "2026-06")
+      const [y, m] = month.split('-').map(Number);
+      const startUTC = new Date(Date.UTC(y, m - 1, 1, 6, 0, 0, 0)); // Día 1 a las 00:00 CR
+      const endUTC = new Date(Date.UTC(y, m, 1, 6, 0, 0, 0)); // Día 1 del SIGUIENTE mes a las 00:00 CR
+      find.date = { $gte: startUTC, $lt: endUTC };
+    } 
+    else if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      // Retrocompatibilidad por si llega a mandar un solo día
+      const start = getStartOfCRDay(date);
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+      find.date = { $gte: start, $lt: end };
     }
 
-    const range = crDayRange(String(usedDate));
-    const find = {};
-    if (range) find.date = range;
-
+    // 3. Filtro por término de búsqueda
     const term = String(q || '').trim();
     if (term) find.item = { $regex: term, $options: 'i' };
 
     const p = Math.max(parseInt(page, 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 1000);
+    // ⭐ SUBIMOS EL LÍMITE A 3000 para que el frontend pueda hacer sus cálculos matemáticos correctamente
+    const l = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 3000);
 
     const [items, total] = await Promise.all([
       History.find(find).sort({ date: -1 }).skip((p - 1) * l).limit(l).lean(),
