@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaTimes, FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt } from "react-icons/fa";
@@ -6,6 +7,12 @@ const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 /* --- utilidades de fecha local --- */
 function pad2(n){ return n < 10 ? `0${n}` : `${n}`; }
+function ymdLocal(d = new Date()){
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth() + 1);
+  const dd = pad2(d.getDate());
+  return `${y}-${m}-${dd}`;  // YYYY-MM-DD
+}
 function ymLocal(d = new Date()){
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
@@ -31,20 +38,18 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
-  // ⭐ Pestaña activa ('history' = Historial Diario/Rango, 'count' = Conteo Mensual)
+  // ⭐ Pestaña activa
   const [activeTab, setActiveTab] = useState("history");
 
   const [q, setQ] = useState("");
   
-  // ⭐ RANGOS DE FECHA (Inician vacíos para mostrar todo por defecto)
+  // ⭐ Estados de Fechas
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal()); 
   
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedStore, setSelectedStore] = useState("");
-  
   const [showFilters, setShowFilters] = useState(false);
 
   const storedUser = useMemo(() => {
@@ -58,7 +63,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
 
   useEffect(() => {
     if (open) {
-      // Al abrir el modal, reseteamos todo
       setStartDate("");
       setEndDate("");
       setSelectedMonth(ymLocal());
@@ -74,61 +78,60 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return () => { document.body.style.overflow = "auto"; };
   }, [open]);
 
-  // 🔥 Petición al Backend: Trae un lote grande para filtrar localmente 🔥
-  useEffect(() => {
-    if (!open) return;
-    let aborted = false;
+  // 🔥 FUNCIÓN CENTRAL: Petición al Backend (Solo se ejecuta al abrir, cambiar pestaña o pulsar "Buscar") 🔥
+  const fetchLogs = async (overrideStart, overrideEnd, overrideMonth) => {
+    setLoading(true);
+    setErrMsg("");
+    try {
+      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
+      
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "3000",
+        _: String(Date.now()), 
+      });
 
-    (async () => {
-      setLoading(true);
-      setErrMsg("");
-      try {
-        const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
-        
-        const params = new URLSearchParams({
-          page: "1",
-          limit: "3000", // Lote amplio para asegurar que los rangos funcionen bien localmente
-          _: String(Date.now()), 
-        });
+      // Permite usar parámetros forzados (para cuando limpiamos filtros) o los que están en el estado
+      const finalStart = overrideStart !== undefined ? overrideStart : startDate;
+      const finalEnd = overrideEnd !== undefined ? overrideEnd : endDate;
+      const finalMonth = overrideMonth !== undefined ? overrideMonth : selectedMonth;
 
-        // ⭐ Enviamos los rangos exactos al backend a través de los Query Params ⭐
-        if (activeTab === "history") {
-          if (startDate) params.append("startDate", startDate);
-          if (endDate) params.append("endDate", endDate);
-        } else if (activeTab === "count") {
-          if (selectedMonth) params.append("month", selectedMonth);
-        }
-
-        const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
-          headers: {
-            "Content-Type": "application/json",
-            "x-super": storedUser?.isSuperUser ? "true" : "false",
-            "x-roles": roles,
-          },
-        });
-        
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-        const items = Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data)
-          ? data
-          : [];
-
-        if (!aborted) setLogs(items);
-      } catch (e) {
-        if (!aborted) {
-          setErrMsg("No se pudo cargar la información.");
-          setLogs([]);
-        }
-      } finally {
-        if (!aborted) setLoading(false);
+      if (activeTab === "history") {
+        if (finalStart) params.append("startDate", finalStart);
+        if (finalEnd) params.append("endDate", finalEnd);
+      } else if (activeTab === "count") {
+        if (finalMonth) params.append("month", finalMonth);
       }
-    })();
 
-    return () => { aborted = true; };
-  }, [open, storedUser, activeTab, startDate, endDate, selectedMonth]); // Escuchamos cambios en las fechas para volver a jalar datos
+      const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
+        headers: {
+          "Content-Type": "application/json",
+          "x-super": storedUser?.isSuperUser ? "true" : "false",
+          "x-roles": roles,
+        },
+      });
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+      setLogs(items);
+    } catch (e) {
+      setErrMsg("No se pudo cargar la información.");
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Se ejecuta automáticamente SOLO cuando abres el modal o cambias de pestaña
+  useEffect(() => {
+    if (open) {
+      fetchLogs();
+    }
+    // eslint-disable-next-line
+  }, [open, activeTab, storedUser]); 
+
 
   async function doClear() {
     if (!isSuperUser) return;
@@ -173,12 +176,14 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     ), { duration: 6000 });
   }
 
-  const clearFilters = () => {
+  // Limpia los estados y hace una petición con fechas vacías para recargar todo
+  const handleClearFilters = () => {
     setStartDate("");
     setEndDate("");
     setSelectedUser("");
     setSelectedStore("");
     setQ("");
+    fetchLogs("", "", undefined); 
     toastHOT.success("Filtros limpiados", { duration: 1500 });
   };
 
@@ -187,22 +192,12 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
-  // ⭐ Filtrado Local de Seguridad y Búsqueda Instantánea ⭐
+  // ⭐ Filtrado Local Exclusivo para Búsqueda Instantánea ⭐
   const filteredLogs = useMemo(() => {
     let result = logs;
 
-    // Filtro salvavidas por si tu backend aún no procesa 'startDate' y 'endDate'
-    result = result.filter(log => {
-      if (!log.date) return false;
-      const d = new Date(log.date);
-      const logYMD = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-      
-      if (startDate && logYMD < startDate) return false;
-      if (endDate && logYMD > endDate) return false;
-      
-      return true;
-    });
-
+    // Ya NO filtramos por fecha localmente porque el backend ya lo hizo al darle a "Buscar Fechas"
+    
     const term = q.trim().toLowerCase();
     if (term) {
       result = result.filter((log) => String(log.item || "").toLowerCase().includes(term));
@@ -220,31 +215,19 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
 
     return result;
-  }, [logs, q, selectedUser, selectedStore, startDate, endDate]);
+  }, [logs, q, selectedUser, selectedStore]);
 
 
-  // ⭐ Lógica Matemática Local para Contar Camisetas Restadas (Pestaña 2) ⭐
+  // ⭐ Lógica Matemática Local para Contar Camisetas Restadas ⭐
   const restasMensuales = useMemo(() => {
     const counts = {};
-    
-    BASE_USERS.forEach(user => {
-      counts[user] = 0;
-    });
+    BASE_USERS.forEach(user => counts[user] = 0);
 
     logs.forEach(log => {
-      if (!log.date) return;
-      
-      const d = new Date(log.date);
-      const logMonth = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
-      
-      // Filtro salvavidas para asegurar que solo contemos el mes actual
-      if (logMonth !== selectedMonth) return;
-
       const isUpdate = log.action && String(log.action).toLowerCase().includes("actualiz");
       
       if (isUpdate && log.details) {
         const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details);
-        
         const regex = /(\d+)\s*(?:->|→)\s*(\d+)/g;
         let match;
         let restasEnEsteLog = 0;
@@ -273,7 +256,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
       .map(([user, count]) => ({ user, count }))
       .sort((a, b) => b.count - a.count);
       
-  }, [logs, selectedMonth]); 
+  }, [logs]); 
 
 
   if (!open) return null;
@@ -420,13 +403,20 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                       </div>
                     </div>
 
-                    {/* BOTONES DE ACCIÓN (Limpiar Filtros y Borrar Todo) */}
-                    <div className="flex flex-col sm:flex-row gap-3 mt-1">
+                    {/* BOTONES DE ACCIÓN (Buscar, Limpiar Filtros y Borrar Todo) */}
+                    <div className="flex flex-col sm:flex-row gap-3 mt-2">
                       <button
-                        onClick={clearFilters}
+                        onClick={() => fetchLogs()}
+                        className="w-full bg-black text-white border border-black py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md"
+                      >
+                        Buscar Fechas
+                      </button>
+
+                      <button
+                        onClick={handleClearFilters}
                         className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
                       >
-                        Limpiar Filtros
+                        Limpiar
                       </button>
                       
                       {isSuperUser && (
@@ -458,7 +448,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                 {!loading && !errMsg && filteredLogs.length > 0 && (
                   <ul className="space-y-4">
                     {filteredLogs.map((log, idx) => {
-                       // Extraemos fecha y hora limpias
                        const logDateObj = log.date ? new Date(log.date) : null;
                        const dateStr = logDateObj ? `${pad2(logDateObj.getDate())}/${pad2(logDateObj.getMonth()+1)}/${logDateObj.getFullYear()}` : "";
                        const timeStr = logDateObj ? logDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
@@ -472,7 +461,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                           
                           <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
                           
-                          {/* Mostramos fecha y hora del evento */}
                           <small className="flex items-center gap-1.5 text-gray-400 block mt-1.5 font-semibold text-xs">
                             <FaCalendarAlt size={10} className="mb-0.5" />
                             {dateStr} — {timeStr}
@@ -498,17 +486,25 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
           {activeTab === "count" && (
             <div className="animate-fade-in-up">
               
-              {/* SELECTOR EXCLUSIVO DE MES (Año - Mes) */}
-              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6 flex items-center justify-between gap-4">
-                 <div className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">
+              {/* SELECTOR EXCLUSIVO DE MES Y BOTÓN */}
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                 <div className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1 text-center sm:text-left w-full sm:w-auto">
                       Seleccionar Mes:
                  </div>
-                 <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value || ymLocal())}
-                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-black text-gray-800 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
-                  />
+                 <div className="flex gap-2 w-full sm:w-auto">
+                     <input
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="flex-1 sm:flex-none bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-black text-gray-800 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                      />
+                      <button
+                        onClick={() => fetchLogs()}
+                        className="bg-black text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md whitespace-nowrap"
+                      >
+                        Buscar
+                      </button>
+                 </div>
               </div>
 
               {loading ? (
