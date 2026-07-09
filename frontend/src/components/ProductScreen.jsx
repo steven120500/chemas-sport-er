@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { toast } from "react-toastify";
-import { FaChevronLeft, FaTimes, FaChevronRight, FaStore, FaWarehouse } from "react-icons/fa";
+import { FaChevronLeft, FaTimes, FaChevronRight, FaStore, FaWarehouse, FaLock } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
-
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -70,6 +69,9 @@ export default function ProductScreen({
   const hasMany = localImages.length > 1;
   const currentSrc = localImages[idx]?.src || "";
 
+  // Variable de usuario para los bloqueos
+  const displayName = user?.username || user?.email || "ChemaSportER";
+
   useEffect(() => {
     setViewProduct(product);
     setEditedName(product?.name || "");
@@ -94,6 +96,75 @@ export default function ProductScreen({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
+  // ⭐ NUEVO: Liberar candado si cierran la pestaña de golpe o desmontan el componente
+  useEffect(() => {
+    const handleUnload = () => {
+      if (isEditing) {
+        navigator.sendBeacon(`${API_BASE}/api/products/${product?._id || product?.id}/unlock`);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      if (isEditing) unlockProduct(); 
+    };
+  }, [isEditing]);
+
+  // ⭐ NUEVA FUNCIÓN: Pedir permiso al backend antes de editar
+  const lockProduct = async () => {
+    const id = product?._id || product?.id;
+    if (!id) return false;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user": displayName },
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        toast.error(`🔒 ${data.lockedBy || 'Alguien'} ya está editando este producto.`);
+        setLoading(false);
+        return false;
+      }
+      setLoading(false);
+      return true; // Éxito, tenemos el candado
+    } catch (error) {
+      toast.error("Error al conectar con el servidor.");
+      setLoading(false);
+      return false;
+    }
+  };
+
+  // ⭐ NUEVA FUNCIÓN: Soltar el candado manualmente
+  const unlockProduct = async () => {
+    const id = product?._id || product?.id;
+    if (!id) return;
+    try {
+      await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user": displayName },
+      });
+    } catch (error) {
+      console.error("Error desbloqueando el producto", error);
+    }
+  };
+
+  const handleEditClick = async () => {
+    const hasLock = await lockProduct();
+    if (hasLock) {
+      setIsEditing(true);
+    }
+  };
+
+  const handleCancelEditClick = () => {
+    setIsEditing(false);
+    unlockProduct();
+    setViewProduct(product); // Restaurar los valores visualmente
+  };
+
   const handleSave = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -104,7 +175,6 @@ export default function ProductScreen({
 
     try {
       setLoading(true);
-      const displayName = user?.username || user?.email || "ChemaSportER";
       const priceInt = Math.max(0, parseInt(editedPrice, 10) || 0);
       const discountInt = Math.max(0, parseInt(editedDiscountPrice, 10) || 0);
       const clean = (obj) =>
@@ -133,15 +203,22 @@ export default function ProductScreen({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error(`Error al actualizar (${res.status})`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+             throw new Error(`Producto bloqueado por ${errorData.lockedBy || 'otro usuario'}`);
+        }
+        throw new Error(`Error al actualizar (${res.status})`);
+      }
 
       const updated = await res.json();
       setViewProduct(updated);
       setIsEditing(false);
       onUpdate?.(updated);
+      toast.success("Cambios guardados correctamente.");
     } catch (err) {
       console.error(err);
-      toast.error("Hubo un problema al actualizar el producto");
+      toast.error(err.message || "Hubo un problema al actualizar el producto");
     } finally {
       setLoading(false);
     }
@@ -156,7 +233,6 @@ export default function ProductScreen({
     }
     try {
       setLoading(true);
-      const displayName = user?.username || user?.email || "ChemaSportER";
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-user": displayName },
@@ -254,7 +330,10 @@ export default function ProductScreen({
       
         {/* BOTÓN VOLVER */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            if (isEditing) unlockProduct();
+            onClose();
+          }}
           className="flex items-center gap-2 text-gray-500 bg-white hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs"
         >
           <FaChevronLeft size={14} /> Volver al catálogo
@@ -565,64 +644,72 @@ export default function ProductScreen({
             <div className="mt-auto">
               <div className="flex flex-col gap-3">
                 {canEdit && isEditing ? (
-                  <button
-                    className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
-                    onClick={() => {
-                        // Obtenemos los cambios antes de lanzar la alerta
-                        const inventoryChanges = getInventoryChanges();
+                  <>
+                    <button
+                        className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
+                        onClick={() => {
+                            const inventoryChanges = getInventoryChanges();
+                            toastHOT(
+                            (t) => (
+                                <div className="text-center p-2">
+                                <p className="font-black text-gray-800 mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
+                                
+                                {inventoryChanges.length > 0 ? (
+                                    <div className="text-left bg-gray-50 border border-gray-200 p-3 rounded-xl mb-4 text-xs font-mono text-gray-700 max-h-32 overflow-y-auto shadow-inner">
+                                        {inventoryChanges.map((change, i) => (
+                                        <div key={i} className="py-1">{change}</div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales del producto.</p>
+                                )}
 
-                        toastHOT(
-                          (t) => (
-                            <div className="text-center p-2">
-                              <p className="font-black text-gray-800 mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
-                              
-                              {/* Mostramos el resumen de los cambios si hay alguno */}
-                              {inventoryChanges.length > 0 ? (
-                                <div className="text-left bg-gray-50 border border-gray-200 p-3 rounded-xl mb-4 text-xs font-mono text-gray-700 max-h-32 overflow-y-auto shadow-inner">
-                                    {inventoryChanges.map((change, i) => (
-                                      <div key={i} className="py-1">{change}</div>
-                                    ))}
+                                <div className="flex gap-3 justify-center mt-2">
+                                    <button
+                                    onClick={() => {
+                                        toastHOT.dismiss(t.id);
+                                        handleSave();
+                                    }}
+                                    className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800"
+                                    >
+                                    SÍ, GUARDAR
+                                    </button>
+                                    <button
+                                    onClick={() => toastHOT.dismiss(t.id)}
+                                    className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200"
+                                    >
+                                    CANCELAR
+                                    </button>
                                 </div>
-                              ) : (
-                                <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales del producto.</p>
-                              )}
+                                </div>
+                            ),
+                            { duration: 8000 }
+                            );
+                        }}
+                        disabled={loading}
+                    >
+                        {loading ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
+                    </button>
 
-                              <div className="flex gap-3 justify-center mt-2">
-                                <button
-                                  onClick={() => {
-                                    toastHOT.dismiss(t.id);
-                                    handleSave();
-                                  }}
-                                  className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800"
-                                >
-                                  SÍ, GUARDAR
-                                </button>
-                                <button
-                                  onClick={() => toastHOT.dismiss(t.id)}
-                                  className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200"
-                                >
-                                  CANCELAR
-                                </button>
-                              </div>
-                            </div>
-                          ),
-                          { duration: 8000 } // Le damos un poquito más de tiempo para leer
-                        );
-                      }}
-                    disabled={loading}
-                  >
-                    {loading ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
-                  </button>
+                    <button
+                        className="w-full bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase transition-colors"
+                        onClick={handleCancelEditClick}
+                        disabled={loading}
+                    >
+                        CANCELAR EDICIÓN
+                    </button>
+                  </>
                 ) : canEdit ? (
                   <button
-                    className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
-                    onClick={() => setIsEditing(true)}
+                    className="w-full bg-black hover:bg-gray-900 text-white flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleEditClick}
+                    disabled={loading}
                   >
-                    MODIFICAR PRODUCTO
+                    {loading ? "PROCESANDO..." : "MODIFICAR PRODUCTO"}
                   </button>
                 ) : null}
 
-                {canDelete && (
+                {canDelete && !isEditing && (
                   <button
                     className="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase transition-colors"
                     onClick={() => {

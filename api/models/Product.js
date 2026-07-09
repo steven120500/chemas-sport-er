@@ -100,6 +100,18 @@ const productSchema = new mongoose.Schema(
     isMundial2026: {
       type: Boolean,
       default: false
+    },
+
+    /* =========================
+       NUEVOS CAMPOS PARA BLOQUEO (CANDADO)
+       ========================= */
+    lockedBy: { 
+      type: String, 
+      default: null 
+    },
+    lockedAt: { 
+      type: Date, 
+      default: null 
     }
   },
   { timestamps: true }

@@ -138,11 +138,71 @@ router.post('/', upload.any(), async (req, res) => {
   }
 });
 
+/* ==================== RUTAS DE BLOQUEO (CANDADO) ================== */
+
+// 🔒 PONER CANDADO
+router.post('/:id/lock', async (req, res) => {
+  try {
+      const product = await Product.findById(req.params.id);
+      if (!product) return res.status(404).json({ error: "Producto no encontrado" });
+
+      const user = whoDidIt(req);
+      const now = new Date();
+
+      // Si ya está bloqueado por OTRA persona, y el bloqueo tiene menos de 10 minutos (600000 ms)
+      if (product.lockedBy && product.lockedBy !== user) {
+          const lockAge = now - product.lockedAt;
+          if (lockAge < 600000) { 
+              return res.status(409).json({ 
+                  error: "Bloqueado", 
+                  lockedBy: product.lockedBy 
+              });
+          }
+      }
+
+      // Si no está bloqueado, o el bloqueo expiró, se lo asignamos a este usuario
+      product.lockedBy = user;
+      product.lockedAt = now;
+      await product.save();
+
+      res.json({ success: true, lockedBy: user });
+  } catch (err) {
+      res.status(500).json({ error: "Error al bloquear producto" });
+  }
+});
+
+// 🔓 QUITAR CANDADO
+router.post('/:id/unlock', async (req, res) => {
+  try {
+      const product = await Product.findById(req.params.id);
+      const user = whoDidIt(req);
+
+      // Solo el usuario que lo bloqueó puede desbloquearlo
+      if (product && product.lockedBy === user) {
+          product.lockedBy = null;
+          product.lockedAt = null;
+          await product.save();
+      }
+      res.json({ success: true });
+  } catch (err) {
+      res.status(500).json({ error: "Error al desbloquear producto" });
+  }
+});
+
 /* ======================== Actualizar Producto ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
+
+    // 🛡️ Seguridad extra: verificar que nadie más tenga el candado al momento de guardar
+    const user = whoDidIt(req);
+    if (prev.lockedBy && prev.lockedBy !== user) {
+      const lockAge = new Date() - prev.lockedAt;
+      if (lockAge < 600000) {
+        return res.status(409).json({ error: "Producto bloqueado por otro usuario", lockedBy: prev.lockedBy });
+      }
+    }
 
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
@@ -172,6 +232,10 @@ router.put('/:id', async (req, res) => {
         : prev.discountPrice,
       stock: nextStock,
       bodega: nextBodega,
+      
+      // ⭐ Aseguramos que el candado se limpie al guardar
+      lockedBy: null,
+      lockedAt: null
     };
 
     if (req.body.hidden !== undefined) {
@@ -286,7 +350,7 @@ router.get('/', async (req, res) => {
     const q     = (req.query.q || '').trim();
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
-    const storeView = (req.query.storeView || '').trim(); // 🔥 RECIBIMOS LA TIENDA
+    const storeView = (req.query.storeView || '').trim(); 
     
     const sortParam = req.query.sort; 
 
@@ -334,15 +398,12 @@ router.get('/', async (req, res) => {
     const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     if (storeView === 'tienda1') {
-      // Solo devolver camisas que tengan al menos 1 talla en stock
       const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
       find.$or = checkSizes.map(size => ({ [`stock.${size}`]: { $gt: 0 } }));
     } else if (storeView === 'tienda2') {
-      // Solo devolver camisas que tengan al menos 1 talla en bodega
       const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
       find.$or = checkSizes.map(size => ({ [`bodega.${size}`]: { $gt: 0 } }));
     } else if (sizesArr.length > 0) {
-      // Vista normal (Todos), pero el usuario seleccionó tallas específicas
       find.$or = sizesArr.flatMap(size => ([
         { [`stock.${size}`]: { $gt: 0 } },
         { [`bodega.${size}`]: { $gt: 0 } },
@@ -350,7 +411,7 @@ router.get('/', async (req, res) => {
     }
 
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 lockedBy';
 
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
