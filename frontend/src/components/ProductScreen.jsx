@@ -34,7 +34,7 @@ function isLikelyObjectId(v) {
 
 export default function ProductScreen({
   product,
-  onClose, // Ahora este onClose funcionará como un botón de "Atrás"
+  onClose,
   onUpdate,
   canEdit,
   canDelete,
@@ -91,7 +91,6 @@ export default function ProductScreen({
     );
     setIdx(0);
     
-    // Hacemos scroll hacia arriba al abrir el producto
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
@@ -230,10 +229,26 @@ export default function ProductScreen({
     return a + b; 
   };
 
-  return (
+  // ⭐ NUEVA FUNCIÓN: Compara inventario viejo vs nuevo para mostrar diferencias
+  const getInventoryChanges = () => {
+    const changes = [];
+    tallasVisibles.forEach((size) => {
+      const oldStock = parseInt(viewProduct?.stock?.[size] ?? 0, 10);
+      const newStock = parseInt(editedStock?.[size] ?? 0, 10);
+      if (oldStock !== newStock) {
+        changes.push(`Tienda #1 [${size}]: ${oldStock} ➔ ${newStock}`);
+      }
 
-    
-    
+      const oldBodega = parseInt(viewProduct?.bodega?.[size] ?? 0, 10);
+      const newBodega = parseInt(editedBodega?.[size] ?? 0, 10);
+      if (oldBodega !== newBodega) {
+        changes.push(`Tienda #2 [${size}]: ${oldBodega} ➔ ${newBodega}`);
+      }
+    });
+    return changes;
+  };
+
+  return (
     <div className="full bg-white pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up">
       <div className="max-w-6xl mx-auto">
       
@@ -429,7 +444,6 @@ export default function ProductScreen({
                                             {size}
                                         </span>
                                         
-                                        {/* ⭐ Muestra cantidad solo si eres administrador */}
                                         {canEdit && (
                                             <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${
                                                 isAgotado ? 'text-gray-300' : 'text-gray-500'
@@ -438,7 +452,6 @@ export default function ProductScreen({
                                             </span>
                                         )}
 
-                                        {/* ⭐ Strikethrough elegante (Tachado en X diagonal) para tallas agotadas */}
                                         {isAgotado && (
                                             <svg className="absolute inset-0 w-full h-full text-gray-300/80" preserveAspectRatio="none" viewBox="0 0 100 100">
                                                 <line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
@@ -502,8 +515,9 @@ export default function ProductScreen({
                                                 type="number"
                                                 min="0"
                                                 className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none focus:ring-0 transition-all ${inputColors} ${currentVal === 0 ? 'opacity-60 hover:opacity-100 shadow-sm' : 'shadow-md'}`}
-                                                value={currentVal === 0 ? "" : currentVal}
+                                                value={currentVal}
                                                 placeholder="0"
+                                                onWheel={(e) => e.target.blur()}
                                                 onChange={(e) => handleStockChange(size, e.target.value)}
                                             />
                                         </div>
@@ -548,13 +562,53 @@ export default function ProductScreen({
               </div>
             )}
 
-
             <div className="mt-auto">
               <div className="flex flex-col gap-3">
                 {canEdit && isEditing ? (
                   <button
                     className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
-                    onClick={handleSave}
+                    onClick={() => {
+                        // Obtenemos los cambios antes de lanzar la alerta
+                        const inventoryChanges = getInventoryChanges();
+
+                        toastHOT(
+                          (t) => (
+                            <div className="text-center p-2">
+                              <p className="font-black text-gray-800 mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
+                              
+                              {/* Mostramos el resumen de los cambios si hay alguno */}
+                              {inventoryChanges.length > 0 ? (
+                                <div className="text-left bg-gray-50 border border-gray-200 p-3 rounded-xl mb-4 text-xs font-mono text-gray-700 max-h-32 overflow-y-auto shadow-inner">
+                                    {inventoryChanges.map((change, i) => (
+                                      <div key={i} className="py-1">{change}</div>
+                                    ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales del producto.</p>
+                              )}
+
+                              <div className="flex gap-3 justify-center mt-2">
+                                <button
+                                  onClick={() => {
+                                    toastHOT.dismiss(t.id);
+                                    handleSave();
+                                  }}
+                                  className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800"
+                                >
+                                  SÍ, GUARDAR
+                                </button>
+                                <button
+                                  onClick={() => toastHOT.dismiss(t.id)}
+                                  className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200"
+                                >
+                                  CANCELAR
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                          { duration: 8000 } // Le damos un poquito más de tiempo para leer
+                        );
+                      }}
                     disabled={loading}
                   >
                     {loading ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
@@ -619,10 +673,6 @@ export default function ProductScreen({
           animation: fadeInUpScreen 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
-
-      
-      
     </div>
-    
   );
 }
