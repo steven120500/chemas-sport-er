@@ -306,6 +306,13 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // ⭐ AQUÍ OCURRE LA MAGIA DE WEBSOCKETS ⭐
+    // Extraemos io de la app de Express y emitimos la alerta a todos
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('productoActualizado', updated);
+    }
+
     res.json(updated);
 
   } catch (err) {

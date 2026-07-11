@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { toast } from "react-toastify";
 import { FaChevronLeft, FaTimes, FaChevronRight, FaStore, FaWarehouse, FaLock } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
+import { io } from "socket.io-client"; // ⭐ 1. IMPORTAMOS SOCKET.IO
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -96,7 +97,58 @@ export default function ProductScreen({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
-  // ⭐ NUEVO: Liberar candado si cierran la pestaña de golpe o desmontan el componente
+  /* ⭐⭐⭐ 2. MAGIA DE WEBSOCKETS EN TIEMPO REAL ⭐⭐⭐ */
+  useEffect(() => {
+    const currentId = product?._id || product?.id;
+    if (!currentId) return;
+
+    // Conectamos al servidor de sockets
+    const socket = io(API_BASE);
+
+    // Escuchamos si alguien más actualiza un producto
+    socket.on('productoActualizado', (productoFresco) => {
+      const frescoId = productoFresco?._id || productoFresco?.id;
+      
+      // Si el producto que editaron es exactamente el que tenemos abierto en pantalla
+      if (frescoId === currentId) {
+        console.log("🟢 Actualización en tiempo real recibida para este producto");
+        
+        // Actualizamos todos los datos en pantalla instantáneamente
+        setViewProduct(productoFresco);
+        setEditedName(productoFresco?.name || "");
+        setEditedPrice(productoFresco?.price ?? 0);
+        setEditedDiscountPrice(productoFresco?.discountPrice ?? 0);
+        setEditedType(productoFresco?.type || "Player");
+        setEditedStock({ ...(productoFresco?.stock || {}) });
+        setEditedBodega({ ...(productoFresco?.bodega || {}) });
+        setEditedHidden(productoFresco?.hidden || false);
+        setEditedIsMundial2026(productoFresco?.isMundial2026 || false);
+
+        setLocalImages(
+          productoFresco?.images?.length
+            ? productoFresco.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
+            : [
+                ...(productoFresco?.imageSrc ? [{ src: productoFresco.imageSrc, isNew: false }] : []),
+                ...(productoFresco?.imageSrc2 ? [{ src: productoFresco.imageSrc2, isNew: false }] : []),
+              ]
+        );
+
+        // Avisamos al usuario para que sepa por qué cambiaron los números
+        toast.info(
+          "🔄 ¡Alguien más acaba de actualizar este producto! La pantalla se ha refrescado automáticamente con los últimos datos.",
+          { position: "top-right", autoClose: 5000 }
+        );
+      }
+    });
+
+    // Limpiamos la conexión cuando cerramos la ventana
+    return () => {
+      socket.disconnect();
+    };
+  }, [product?._id, product?.id]);
+  /* ⭐⭐⭐ FIN DE WEBSOCKETS ⭐⭐⭐ */
+
+  // Liberar candado si cierran la pestaña de golpe o desmontan el componente
   useEffect(() => {
     const handleUnload = () => {
       if (isEditing) {
@@ -110,7 +162,7 @@ export default function ProductScreen({
     };
   }, [isEditing]);
 
-  // ⭐ NUEVA FUNCIÓN: Pedir permiso al backend antes de editar
+  // Pedir permiso al backend antes de editar
   const lockProduct = async () => {
     const id = product?._id || product?.id;
     if (!id) return false;
@@ -130,7 +182,7 @@ export default function ProductScreen({
         return false;
       }
       setLoading(false);
-      return true; // Éxito, tenemos el candado
+      return true; 
     } catch (error) {
       toast.error("Error al conectar con el servidor.");
       setLoading(false);
@@ -138,7 +190,7 @@ export default function ProductScreen({
     }
   };
 
-  // ⭐ NUEVA FUNCIÓN: Soltar el candado manualmente
+  // Soltar el candado manualmente
   const unlockProduct = async () => {
     const id = product?._id || product?.id;
     if (!id) return;
@@ -162,7 +214,7 @@ export default function ProductScreen({
   const handleCancelEditClick = () => {
     setIsEditing(false);
     unlockProduct();
-    setViewProduct(product); // Restaurar los valores visualmente
+    setViewProduct(product); 
   };
 
   const handleSave = async () => {
@@ -305,7 +357,7 @@ export default function ProductScreen({
     return a + b; 
   };
 
-  // ⭐ NUEVA FUNCIÓN: Compara inventario viejo vs nuevo para mostrar diferencias
+  // Compara inventario viejo vs nuevo para mostrar diferencias
   const getInventoryChanges = () => {
     const changes = [];
     tallasVisibles.forEach((size) => {
