@@ -165,8 +165,11 @@ router.post('/:id/lock', async (req, res) => {
       product.lockedAt = now;
       await product.save();
 
-      res.json({ success: true, lockedBy: user });
+      // ⭐ CORRECCIÓN CRÍTICA: Devolvemos el producto fresco al frontend
+      const freshProduct = await Product.findById(req.params.id).lean();
+      res.json({ success: true, lockedBy: user, product: freshProduct });
   } catch (err) {
+      console.error("Error en /lock:", err);
       res.status(500).json({ error: "Error al bloquear producto" });
   }
 });
@@ -307,7 +310,6 @@ router.put('/:id', async (req, res) => {
     }
 
     // ⭐ AQUÍ OCURRE LA MAGIA DE WEBSOCKETS ⭐
-    // Extraemos io de la app de Express y emitimos la alerta a todos
     const io = req.app.get('io');
     if (io) {
       io.emit('productoActualizado', updated);

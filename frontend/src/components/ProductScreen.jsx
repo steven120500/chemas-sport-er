@@ -109,8 +109,8 @@ export default function ProductScreen({
     socket.on('productoActualizado', (productoFresco) => {
       const frescoId = productoFresco?._id || productoFresco?.id;
       
-      // Si el producto que editaron es exactamente el que tenemos abierto en pantalla
-      if (frescoId === currentId) {
+      // Si el producto que editaron es exactamente el que tenemos abierto en pantalla y NO lo estamos editando nosotros
+      if (frescoId === currentId && !isEditing) {
         console.log("🟢 Actualización en tiempo real recibida para este producto");
         
         // Actualizamos todos los datos en pantalla instantáneamente
@@ -145,7 +145,7 @@ export default function ProductScreen({
     return () => {
       socket.disconnect();
     };
-  }, [product?._id, product?.id]);
+  }, [product?._id, product?.id, isEditing]);
   /* ⭐⭐⭐ FIN DE WEBSOCKETS ⭐⭐⭐ */
 
   // Liberar candado si cierran la pestaña de golpe o desmontan el componente
@@ -162,10 +162,10 @@ export default function ProductScreen({
     };
   }, [isEditing]);
 
-  // Pedir permiso al backend antes de editar
+  // ⭐ CORRECCIÓN CRÍTICA: Ahora lockProduct devuelve el objeto FRESCO de la base de datos
   const lockProduct = async () => {
     const id = product?._id || product?.id;
-    if (!id) return false;
+    if (!id) return null;
     
     setLoading(true);
     try {
@@ -179,14 +179,14 @@ export default function ProductScreen({
       if (!res.ok) {
         toast.error(`🔒 ${data.lockedBy || 'Alguien'} ya está editando este producto.`);
         setLoading(false);
-        return false;
+        return null;
       }
       setLoading(false);
-      return true; 
+      return data.product; // ⭐ Retornamos la verdad absoluta
     } catch (error) {
       toast.error("Error al conectar con el servidor.");
       setLoading(false);
-      return false;
+      return null;
     }
   };
 
@@ -204,9 +204,32 @@ export default function ProductScreen({
     }
   };
 
+  // ⭐ CORRECCIÓN CRÍTICA: Inyectamos los datos frescos en los inputs ANTES de abrir la edición
   const handleEditClick = async () => {
-    const hasLock = await lockProduct();
-    if (hasLock) {
+    const freshProduct = await lockProduct();
+    
+    if (freshProduct) {
+      // 1. Cargamos la verdad absoluta en todos los estados del formulario
+      setViewProduct(freshProduct);
+      setEditedName(freshProduct?.name || "");
+      setEditedPrice(freshProduct?.price ?? 0);
+      setEditedDiscountPrice(freshProduct?.discountPrice ?? 0);
+      setEditedType(freshProduct?.type || "Player");
+      setEditedStock({ ...(freshProduct?.stock || {}) });
+      setEditedBodega({ ...(freshProduct?.bodega || {}) });
+      setEditedHidden(freshProduct?.hidden || false);
+      setEditedIsMundial2026(freshProduct?.isMundial2026 || false);
+      
+      setLocalImages(
+        freshProduct?.images?.length
+          ? freshProduct.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
+          : [
+              ...(freshProduct?.imageSrc ? [{ src: freshProduct.imageSrc, isNew: false }] : []),
+              ...(freshProduct?.imageSrc2 ? [{ src: freshProduct.imageSrc2, isNew: false }] : []),
+            ]
+      );
+
+      // 2. Abrimos el modo edición con la garantía de que no hay datos fantasma
       setIsEditing(true);
     }
   };
