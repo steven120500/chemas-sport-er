@@ -56,6 +56,10 @@ export default function ProductScreen({
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
 
+  // ⭐ ESTADOS PARA EL MODAL DE NOMBRE DE CLIENTE AL REBAJAR STOCK
+  const [showBuyerModal, setShowBuyerModal] = useState(false);
+  const [buyerName, setBuyerName] = useState("");
+
   const galleryFromProduct = useMemo(() => {
     if (Array.isArray(product?.images) && product.images.length > 0) {
       return product.images.map((i) => (typeof i === "string" ? i : i?.url)).filter(Boolean);
@@ -97,7 +101,7 @@ export default function ProductScreen({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
-  /* ⭐⭐⭐ 2. MAGIA DE WEBSOCKETS EN TIEMPO REAL ⭐⭐⭐ */
+  /* ⭐⭐⭐ 2. MAGIA DE WEBSOCKETS EN TIEMPO REAL CON DETALLE DE TIENDA Y CLIENTE ⭐⭐⭐ */
   useEffect(() => {
     const currentId = product?._id || product?.id;
     if (!currentId) return;
@@ -133,10 +137,14 @@ export default function ProductScreen({
               ]
         );
 
-        // Avisamos al usuario para que sepa por qué cambiaron los números
+        // ⭐ LEEMOS QUÉ TIENDA Y QUÉ CLIENTE SE EDITÓ DESDE EL BACKEND
+        const meta = productoFresco._lastEditMeta || {};
+        const txtTienda = meta.store ? ` en ${meta.store}` : "";
+        const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (👤 Cliente: ${meta.customer})` : "";
+        
         toast.info(
-          "🔄 ¡Alguien más acaba de actualizar este producto! La pantalla se ha refrescado automáticamente con los últimos datos.",
-          { position: "top-right", autoClose: 5000 }
+          `🔄 ¡${meta.user || "Alguien"} ${meta.action || "actualizó"}${txtTienda}!${txtCliente} La pantalla se ha refrescado.`,
+          { position: "top-center", autoClose: 6000 }
         );
       }
     });
@@ -240,7 +248,23 @@ export default function ProductScreen({
     setViewProduct(product); 
   };
 
-  const handleSave = async () => {
+  // ⭐ NUEVO: REVISA SI SE RESTÓ ALGUNA CAMISETA DE TIENDA 1 O 2 PARA PEDIR CLIENTE
+  const checkHasDeduction = () => {
+    let decreased = false;
+    tallasVisibles.forEach((size) => {
+      const oldS = parseInt(viewProduct?.stock?.[size] ?? 0, 10);
+      const newS = parseInt(editedStock?.[size] ?? 0, 10);
+      if (oldS > newS) decreased = true;
+
+      const oldB = parseInt(viewProduct?.bodega?.[size] ?? 0, 10);
+      const newB = parseInt(editedBodega?.[size] ?? 0, 10);
+      if (oldB > newB) decreased = true;
+    });
+    return decreased;
+  };
+
+  // ⭐ ACTUALIZADO: RECIBE clientName PARA GUARDARLO EN EL HISTORIAL
+  const handleSave = async (clientName = "") => {
     if (loading) return;
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
@@ -269,7 +293,8 @@ export default function ProductScreen({
         imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: (editedName || "").trim(),
         hidden: editedHidden,
-        isMundial2026: editedIsMundial2026, 
+        isMundial2026: editedIsMundial2026,
+        customerName: clientName, // ⭐ ENVÍO DEL CLIENTE AL BACKEND
       };
 
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -743,7 +768,12 @@ export default function ProductScreen({
                                     <button
                                     onClick={() => {
                                         toastHOT.dismiss(t.id);
-                                        handleSave();
+                                        // ⭐ SI RESTARON CAMISETAS, ABRIMOS EL MODAL DEL CLIENTE
+                                        if (checkHasDeduction()) {
+                                          setShowBuyerModal(true);
+                                        } else {
+                                          handleSave(""); // Si no rebajaron nada, guardamos normal
+                                        }
                                     }}
                                     className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800"
                                     >
@@ -825,6 +855,63 @@ export default function ProductScreen({
           </div>
         </div>
       </div>
+
+      {/* ⭐ MODAL DE NOMBRE DE CLIENTE CUANDO SE REBAJA STOCK ⭐ */}
+      {showBuyerModal && (
+        <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative animate-scaleUp">
+            
+            <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">
+              👤
+            </div>
+            
+            <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
+            <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">
+              Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente o comprador para dejarlo registrado en el historial.
+            </p>
+            
+            <div className="w-full relative mb-6">
+              <input
+                type="text"
+                placeholder="Ej: Carlos Lobo / Venta en Tienda #1"
+                className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:ring-0 focus:outline-none transition-all shadow-inner bg-gray-50/50"
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBuyerModal(false);
+                  handleSave(buyerName || "Cliente General / Tienda");
+                  setBuyerName("");
+                }}
+                disabled={loading}
+                className="flex-1 bg-black hover:bg-gray-900 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg shadow-black/20 transition-transform active:scale-95 cursor-pointer"
+              >
+                {loading ? "GUARDANDO..." : "CONFIRMADA LA VENTA"}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBuyerModal(false);
+                  handleSave("No especificado");
+                  setBuyerName("");
+                }}
+                disabled={loading}
+                className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Omitir
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeInUpScreen {

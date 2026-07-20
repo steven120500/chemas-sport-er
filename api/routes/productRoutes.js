@@ -298,24 +298,55 @@ router.put('/:id', async (req, res) => {
     updated.isPopular = totalMonth >= 10;
     await updated.save();
 
+    // ⭐ 1. DETECTAR EN QUÉ TIENDA FUE EL CAMBIO
+    let tiendasModificadas = [];
+    if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) {
+      tiendasModificadas.push("Tienda #1");
+    }
+    if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) {
+      tiendasModificadas.push("Tienda #2");
+    }
+    const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
+
+    // ⭐ 2. RECIBIR EL NOMBRE DEL CLIENTE (Si hubo rebaja)
+    const nombreCliente = (req.body.customerName || "").trim();
+
     const changes = diffProduct(prev, updated.toObject());
     if (changes.length) {
+      let accionTexto = restadas > 0 ? 'vendió / rebajó stock' : 'actualizó producto';
+      let detalleCompleto = changes.join(' | ');
+
+      // Le armamos un texto súper elegante y claro para el historial
+      if (nombreCliente && nombreCliente !== "No especificado") {
+        detalleCompleto = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+      } else {
+        detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+      }
+
       await History.create({
         user: whoDidIt(req),
-        action: 'actualizó producto',
+        action: accionTexto,
         item: `${updated.name} (${updated.type})`,
         date: new Date(),
-        details: changes.join(' | ')
+        details: detalleCompleto
       });
     }
 
-    // ⭐ AQUÍ OCURRE LA MAGIA DE WEBSOCKETS ⭐
+    // ⭐ 3. MAGIA DE WEBSOCKETS CON DATOS DE LA TIENDA Y CLIENTE ⭐
+    const updatedObj = updated.toObject();
+    updatedObj._lastEditMeta = {
+      user: whoDidIt(req),
+      store: etiquetaTienda,
+      customer: nombreCliente,
+      action: restadas > 0 ? "rebajó stock" : "editó"
+    };
+
     const io = req.app.get('io');
     if (io) {
-      io.emit('productoActualizado', updated);
+      io.emit('productoActualizado', updatedObj);
     }
 
-    res.json(updated);
+    res.json(updatedObj);
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
