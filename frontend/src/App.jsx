@@ -213,7 +213,7 @@ function App() {
         : prev
     );
 
-    toast.success('Producto actualizado correctamente');
+
     refreshCounts();
   };
 
