@@ -315,7 +315,16 @@ export default function ProductScreen({
       setViewProduct(updated);
       setIsEditing(false);
       onUpdate?.(updated);
-      toast.success("Cambios guardados correctamente.");
+
+      // ⭐ AQUI ESTÁ LA MAGIA PARA LA NOTIFICACIÓN VERDE ⭐
+      const tiendaModificada = updated._lastEditMeta?.store;
+      
+      if (tiendaModificada && tiendaModificada !== "Datos generales") {
+        toast.success(`Cambio realizado en ${tiendaModificada} correctamente.`);
+      } else {
+        toast.success("Cambios guardados correctamente.");
+      }
+
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Hubo un problema al actualizar el producto");
@@ -858,7 +867,7 @@ export default function ProductScreen({
 
       {/* ⭐ MODAL DE NOMBRE DE CLIENTE CUANDO SE REBAJA STOCK ⭐ */}
       {showBuyerModal && (
-        <div className="fixed inset-0 z-[60000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative animate-scaleUp">
             
             <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">
@@ -873,7 +882,7 @@ export default function ProductScreen({
             <div className="w-full relative mb-6">
               <input
                 type="text"
-                placeholder="Ej: Carlos Lobo / Venta en Tienda #1"
+                placeholder="Ej: Emanuel Espinoza"
                 className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:ring-0 focus:outline-none transition-all shadow-inner bg-gray-50/50"
                 value={buyerName}
                 onChange={(e) => setBuyerName(e.target.value)}

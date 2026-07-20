@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaTimes, FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt } from "react-icons/fa";
@@ -32,6 +31,46 @@ const BASE_USERS = [
   "Stef", 
   "Stefanie"
 ];
+
+// ⭐ FUNCIÓN INTELIGENTE PARA EXTRAER LOS DATOS EN FORMATO GUÍA
+function extractGuideData(log) {
+  const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+  
+  // 1. Extraer Cliente
+  let cliente = "No especificado (Venta General)";
+  const matchCliente = detailsStr.match(/Cliente:\s*([^|]+)/i);
+  if (matchCliente && matchCliente[1]) {
+    cliente = matchCliente[1].trim();
+  }
+
+  // 2. Extraer Tienda
+  let tienda = "No especificada";
+  if (detailsStr.includes("Tienda #1") && detailsStr.includes("Tienda #2")) {
+    tienda = "Tienda #1 y Tienda #2";
+  } else if (detailsStr.includes("Tienda #1")) {
+    tienda = "Tienda #1";
+  } else if (detailsStr.includes("Tienda #2")) {
+    tienda = "Tienda #2";
+  }
+
+  // 3. Extraer Talla o cambio exacto (ej: [L]: 1 → 0)
+  const cambios = detailsStr
+    .split("|")
+    .map(part => part.trim())
+    .filter(part => !part.includes("Cliente:") && !part.includes("🏬 Tienda #") && part !== "Tienda #1" && part !== "Tienda #2")
+    .join(" | ");
+
+  const camiseta = `${log.item || "No especificado"}${cambios ? ` — (${cambios})` : ""}`;
+  const vendedor = log.user || "Sistema";
+
+  return `📦 GUÍA DE PEDIDO / ENTREGA\n` +
+         `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+         `👤 CLIENTE: ${cliente}\n` +
+         `👕 CAMISETA: ${camiseta}\n` +
+         `🧑‍💻 VENDEDOR: ${vendedor}\n` +
+         `🏬 TIENDA: ${tienda}\n` +
+         `━━━━━━━━━━━━━━━━━━━━━━━━`;
+}
 
 export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   const [logs, setLogs] = useState([]);
@@ -78,7 +117,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return () => { document.body.style.overflow = "auto"; };
   }, [open]);
 
-  // 🔥 FUNCIÓN CENTRAL: Petición al Backend (Solo se ejecuta al abrir, cambiar pestaña o pulsar "Buscar") 🔥
+  // 🔥 FUNCIÓN CENTRAL: Petición al Backend 🔥
   const fetchLogs = async (overrideStart, overrideEnd, overrideMonth) => {
     setLoading(true);
     setErrMsg("");
@@ -91,7 +130,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         _: String(Date.now()), 
       });
 
-      // Permite usar parámetros forzados (para cuando limpiamos filtros) o los que están en el estado
       const finalStart = overrideStart !== undefined ? overrideStart : startDate;
       const finalEnd = overrideEnd !== undefined ? overrideEnd : endDate;
       const finalMonth = overrideMonth !== undefined ? overrideMonth : selectedMonth;
@@ -124,7 +162,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     }
   };
 
-  // Se ejecuta automáticamente SOLO cuando abres el modal o cambias de pestaña
   useEffect(() => {
     if (open) {
       fetchLogs();
@@ -176,7 +213,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     ), { duration: 6000 });
   }
 
-  // Limpia los estados y hace una petición con fechas vacías para recargar todo
   const handleClearFilters = () => {
     setStartDate("");
     setEndDate("");
@@ -192,12 +228,9 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
-  // ⭐ Filtrado Local Exclusivo para Búsqueda Instantánea ⭐
   const filteredLogs = useMemo(() => {
     let result = logs;
 
-    // Ya NO filtramos por fecha localmente porque el backend ya lo hizo al darle a "Buscar Fechas"
-    
     const term = q.trim().toLowerCase();
     if (term) {
       result = result.filter((log) => String(log.item || "").toLowerCase().includes(term));
@@ -218,7 +251,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
   }, [logs, q, selectedUser, selectedStore]);
 
 
-  // ⭐ Lógica Matemática Local para Contar Camisetas Restadas ⭐
   const restasMensuales = useMemo(() => {
     const counts = {};
     BASE_USERS.forEach(user => counts[user] = 0);
@@ -294,7 +326,7 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
             </h2>
           </div>
 
-          {/* SPREAD TABS (Selector de Vista) */}
+          {/* SPREAD TABS */}
           <div className="flex bg-gray-100 p-1 rounded-2xl mb-4">
             <button
               onClick={() => setActiveTab("history")}
@@ -322,12 +354,10 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
         {/* CONTENIDO SCROLLABLE */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 px-6 sm:px-8 pb-6 sm:pb-8 min-h-0">
           
-          {/* =========================================
-              VISTA 1: HISTORIAL CON RANGO DE FECHAS
-          ========================================= */}
+          {/* VISTA 1: HISTORIAL */}
           {activeTab === "history" && (
             <div className="animate-fade-in-up">
-              {/* FILTROS DIARIOS/RANGO */}
+              {/* FILTROS */}
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 mb-6 flex flex-col gap-3">
                 <div className="flex gap-2">
                   <input
@@ -352,7 +382,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                 {showFilters && (
                   <div className="flex flex-col gap-3 mt-1 pt-3 border-t border-gray-200 animate-fade-in-up">
                     
-                    {/* SELECTORES DE RANGO DE FECHAS */}
                     <div className="flex flex-col sm:flex-row gap-3">
                         <div className="w-full">
                             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Desde Fecha</label>
@@ -403,7 +432,6 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                       </div>
                     </div>
 
-                    {/* BOTONES DE ACCIÓN (Buscar, Limpiar Filtros y Borrar Todo) */}
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
                       <button
                         onClick={() => fetchLogs()}
@@ -453,24 +481,49 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
                        const timeStr = logDateObj ? logDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
 
                        return (
-                        <li key={log._id || idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow">
+                        <li key={log._id || idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow flex flex-col justify-between">
                           
-                          <div className="mb-2">
-                            <strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong>
-                          </div>
-                          
-                          <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
-                          
-                          <small className="flex items-center gap-1.5 text-gray-400 block mt-1.5 font-semibold text-xs">
-                            <FaCalendarAlt size={10} className="mb-0.5" />
-                            {dateStr} — {timeStr}
-                          </small>
+                          <div>
+                            <div className="mb-2">
+                              <strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong>
+                            </div>
+                            
+                            <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
+                            
+                            <small className="flex items-center gap-1.5 text-gray-400 block mt-1.5 font-semibold text-xs">
+                              <FaCalendarAlt size={10} className="mb-0.5" />
+                              {dateStr} — {timeStr}
+                            </small>
 
-                          {log.details && (
-                            <pre className="mt-3 bg-gray-50 border border-gray-100 p-3 rounded-xl text-[11px] overflow-x-auto text-gray-600 font-mono whitespace-pre-wrap shadow-inner">
-                              {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
-                            </pre>
-                          )}
+                            {log.details && (
+                              <pre className="mt-3 bg-gray-50 border border-gray-100 p-3 rounded-xl text-[11px] overflow-x-auto text-gray-600 font-mono whitespace-pre-wrap shadow-inner">
+                                {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+
+                          {/* ⭐ BOTÓN PARA SACAR LA GUÍA EXACTA CON LOS 4 DATOS ⭐ */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const textoGuia = extractGuideData(log);
+                              navigator.clipboard.writeText(textoGuia);
+                              
+                              toastHOT.success("¡Guía de pedido copiada! Lista para pegar 📋", {
+                                style: {
+                                  borderRadius: '12px',
+                                  background: '#000',
+                                  color: '#fff',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }
+                              });
+                            }}
+                            className="mt-4 w-full py-3 bg-black hover:bg-gray-800 text-white rounded-xl text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95"
+                          >
+                            <span>📋 Copiar Guía de Envío / Pedido</span>
+                          </button>
+
                         </li>
                       );
                     })}
@@ -480,13 +533,10 @@ export default function HistoryModal({ open, onClose, isSuperUser = false }) {
             </div>
           )}
 
-          {/* =========================================
-              VISTA 2: CONTEO MENSUAL DE CAMISETAS RESTADAS
-          ========================================= */}
+          {/* VISTA 2: CONTEO MENSUAL */}
           {activeTab === "count" && (
             <div className="animate-fade-in-up">
               
-              {/* SELECTOR EXCLUSIVO DE MES Y BOTÓN */}
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1 text-center sm:text-left w-full sm:w-auto">
                       Seleccionar Mes:
