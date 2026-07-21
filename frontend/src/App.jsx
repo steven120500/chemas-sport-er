@@ -1,6 +1,8 @@
 import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom'; // ⭐ IMPORTAMOS REACT-ROUTER
+
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import ProductCard from './components/ProductCard';
@@ -18,7 +20,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
 import TopBanner from './components/TopBanner';
 import UserListModal from './components/UserListModal';
-import HistoryModal from './components/HistoryModal';
+import HistoryPage from './components/HistoryPage'; // ⭐ AHORA ES UNA PÁGINA COMPLETA
 import Medidas from './components/Medidas';
 import Cantidad from './components/Cantidad';
 import Bienvenido from './components/Bienvenido';
@@ -35,13 +37,38 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
-function App() {
+// ⭐ COMPONENTE ENVOLTORIO PARA LA RUTA DEL PRODUCTO INDIVIDUAL ⭐
+function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
+  const { id } = useParams();
+  const product = products.find(p => getPid(p) === id);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  if (loadingProducts && !products.length) return <LoadingOverlay message="Cargando producto..." />;
+  if (!loadingProducts && !product) return <Navigate to="/" replace />;
+  if (!product) return null;
+
+  return (
+    <ProductScreen
+      key={`${getPid(product)}-${product.updatedAt || ''}`}
+      product={product}
+      onClose={onClose}
+      onUpdate={onUpdate}
+      canEdit={canEdit}
+      canDelete={canDelete}
+      user={user}
+      storeView={storeView}
+    />
+  );
+}
+
+function MainApp() {
   const [showIntro, setShowIntro] = useState(true); 
   const [products, setProducts] = useState([]);
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  const [selectedProduct, setSelectedProduct] = useState(null);
   
   // ⭐ ESTADO PARA RECORDAR DÓNDE ESTABA EL SCROLL ⭐
   const [savedScroll, setSavedScroll] = useState(0);
@@ -57,7 +84,6 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
   const [showUserListModal, setShowUserListModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMedidas, setShowMedidas] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -65,12 +91,13 @@ function App() {
   const [total, setTotal] = useState(0);
   const pages = Math.max(1, Math.ceil(total / limit));
 
+  const navigate = useNavigate(); // ⭐ INICIAMOS EL NAVEGADOR DE RUTAS
+
   const anyModalOpen =
     showAddModal ||
     showLogin ||
     showRegisterUserModal ||
     showUserListModal ||
-    showHistoryModal ||
     showMedidas;
 
   const [user, setUser] = useState(() => {
@@ -171,7 +198,6 @@ function App() {
   const pageTopRef = useRef(null);
   
   useEffect(() => {
-    // ⭐ Le quitamos el if(!selectedProduct) para que solo se active cuando cambias de página o filtros
     fetchProducts({ page, q: searchTerm, type: filterType });
     if (pageTopRef.current) {
       pageTopRef.current.style.scrollMarginTop = '100px'; 
@@ -179,7 +205,6 @@ function App() {
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    // ⭐ Eliminamos selectedProduct de aquí para que no haga scroll raro al volver
   }, [page, searchTerm, filterType, filterSizes, storeView]);
 
   useEffect(() => {
@@ -190,11 +215,11 @@ function App() {
     setTimeout(() => fetchAllForCounts(), 600);
   };
 
+  // ⭐ FUNCIONES DE NAVEGACIÓN DE PRODUCTOS ⭐
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
-      setSelectedProduct(null);
-      // ⭐ Restaura el scroll también si eliminas el producto
+      navigate('/');
       setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
       toast.success('Producto eliminado correctamente');
       refreshCounts();
@@ -206,23 +231,20 @@ function App() {
         getPid(p) === getPid(updatedProduct) ? { ...p, ...updatedProduct } : p
       )
     );
-
-    setSelectedProduct((prev) =>
-      prev && getPid(prev) === getPid(updatedProduct)
-        ? { ...prev, ...updatedProduct }
-        : prev
-    );
-
-
     refreshCounts();
   };
 
-  const handleLoginClick = () => setShowLogin(true);
-  const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    setShowLogin(false);
-    toast.success('Bienvenido');
+  const handleProductClose = () => {
+    navigate('/');
+    setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
   };
+
+  const handleProductClick = (product) => {
+    setSavedScroll(window.scrollY);
+    navigate(`/producto/${getPid(product)}`);
+  };
+
+  const handleLoginClick = () => setShowLogin(true);
 
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
@@ -270,7 +292,6 @@ function App() {
         {/* ================= MODALES GLOBALES ================= */}
         {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
         {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} currentUser={user} token={user?.token} />}
-        {showHistoryModal && <HistoryModal open={showHistoryModal} onClose={() => setShowHistoryModal(false)} isSuperUser={user?.isSuperUser === true} />}
         {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
         {showAddModal && (
           <AddProductModal
@@ -311,38 +332,42 @@ function App() {
               setFilterType('');
               setSearchTerm('');
               setPage(1);
-              setSelectedProduct(null); 
+              navigate('/');
             }}
             user={user}
             isSuperUser={isSuperUser}
             setShowRegisterUserModal={setShowRegisterUserModal}
             setShowUserListModal={setShowUserListModal}
-            setShowHistoryModal={setShowHistoryModal}
+            setShowHistoryModal={() => navigate('/history')} // ⭐ NAVEGAMOS AL HISTORIAL
             canSeeHistory={canSeeHistory}
           />
         )}
 
-        {/* ================= CONTENIDO PRINCIPAL ================= */}
+        {/* ================= SISTEMA DE RUTAS PRINCIPALES ================= */}
         <main className="flex-1 w-full relative">
-            {selectedProduct ? (
-            
-            <ProductScreen
-                key={`${getPid(selectedProduct)}-${selectedProduct.updatedAt || ''}`}
-                product={selectedProduct}
-                onClose={() => {
-                  setSelectedProduct(null);
-                  // ⭐ AL VOLVER, RESTAURAMOS EL SCROLL AL PIXEL EXACTO ⭐
-                  setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
-                }}
-                onUpdate={handleProductUpdate}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                user={user}
-                storeView={storeView}
-            />
+          <Routes>
+            {/* RUTA 1: PÁGINA DEL HISTORIAL */}
+            <Route path="/history" element={
+              <HistoryPage isSuperUser={isSuperUser} />
+            } />
 
-            ) : (
-            <>
+            {/* RUTA 2: PÁGINA DE UNA CAMISETA ESPECÍFICA */}
+            <Route path="/producto/:id" element={
+              <ProductDetailWrapper 
+                products={products} 
+                loadingProducts={loading} 
+                onClose={handleProductClose} 
+                onUpdate={handleProductUpdate} 
+                user={user} 
+                storeView={storeView} 
+                canEdit={canEdit} 
+                canDelete={canDelete} 
+              />
+            } />
+
+            {/* RUTA 3: CATÁLOGO PRINCIPAL (HOME) */}
+            <Route path="/" element={
+              <>
                 {loading && <LoadingOverlay message="Cargando productos..." />}
 
                 {!loading && allProductsForCounts?.length > 0 && (
@@ -520,11 +545,7 @@ function App() {
                         key={getPid(product)}
                         product={product}
                         index={index}
-                        onClick={() => {
-                          // ⭐ AL ABRIR UN PRODUCTO, GUARDAMOS EN QUÉ PIXEL ESTÁBAMOS ⭐
-                          setSavedScroll(window.scrollY);
-                          setSelectedProduct(product);
-                        }}
+                        onClick={() => handleProductClick(product)}
                         user={user}
                     />
                     ))
@@ -579,8 +600,9 @@ function App() {
                     </nav>
                 </div>
                 )}
-            </>
-            )}
+              </>
+            } />
+          </Routes>
         </main>
 
         {/* ================= FOOTER GLOBAL ================= */}
@@ -592,4 +614,11 @@ function App() {
   );
 }
 
-export default App;
+// ⭐ ENVOLVEMOS TODA LA APLICACIÓN CON EL ENRUTADOR OFICIAL ⭐
+export default function AppWrapper() {
+  return (
+    <Router>
+      <MainApp />
+    </Router>
+  );
+}
