@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt, FaChevronLeft, FaChevronRight } from "react-icons/fa";
@@ -22,7 +21,6 @@ function ymLocal(d = new Date()){
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
 
-// ⭐ NUEVA FUNCIÓN CON DETECTOR DE CANTIDADES ⭐
 function parseLogDetails(log) {
   const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
@@ -46,27 +44,25 @@ function parseLogDetails(log) {
 
     if (oldV > newV) {
       hasMatches = true;
-      const cantidad = oldV - newV; // Matemáticas para saber cuántas se restaron
+      const cantidad = oldV - newV;
 
-      // ⭐ Si rebajaron 2 o más de la misma, repetimos la línea esa cantidad de veces
       for (let i = 0; i < cantidad; i++) {
-        items.push(`-  CAMISETA: ${nombreChema} talla ${talla}\n TIENDA: ${tienda}`);
+        items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nTIENDA: ${tienda}`);
       }
     }
   }
 
   if (!hasMatches) {
     const tiendaF = detailsStr.includes("Tienda #1") ? "Tienda #1" : (detailsStr.includes("Tienda #2") ? "Tienda #2" : "General");
-    items.push(`-  CAMISETA: ${nombreChema}\n TIENDA: ${tiendaF}`);
+    items.push(`- CAMISETA: ${nombreChema}\nTIENDA: ${tiendaF}`);
   }
 
   return { cliente, vendedor, items };
 }
 
-// FORMATO INDIVIDUAL
 function extractGuideData(log) {
   const data = parseLogDetails(log);
-  return ` CLIENTE: ${data.cliente}\n${data.items.join('\n')}\nVendedor: ${data.vendedor}`;
+  return `CLIENTE: ${data.cliente}\n${data.items.join('\n')}\nVendedor: ${data.vendedor}`;
 }
 
 export default function HistoryPage({ isSuperUser = false }) {
@@ -86,8 +82,6 @@ export default function HistoryPage({ isSuperUser = false }) {
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
-  // ⭐ ESTADO PARA GUARDAR LAS CAJITAS MARCADAS ⭐
   const [selectedLogs, setSelectedLogs] = useState([]);
 
   const storedUser = useMemo(() => {
@@ -103,7 +97,6 @@ export default function HistoryPage({ isSuperUser = false }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Limpiar selecciones cuando cambian los filtros o la pestaña
   useEffect(() => {
     setSelectedLogs([]);
   }, [page, activeTab, q, startDate, endDate, selectedMonth, selectedUser, selectedStore]);
@@ -212,14 +205,12 @@ export default function HistoryPage({ isSuperUser = false }) {
     toastHOT.success("Filtros limpiados", { duration: 1500 });
   };
 
-  // ⭐ FUNCIÓN PARA MARCAR/DESMARCAR CAJITAS ⭐
   const toggleSelection = (id) => {
     setSelectedLogs(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
-  // ⭐ FUNCIÓN PARA COPIAR VARIAS CAMISAS JUNTAS ⭐
   const handleCopyMultiple = () => {
     const logsToCopy = logs.filter(l => selectedLogs.includes(l._id));
     if (!logsToCopy.length) return;
@@ -235,14 +226,16 @@ export default function HistoryPage({ isSuperUser = false }) {
       allItems.push(...data.items);
     });
 
-    const finalString = ` CLIENTE: ${cliente}\n${allItems.join('\n')}\nVendedor: ${vendedor}`;
+    const finalString = `CLIENTE: ${cliente}\n${allItems.join('\n')}\nVendedor: ${vendedor}`;
     navigator.clipboard.writeText(finalString);
     
-    toastHOT.success("¡Guía múltiple copiada! Lista para pegar ", { 
+    toastHOT.success("Guía múltiple copiada. Lista para pegar.", { 
+        id: "notificacion-copia-multiple",
+        duration: 3000,
         style: { borderRadius: '12px', background: '#000', color: '#fff', fontSize: '12px', fontWeight: 'bold' }
     });
     
-    setSelectedLogs([]); // Limpiamos la selección después de copiar
+    setSelectedLogs([]); 
   };
 
   const uniqueUsers = useMemo(() => {
@@ -286,7 +279,6 @@ export default function HistoryPage({ isSuperUser = false }) {
     <div className="min-h-screen bg-gray-50 pt-8 pb-32 px-4 sm:px-6 lg:px-8 relative">
       <div className="max-w-4xl mx-auto">
         
-        {/* BOTÓN VOLVER */}
         <button
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-gray-500 bg-transparent hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs"
@@ -326,7 +318,6 @@ export default function HistoryPage({ isSuperUser = false }) {
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
                       <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md">Buscar Fechas</button>
                       <button onClick={handleClearFilters} className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors">Limpiar</button>
-                      {isSuperUser && (<button onClick={askClear} disabled={loading} className="w-full bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50">Borrar Historial</button>)}
                     </div>
                   </div>
                 )}
@@ -352,7 +343,6 @@ export default function HistoryPage({ isSuperUser = false }) {
                        return (
                         <li key={log._id || idx} className={`relative bg-white border-2 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-4 ${isSelected ? 'border-black bg-gray-50' : 'border-gray-100'}`}>
                           
-                          {/* ⭐ CHECKBOX Y DETALLES ⭐ */}
                           <div className="flex items-start gap-4 flex-1">
                             <div className="mt-1">
                                 <input 
@@ -374,19 +364,22 @@ export default function HistoryPage({ isSuperUser = false }) {
                             </div>
                           </div>
 
-                          {/* BOTÓN INDIVIDUAL (Se oculta si estás marcando varios) */}
                           {selectedLogs.length === 0 && (
                             <div className="sm:w-48 shrink-0 mt-2 sm:mt-0">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                    const textoGuia = extractGuideData(log);
-                                    navigator.clipboard.writeText(textoGuia);
-                                    toastHOT.success("¡Guía copiada! Lista para pegar 📋", { style: { borderRadius: '12px', background: '#000', color: '#fff', fontSize: '12px', fontWeight: 'bold' }});
+                                      const textoGuia = extractGuideData(log);
+                                      navigator.clipboard.writeText(textoGuia);
+                                      toastHOT.success("Guía copiada. Lista para pegar.", { 
+                                          id: "notificacion-copia-individual",
+                                          duration: 3000,
+                                          style: { borderRadius: '12px', background: '#000', color: '#fff', fontSize: '12px', fontWeight: 'bold' }
+                                      });
                                     }}
                                     className="w-full py-3 bg-black hover:bg-white hover:text-black rounded-xl text-[11px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer border border-gray-200"
                                 >
-                                    <span>Copiar Guía</span>
+                                    <span>Copiar</span>
                                 </button>
                             </div>
                           )}
@@ -396,7 +389,6 @@ export default function HistoryPage({ isSuperUser = false }) {
                   </ul>
                 )}
 
-                {/* BOTONES DE PAGINACIÓN */}
                 {!loading && totalPages > 1 && (
                   <div className="flex items-center justify-center gap-4 mt-8 pt-6 border-t border-gray-100">
                     <button onClick={handlePrevPage} disabled={page === 1} className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-2"><FaChevronLeft /> Anterior</button>
@@ -439,7 +431,6 @@ export default function HistoryPage({ isSuperUser = false }) {
         </div>
       </div>
 
-      {/* ⭐ BOTÓN FLOTANTE GIGANTE PARA COPIAR VARIAS JUNTAS ⭐ */}
       {selectedLogs.length > 1 && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-up">
            <button 
