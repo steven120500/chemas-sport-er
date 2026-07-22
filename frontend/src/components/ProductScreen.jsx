@@ -201,28 +201,50 @@ export default function ProductScreen({
   };
 
   const handleEditClick = async () => {
-    const freshProduct = await lockProduct();
-    if (freshProduct) {
-      setViewProduct(freshProduct);
-      setEditedName(freshProduct?.name || "");
-      setEditedPrice(freshProduct?.price ?? 0);
-      setEditedDiscountPrice(freshProduct?.discountPrice ?? 0);
-      setEditedType(freshProduct?.type || "Player");
-      setEditedStock({ ...(freshProduct?.stock || {}) });
-      setEditedBodega({ ...(freshProduct?.bodega || {}) });
-      setEditedHidden(freshProduct?.hidden || false);
-      setEditedIsMundial2026(freshProduct?.isMundial2026 || false);
+    // ⭐ 1. Abrimos el modo edición de inmediato para que la pantalla no se congele
+    setIsEditing(true);
+
+    // 2. Solicitamos el candado y los datos frescos en segundo plano de manera silenciosa
+    const id = product?._id || product?.id;
+    if (!id) return;
+    
+    fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/lock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-user": displayName },
+    })
+    .then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) {
+        setIsEditing(false); // Si está bloqueado, cerramos la edición
+        toast.error(`Producto bloqueado por ${data.lockedBy || 'otro usuario'}.`);
+        return;
+      }
       
-      setLocalImages(
-        freshProduct?.images?.length
-          ? freshProduct.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
-          : [
-              ...(freshProduct?.imageSrc ? [{ src: freshProduct.imageSrc, isNew: false }] : []),
-              ...(freshProduct?.imageSrc2 ? [{ src: freshProduct.imageSrc2, isNew: false }] : []),
-            ]
-      );
-      setIsEditing(true);
-    }
+      const freshProduct = data.product;
+      if (freshProduct) {
+        setViewProduct(freshProduct);
+        setEditedName(freshProduct?.name || "");
+        setEditedPrice(freshProduct?.price ?? 0);
+        setEditedDiscountPrice(freshProduct?.discountPrice ?? 0);
+        setEditedType(freshProduct?.type || "Player");
+        setEditedStock({ ...(freshProduct?.stock || {}) });
+        setEditedBodega({ ...(freshProduct?.bodega || {}) });
+        setEditedHidden(freshProduct?.hidden || false);
+        setEditedIsMundial2026(freshProduct?.isMundial2026 || false);
+        
+        setLocalImages(
+          freshProduct?.images?.length
+            ? freshProduct.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
+            : [
+                ...(freshProduct?.imageSrc ? [{ src: freshProduct.imageSrc, isNew: false }] : []),
+                ...(freshProduct?.imageSrc2 ? [{ src: freshProduct.imageSrc2, isNew: false }] : []),
+              ]
+        );
+      }
+    })
+    .catch(() => {
+      toast.error("Error al conectar con el servidor.");
+    });
   };
 
   const handleCancelEditClick = () => {
