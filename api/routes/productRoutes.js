@@ -149,7 +149,6 @@ router.post('/:id/lock', async (req, res) => {
       const user = whoDidIt(req);
       const now = new Date();
 
-      // Si ya está bloqueado por OTRA persona, y el bloqueo tiene menos de 10 minutos (600000 ms)
       if (product.lockedBy && product.lockedBy !== user) {
           const lockAge = now - product.lockedAt;
           if (lockAge < 600000) { 
@@ -160,12 +159,10 @@ router.post('/:id/lock', async (req, res) => {
           }
       }
 
-      // Si no está bloqueado, o el bloqueo expiró, se lo asignamos a este usuario
       product.lockedBy = user;
       product.lockedAt = now;
       await product.save();
 
-      // ⭐ CORRECCIÓN CRÍTICA: Devolvemos el producto fresco al frontend
       const freshProduct = await Product.findById(req.params.id).lean();
       res.json({ success: true, lockedBy: user, product: freshProduct });
   } catch (err) {
@@ -180,7 +177,6 @@ router.post('/:id/unlock', async (req, res) => {
       const product = await Product.findById(req.params.id);
       const user = whoDidIt(req);
 
-      // Solo el usuario que lo bloqueó puede desbloquearlo
       if (product && product.lockedBy === user) {
           product.lockedBy = null;
           product.lockedAt = null;
@@ -192,13 +188,12 @@ router.post('/:id/unlock', async (req, res) => {
   }
 });
 
-/* ======================== Actualizar Producto ====================== */
+/* ======================== Actualizar Producto (OPTIMIZADO) ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // 🛡️ Seguridad extra: verificar que nadie más tenga el candado al momento de guardar
     const user = whoDidIt(req);
     if (prev.lockedBy && prev.lockedBy !== user) {
       const lockAge = new Date() - prev.lockedAt;
@@ -235,8 +230,6 @@ router.put('/:id', async (req, res) => {
         : prev.discountPrice,
       stock: nextStock,
       bodega: nextBodega,
-      
-      // ⭐ Aseguramos que el candado se limpie al guardar
       lockedBy: null,
       lockedAt: null
     };
@@ -257,100 +250,114 @@ router.put('/:id', async (req, res) => {
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
       const normalized = [];
+      const uploadTasks = [];
 
       for (const raw of incomingImages.slice(0, 2)) {
         if (!raw) continue;
-
         if (typeof raw === 'string' && raw.startsWith('data:')) {
-          const up = await cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' });
-          normalized.push({ public_id: up.public_id, url: up.secure_url });
+          uploadTasks.push(
+            cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' })
+              .then(up => ({ public_id: up.public_id, url: up.secure_url }))
+          );
         } else {
           const found = prevList.find(i => i.url === raw);
           normalized.push(found || { public_id: null, url: raw });
         }
       }
 
+      if (uploadTasks.length > 0) {
+        const uploadedNew = await Promise.all(uploadTasks);
+        normalized.push(...uploadedNew);
+      }
+
       update.images = normalized;
       update.imageSrc = normalized[0]?.url || '';
     }
 
-    let updated = await Product.findByIdAndUpdate(
+    // 1. Guardado principal en MongoDB (Lo único que bloquea la respuesta HTTP)
+    const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     );
 
-    if (restadas > 0) {
-      updated.popularCountHistory.push({
-        date: new Date().toISOString(),
-        quantity: restadas
-      });
-    }
-
-    const now = new Date();
-    const totalMonth = updated.popularCountHistory
-      .filter(entry => {
-        const d = new Date(entry.date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, e) => sum + e.quantity, 0);
-
-    updated.isPopular = totalMonth >= 10;
-    await updated.save();
-
-    // ⭐ 1. DETECTAR EN QUÉ TIENDA FUE EL CAMBIO
-    let tiendasModificadas = [];
-    if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) {
-      tiendasModificadas.push("Tienda #1");
-    }
-    if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) {
-      tiendasModificadas.push("Tienda #2");
-    }
-    const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
-
-    // ⭐ 2. RECIBIR EL NOMBRE DEL CLIENTE (Si hubo rebaja)
-    const nombreCliente = (req.body.customerName || "").trim();
-
-    const changes = diffProduct(prev, updated.toObject());
-    if (changes.length) {
-      let accionTexto = restadas > 0 ? 'vendió / rebajó stock' : 'actualizó producto';
-      let detalleCompleto = changes.join(' | ');
-
-      // Le armamos un texto súper elegante y claro para el historial
-      if (nombreCliente && nombreCliente !== "No especificado") {
-        detalleCompleto = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleCompleto}`;
-      } else {
-        detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
-      }
-
-      await History.create({
-        user: whoDidIt(req),
-        action: accionTexto,
-        item: `${updated.name} (${updated.type})`,
-        date: new Date(),
-        details: detalleCompleto
-      });
-    }
-
-    // ⭐ 3. MAGIA DE WEBSOCKETS CON DATOS DE LA TIENDA Y CLIENTE ⭐
     const updatedObj = updated.toObject();
-    updatedObj._lastEditMeta = {
-      user: whoDidIt(req),
-      store: etiquetaTienda,
-      customer: nombreCliente,
-      action: restadas > 0 ? "rebajó stock" : "editó"
-    };
 
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('productoActualizado', updatedObj);
-    }
+    // ⭐ 2. RESPONDEMOS AL FRONTEND DE INMEDIATO (Eliminando el tiempo de espera) ⭐
+    res.status(200).json(updatedObj);
 
-    res.json(updatedObj);
+    // 3. PROCESO EN SEGUNDO PLANO (Fire & Forget): Historial, Popularidad y WebSockets
+    setTimeout(async () => {
+      try {
+        if (restadas > 0) {
+          updated.popularCountHistory.push({
+            date: new Date().toISOString(),
+            quantity: restadas
+          });
+        }
+
+        const now = new Date();
+        const totalMonth = updated.popularCountHistory
+          .filter(entry => {
+            const d = new Date(entry.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          })
+          .reduce((sum, e) => sum + e.quantity, 0);
+
+        updated.isPopular = totalMonth >= 10;
+        await updated.save();
+
+        let tiendasModificadas = [];
+        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) {
+          tiendasModificadas.push("Tienda #1");
+        }
+        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) {
+          tiendasModificadas.push("Tienda #2");
+        }
+        const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
+        const nombreCliente = (req.body.customerName || "").trim();
+
+        const changes = diffProduct(prev, updatedObj);
+        if (changes.length) {
+          let accionTexto = restadas > 0 ? 'vendió / rebajó stock' : 'actualizó producto';
+          let detalleCompleto = changes.join(' | ');
+
+          if (nombreCliente && nombreCliente !== "No especificado") {
+            detalleCompleto = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+          } else {
+            detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+          }
+
+          await History.create({
+            user: user,
+            action: accionTexto,
+            item: `${updated.name} (${updated.type})`,
+            date: new Date(),
+            details: detalleCompleto
+          });
+        }
+
+        updatedObj._lastEditMeta = {
+          user: user,
+          store: etiquetaTienda,
+          customer: nombreCliente,
+          action: restadas > 0 ? "rebajó stock" : "editó"
+        };
+
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('productoActualizado', updatedObj);
+        }
+      } catch (bgError) {
+        console.error('Error analítico en segundo plano en PUT /api/products/:id:', bgError);
+      }
+    }, 0);
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
-    res.status(500).json({ error: 'Error al actualizar producto' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error al actualizar producto' });
+    }
   }
 });
 
