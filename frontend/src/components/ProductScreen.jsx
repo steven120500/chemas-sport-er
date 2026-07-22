@@ -98,54 +98,58 @@ export default function ProductScreen({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
-  /* ⭐ SOCKETS OPTIMIZADOS (Solo se conectan si no estás editando activamente) ⭐ */
-  useEffect(() => {
-    const currentId = product?._id || product?.id;
-    if (!currentId || isEditing) return;
+ /* ⭐ SOCKETS PROTEGIDOS: SOLO PARA ADMINISTRADORES / USUARIOS CON FUNCIONES ⭐ */
+ useEffect(() => {
+  const currentId = product?._id || product?.id;
+  if (!currentId || isEditing) return;
 
-    const socket = io(API_BASE, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 3
-    });
+  // Verificamos si el usuario actual tiene permisos o roles activos
+  const hasAdminRole = user?.isSuperUser || user?.isAdmin || (Array.isArray(user?.roles) && user.roles.length > 0);
+  if (!hasAdminRole) return; // Si es un cliente común y corriente, ignoramos el socket por completo
 
-    socket.on('productoActualizado', (productoFresco) => {
-      const frescoId = productoFresco?._id || productoFresco?.id;
+  const socket = io(API_BASE, {
+    transports: ['websocket', 'polling'],
+    reconnectionAttempts: 3
+  });
+
+  socket.on('productoActualizado', (productoFresco) => {
+    const frescoId = productoFresco?._id || productoFresco?.id;
+    
+    if (frescoId === currentId && !isEditing) {
+      setViewProduct(productoFresco);
+      setEditedName(productoFresco?.name || "");
+      setEditedPrice(productoFresco?.price ?? 0);
+      setEditedDiscountPrice(productoFresco?.discountPrice ?? 0);
+      setEditedType(productoFresco?.type || "Player");
+      setEditedStock({ ...(productoFresco?.stock || {}) });
+      setEditedBodega({ ...(productoFresco?.bodega || {}) });
+      setEditedHidden(productoFresco?.hidden || false);
+      setEditedIsMundial2026(productoFresco?.isMundial2026 || false);
+
+      setLocalImages(
+        productoFresco?.images?.length
+          ? productoFresco.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
+          : [
+              ...(productoFresco?.imageSrc ? [{ src: productoFresco.imageSrc, isNew: false }] : []),
+              ...(productoFresco?.imageSrc2 ? [{ src: productoFresco.imageSrc2, isNew: false }] : []),
+            ]
+      );
+
+      const meta = productoFresco._lastEditMeta || {};
+      const txtTienda = meta.store ? ` en ${meta.store}` : "";
+      const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (Cliente: ${meta.customer})` : "";
       
-      if (frescoId === currentId && !isEditing) {
-        setViewProduct(productoFresco);
-        setEditedName(productoFresco?.name || "");
-        setEditedPrice(productoFresco?.price ?? 0);
-        setEditedDiscountPrice(productoFresco?.discountPrice ?? 0);
-        setEditedType(productoFresco?.type || "Player");
-        setEditedStock({ ...(productoFresco?.stock || {}) });
-        setEditedBodega({ ...(productoFresco?.bodega || {}) });
-        setEditedHidden(productoFresco?.hidden || false);
-        setEditedIsMundial2026(productoFresco?.isMundial2026 || false);
+      toast.info(
+        `¡${meta.user || "Alguien"} ${meta.action || "actualizó"}${txtTienda}!${txtCliente} Pantalla actualizada.`,
+        { position: "top-center", autoClose: 4000 }
+      );
+    }
+  });
 
-        setLocalImages(
-          productoFresco?.images?.length
-            ? productoFresco.images.map((img) => ({ src: typeof img === "string" ? img : img.url, isNew: false }))
-            : [
-                ...(productoFresco?.imageSrc ? [{ src: productoFresco.imageSrc, isNew: false }] : []),
-                ...(productoFresco?.imageSrc2 ? [{ src: productoFresco.imageSrc2, isNew: false }] : []),
-              ]
-        );
-
-        const meta = productoFresco._lastEditMeta || {};
-        const txtTienda = meta.store ? ` en ${meta.store}` : "";
-        const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (Cliente: ${meta.customer})` : "";
-        
-        toast.info(
-          `¡${meta.user || "Alguien"} ${meta.action || "actualizó"}${txtTienda}!${txtCliente} Pantalla actualizada.`,
-          { position: "top-center", autoClose: 4000 }
-        );
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [product?._id, product?.id, isEditing]);
+  return () => {
+    socket.disconnect();
+  };
+}, [product?._id, product?.id, isEditing, user]);
 
   useEffect(() => {
     const handleUnload = () => {
