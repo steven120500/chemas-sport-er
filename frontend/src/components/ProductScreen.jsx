@@ -99,13 +99,14 @@ export default function ProductScreen({
   }, [product]);
 
  /* ⭐ SOCKETS PROTEGIDOS: SOLO PARA ADMINISTRADORES / USUARIOS CON FUNCIONES ⭐ */
- useEffect(() => {
+/* ⭐ SOCKETS EN TIEMPO REAL BLINDADOS Y ACTUALIZADOS ⭐ */
+useEffect(() => {
   const currentId = product?._id || product?.id;
   if (!currentId || isEditing) return;
 
-  // Verificamos si el usuario actual tiene permisos o roles activos
+  // Solo para administradores / usuarios con funciones
   const hasAdminRole = user?.isSuperUser || user?.isAdmin || (Array.isArray(user?.roles) && user.roles.length > 0);
-  if (!hasAdminRole) return; // Si es un cliente común y corriente, ignoramos el socket por completo
+  if (!hasAdminRole) return;
 
   const socket = io(API_BASE, {
     transports: ['websocket', 'polling'],
@@ -116,6 +117,7 @@ export default function ProductScreen({
     const frescoId = productoFresco?._id || productoFresco?.id;
     
     if (frescoId === currentId && !isEditing) {
+      // Actualizamos la vista y los estados internos editables al instante
       setViewProduct(productoFresco);
       setEditedName(productoFresco?.name || "");
       setEditedPrice(productoFresco?.price ?? 0);
@@ -135,6 +137,7 @@ export default function ProductScreen({
             ]
       );
 
+      // Notificación para el admin
       const meta = productoFresco._lastEditMeta || {};
       const txtTienda = meta.store ? ` en ${meta.store}` : "";
       const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (Cliente: ${meta.customer})` : "";
@@ -205,26 +208,29 @@ export default function ProductScreen({
   };
 
   const handleEditClick = async () => {
-    // ⭐ 1. Abrimos el modo edición de inmediato para que la pantalla no se congele
-    setIsEditing(true);
-
-    // 2. Solicitamos el candado y los datos frescos en segundo plano de manera silenciosa
     const id = product?._id || product?.id;
     if (!id) return;
-    
-    fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/lock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-user": displayName },
-    })
-    .then(async (res) => {
+
+    try {
+      // 1. Primero consultamos el candado al servidor ANTES de abrir la pantalla de edición
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user": displayName },
+      });
+      
       const data = await res.json();
+      
       if (!res.ok) {
-        setIsEditing(false); // Si está bloqueado, cerramos la edición
+        // Si está bloqueado, alertamos y NOS ASEGURAMOS de que la edición NUNCA se abra
+        setIsEditing(false);
         toast.error(`Producto bloqueado por ${data.lockedBy || 'otro usuario'}.`);
         return;
       }
       
+      // 2. Si el servidor dio luz verde, abrimos la edición y cargamos los datos frescos
+      setIsEditing(true);
       const freshProduct = data.product;
+      
       if (freshProduct) {
         setViewProduct(freshProduct);
         setEditedName(freshProduct?.name || "");
@@ -245,10 +251,10 @@ export default function ProductScreen({
               ]
         );
       }
-    })
-    .catch(() => {
-      toast.error("Error al conectar con el servidor.");
-    });
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al verificar el bloqueo con el servidor.");
+    }
   };
 
   const handleCancelEditClick = () => {
@@ -307,31 +313,70 @@ export default function ProductScreen({
         customerName: clientName,
       };
 
-      // Objeto optimista para refrescar al instante
+      // ⭐ DETECCIÓN PRECISA Y 100% SEGURA DE QUÉ TIENDA SE EDITÓ ⭐
+      let tiendaModificada = [];
+      const stockViejo = viewProduct?.stock || {};
+      const bodegaVieja = viewProduct?.bodega || {};
+      
+      const cambioTienda1 = tallasVisibles.some(
+        (size) => parseInt(stockViejo[size] ?? 0, 10) !== parseInt(cleanStock[size] ?? 0, 10)
+      );
+      
+      const cambioTienda2 = tallasVisibles.some(
+        (size) => parseInt(bodegaVieja[size] ?? 0, 10) !== parseInt(cleanBodega[size] ?? 0, 10)
+      );
+
+      if (cambioTienda1) tiendaModificada.push("Tienda #1");
+      if (cambioTienda2) tiendaModificada.push("Tienda #2");
+
+      const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
+
+      // ⭐ 1. CREAMOS EL OBJETO ACTUALIZADO AL INSTANTE LOCALMENTE ⭐
       const localUpdatedProduct = {
         ...viewProduct,
-        ...payload,
+        name: payload.name,
+        price: payload.price,
+        discountPrice: payload.discountPrice,
+        type: payload.type,
         stock: cleanStock,
         bodega: cleanBodega,
+        hidden: payload.hidden,
+        isMundial2026: payload.isMundial2026,
       };
 
+      // ⭐ 2. REFLEJAMOS EL CAMBIO EN PANTALLA EN 0 SEGUNDOS ⭐
       setViewProduct(localUpdatedProduct);
       onUpdate?.(localUpdatedProduct);
       setIsEditing(false);
       setLoading(false);
-      toast.success("Inventario actualizado correctamente.");
 
-      // Sincronización en segundo plano con el servidor
+      // ⭐ TOAST DETALLADO SEGÚN LA TIENDA MODIFICADA ⭐
+      if (etiquetaTienda) {
+        toast.success(`Cambio realizado en ${etiquetaTienda} correctamente.`);
+      } else {
+        toast.success("Cambios guardados correctamente.");
+      }
+
+      // 3. Sincronización silenciosa en segundo plano con el servidor
       await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-user": displayName },
         body: JSON.stringify(payload),
+      })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Error al sincronizar");
+        const updatedFromBackend = await res.json();
+        setViewProduct(updatedFromBackend);
+        onUpdate?.(updatedFromBackend);
+      })
+      .catch((err) => {
+        console.error("Error al guardar en el servidor:", err);
       });
 
     } catch (err) {
       console.error(err);
       setLoading(false);
-      toast.error("Error al guardar en el servidor");
+      toast.error("Error al procesar los datos");
     }
   };
 
