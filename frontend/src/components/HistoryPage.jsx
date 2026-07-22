@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -176,11 +176,11 @@ export default function HistoryPage({ isSuperUser = false }) {
         headers: { "Content-Type": "application/json", "x-super": xsuper, "x-roles": roles },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toastHOT.success("Historial limpiado.");
+      toastHOT.success("Historial eliminado correctamente.");
       setLogs([]);
       setTotalPages(1);
     } catch {
-      toastHOT.error("No se pudo limpiar el historial.");
+      toastHOT.error("No se pudo eliminar el historial.");
     } finally {
       setLoading(false);
     }
@@ -189,11 +189,11 @@ export default function HistoryPage({ isSuperUser = false }) {
   function askClear() {
     if (!isSuperUser || loading) return;
     toastHOT((t) => (
-      <div className="text-center p-1">
-        <p className="font-black text-gray-800 mb-3 text-sm sm:text-base">¿Eliminar TODO el historial permanentemente?</p>
-        <div className="mt-2 flex gap-2 justify-center">
-          <button onClick={() => { toastHOT.dismiss(t.id); doClear(); }} className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-700 uppercase tracking-wider">Eliminar Todo</button>
-          <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 uppercase tracking-wider">Cancelar</button>
+      <div className="text-center p-2">
+        <p className="font-black text-gray-800 mb-3 text-sm sm:text-base">¿Eliminar todo el historial permanentemente?</p>
+        <div className="mt-3 flex gap-2 justify-center">
+          <button onClick={() => { toastHOT.dismiss(t.id); doClear(); }} className="bg-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-red-700 uppercase tracking-wider transition-colors">Eliminar Todo</button>
+          <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-black hover:bg-gray-200 uppercase tracking-wider transition-colors">Cancelar</button>
         </div>
       </div>
     ), { duration: 6000 });
@@ -202,7 +202,7 @@ export default function HistoryPage({ isSuperUser = false }) {
   const handleClearFilters = () => {
     setStartDate(""); setEndDate(""); setSelectedUser(""); setSelectedStore(""); setQ(""); setPage(1);
     fetchLogs("", "", undefined, 1); 
-    toastHOT.success("Filtros limpiados", { duration: 1500 });
+    toastHOT.success("Filtros limpiados.", { duration: 1500 });
   };
 
   const toggleSelection = (id) => {
@@ -287,9 +287,24 @@ export default function HistoryPage({ isSuperUser = false }) {
         </button>
 
         <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 sm:p-8 animate-fade-in-up">
-          <div className="text-center mb-8 mt-2">
-            <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 shadow-sm">Administración</span>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight tracking-tight">Registros del Sistema</h2>
+          
+          {/* ⭐ ENCABEZADO CON EL BOTÓN DE BORRAR ESTRICTO PARA SUPER USUARIO ⭐ */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 mt-2">
+            <div className="text-center sm:text-left">
+              <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 shadow-sm">Administración</span>
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight tracking-tight">Registros del Sistema</h2>
+            </div>
+
+            {isSuperUser && (
+              <button
+                onClick={askClear}
+                disabled={loading || logs.length === 0}
+                className="flex items-center gap-2 px-5 py-3 bg-red-50 border border-red-200 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-40"
+                title="Eliminar todos los registros"
+              >
+                <FaTrash size={12} /> Eliminar Historial
+              </button>
+            )}
           </div>
 
           <div className="flex bg-gray-100 p-1 rounded-2xl mb-8">
