@@ -22,32 +22,42 @@ app.set('trust proxy', 1);
 
 app.use(compression());
 
-// Guardamos los dominios permitidos en una variable para usarla en Express y en Sockets
+// Guardamos los dominios permitidos
 const allowedOrigins = [
   'https://chemasport-er.onrender.com',
   'http://localhost:5173',
+  'http://localhost:3000',
   "https://chemasporter.com",           
   "https://www.chemasporter.com"
 ];
 
+// ⭐ 1. CORS DE EXPRESS BLINDADO PARA TUS CABECERAS PERSONALIZADAS ⭐
 app.use(cors({
   origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-/* 👇👇👇 CONFIGURACIÓN DE WEBSOCKETS 👇👇👇 */
+/* 👇👇👇 CONFIGURACIÓN DE WEBSOCKETS OPTIMIZADA PARA RENDER 👇👇👇 */
 
 // 3. Creamos el servidor HTTP envolviendo a la app de Express
 const server = http.createServer(app);
 
-// 4. Inicializamos Socket.io con las reglas de CORS
+// ⭐ 4. INICIALIZACIÓN BLINDADA CONTRA EL ERROR 502 DE RENDER ⭐
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
+  },
+  transports: ['websocket', 'polling'], // 👈 Obligatorio para que Render no tire 502
+  pingTimeout: 60000,                   // 👈 60 segundos de paciencia para evitar desconexiones
+  pingInterval: 25000                   // 👈 Mantiene viva la conexión en la nube
 });
 
 // 5. Guardamos 'io' en app para poder usarlo desde nuestros archivos de rutas (productRoutes)
@@ -93,5 +103,5 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// 7. ⚠️ IMPORTANTE: Cambiamos app.listen por server.listen
+// 7. Servidor escuchando
 server.listen(PORT, () => console.log(`🚀 Servidor en tiempo real corriendo en puerto ${PORT}`));
