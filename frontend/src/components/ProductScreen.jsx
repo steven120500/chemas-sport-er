@@ -278,37 +278,32 @@ export default function ProductScreen({
         customerName: clientName,
       };
 
-      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+      // ⭐ 1. Cierra la edición y descongela la UI AL INSTANTE (Optimista)
+      setIsEditing(false);
+      setLoading(false);
+
+      // 2. Envía los datos al servidor en segundo plano
+      fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-user": displayName },
         body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        if (res.status === 409) {
-             throw new Error(`Bloqueado por ${errorData.lockedBy || 'otro usuario'}`);
-        }
-        throw new Error(`Error al actualizar (${res.status})`);
-      }
-
-      const updated = await res.json();
-      setViewProduct(updated);
-      setIsEditing(false);
-      onUpdate?.(updated);
-
-      const tiendaModificada = updated._lastEditMeta?.store;
-      if (tiendaModificada && tiendaModificada !== "Datos generales") {
-        toast.success(`Cambio guardado en ${tiendaModificada}.`);
-      } else {
+      })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Error al actualizar");
+        const updated = await res.json();
+        setViewProduct(updated);
+        onUpdate?.(updated);
         toast.success("Cambios guardados correctamente.");
-      }
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Hubo un problema al sincronizar con el servidor");
+      });
 
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Error al actualizar el producto");
-    } finally {
       setLoading(false);
+      toast.error("Error al procesar los datos");
     }
   };
 
