@@ -284,13 +284,16 @@ export default function ProductScreen({
           Object.entries(obj || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)])
         );
 
+      const cleanStock = clean(editedStock);
+      const cleanBodega = clean(editedBodega);
+
       const payload = {
         name: (editedName || "").trim(),
         price: priceInt,
         discountPrice: discountInt,
         type: (editedType || "").trim(),
-        stock: clean(editedStock),
-        bodega: clean(editedBodega),
+        stock: cleanStock,
+        bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
@@ -300,26 +303,42 @@ export default function ProductScreen({
         customerName: clientName,
       };
 
-      // ⭐ 1. Cierra la edición y descongela la UI AL INSTANTE (Optimista)
+      // ⭐ 1. CREAMOS EL OBJETO ACTUALIZADO AL INSTANTE LOCALMENTE ⭐
+      const localUpdatedProduct = {
+        ...viewProduct,
+        name: payload.name,
+        price: payload.price,
+        discountPrice: payload.discountPrice,
+        type: payload.type,
+        stock: cleanStock,
+        bodega: cleanBodega,
+        hidden: payload.hidden,
+        isMundial2026: payload.isMundial2026,
+      };
+
+      // ⭐ 2. REFLEJAMOS EL STOCK RESTADO EN LA PANTALLA EN 0 SEGUNDOS ⭐
+      setViewProduct(localUpdatedProduct);
+      onUpdate?.(localUpdatedProduct);
       setIsEditing(false);
       setLoading(false);
 
-      // 2. Envía los datos al servidor en segundo plano
+      toast.success("Stock actualizado correctamente.");
+
+      // 3. Sincronización silenciosa en segundo plano con el servidor
       fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-user": displayName },
         body: JSON.stringify(payload),
       })
       .then(async (res) => {
-        if (!res.ok) throw new Error("Error al actualizar");
-        const updated = await res.json();
-        setViewProduct(updated);
-        onUpdate?.(updated);
-        toast.success("Cambios guardados correctamente.");
+        if (!res.ok) throw new Error("Error al sincronizar");
+        const updatedFromBackend = await res.json();
+        // Si el servidor devolvió algo extra (como metadatos), lo sincronizamos suavemente
+        setViewProduct(updatedFromBackend);
+        onUpdate?.(updatedFromBackend);
       })
       .catch((err) => {
-        console.error(err);
-        toast.error("Hubo un problema al sincronizar con el servidor");
+        console.error("Error al guardar en el servidor:", err);
       });
 
     } catch (err) {
@@ -328,7 +347,7 @@ export default function ProductScreen({
       toast.error("Error al procesar los datos");
     }
   };
-
+  
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
