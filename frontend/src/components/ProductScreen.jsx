@@ -303,6 +303,16 @@ export default function ProductScreen({
         customerName: clientName,
       };
 
+      // ⭐ DETECTAR QUÉ TIENDA FUE LA MODIFICADA PARA EL MENSAJE ⭐
+      let tiendaModificada = [];
+      if (JSON.stringify(viewProduct?.stock) !== JSON.stringify(cleanStock)) {
+        tiendaModificada.push("Tienda #1");
+      }
+      if (JSON.stringify(viewProduct?.bodega) !== JSON.stringify(cleanBodega)) {
+        tiendaModificada.push("Tienda #2");
+      }
+      const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
+
       // ⭐ 1. CREAMOS EL OBJETO ACTUALIZADO AL INSTANTE LOCALMENTE ⭐
       const localUpdatedProduct = {
         ...viewProduct,
@@ -316,13 +326,18 @@ export default function ProductScreen({
         isMundial2026: payload.isMundial2026,
       };
 
-      // ⭐ 2. REFLEJAMOS EL STOCK RESTADO EN LA PANTALLA EN 0 SEGUNDOS ⭐
+      // ⭐ 2. REFLEJAMOS EL CAMBIO EN PANTALLA EN 0 SEGUNDOS ⭐
       setViewProduct(localUpdatedProduct);
       onUpdate?.(localUpdatedProduct);
       setIsEditing(false);
       setLoading(false);
 
-      toast.success("Stock actualizado correctamente.");
+      // ⭐ RESTAURAMOS LOS TOASTS DETALLADOS ⭐
+      if (etiquetaTienda) {
+        toast.success(`Cambio realizado en ${etiquetaTienda} correctamente.`);
+      } else {
+        toast.success("Cambios guardados correctamente.");
+      }
 
       // 3. Sincronización silenciosa en segundo plano con el servidor
       fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -333,7 +348,6 @@ export default function ProductScreen({
       .then(async (res) => {
         if (!res.ok) throw new Error("Error al sincronizar");
         const updatedFromBackend = await res.json();
-        // Si el servidor devolvió algo extra (como metadatos), lo sincronizamos suavemente
         setViewProduct(updatedFromBackend);
         onUpdate?.(updatedFromBackend);
       })
@@ -347,7 +361,7 @@ export default function ProductScreen({
       toast.error("Error al procesar los datos");
     }
   };
-  
+
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
