@@ -307,82 +307,59 @@ export default function ProductScreen({
         customerName: clientName,
       };
 
-      // ⭐ DETECTAR QUÉ TIENDA FUE LA MODIFICADA PARA EL MENSAJE ⭐
-      let tiendaModificada = [];
-      if (JSON.stringify(viewProduct?.stock) !== JSON.stringify(cleanStock)) {
-        tiendaModificada.push("Tienda #1");
-      }
-      if (JSON.stringify(viewProduct?.bodega) !== JSON.stringify(cleanBodega)) {
-        tiendaModificada.push("Tienda #2");
-      }
-      const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
-
-      // ⭐ 1. CREAMOS EL OBJETO ACTUALIZADO AL INSTANTE LOCALMENTE ⭐
+      // Objeto optimista para refrescar al instante
       const localUpdatedProduct = {
         ...viewProduct,
-        name: payload.name,
-        price: payload.price,
-        discountPrice: payload.discountPrice,
-        type: payload.type,
+        ...payload,
         stock: cleanStock,
         bodega: cleanBodega,
-        hidden: payload.hidden,
-        isMundial2026: payload.isMundial2026,
       };
 
-      // ⭐ 2. REFLEJAMOS EL CAMBIO EN PANTALLA EN 0 SEGUNDOS ⭐
       setViewProduct(localUpdatedProduct);
       onUpdate?.(localUpdatedProduct);
       setIsEditing(false);
       setLoading(false);
+      toast.success("Inventario actualizado correctamente.");
 
-      // ⭐ RESTAURAMOS LOS TOASTS DETALLADOS ⭐
-      if (etiquetaTienda) {
-        toast.success(`Cambio realizado en ${etiquetaTienda} correctamente.`);
-      } else {
-        toast.success("Cambios guardados correctamente.");
-      }
-
-      // 3. Sincronización silenciosa en segundo plano con el servidor
-      fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+      // Sincronización en segundo plano con el servidor
+      await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-user": displayName },
         body: JSON.stringify(payload),
-      })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Error al sincronizar");
-        const updatedFromBackend = await res.json();
-        setViewProduct(updatedFromBackend);
-        onUpdate?.(updatedFromBackend);
-      })
-      .catch((err) => {
-        console.error("Error al guardar en el servidor:", err);
       });
 
     } catch (err) {
       console.error(err);
       setLoading(false);
-      toast.error("Error al procesar los datos");
+      toast.error("Error al guardar en el servidor");
     }
   };
 
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
-    if (!id || !isLikelyObjectId(id)) return;
+    if (!id || !isLikelyObjectId(id)) {
+      toast.error("ID de producto inválido");
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+
+      // Eliminación optimista inmediata en la UI
+      onUpdate?.(null, id);
+      onClose?.();
+      toast.success("Producto eliminado correctamente.");
+
+      // Petición al backend en segundo plano
+      await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-user": displayName },
       });
-      if (!res.ok) throw new Error("Error al eliminar");
-      onUpdate?.(null, id);
-      onClose?.();
-    } catch {
-      toast.error("No se pudo eliminar el producto");
-    } finally {
+
+    } catch (err) {
       setLoading(false);
+      toast.error("No se pudo eliminar el producto");
     }
   };
 
