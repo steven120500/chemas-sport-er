@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { FaChevronLeft, FaTimes, FaChevronRight, FaStore, FaWarehouse, FaLock } from "react-icons/fa";
+import { FaChevronLeft, FaTimes, FaChevronRight, FaStore, FaWarehouse } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
-import { io } from "socket.io-client"; // ⭐ 1. IMPORTAMOS SOCKET.IO
+import { io } from "socket.io-client";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -56,7 +56,6 @@ export default function ProductScreen({
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
 
-  // ⭐ ESTADOS PARA EL MODAL DE NOMBRE DE CLIENTE AL REBAJAR STOCK
   const [showBuyerModal, setShowBuyerModal] = useState(false);
   const [buyerName, setBuyerName] = useState("");
 
@@ -74,7 +73,6 @@ export default function ProductScreen({
   const hasMany = localImages.length > 1;
   const currentSrc = localImages[idx]?.src || "";
 
-  // Variable de usuario para los bloqueos
   const displayName = user?.username || user?.email || "ChemaSportER";
 
   useEffect(() => {
@@ -97,27 +95,23 @@ export default function ProductScreen({
           ]
     );
     setIdx(0);
-    
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
-  /* ⭐⭐⭐ 2. MAGIA DE WEBSOCKETS EN TIEMPO REAL CON DETALLE DE TIENDA Y CLIENTE ⭐⭐⭐ */
+  /* ⭐ SOCKETS OPTIMIZADOS (Solo se conectan si no estás editando activamente) ⭐ */
   useEffect(() => {
     const currentId = product?._id || product?.id;
-    if (!currentId) return;
+    if (!currentId || isEditing) return;
 
-    // Conectamos al servidor de sockets
-    const socket = io(API_BASE);
+    const socket = io(API_BASE, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 3
+    });
 
-    // Escuchamos si alguien más actualiza un producto
     socket.on('productoActualizado', (productoFresco) => {
       const frescoId = productoFresco?._id || productoFresco?.id;
       
-      // Si el producto que editaron es exactamente el que tenemos abierto en pantalla y NO lo estamos editando nosotros
       if (frescoId === currentId && !isEditing) {
-        console.log("🟢 Actualización en tiempo real recibida para este producto");
-        
-        // Actualizamos todos los datos en pantalla instantáneamente
         setViewProduct(productoFresco);
         setEditedName(productoFresco?.name || "");
         setEditedPrice(productoFresco?.price ?? 0);
@@ -137,26 +131,22 @@ export default function ProductScreen({
               ]
         );
 
-        // ⭐ LEEMOS QUÉ TIENDA Y QUÉ CLIENTE SE EDITÓ DESDE EL BACKEND
         const meta = productoFresco._lastEditMeta || {};
         const txtTienda = meta.store ? ` en ${meta.store}` : "";
-        const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (👤 Cliente: ${meta.customer})` : "";
+        const txtCliente = meta.customer && meta.customer !== "No especificado" ? ` (Cliente: ${meta.customer})` : "";
         
         toast.info(
-          `🔄 ¡${meta.user || "Alguien"} ${meta.action || "actualizó"}${txtTienda}!${txtCliente} La pantalla se ha refrescado.`,
-          { position: "top-center", autoClose: 6000 }
+          `¡${meta.user || "Alguien"} ${meta.action || "actualizó"}${txtTienda}!${txtCliente} Pantalla actualizada.`,
+          { position: "top-center", autoClose: 4000 }
         );
       }
     });
 
-    // Limpiamos la conexión cuando cerramos la ventana
     return () => {
       socket.disconnect();
     };
   }, [product?._id, product?.id, isEditing]);
-  /* ⭐⭐⭐ FIN DE WEBSOCKETS ⭐⭐⭐ */
 
-  // Liberar candado si cierran la pestaña de golpe o desmontan el componente
   useEffect(() => {
     const handleUnload = () => {
       if (isEditing) {
@@ -170,7 +160,6 @@ export default function ProductScreen({
     };
   }, [isEditing]);
 
-  // ⭐ CORRECCIÓN CRÍTICA: Ahora lockProduct devuelve el objeto FRESCO de la base de datos
   const lockProduct = async () => {
     const id = product?._id || product?.id;
     if (!id) return null;
@@ -185,20 +174,19 @@ export default function ProductScreen({
       const data = await res.json();
       
       if (!res.ok) {
-        toast.error(`🔒 ${data.lockedBy || 'Alguien'} ya está editando este producto.`);
+        toast.error(`Producto bloqueado por ${data.lockedBy || 'otro usuario'}.`);
         setLoading(false);
         return null;
       }
       setLoading(false);
-      return data.product; // ⭐ Retornamos la verdad absoluta
-    } catch (error) {
+      return data.product;
+    } catch {
       toast.error("Error al conectar con el servidor.");
       setLoading(false);
       return null;
     }
   };
 
-  // Soltar el candado manualmente
   const unlockProduct = async () => {
     const id = product?._id || product?.id;
     if (!id) return;
@@ -212,12 +200,9 @@ export default function ProductScreen({
     }
   };
 
-  // ⭐ CORRECCIÓN CRÍTICA: Inyectamos los datos frescos en los inputs ANTES de abrir la edición
   const handleEditClick = async () => {
     const freshProduct = await lockProduct();
-    
     if (freshProduct) {
-      // 1. Cargamos la verdad absoluta en todos los estados del formulario
       setViewProduct(freshProduct);
       setEditedName(freshProduct?.name || "");
       setEditedPrice(freshProduct?.price ?? 0);
@@ -236,8 +221,6 @@ export default function ProductScreen({
               ...(freshProduct?.imageSrc2 ? [{ src: freshProduct.imageSrc2, isNew: false }] : []),
             ]
       );
-
-      // 2. Abrimos el modo edición con la garantía de que no hay datos fantasma
       setIsEditing(true);
     }
   };
@@ -248,7 +231,6 @@ export default function ProductScreen({
     setViewProduct(product); 
   };
 
-  // ⭐ NUEVO: REVISA SI SE RESTÓ ALGUNA CAMISETA DE TIENDA 1 O 2 PARA PEDIR CLIENTE
   const checkHasDeduction = () => {
     let decreased = false;
     tallasVisibles.forEach((size) => {
@@ -263,12 +245,11 @@ export default function ProductScreen({
     return decreased;
   };
 
-  // ⭐ ACTUALIZADO: RECIBE clientName PARA GUARDARLO EN EL HISTORIAL
   const handleSave = async (clientName = "") => {
     if (loading) return;
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) {
-      toast.error("No se encontró un ID válido del producto");
+      toast.error("ID de producto inválido");
       return;
     }
 
@@ -294,7 +275,7 @@ export default function ProductScreen({
         imageAlt: (editedName || "").trim(),
         hidden: editedHidden,
         isMundial2026: editedIsMundial2026,
-        customerName: clientName, // ⭐ ENVÍO DEL CLIENTE AL BACKEND
+        customerName: clientName,
       };
 
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -306,7 +287,7 @@ export default function ProductScreen({
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         if (res.status === 409) {
-             throw new Error(`Producto bloqueado por ${errorData.lockedBy || 'otro usuario'}`);
+             throw new Error(`Bloqueado por ${errorData.lockedBy || 'otro usuario'}`);
         }
         throw new Error(`Error al actualizar (${res.status})`);
       }
@@ -316,18 +297,16 @@ export default function ProductScreen({
       setIsEditing(false);
       onUpdate?.(updated);
 
-      // ⭐ AQUI ESTÁ LA MAGIA PARA LA NOTIFICACIÓN VERDE ⭐
       const tiendaModificada = updated._lastEditMeta?.store;
-      
       if (tiendaModificada && tiendaModificada !== "Datos generales") {
-        toast.success(`Cambio realizado en ${tiendaModificada} correctamente.`);
+        toast.success(`Cambio guardado en ${tiendaModificada}.`);
       } else {
         toast.success("Cambios guardados correctamente.");
       }
 
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Hubo un problema al actualizar el producto");
+      toast.error(err.message || "Error al actualizar el producto");
     } finally {
       setLoading(false);
     }
@@ -336,10 +315,7 @@ export default function ProductScreen({
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
-    if (!id || !isLikelyObjectId(id)) {
-      toast.error("No se encontró un ID válido del producto");
-      return;
-    }
+    if (!id || !isLikelyObjectId(id)) return;
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -349,7 +325,7 @@ export default function ProductScreen({
       if (!res.ok) throw new Error("Error al eliminar");
       onUpdate?.(null, id);
       onClose?.();
-    } catch (err) {
+    } catch {
       toast.error("No se pudo eliminar el producto");
     } finally {
       setLoading(false);
@@ -366,11 +342,7 @@ export default function ProductScreen({
 
   const handleImageChange = (e, index) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      toast.error("Formato de imagen no soportado");
-      return;
-    }
+    if (!file || !ACCEPTED_TYPES.includes(file.type)) return;
     const reader = new FileReader();
     reader.onload = () => {
       setLocalImages((prev) => {
@@ -414,20 +386,19 @@ export default function ProductScreen({
     return a + b; 
   };
 
-  // Compara inventario viejo vs nuevo para mostrar diferencias
   const getInventoryChanges = () => {
     const changes = [];
     tallasVisibles.forEach((size) => {
       const oldStock = parseInt(viewProduct?.stock?.[size] ?? 0, 10);
       const newStock = parseInt(editedStock?.[size] ?? 0, 10);
       if (oldStock !== newStock) {
-        changes.push(`Tienda #1 [${size}]: ${oldStock} ➔ ${newStock}`);
+        changes.push(`Tienda #1 [${size}]: ${oldStock} -> ${newStock}`);
       }
 
       const oldBodega = parseInt(viewProduct?.bodega?.[size] ?? 0, 10);
       const newBodega = parseInt(editedBodega?.[size] ?? 0, 10);
       if (oldBodega !== newBodega) {
-        changes.push(`Tienda #2 [${size}]: ${oldBodega} ➔ ${newBodega}`);
+        changes.push(`Tienda #2 [${size}]: ${oldBodega} -> ${newBodega}`);
       }
     });
     return changes;
@@ -437,21 +408,18 @@ export default function ProductScreen({
     <div className="full bg-white pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up">
       <div className="max-w-6xl mx-auto">
       
-        {/* BOTÓN VOLVER */}
         <button
           onClick={() => {
             if (isEditing) unlockProduct();
             onClose();
           }}
-          className="flex items-center gap-2 text-gray-500 bg-white hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs"
+          className="flex items-center gap-2 text-gray-500 bg-white hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs cursor-pointer"
         >
           <FaChevronLeft size={14} /> Volver al catálogo
         </button>
 
-        {/* LAYOUT A 2 COLUMNAS (Pantalla grande) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
           
-          {/* COLUMNA IZQUIERDA: IMAGEN */}
           <div className="w-full">
             {!isEditing ? (
               <div className="relative flex items-center justify-center bg-gray-50/50 rounded-3xl p-6 border border-gray-100">
@@ -472,18 +440,18 @@ export default function ProductScreen({
                   <>
                     <button
                       onClick={() => setIdx((i) => (i - 1 + localImages.length) % localImages.length)}
-                      className="absolute left-4 z-10 bg-black backdrop-blur hover:bg-gray-800 text-white shadow-md p-4 rounded-full transition-all hover:scale-105"
+                      className="absolute left-4 z-10 bg-black text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer"
                     >
                       <FaChevronLeft size={20} />
                     </button>
                     <button
                       onClick={() => setIdx((i) => (i + 1) % localImages.length)}
-                      className="absolute right-4 z-10 bg-black backdrop-blur hover:bg-gray-800 text-white shadow-md p-4 rounded-full transition-all hover:scale-105"
+                      className="absolute right-4 z-10 bg-black text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer"
                     >
                       <FaChevronRight size={20} />
                     </button>
                     
-                    <div className="absolute bottom-6 bg-black backdrop-blur-md text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
+                    <div className="absolute bottom-6 bg-black text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
                         {idx + 1} / {localImages.length}
                     </div>
                   </>
@@ -499,15 +467,14 @@ export default function ProductScreen({
                         src={thumbUrl || img.src}
                         alt={`img-${i}`}
                         className="h-40 w-40 object-cover rounded-2xl shadow-sm border border-gray-200"
-                        loading="lazy"
                       />
                       <button
                         onClick={() => handleImageRemove(i)}
-                        className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2.5 shadow-lg hover:bg-red-600 transition-transform transform hover:scale-110"
+                        className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2.5 shadow-lg hover:bg-red-600 cursor-pointer"
                       >
                         <FaTimes size={12} />
                       </button>
-                      <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl">
+                      <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl">
                           <label className="text-white text-xs cursor-pointer font-bold tracking-wide">
                               CAMBIAR
                               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, i)} />
@@ -517,7 +484,7 @@ export default function ProductScreen({
                   );
                 })}
                 {localImages.length < 2 && (
-                  <label className="h-40 w-40 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 rounded-2xl cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors">
+                  <label className="h-40 w-40 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 rounded-2xl cursor-pointer hover:bg-gray-100">
                     <span className="text-3xl mb-1">+</span>
                     <span className="text-xs font-bold uppercase tracking-wider">Añadir Foto</span>
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, localImages.length)} />
@@ -527,7 +494,6 @@ export default function ProductScreen({
             )}
           </div>
 
-          {/* COLUMNA DERECHA: INFORMACIÓN */}
           <div className="w-full flex flex-col">
             
             <div className="mb-8">
@@ -537,7 +503,7 @@ export default function ProductScreen({
                   <select
                     value={editedType}
                     onChange={(e) => setEditedType(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl mb-4 bg-gray-50 focus:ring-2 focus:ring-black/5 focus:border-black font-semibold transition-all outline-none"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl mb-4 bg-gray-50 font-semibold outline-none cursor-pointer"
                   >
                     {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón"].map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -547,7 +513,7 @@ export default function ProductScreen({
                   <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Nombre</label>
                   <input
                     type="text"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-black text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all mb-4"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-black text-gray-900 outline-none mb-4"
                     value={editedName}
                     onChange={(e) => setEditedName(e.target.value)}
                   />
@@ -557,7 +523,7 @@ export default function ProductScreen({
                         <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Precio</label>
                         <input
                             type="number"
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold outline-none"
                             value={editedPrice}
                             onChange={(e) => setEditedPrice(e.target.value)}
                         />
@@ -566,7 +532,7 @@ export default function ProductScreen({
                         <label className="block text-xs text-green-700 mb-1.5 font-bold uppercase tracking-widest ml-1">Descuento</label>
                         <input
                             type="number"
-                            className="w-full bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-lg font-bold text-green-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
+                            className="w-full bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-lg font-bold text-green-700 outline-none"
                             value={editedDiscountPrice}
                             onChange={(e) => setEditedDiscountPrice(e.target.value)}
                         />
@@ -584,7 +550,7 @@ export default function ProductScreen({
 
                   {hasDiscount ? (
                     <div className="flex flex-col items-start mb-6">
-                        <span className="bg-black text-white text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest shadow-sm">
+                        <span className="bg-black text-white text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">
                             Oferta
                         </span>
                         <div className="flex items-end gap-4">
@@ -624,8 +590,8 @@ export default function ProductScreen({
                                             isAgotado 
                                             ? 'border-gray-100 bg-gray-50/50 opacity-60' 
                                             : isTienda2 
-                                                ? 'border-purple-200 bg-purple-50/30 hover:border-purple-500 cursor-pointer shadow-sm'
-                                                : 'border-gray-200 bg-white hover:border-black hover:shadow-md cursor-pointer shadow-sm'
+                                                ? 'border-purple-200 bg-purple-50/30 shadow-sm'
+                                                : 'border-gray-200 bg-white shadow-sm'
                                         }`}
                                     >
                                         <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isTienda2 ? 'text-purple-900' : 'text-gray-900'}`}>
@@ -658,10 +624,10 @@ export default function ProductScreen({
                         
                         <div className="flex gap-3 mb-6">
                             <button
-                                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all ${
+                                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${
                                     invMode === "stock" 
                                     ? "bg-black border-black text-white shadow-lg" 
-                                    : "bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600"
+                                    : "bg-white border-gray-200 text-gray-400"
                                 }`}
                                 onClick={() => setInvMode("stock")}
                             >
@@ -670,10 +636,10 @@ export default function ProductScreen({
                             </button>
                             
                             <button
-                                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all ${
+                                className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${
                                     invMode === "bodega" 
                                     ? "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30" 
-                                    : "bg-white border-gray-200 text-gray-400 hover:border-purple-200 hover:text-purple-500"
+                                    : "bg-white border-gray-200 text-gray-400"
                                 }`}
                                 onClick={() => setInvMode("bodega")}
                             >
@@ -702,7 +668,7 @@ export default function ProductScreen({
                                             <input
                                                 type="number"
                                                 min="0"
-                                                className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none focus:ring-0 transition-all ${inputColors} ${currentVal === 0 ? 'opacity-60 hover:opacity-100 shadow-sm' : 'shadow-md'}`}
+                                                className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none transition-all ${inputColors} ${currentVal === 0 ? 'opacity-60 shadow-sm' : 'shadow-md'}`}
                                                 value={currentVal}
                                                 placeholder="0"
                                                 onWheel={(e) => e.target.blur()}
@@ -755,7 +721,7 @@ export default function ProductScreen({
                 {canEdit && isEditing ? (
                   <>
                     <button
-                        className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
+                        className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform cursor-pointer"
                         onClick={() => {
                             const inventoryChanges = getInventoryChanges();
                             toastHOT(
@@ -777,20 +743,19 @@ export default function ProductScreen({
                                     <button
                                     onClick={() => {
                                         toastHOT.dismiss(t.id);
-                                        // ⭐ SI RESTARON CAMISETAS, ABRIMOS EL MODAL DEL CLIENTE
                                         if (checkHasDeduction()) {
                                           setShowBuyerModal(true);
                                         } else {
-                                          handleSave(""); // Si no rebajaron nada, guardamos normal
+                                          handleSave("");
                                         }
                                     }}
-                                    className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800"
+                                    className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer"
                                     >
                                     SÍ, GUARDAR
                                     </button>
                                     <button
                                     onClick={() => toastHOT.dismiss(t.id)}
-                                    className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200"
+                                    className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer"
                                     >
                                     CANCELAR
                                     </button>
@@ -806,7 +771,7 @@ export default function ProductScreen({
                     </button>
 
                     <button
-                        className="w-full bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase transition-colors"
+                        className="w-full bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer"
                         onClick={handleCancelEditClick}
                         disabled={loading}
                     >
@@ -815,7 +780,7 @@ export default function ProductScreen({
                   </>
                 ) : canEdit ? (
                   <button
-                    className="w-full bg-black hover:bg-gray-900 text-white flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-black hover:bg-gray-900 text-white flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg cursor-pointer disabled:opacity-50"
                     onClick={handleEditClick}
                     disabled={loading}
                   >
@@ -825,7 +790,7 @@ export default function ProductScreen({
 
                 {canDelete && !isEditing && (
                   <button
-                    className="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase transition-colors"
+                    className="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer"
                     onClick={() => {
                       toastHOT(
                         (t) => (
@@ -837,13 +802,13 @@ export default function ProductScreen({
                                   toastHOT.dismiss(t.id);
                                   handleDelete();
                                 }}
-                                className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700"
+                                className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer"
                               >
                                 ELIMINAR
                               </button>
                               <button
                                 onClick={() => toastHOT.dismiss(t.id)}
-                                className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200"
+                                className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer"
                               >
                                 CANCELAR
                               </button>
@@ -865,25 +830,23 @@ export default function ProductScreen({
         </div>
       </div>
 
-      {/* ⭐ MODAL DE NOMBRE DE CLIENTE CUANDO SE REBAJA STOCK ⭐ */}
       {showBuyerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative animate-scaleUp">
-            
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative">
             <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">
               👤
             </div>
             
             <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
             <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">
-              Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente o comprador para dejarlo registrado en el historial.
+              Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.
             </p>
             
             <div className="w-full relative mb-6">
               <input
                 type="text"
                 placeholder="Ej: Emanuel Espinoza"
-                className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:ring-0 focus:outline-none transition-all shadow-inner bg-gray-50/50"
+                className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50"
                 value={buyerName}
                 onChange={(e) => setBuyerName(e.target.value)}
                 autoFocus
@@ -899,9 +862,9 @@ export default function ProductScreen({
                   setBuyerName("");
                 }}
                 disabled={loading}
-                className="flex-1 bg-black hover:bg-gray-900 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg shadow-black/20 transition-transform active:scale-95 cursor-pointer"
+                className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg cursor-pointer"
               >
-                {loading ? "GUARDANDO..." : "CONFIRMADA LA VENTA"}
+                {loading ? "GUARDANDO..." : "CONFIRMAR"}
               </button>
               
               <button
@@ -912,7 +875,7 @@ export default function ProductScreen({
                   setBuyerName("");
                 }}
                 disabled={loading}
-                className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                className="px-5 bg-gray-100 text-gray-600 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider cursor-pointer"
               >
                 Omitir
               </button>
@@ -921,16 +884,6 @@ export default function ProductScreen({
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeInUpScreen {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUpScreen 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
     </div>
   );
 }
