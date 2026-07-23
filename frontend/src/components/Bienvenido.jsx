@@ -48,7 +48,7 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     // 🔥 Aumentamos la altura en desktop (md:h-[90vh]) para bajar el contenido hasta el límite del corte 🔥
-    <div className="relative w-full h-[360px] md:h-[85vh] overflow-hidden flex flex-col justify-center items-center font-sans pb-40">
+    <div className="relative w-full h-[360px] md:h-[85vh] overflow-hidden flex flex-col justify-center items-center font-sans pb-32">
       
       <style>
         {`
