@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [fase, setFase] = useState(1); // Controla si estamos en fase 1, 2 o 3
   const [isHovered, setIsHovered] = useState(false); // Para el efecto hover de la píldora
-  const [mobileShowOffer, setMobileShowOffer] = useState(false); // 🔥 NUEVO: Para alternar en móvil
+  const [mobileShowOffer, setMobileShowOffer] = useState(false); // Para alternar en móvil
 
   useEffect(() => {
     // Control de responsive para fondos
@@ -18,7 +19,7 @@ const Bienvenido = ({ onNavigate }) => {
       setFase((prevFase) => (prevFase === 3 ? 1 : prevFase + 1));
     }, 4000); // Cambia de fase cada 4 segundos
 
-    // 🔥 NUEVO: Temporizador exclusivo para móvil que alterna el texto del botón cada 2.5 segundos
+    // Temporizador exclusivo para móvil que alterna el texto del botón cada 2.5 segundos
     const intervalMobile = setInterval(() => {
       if (window.innerWidth < 768) {
         setMobileShowOffer((prev) => !prev);
@@ -28,7 +29,7 @@ const Bienvenido = ({ onNavigate }) => {
     return () => {
       window.removeEventListener('resize', handleResize);
       clearInterval(intervalFases);
-      clearInterval(intervalMobile); // 🔥 NUEVO: Limpiamos el temporizador al salir
+      clearInterval(intervalMobile);
     };
   }, []);
 
@@ -42,12 +43,12 @@ const Bienvenido = ({ onNavigate }) => {
     }, 100);
   };
 
-  // 🔥 NUEVO: Si pones el mouse en compu O si el temporizador de móvil está activo, muestra "VER OFERTAS"
+  // Si pones el mouse en compu O si el temporizador de móvil está activo, muestra "VER OFERTAS"
   const showCallToAction = isHovered || (isMobile && mobileShowOffer);
 
   return (
     // 🔥 Aumentamos la altura en desktop (md:h-[90vh]) para bajar el contenido hasta el límite del corte 🔥
-    <div className="relative w-full h-[360px] md:h-[85vh] overflow-hidden flex flex-col justify-center items-center font-sans pb-48">
+    <div className="relative w-full h-[360px] md:h-[85vh] overflow-hidden flex flex-col justify-center items-center font-sans pb-40">
       
       <style>
         {`
@@ -120,39 +121,39 @@ const Bienvenido = ({ onNavigate }) => {
 
         </div>
         
-{/* 🔥 PÍLDORA INTERACTIVA 2 EN 1 (VERSIÓN XXL ULTRA GIGANTE) 🔥 */}
-<div className="relative z-30 mt-8 md:mt-16 flex flex-col items-center">
+        {/* 🔥 PÍLDORA INTERACTIVA 2 EN 1 (MÁS COMPACTA EN MÓVIL, GIGANTE EN DESKTOP) 🔥 */}
+        <div className="relative z-30 mt-8 md:mt-16 flex flex-col items-center">
           
           <button
             onClick={handleOfertas}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            // 👇 AQUÍ SE AGRANDÓ AL MÁXIMO: h-20 md:h-28, min-w-[340px] md:min-w-[540px], px-16 py-6 md:px-24 md:py-8 👇
-            className="group bg-white text-gray-950 border-2 border-gray-100 px-16 py-6 md:px-24 md:py-8 rounded-full font-black text-xl sm:text-2xl md:text-4xl transition-all duration-300 hover:scale-105 animate-btn-white uppercase tracking-wider shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex items-center justify-center min-w-[340px] md:min-w-[540px] h-20 md:h-28 cursor-pointer select-none"
+            // 👇 AQUÍ AJUSTAMOS EL TAMAÑO: h-14 en móvil (md:h-28), min-w-[250px] en móvil (md:min-w-[540px]), px-8 py-3 en móvil 👇
+            className="group bg-white text-gray-950 border-2 border-gray-100 px-8 py-3 md:px-24 md:py-8 rounded-full font-black text-base sm:text-lg md:text-4xl transition-all duration-300 hover:scale-105 animate-btn-white uppercase tracking-wider shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex items-center justify-center min-w-[250px] md:min-w-[540px] h-14 md:h-28 cursor-pointer select-none"
           >
-            {/* 🔥 AQUÍ ESTÁ LA MAGIA: Usamos showCallToAction para que funcione en compu y en celular 🔥 */}
+            {/* Si el mouse está encima (o en móvil el temporizador activa la llamada), muestra VER OFERTAS */}
             {showCallToAction ? (
-              <span className="flex items-center gap-4 text-black animate-fade-in font-extrabold tracking-widest text-2xl md:text-4xl">
+              <span className="flex items-center gap-2 md:gap-4 text-black animate-fade-in font-extrabold tracking-widest text-lg md:text-4xl">
                 <span>VER OFERTAS </span>
               </span>
             ) : (
-              <span className="flex items-center gap-3 md:gap-5 transition-opacity duration-300">
+              <span className="flex items-center gap-2 md:gap-5 transition-opacity duration-300">
                 {fase === 1 && (
                   <>
-                    <span className="text-gray-500 font-bold text-xl md:text-3xl">1 POR</span>
-                    <span className="font-black text-black tracking-tighter text-2xl md:text-5xl">₡15.000</span>
+                    <span className="text-gray-500 font-bold text-base md:text-3xl">1 POR</span>
+                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡15.000</span>
                   </>
                 )}
                 {fase === 2 && (
                   <>
-                    <span className="text-gray-500 font-bold text-xl md:text-3xl">2 POR</span>
-                    <span className="font-black text-black tracking-tighter text-2xl md:text-5xl">₡27.000</span>
+                    <span className="text-gray-500 font-bold text-base md:text-3xl">2 POR</span>
+                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡27.000</span>
                   </>
                 )}
                 {fase === 3 && (
                   <>
-                    <span className="text-gray-500 font-bold text-xl md:text-3xl">3 POR</span>
-                    <span className="font-black text-black tracking-tighter text-2xl md:text-5xl">₡35.000</span>
+                    <span className="text-gray-500 font-bold text-base md:text-3xl">3 POR</span>
+                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡35.000</span>
                   </>
                 )}
               </span>
@@ -163,7 +164,6 @@ const Bienvenido = ({ onNavigate }) => {
       </div>
 
       {/* 🔥 INDICADORES DE FASE FIJOS HASTA EL BORDE INFERIOR 🔥 */}
-      {/* 👇 AQUÍ ESTÁ EL TRUCO: Con "absolute bottom-4 md:bottom-8" se van al puro fondo del banner negro 👇 */}
       <div className="absolute bottom-4 md:bottom-8 left-0 right-0 flex gap-3 z-40 items-center justify-center">
         {[1, 2, 3].map((num) => (
           <button
