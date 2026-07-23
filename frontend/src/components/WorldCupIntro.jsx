@@ -120,7 +120,7 @@ const IntroLoader = ({ onFinished }) => {
       {/* --- SUPERIOR --- */}
       <div className="w-full flex justify-between items-center opacity-40 text-xs tracking-widest uppercase font-mono">
         <span>ChemaSport ER</span>
-        <span>Est. 2023</span>
+        <span>Est. 2026</span>
       </div>
 
       {/* --- CENTRO: LOGO TIPOGRÁFICO (OCULTO HASTA EL IMPACTO DEL BALÓN) --- */}
