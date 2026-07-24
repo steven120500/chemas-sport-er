@@ -89,7 +89,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       onClick={() => onClick(product)}
       className={`group/card relative w-full bg-white rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-black p-0 transition-shadow duration-300 cursor-pointer overflow-hidden flex flex-col justify-between font-sans shadow-sm hover:shadow-2xl
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
-        ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-75" : ""}
       `}
     >
       {/* ⭐ ESTILOS CSS PARA BRILLOS Y ANIMACIONES ⭐ */}
@@ -151,18 +150,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                   </span>
                   <span className="hidden sm:inline-flex shine-sutil bg-green-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     OFERTA
-                  </span>
-                </>
-              )}
-
-              {/* ⬛ Agotado */}
-              {isTotalAgotado && (
-                <>
-                  <span className="sm:hidden shine-sutil bg-gray-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Agotado">
-                    <FaBan size={9} />
-                  </span>
-                  <span className="hidden sm:inline-flex shine-sutil bg-gray-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
-                    AGOTADO
                   </span>
                 </>
               )}
@@ -235,7 +222,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                     className={`w-full h-full object-cover object-center transition-transform duration-700 ease-out ${
                       !isTotalAgotado ? "group-hover/card:scale-110" : ""
                     } ${
-                      isTotalAgotado ? "grayscale-[80%] opacity-60" : ""
+                      isTotalAgotado ? "grayscale-[90%] opacity-40 blur-[1px]" : ""
                     } ${sImg ? "group-hover/card:opacity-0 transition-opacity duration-300" : ""}`}
                     loading="lazy"
                     decoding="async"
@@ -254,6 +241,17 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                 </>
               );
             })()}
+
+            {/* 🛑 SELLO DE AGOTADO EN EL MEDIO DE LA TARJETA (MÓVIL Y PC) */}
+            {isTotalAgotado && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center p-2 pointer-events-none">
+                <div className="bg-black border-2 border-white text-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-2xl transform -rotate-6 backdrop-blur-md">
+                  <span className="text-xs sm:text-base font-black uppercase tracking-widest text-center block text-gray-500 drop-shadow">
+                    AGOTADO
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
             {isAdmin && product.hidden && (

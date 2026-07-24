@@ -1,9 +1,10 @@
-import { motion } from "framer-motion";
-import { FaChevronDown } from "react-icons/fa"; 
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaSlidersH, FaTimes, FaCheck, FaChevronDown } from "react-icons/fa";
 
 const categories = [
   { label: "Todos", value: "" },
-  { label: "Nuevo", value: "Nuevo" },         // ⭐ NUEVO: Agregado botón "Nuevo"
+  { label: "Nuevo", value: "Nuevo" },         
   { label: "Nacional", value: "Nacional" },
   { label: "Mundial 2026", value: "Mundial 2026" }, 
   { label: "Populares", value: "Populares" }, 
@@ -21,105 +22,248 @@ const categories = [
   { label: "NFL", value: "NFL" },
 ];
 
+const tallasAdulto = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+const tallasNino = [
+  { size: "16", label: "16 (Talla 2)" },
+  { size: "18", label: "18 (Talla 4)" },
+  { size: "20", label: "20 (Talla 6)" },
+  { size: "22", label: "22 (Talla 8)" },
+  { size: "24", label: "24 (Talla 10)" },
+  { size: "26", label: "26 (Talla 12)" },
+  { size: "28", label: "28 (Talla 14/16)" },
+];
+
 export default function FilterBar({
   searchTerm,
   setSearchTerm,
   filterType,
   setFilterType,
+  filterSizes = [],
+  setFilterSizes,
   onToggleTallas,
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeAccordion, setActiveAccordion] = useState(""); 
+
   return (
-    <div className="w-full flex flex-col gap-5 pt-6 mb-6 mt-6 px-4 md:px-0">
+    <div className="w-full flex flex-col gap-4 pt-3 mb-6 mt-4 px-4 max-w-4xl mx-auto">
       
-      {/* 1. BARRA DE BÚSQUEDA + BOTÓN TALLAS */}
+      {/* 1. BARRA DE BÚSQUEDA */}
       <motion.div
         className="w-full flex justify-center"
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <div className="relative w-full max-w-lg flex items-center gap-3">
-          
-          {/* Input Buscador */}
-          <div className="relative flex-1 group">
-             <svg className="absolute left-5 top-3 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-black transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-             </svg>
-            <input
-              type="text"
-              placeholder="Buscar camiseta..."
-              className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all shadow-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          {/* Botón Tallas */}
-          <button
-            onClick={onToggleTallas}
-            className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-xl hover:bg-zinc-800 transition-colors shadow-md text-sm font-bold tracking-wide"
-          >
-            TALLAS
-            <FaChevronDown className="text-xs" />
-          </button>
-
+        <div className="relative w-full max-w-md">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar camiseta..."
+            className="w-full pl-11 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </motion.div>
 
-      {/* 2. CARRUSEL DE CATEGORÍAS (Scroll Horizontal) */}
-      <motion.div
-        className="w-full overflow-x-auto pt-3 pb-2 scrollbar-hide mask-fade"
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}
+      {/* 2. BOTÓN "FILTRAR Y ORDENAR" */}
+      <motion.div 
+        className="w-full flex justify-center"
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
       >
-        <div className="flex gap-2 px-2 md:justify-center min-w-max">
-          {categories.map((cat) => {
-            const isActive = filterType === cat.value;
-            
-            // LÓGICA DE COLORES
-            let btnClass = "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"; // Base
-            
-            if (cat.value === "Nuevo") {
-              // ⭐ NUEVO ESTILO: Morado para "Nuevo"
-              btnClass = isActive 
-                ? "bg-yellow-600 border-yellow-600 text-white shadow-md scale-105" 
-                : "bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100";
-            }
-            else if (cat.value === "Mundial 2026") {
-              btnClass = isActive 
-                ? "bg-purple-400 border-purple-400 text-white shadow-md scale-105" 
-                : "bg-purple-50 border-purple-200 text-purple-400 hover:bg-purple-200";
-            }
-            else if (cat.value === "Populares") {
-              btnClass = isActive 
-                ? "bg-red-500 border-red-500 text-white shadow-md scale-105" 
-                : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100";
-            } 
-            else if (cat.value === "Ofertas") {
-              btnClass = isActive 
-                ? "bg-green-600 border-green-600 text-white shadow-md scale-105" 
-                : "bg-green-50 border-green-200 text-green-700 hover:bg-green-100";
-            } 
-            else if (isActive) {
-              btnClass = "bg-black border-black text-white shadow-md scale-105";
-            }
-
-            return (
-              <button
-                key={cat.label}
-                onClick={() => setFilterType(cat.value)}
-                className={`
-                  ${btnClass}
-                  px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap
-                `}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+        <button
+          onClick={() => {
+            setIsOpen(true);
+            onToggleTallas?.();
+          }}
+          className="flex items-center gap-2.5 px-6 py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95"
+        >
+          <FaSlidersH className="text-xs text-zinc-400" />
+          Filtrar y ordenar
+        </button>
       </motion.div>
+
+      {/* 3. MODAL UBICADO EXACTAMENTE EN EL CENTRO PERO ABAJO */}
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-end justify-center p-0 sm:pb-8">
+            
+            {/* Backdrop oscuro con blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            {/* 
+              👇 AQUÍ PUEDES MODIFICAR EL ANCHO EXCLUSIVAMENTE PARA DESKTOP 
+              - 'w-full' rige para móvil (ocupa todo el ancho abajo).
+              - 'sm:w-[750px]' rige para computadora. ¡Puedes cambiar ese número (ej: 850px, 950px) para hacerlo más ancho o más angosto!
+            */}
+            <motion.div
+              initial={{ y: "100%", opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: "100%", opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans"
+            >
+              <div>
+                {/* Cabecera con botón de cerrar */}
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-6">
+                  <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="p-2.5 rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors"
+                  >
+                    <FaTimes size={16} />
+                  </button>
+                </div>
+
+                {/* Acordeones limpios */}
+                <div className="flex flex-col divide-y divide-zinc-100">
+                  
+                  {/* Acordeón de Versión / Categoría */}
+                  <div className="py-4">
+                    <button
+                      onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
+                      className="w-full flex text-black items-center justify-between text-sm font-bold text-zinc-800 uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0"
+                    >
+                      <span>Versión / Categoría</span>
+                      <FaChevronDown className={`text-xs text-zinc-500 transition-transform duration-300 ${activeAccordion === "categoria" ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {activeAccordion === "categoria" && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 pb-2"
+                      >
+                        {categories.map((cat) => {
+                          const isActive = filterType === cat.value;
+                          return (
+                            <button
+                              key={cat.label}
+                              onClick={() => setFilterType(cat.value)}
+                              className={`
+                                flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-none
+                                ${isActive 
+                                  ? 'bg-black text-white shadow-sm' 
+                                  : 'bg-zinc-50 text-zinc-700 border border-zinc-200'}
+                              `}
+                            >
+                              <span>{cat.label}</span>
+                              {isActive && <FaCheck size={10} className="text-white" />}
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Acordeón de Talla */}
+                  <div className="py-4">
+                    <button
+                      onClick={() => setActiveAccordion(activeAccordion === "talla" ? "" : "talla")}
+                      className="w-full flex items-center text-black justify-between text-sm font-bold text-zinc-800 uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0"
+                    >
+                      <span>Talla</span>
+                      <FaChevronDown className={`text-xs text-zinc-500 transition-transform duration-300 ${activeAccordion === "talla" ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {activeAccordion === "talla" && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-col gap-4 pt-3 pb-2"
+                      >
+                        {/* Tallas Adulto */}
+                        <div>
+                          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Adulto</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tallasAdulto.map((size) => {
+                              const isActive = filterSizes?.includes(size);
+                              return (
+                                <button
+                                  key={size}
+                                  onClick={() => {
+                                    if (setFilterSizes) {
+                                      setFilterSizes(prev => 
+                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                                      );
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border ${
+                                    isActive 
+                                      ? "bg-black text-white border-black shadow-sm" 
+                                      : "bg-zinc-50 text-zinc-700 border-zinc-200"
+                                  }`}
+                                >
+                                  {size}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Tallas Niño */}
+                        <div>
+                          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Niño</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tallasNino.map(({ size, label }) => {
+                              const isActive = filterSizes?.includes(size);
+                              return (
+                                <button
+                                  key={size}
+                                  onClick={() => {
+                                    if (setFilterSizes) {
+                                      setFilterSizes(prev => 
+                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                                      );
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border ${
+                                    isActive 
+                                      ? "bg-black text-white border-black shadow-sm" 
+                                      : "bg-zinc-50 text-zinc-700 border-zinc-200"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                      </motion.div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Botón Inferior Fijo de Aplicar */}
+              <div className="pt-4 border-t border-zinc-100 mt-4">
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm tracking-wider uppercase shadow-xl transition-none"
+                >
+                  Aplicar filtros
+                </button>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
