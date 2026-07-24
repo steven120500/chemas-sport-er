@@ -1,36 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [fase, setFase] = useState(1); // Controla si estamos en fase 1, 2 o 3
-  const [isHovered, setIsHovered] = useState(false); // Para el efecto hover de la píldora
-  const [mobileShowOffer, setMobileShowOffer] = useState(false); // Para alternar en móvil
 
   useEffect(() => {
-    // Control de responsive para fondos
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
     window.addEventListener('resize', handleResize);
-
-    // Temporizador para alternar entre las 3 fases automáticamente
-    const intervalFases = setInterval(() => {
-      setFase((prevFase) => (prevFase === 3 ? 1 : prevFase + 1));
-    }, 4000); // Cambia de fase cada 4 segundos
-
-    // Temporizador exclusivo para móvil que alterna el texto del botón cada 2.5 segundos
-    const intervalMobile = setInterval(() => {
-      if (window.innerWidth < 768) {
-        setMobileShowOffer((prev) => !prev);
-      }
-    }, 2500);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearInterval(intervalFases);
-      clearInterval(intervalMobile);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleOfertas = () => {
@@ -43,140 +21,145 @@ const Bienvenido = ({ onNavigate }) => {
     }, 100);
   };
 
-  // Si pones el mouse en compu O si el temporizador de móvil está activo, muestra "VER OFERTAS"
-  const showCallToAction = isHovered || (isMobile && mobileShowOffer);
-
   return (
-    // 🔥 Aumentamos la altura en desktop (md:h-[90vh]) para bajar el contenido hasta el límite del corte 🔥
-    <div className="relative w-full h-[360px] md:h-[85vh] overflow-hidden flex flex-col justify-center items-center font-sans pb-32">
+    <div 
+      className="relative w-full md:h-[85vh] md:min-h-[600px] overflow-hidden flex flex-col justify-between items-center font-sans py-4 md:py-12"
+      style={{
+        minHeight: isMobile ? '500px' : 'max(65vh, 600px)'
+      }}
+    >
       
       <style>
         {`
-          /* 🔥 BOTÓN BLANCO ANIMADO CON BRILLO 🔥 */
-          @keyframes btnWhitePulse {
-            0%   { background-color: #ffffff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); } 
-            50%  { background-color: #f8fafc; box-shadow: 0 0 25px rgba(255, 255, 255, 0.7); } 
-            100% { background-color: #ffffff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+          @keyframes cardEntrance {
+            0% { opacity: 0; transform: translateY(25px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
           }
-          .animate-btn-white { animation: btnWhitePulse 3s ease-in-out infinite; }
-
-          /* Animación suave para cuando rotan las fases de las camisetas */
-          @keyframes phaseZoomIn {
-            0% { opacity: 0; transform: scale(0.93) translateY(8px); }
-            100% { opacity: 1; transform: scale(1) translateY(0); }
+          .animate-card-1 { animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.1s; opacity: 0; }
+          .animate-card-2 { animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.22s; opacity: 0; }
+          .animate-card-3 { animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.34s; opacity: 0; }
+          
+          @keyframes btnEntrance {
+            0% { opacity: 0; transform: translateY(15px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
           }
-          .animate-phase { animation: phaseZoomIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+          .animate-btn-enter { animation: btnEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.45s; opacity: 0; }
         `}
       </style>
 
-      {/* 🖼️ CAPA BASE: Fondo dinámico (Móvil vs Desktop) */}
+      {/* 🖼️ CAPA BASE: Fondo dinámico */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0 pointer-events-none transition-all duration-700"
         style={{ backgroundImage: `url(${isMobile ? '/FondoMovil.png' : '/FondoDes.png'})` }}
       ></div>
       
-      {/* Capa de oscurecimiento para resaltar las prendas */}
-      <div className={`absolute inset-0 ${isMobile ? 'bg-black/30' : 'bg-black/50'} z-10 pointer-events-none`}></div>
+      {/* Capa de oscurecimiento */}
+      <div className="absolute inset-0 bg-black/50 z-10 pointer-events-none"></div>
 
-      {/* --- CONTENIDO PRINCIPAL --- */}
-      <div className="relative z-20 flex flex-col justify-end items-center w-full max-w-4xl px-4">
-
-        {/* 🔥 CONTENEDOR DINÁMICO DE FASES (CAMISETAS) 🔥 */}
-        <div className=" relative z-20 min-h-[220px] md:min-h-[320px] flex flex-col justify-center items-center mt-16 md:mt-28 mb-2">
-          
-          {/* --- FASE 1: 1 Camiseta --- */}
-          {fase === 1 && (
-            <div className="flex flex-col items-center animate-phase">
-              <div className="pb-8 w-60 md:w-80 relative z-10">
-                <img src="/Mundial.png" className="w-full h-auto object-contain drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]" alt="1 Camiseta"/>
-              </div>
-            </div>
-          )}
-
-          {/* --- FASE 2: 2 Camisetas --- */}
-          {fase === 2 && (
-            <div className="flex flex-col items-center animate-phase">
-              <div className="flex justify-center items-center w-60 md:w-80 relative z-10">
-                <img src="/Mundial.png" className="w-80 md:w-80 h-auto object-contain -mr-16 md:-mr-20 z-20 drop-shadow-[0_25px_50px_rgba(0,0,0,0.95)]" alt="Camiseta 1"/>
-                <img src="/Fan2.png" className="w-80 md:w-80 h-auto object-contain z-10 drop-shadow-[0_15px_30px_rgba(0,0,0,0.8)] scale-95 transform translate-y-1" alt="Camiseta 2"/>
-              </div>
-            </div>
-          )}
-
-          {/* --- FASE 3: 3 Camisetas --- */}
-          {fase === 3 && (
-            <div className="flex flex-col items-center animate-phase">
-              <div className="flex justify-center items-center w-68 md:w-[400px] relative z-10">
-                {/* Camiseta 1: Mantenemos w-80 y la pegamos al centro con -mr-32 md:-mr-48 */}
-                <img src="/Mundial.png" className="w-60 md:w-80 h-auto object-contain -mr-32 md:-mr-48 z-30 drop-shadow-[0_25px_50px_rgba(0,0,0,0.95)]" alt="Camiseta 1"/>
-                
-                {/* Camiseta 2: Se queda en el centro intacta con w-80 */}
-                <img src="/Fan2.png" className="w-60 md:w-80 h-auto object-contain z-20 drop-shadow-[0_20px_40px_rgba(0,0,0,0.85)] scale-95 transform -translate-y-2" alt="Camiseta 2"/>
-                
-                {/* Camiseta 3: Ajustada a w-80 y pegada hacia la izquierda con -ml-32 md:-ml-48 */}
-                <img src="/Player2.png" className="w-60 md:w-80 h-auto object-contain -ml-32 md:-ml-48 z-10 drop-shadow-[0_15px_30px_rgba(0,0,0,0.7)] scale-90 transform translate-y-1" alt="Camiseta 3"/>
-              </div>
-            </div>
-          )}
-
-        </div>
+      {/* --- CONTENEDOR DE LAS 3 OFERTAS --- */}
+      <div className="relative z-20 flex flex-col md:flex-row items-stretch md:items-center justify-around w-full max-w-6xl px-4 md:px-8 flex-grow my-auto gap-3.5 md:gap-6 py-2">
         
-        {/* 🔥 PÍLDORA INTERACTIVA 2 EN 1 (MÁS COMPACTA EN MÓVIL, GIGANTE EN DESKTOP) 🔥 */}
-        <div className="relative z-30 mt-8 md:mt-16 flex flex-col items-center">
+        {/* ==================== OFERTA 1 (1 CAMISETA) ==================== */}
+        <div className="animate-card-1 w-full max-w-sm mx-auto md:max-w-none md:w-1/3 bg-black/60 md:bg-transparent border border-white/20 md:border-none rounded-2xl px-5 py-3 md:p-4 shadow-xl overflow-hidden flex flex-row md:flex-col items-center justify-between">
           
-          <button
-            onClick={handleOfertas}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            // 👇 AQUÍ AJUSTAMOS EL TAMAÑO: h-14 en móvil (md:h-28), min-w-[250px] en móvil (md:min-w-[540px]), px-8 py-3 en móvil 👇
-            className="group bg-white text-gray-950 border-2 border-gray-100 px-8 py-3 md:px-24 md:py-8 rounded-full font-black text-base sm:text-lg md:text-4xl transition-all duration-300 hover:scale-105 animate-btn-white uppercase tracking-wider shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex items-center justify-center min-w-[250px] md:min-w-[540px] h-14 md:h-28 cursor-pointer select-none"
-          >
-            {/* Si el mouse está encima (o en móvil el temporizador activa la llamada), muestra VER OFERTAS */}
-            {showCallToAction ? (
-              <span className="flex items-center gap-2 md:gap-4 text-black animate-fade-in font-extrabold tracking-widest text-lg md:text-4xl">
-                <span>VER OFERTAS </span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 md:gap-5 transition-opacity duration-300">
-                {fase === 1 && (
-                  <>
-                    <span className="text-gray-500 font-bold text-base md:text-3xl">1 POR</span>
-                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡15.000</span>
-                  </>
-                )}
-                {fase === 2 && (
-                  <>
-                    <span className="text-gray-500 font-bold text-base md:text-3xl">2 POR</span>
-                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡27.000</span>
-                  </>
-                )}
-                {fase === 3 && (
-                  <>
-                    <span className="text-gray-500 font-bold text-base md:text-3xl">3 POR</span>
-                    <span className="font-black text-black tracking-tighter text-xl md:text-5xl">₡35.000</span>
-                  </>
-                )}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center justify-start md:justify-center w-36 md:w-56 h-20 md:h-48 relative">
+            <img 
+              src="/Mundial.png" 
+              className="w-20 md:w-52 h-auto object-contain drop-shadow-[0_15px_25px_rgba(0,0,0,0.95)]" 
+              alt="1 Camiseta"
+            />
+          </div>
+
+          <div className="flex flex-col items-end md:items-center justify-center md:mt-6 text-right md:text-center">
+            <span className="text-gray-300 font-bold text-xs md:text-xl uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              1 POR
+            </span>
+            <span className="font-black text-white tracking-tighter text-2xl md:text-5xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] leading-none mt-1">
+              ₡15.000
+            </span>
+          </div>
 
         </div>
-      </div>
 
-      {/* 🔥 INDICADORES DE FASE FIJOS HASTA EL BORDE INFERIOR 🔥 */}
-      <div className="absolute bottom-4 md:bottom-8 left-0 right-0 flex gap-3 z-40 items-center justify-center">
-        {[1, 2, 3].map((num) => (
-          <button
-            key={num}
-            onClick={() => setFase(num)}
-            className={`h-[2px] rounded-full transition-all duration-500 ${
-              fase === num 
-                ? 'w-10 bg-gray-300 shadow-[0_0_8px_rgba(255,255,255,0.6)]' 
-                : 'w-4 bg-white/20 hover:bg-white/40'
-            }`}
-            aria-label={`Ver oferta ${num}`}
-          />
-        ))}
+        {/* ==================== OFERTA 2 (2 CAMISETAS) ==================== */}
+        <div className="animate-card-2 w-full max-w-sm mx-auto md:max-w-none md:w-1/3 bg-black/60 md:bg-transparent border border-white/20 md:border-none rounded-2xl px-5 py-3 md:p-4 shadow-xl overflow-hidden flex flex-row md:flex-col items-center justify-between">
+          
+          <div className="flex items-center justify-start md:justify-center w-40 md:w-64 h-20 md:h-48 relative">
+            <img 
+              src="/Mundial.png" 
+              className="w-20 md:w-44 h-auto object-contain z-20 drop-shadow-[0_15px_25px_rgba(0,0,0,0.95)]" 
+              alt="Camiseta 1"
+            />
+            <img 
+              src="/Fan2.png" 
+              className="w-20 md:w-44 h-auto object-contain -ml-10 md:-ml-16 z-10 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] scale-95 transform translate-y-1" 
+              alt="Camiseta 2"
+            />
+          </div>
+
+          <div className="flex flex-col items-end md:items-center justify-center md:mt-6 text-right md:text-center">
+            <span className="text-gray-300 font-bold text-xs md:text-xl uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              2 POR
+            </span>
+            <span className="font-black text-white tracking-tighter text-2xl md:text-5xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] leading-none mt-1">
+              ₡27.000
+            </span>
+          </div>
+
+        </div>
+
+        {/* ==================== OFERTA 3 (3 CAMISETAS) ==================== */}
+        <div className="animate-card-3 w-full max-w-sm mx-auto md:max-w-none md:w-1/3 bg-black/60 md:bg-transparent border border-white/20 md:border-none rounded-2xl px-5 py-3 md:p-4 shadow-xl overflow-hidden flex flex-row md:flex-col items-center justify-between">
+          
+          <div className="flex items-center justify-start md:justify-center w-40 md:w-72 h-20 md:h-48 relative">
+            <img 
+              src="/Mundial.png" 
+              className="w-16 md:w-40 h-auto object-contain z-30 drop-shadow-[0_15px_25px_rgba(0,0,0,0.95)]" 
+              alt="Camiseta 1"
+            />
+            <img 
+              src="/Fan2.png" 
+              className="w-16 md:w-40 h-auto object-contain -ml-8 md:-ml-16 z-20 drop-shadow-[0_10px_20px_rgba(0,0,0,0.85)] scale-95 transform -translate-y-1" 
+              alt="Camiseta 2"
+            />
+            <img 
+              src="/Player2.png" 
+              className="w-16 md:w-40 h-auto object-contain -ml-8 md:-ml-16 z-10 drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] scale-90 transform translate-y-1" 
+              alt="Camiseta 3"
+            />
+          </div>
+
+          <div className="flex flex-col items-end md:items-center justify-center md:mt-6 text-right md:text-center">
+            <span className="text-gray-300 font-bold text-xs md:text-xl uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              3 POR
+            </span>
+            <span className="font-black text-white tracking-tighter text-2xl md:text-5xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] leading-none mt-1">
+              ₡35.000
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+      
+      {/* --- BOTÓN CENTRADO INFERIOR --- */}
+      <div className="relative z-30 mt-2 md:mt-4 flex flex-col items-center w-full px-4 animate-btn-enter">
+        <button
+          onClick={handleOfertas}
+          className="bg-white text-gray-950 border-2 border-gray-100 px-8 py-3 md:px-16 md:py-6 rounded-full font-black text-sm md:text-2xl transition-all duration-300 hover:scale-105 hover:bg-gray-50 uppercase tracking-wider shadow-[0_15px_35px_rgba(0,0,0,0.9)] flex items-center justify-center min-w-[240px] md:min-w-[400px] h-12 md:h-20 cursor-pointer select-none active:scale-95"
+        >
+          <span className="flex items-center gap-2 md:gap-3 text-black font-extrabold tracking-widest">
+            <span>VER OFERTAS</span>
+            <svg 
+              className="w-4 h-4 md:w-6 md:h-6" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </span>
+        </button>
       </div>
 
     </div>
