@@ -93,7 +93,7 @@ export default function FilterBar({
           className="flex items-center gap-2.5 px-6 py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95"
         >
           <FaSlidersH className="text-xs text-zinc-400" />
-          Filtrar y ordenar
+          Filtrar
         </button>
       </motion.div>
 
