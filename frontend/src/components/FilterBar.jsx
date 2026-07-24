@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaSlidersH, FaTimes, FaCheck, FaChevronDown } from "react-icons/fa";
+import { FaSlidersH, FaTimes, FaCheck, FaChevronDown, FaTrashAlt } from "react-icons/fa";
 
 const categories = [
   { label: "Todos", value: "" },
@@ -44,6 +44,15 @@ export default function FilterBar({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState(""); 
+
+  // Detecta si hay algún filtro activo (categoría distinta de vacío o tallas seleccionadas)
+  const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0);
+
+  // Función para limpiar los filtros
+  const handleClearFilters = () => {
+    if (setFilterType) setFilterType("");
+    if (setFilterSizes) setFilterSizes([]);
+  };
 
   return (
     <div className="w-full flex flex-col gap-4 pt-3 mb-6 mt-4 px-4 max-w-4xl mx-auto">
@@ -105,7 +114,7 @@ export default function FilterBar({
             {/* 
               👇 AQUÍ PUEDES MODIFICAR EL ANCHO EXCLUSIVAMENTE PARA DESKTOP 
               - 'w-full' rige para móvil (ocupa todo el ancho abajo).
-              - 'sm:w-[750px]' rige para computadora. ¡Puedes cambiar ese número (ej: 850px, 950px) para hacerlo más ancho o más angosto!
+              - 'sm:max-w-4xl' rige para computadora.
             */}
             <motion.div
               initial={{ y: "100%", opacity: 0, scale: 0.95 }}
@@ -115,9 +124,23 @@ export default function FilterBar({
               className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans"
             >
               <div>
-                {/* Cabecera con botón de cerrar */}
+                {/* Cabecera con título, botón de Borrar condicional y botón de cerrar */}
                 <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-6">
-                  <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
+                    
+                    {/* Botón de Borrar Filtros (Aparece solo si hay filtros activos) */}
+                    {hasActiveFilters && (
+                      <button
+                        onClick={handleClearFilters}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-zinc-800 rounded-full text-xs font-bold uppercase transition-none border border-zinc-200"
+                      >
+                        <FaTrashAlt size={10} className="text-zinc-500" />
+                        Borrar
+                      </button>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => setIsOpen(false)}
                     className="p-2.5 rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors"
