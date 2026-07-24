@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FaFire } from "react-icons/fa";
+import { FaTag, FaStar, FaBan } from "react-icons/fa";
 
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
@@ -14,18 +14,26 @@ const ADULT_SIZES = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 const BALL_SIZES = ["3", "4", "5"];
 
-export default function ProductCard({ product, onClick, user }) {
+export default function ProductCard({ product, onClick, user, index = 0 }) {
   // 🔥 ESCUDO ANTI-PANTALLA BLANCA 🔥
   if (!product) return null;
+
+  // 🔍 Extracción robusta de la imagen principal y secundaria adaptada al esquema de la BD
+  const primaryImg = product.imageSrc;
+  const secondaryImg = 
+    product.secondaryImage || 
+    product.imageSrc2 || 
+    product.secondImage || 
+    product.foto2 || 
+    product.img2 || 
+    (Array.isArray(product.images) && product.images[1] && (typeof product.images[1] === 'string' ? product.images[1] : product.images[1].url)) || 
+    null;
 
   const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
 
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
   
-  // 🔥 Lógica para detectar si es del mundial
-  const isMundial = product.isMundial2026 === true;
-
   const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 
   const stockAgotadas = [];
@@ -70,197 +78,253 @@ export default function ProductCard({ product, onClick, user }) {
 
   return (
     <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      className={`relative rounded-lg transition cursor-pointer overflow-hidden w-full bg-white
-        ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
-        ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-80 grayscale-[30%]" : ""}
-        
-        /* 🔥 ESTILO ESPECIAL MUNDIAL: Borde dorado y resplandor, fondo siempre blanco 🔥 */
-        ${isMundial 
-          ? "ring-2 ring-purple-400 shadow-[0_0_15px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_rgba(234,179,8,0.7)]" 
-          : "shadow-md hover:shadow-lg"
-        }
-      `}
-      onClick={() => onClick(product)}
-    >
+      // ⭐ ANIMACIÓN DE APARICIÓN AL INICIO ⭐
+      initial={{ opacity: 0, y: 25, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.35), ease: "easeOut" }}
       
-      {/* ⭐ CONTENEDOR PARA ETIQUETAS APILADAS */}
-      <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 items-start">
+      // ⭐ ANIMACIONES DE INTERACCIÓN MODERNAS ⭐
+      whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
+      whileTap={{ scale: 0.97 }}
+      onClick={() => onClick(product)}
+      className={`group/card relative w-full bg-white rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-black p-0 transition-shadow duration-300 cursor-pointer overflow-hidden flex flex-col justify-between font-sans shadow-sm hover:shadow-2xl
+        ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
+        ${isTotalAgotado && (!isAdmin || !product.hidden) ? "opacity-75" : ""}
+      `}
+    >
+      {/* ⭐ ESTILOS CSS PARA BRILLOS Y ANIMACIONES ⭐ */}
+      <style>
+        {`
+          @keyframes minimalShine {
+            0%, 100% { filter: drop-shadow(0 0 2px rgba(0,0,0,0.3)); }
+            50% { filter: drop-shadow(0 0 6px rgba(0,0,0,0.6)); }
+          }
+          @keyframes platinumGlow {
+            0%, 100% { filter: drop-shadow(0 0 2px rgba(156, 163, 175, 0.3)); transform: scale(1); }
+            50% { filter: drop-shadow(0 0 8px rgba(209, 213, 219, 0.9)); transform: scale(1.02); }
+          }
+          .shine-sutil { animation: minimalShine 2.5s infinite ease-in-out; }
+          @media (min-width: 768px) {
+            .shine-desktop-tipo { animation: platinumGlow 2.2s infinite ease-in-out; display: inline-block; }
+          }
+        `}
+      </style>
+
+      {/* =========================================================================
+          ⭐ CUERPO DEL CARD: GRILLA 6 vs 6 RESPONSIVA ⭐
+          ========================================================================= */}
+      <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px]">
         
-        {/* 🔸 Tipo */}
-        {product.type && (
-          <div className={`text-xs font-semibold px-3 py-1 rounded-full shadow ${isMundial ? 'bg-purple-700 text-white border ' : 'bg-black text-white'}`}>
-            {product.type}
-          </div>
-        )}
-
-        {/* 🌟 Etiqueta Nuevo */}
-        {isNuevo && (
-          <div className="etiqueta-nuevo text-white text-xs font-bold px-3 py-1 rounded-full shadow-md bg-yellow-600">
-            ¡Nuevo!
-          </div>
-        )}
-      </div>
-
-      {/* 🟩 Oferta */}
-      {hasDiscount && (
-        <span className="absolute etiqueta-oferta-verde bottom-44 -left-2 text-white font-bold shadow z-10 text-xs sm:text-xs md:text-sm px-2 py-1 md:px-3 md:py-2">
-          Oferta
-        </span>
-      )}
-
-      {/* 🔥 Popular */}
-      {product.isPopular === true && (
-        <span
-          className="absolute etiqueta-popular-naranja top-2 right-2 z-30
-                     flex items-center justify-center px-2 py-1 rounded"
-        >
-          <FaFire size={16} color="white" />
-        </span>
-      )}
-
-      {/* Imagen (Fondo gris claro o ultra oscuro si es mundial) */}
-      <div className={`relative w-full h-[300px] overflow-hidden ${isMundial ? 'bg-[#0a0a0a]' : 'bg-gray-100'}`}>
-        {(() => {
-          const screenWidth = window.innerWidth;
-          let H = 1000;
-          if (screenWidth >= 1024) H = 700;
-          else if (screenWidth >= 768) H = 1000;
-
-          const img320 = cldUrl(product.imageSrc, 320, H);
-          const img640 = cldUrl(product.imageSrc, 640, H);
-          const img960 = cldUrl(product.imageSrc, 960, H);
-
-          return (
-            <motion.img
-              src={img640 || product.imageSrc}
-              srcSet={
-                img320 && img640 && img960
-                  ? `${img320} 320w, ${img640} 640w, ${img960} 960w`
-                  : undefined
-              }
-              sizes="(min-width:1024px) 25vw, (min-width:768px) 33vw, 50vw"
-              alt={product.imageAlt || product.name}
-              className="w-full h-full object-cover object-center"
-              loading="lazy"
-              decoding="async"
-            />
-          );
-        })()}
-
-        {/* ⭐ Sticker para el Mundial (Esquina Inferior Derecha) ⭐ */}
-        {/* Ajustado: h-20 en móvil, h-32 en tablet, h-36/h-40 en desktop */}
-        {isMundial && (
-          <img
-            src="/sticker.png" 
-            alt="Sticker Mundial"
-            className="absolute bottom-2 right-2 md:bottom-1 md:right-4 h-16 sm:h-36 md:h-36 lg:h-36 w-auto object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)] z-10 transition-all duration-300"
-          />
-        )}
-
-        {/* 🟥 OVERLAY SI ESTÁ AGOTADO */}
-        {isTotalAgotado && (
-          <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-20 flex items-center justify-center">
-            <div className="bg-black text-white border-2 border-white px-6 py-2 rounded-lg transform -rotate-12 shadow-xl">
-              <span className="text-xl md:text-2xl font-black tracking-widest uppercase drop-shadow-md">
-                Agotado
+        {/* --- COLUMNA IZQUIERDA: INFORMACIÓN Y ETIQUETAS --- */}
+        <div className="col-span-6 flex flex-col justify-between p-3.5 sm:p-6 pr-2 sm:pr-5 z-10">
+          
+          {/* ⭐ BLOQUE SUPERIOR IZQUIERDO: TIPO Y ETIQUETAS ⭐ */}
+          <div className="flex flex-col gap-1.5 sm:gap-2 items-start w-full">
+            
+            {/* 🔸 Categoría / Tipo */}
+            {product.type && (
+              <span className="shine-desktop-tipo bg-gray-600 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm">
+                {product.type}
               </span>
+            )}
+
+            {/* 🔹 ETIQUETAS */}
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+              
+              {/* ⭐ Popular */}
+              {product.isPopular === true && (
+                <>
+                  <span className="sm:hidden shine-sutil bg-yellow-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Popular">
+                    <FaStar size={9} />
+                  </span>
+                  <span className="hidden sm:inline-flex shine-sutil bg-yellow-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm" title="Producto Popular">
+                    POPULAR
+                  </span>
+                </>
+              )}
+
+              {/* 🟩 Oferta */}
+              {hasDiscount && !isTotalAgotado && (
+                <>
+                  <span className="sm:hidden shine-sutil bg-green-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Oferta">
+                    <FaTag size={9} />
+                  </span>
+                  <span className="hidden sm:inline-flex shine-sutil bg-green-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                    OFERTA
+                  </span>
+                </>
+              )}
+
+              {/* ⬛ Agotado */}
+              {isTotalAgotado && (
+                <>
+                  <span className="sm:hidden shine-sutil bg-gray-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Agotado">
+                    <FaBan size={9} />
+                  </span>
+                  <span className="hidden sm:inline-flex shine-sutil bg-gray-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                    AGOTADO
+                  </span>
+                </>
+              )}
             </div>
           </div>
-        )}
 
-        {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
-        {isAdmin && product.hidden && (
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30 flex items-center justify-center">
-            <span className="text-white text-lg sm:text-xl md:text-2xl font-bold text-center px-3 drop-shadow-md">
-              No visible para el cliente
-            </span>
+          {/* ⭐ BLOQUE CENTRAL IZQUIERDO: TÍTULO Y PRECIO ⭐ */}
+          <div className="flex flex-col my-auto py-1.5 sm:py-2">
+            
+            <h3 className="text-[11px] sm:text-lg font-extrabold text-black uppercase tracking-tight leading-snug line-clamp-3">
+              {product.name}
+            </h3>
+
+            <div className="w-6 sm:w-10 border-t-2 border-black my-2 sm:my-4"></div>
+
+            <div className="flex flex-col">
+              {hasDiscount ? (
+                <div className="flex flex-col">
+                  <span className="text-[10px] sm:text-sm text-gray-400 line-through font-bold">
+                    ₡{Number(product.price).toLocaleString("de-DE")}
+                  </span>
+                  <span className="text-sm sm:text-2xl font-black text-green-600 tracking-tight">
+                    ₡{Number(product.discountPrice).toLocaleString("de-DE")}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-sm sm:text-2xl font-black text-black tracking-tight">
+                  ₡{Number(product.price).toLocaleString("de-DE")}
+                </span>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Info - SIEMPRE CON FONDO BLANCO Y TEXTO OSCURO */}
-      <div className="p-4 text-center flex flex-col items-center justify-between">
-        
-        {/* 🔥 TÍTULO (Siempre oscuro) */}
-        <h3 className="text-sm sm:text-base md:text-lg font-extrabold line-clamp-2 text-gray-900">
-          {product.name}
-        </h3>
+          <div className="h-1"></div>
+        </div>
 
-        {/* Precio */}
-        {hasDiscount ? (
-          <div className="mt-2 flex flex-col items-center">
-            <p className="text-sm sm:text-base line-through text-gray-500">
-              ₡{Number(product.price).toLocaleString("de-DE")}
-            </p>
-            <p className="text-lg sm:text-xl md:text-2xl font-extrabold text-green-600">
-              ₡{Number(product.discountPrice).toLocaleString("de-DE")}
-            </p>
-          </div>
-        ) : (
-          /* 🔥 PRECIO NORMAL (Siempre oscuro) */
-          <p className="mt-2 text-base sm:text-lg md:text-xl font-bold text-black">
-            ₡{Number(product.price).toLocaleString("de-DE")}
-          </p>
-        )}
+        {/* --- COLUMNA DERECHA: IMAGEN (Hover solo si NO está agotado) --- */}
+        <div className="col-span-6 relative w-full h-full">
+          
+          {/* ⭐ ETIQUETA "NEW" ⭐ */}
+          {isNuevo && !isTotalAgotado && (
+            <div className="absolute top-1/2 -left-4 sm:-left-7 -translate-y-1/2 z-30 w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none">
+              <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
+                <polygon points="50,0 58,15 74,8 77,24 94,22 91,38 100,48 91,59 95,76 78,77 74,93 58,85 50,100 42,85 26,93 22,77 5,76 9,59 0,48 9,38 6,22 23,24 26,8 42,15" />
+              </svg>
+              <span className="absolute text-white font-black text-[9px] sm:text-xs tracking-tighter uppercase select-none">
+                NEW
+              </span>
+            </div>
+          )}
 
-        {/* Avisos superadmin */}
-        {user?.isSuperUser && (
-          <div className="mt-3 text-xs sm:text-sm text-left w-full px-2">
-            {/* INVENTARIO */}
-            {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
-              <>
-                <p className="font-bold mt-2 text-black">Tienda #1</p>
-                {stockAgotadas.length > 0 && (
-                  <p className="text-red-600">Agotado {stockAgotadas.join(" ")}</p>
-                )}
-                {stockQueda1.length > 0 && (
-                  <p className="text-green-600">Queda 1 {stockQueda1.join(" ")}</p>
-                )}
-              </>
-            )}
+          {/* Contenedor de la Imagen */}
+          <div className="relative w-full h-full bg-[#f4f4f4] overflow-hidden rounded-r-[16px] sm:rounded-r-[24px]">
+            {(() => {
+              const screenWidth = window.innerWidth;
+              let H = 1000;
+              if (screenWidth >= 1024) H = 700;
+              else if (screenWidth >= 768) H = 1000;
 
-            {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
-              <>
-                <p className="font-bold mt-2 text-black">Tienda #2</p>
-                {bodegaAgotadas.length > 0 && (
-                  <p className="text-red-600">Agotado {bodegaAgotadas.join(" ")}</p>
-                )}
-                {bodegaQueda1.length > 0 && (
-                  <p className="text-green-600">Queda 1 {bodegaQueda1.join(" ")}</p>
-                )}
-              </>
-            )}
+              const pImg = cldUrl(primaryImg, 640, H) || primaryImg;
+              // Si está agotado, ignoramos la secundaria para que no haga nada al pasar el mouse
+              const sImg = !isTotalAgotado && secondaryImg ? (cldUrl(secondaryImg, 640, H) || secondaryImg) : null;
 
-            {traspasosUrgentes.length > 0 && (
-              <div className="mt-3 bg-red-100 border-l-4 border-red-500 text-red-800 p-2 rounded">
-                <p className="font-bold text-red-700 mb-1">🚨 Traspasos urgentes:</p>
-                <ul className="list-disc pl-5">
-                  {traspasosUrgentes.map((t, i) => (
-                    <li key={i}>
-                      Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
-                    </li>
-                  ))}
-                </ul>
+              return (
+                <>
+                  {/* 🖼️ Imagen Principal */}
+                  <img
+                    src={pImg}
+                    alt={product.imageAlt || product.name}
+                    className={`w-full h-full object-cover object-center transition-transform duration-700 ease-out ${
+                      !isTotalAgotado ? "group-hover/card:scale-110" : ""
+                    } ${
+                      isTotalAgotado ? "grayscale-[80%] opacity-60" : ""
+                    } ${sImg ? "group-hover/card:opacity-0 transition-opacity duration-300" : ""}`}
+                    loading="lazy"
+                    decoding="async"
+                  />
+
+                  {/* 🖼️ Imagen Secundaria (Solo hace hover si NO está agotado y existe) */}
+                  {sImg && (
+                    <img
+                      src={sImg}
+                      alt={`${product.name} secundaria`}
+                      className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-500 ease-out opacity-0 group-hover/card:opacity-100 group-hover/card:scale-110`}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                </>
+              );
+            })()}
+
+            {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
+            {isAdmin && product.hidden && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30 flex items-center justify-center p-1">
+                <span className="text-white text-[9px] font-bold text-center uppercase tracking-wider">
+                  Oculto
+                </span>
               </div>
             )}
-
-            {traspasosSugeridos.length > 0 && (
-              <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
-                <p className="font-bold text-yellow-700 mb-1">📦 Traspasos sugeridos:</p>
-                <ul className="list-disc pl-5">
-                  {traspasosSugeridos.map((t, i) => (
-                    <li key={i}>
-                      Talla {t.talla} ({t.stock} en T1, {t.bodega} en T2)
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
-        )}
+        </div>
+
       </div>
+
+      {/* =========================================================================
+          ⭐ PANEL DE LOGÍSTICA PARA SUPERUSUARIOS ⭐
+          ========================================================================= */}
+      {user?.isSuperUser && (
+        <div className="px-3 sm:px-6 pb-3 pt-2 border-t border-dashed border-gray-300 text-[11px] sm:text-xs text-left w-full font-sans">
+          {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
+            <>
+              <p className="font-bold mt-1 text-black">Tienda #1</p>
+              {stockAgotadas.length > 0 && (
+                <p className="text-red-600 font-semibold">Agotado: {stockAgotadas.join(" ")}</p>
+              )}
+              {stockQueda1.length > 0 && (
+                <p className="text-green-600 font-semibold">Queda 1: {stockQueda1.join(" ")}</p>
+              )}
+            </>
+          )}
+
+          {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
+            <>
+              <p className="font-bold mt-2 text-black">Tienda #2</p>
+              {bodegaAgotadas.length > 0 && (
+                <p className="text-red-600 font-semibold">Agotado: {bodegaAgotadas.join(" ")}</p>
+              )}
+              {bodegaQueda1.length > 0 && (
+                <p className="text-green-600 font-semibold">Queda 1: {bodegaQueda1.join(" ")}</p>
+              )}
+            </>
+          )}
+
+          {traspasosUrgentes.length > 0 && (
+            <div className="mt-2 bg-red-50 border-l-4 border-red-500 text-red-800 p-2 rounded">
+              <p className="font-bold text-red-700 mb-0.5">🚨 Traspasos urgentes:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {traspasosUrgentes.map((t, i) => (
+                  <li key={i}>
+                    Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {traspasosSugeridos.length > 0 && (
+            <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
+              <p className="font-bold text-yellow-700 mb-0.5">📦 Traspasos sugeridos:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {traspasosSugeridos.map((t, i) => (
+                  <li key={i}>
+                    Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
     </motion.div>
   );
 }

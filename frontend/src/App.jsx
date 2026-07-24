@@ -1,7 +1,7 @@
 import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom'; // ⭐ IMPORTAMOS REACT-ROUTER
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -20,7 +20,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
 import TopBanner from './components/TopBanner';
 import UserListModal from './components/UserListModal';
-import HistoryPage from './components/HistoryPage'; // ⭐ AHORA ES UNA PÁGINA COMPLETA
+import HistoryPage from './components/HistoryPage'; 
 import Medidas from './components/Medidas';
 import Cantidad from './components/Cantidad';
 import Bienvenido from './components/Bienvenido';
@@ -37,7 +37,6 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
-// ⭐ COMPONENTE ENVOLTORIO PARA LA RUTA DEL PRODUCTO INDIVIDUAL ⭐
 function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
   const { id } = useParams();
   const product = products.find(p => getPid(p) === id);
@@ -70,7 +69,6 @@ function MainApp() {
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // ⭐ ESTADO PARA RECORDAR DÓNDE ESTABA EL SCROLL ⭐
   const [savedScroll, setSavedScroll] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,7 +89,7 @@ function MainApp() {
   const [total, setTotal] = useState(0);
   const pages = Math.max(1, Math.ceil(total / limit));
 
-  const navigate = useNavigate(); // ⭐ INICIAMOS EL NAVEGADOR DE RUTAS
+  const navigate = useNavigate();
 
   const anyModalOpen =
     showAddModal ||
@@ -215,7 +213,6 @@ function MainApp() {
     setTimeout(() => fetchAllForCounts(), 600);
   };
 
-  // ⭐ FUNCIONES DE NAVEGACIÓN DE PRODUCTOS ⭐
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
@@ -338,7 +335,7 @@ function MainApp() {
             isSuperUser={isSuperUser}
             setShowRegisterUserModal={setShowRegisterUserModal}
             setShowUserListModal={setShowUserListModal}
-            setShowHistoryModal={() => navigate('/history')} // ⭐ NAVEGAMOS AL HISTORIAL
+            setShowHistoryModal={() => navigate('/history')}
             canSeeHistory={canSeeHistory}
           />
         )}
@@ -346,12 +343,7 @@ function MainApp() {
         {/* ================= SISTEMA DE RUTAS PRINCIPALES ================= */}
         <main className="flex-1 w-full relative">
           <Routes>
-            {/* RUTA 1: PÁGINA DEL HISTORIAL */}
-            <Route path="/history" element={
-              <HistoryPage isSuperUser={isSuperUser} />
-            } />
-
-            {/* RUTA 2: PÁGINA DE UNA CAMISETA ESPECÍFICA */}
+            <Route path="/history" element={<HistoryPage isSuperUser={isSuperUser} />} />
             <Route path="/producto/:id" element={
               <ProductDetailWrapper 
                 products={products} 
@@ -365,7 +357,6 @@ function MainApp() {
               />
             } />
 
-            {/* RUTA 3: CATÁLOGO PRINCIPAL (HOME) */}
             <Route path="/" element={
               <>
                 {loading && <LoadingOverlay message="Cargando productos..." />}
@@ -391,7 +382,6 @@ function MainApp() {
 
                 <div ref={pageTopRef} />
 
-                {/* BOTONES SUPERUSUARIO */}
                 {isSuperUser && (
                 <div className="w-full max-w-7xl mx-auto px-4 mt-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
@@ -443,125 +433,128 @@ function MainApp() {
                 />
                 
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
+                  <AnimatePresence>
+                      {showSizes && (
+                      <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
+                      >
+                          <div className="flex flex-col gap-6 items-center p-6">
+                          {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
+                              <div className="w-full text-center">
+                              <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
+                              <div className="flex flex-wrap justify-center gap-2">
+                                  {tallasBalon.map((size) => {
+                                  const isActive = filterSizes.includes(size);
+                                  return (
+                                      <button
+                                      key={size}
+                                      onClick={() => {
+                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                          setPage(1);
+                                      }}
+                                      className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                      }`}
+                                      >
+                                      {size}
+                                      </button>
+                                  );
+                                  })}
+                              </div>
+                              </div>
+                          ) : (
+                              <>
+                              <div className="w-full text-center">
+                                  <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
+                                  <div className="flex flex-wrap justify-center gap-2">
+                                  {tallasAdulto.map((size) => {
+                                      const isActive = filterSizes.includes(size);
+                                      return (
+                                      <button
+                                          key={size}
+                                          onClick={() => {
+                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                          setPage(1);
+                                          }}
+                                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                          }`}
+                                      >
+                                          {size}
+                                      </button>
+                                      );
+                                  })}
+                                  </div>
+                              </div>
+                              <div className="w-full text-center">
+                                  <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
+                                  <div className="flex flex-wrap justify-center gap-2">
+                                  {tallasNino.map(({ size, label }) => {
+                                      const isActive = filterSizes.includes(size);
+                                      return (
+                                      <button
+                                          key={size}
+                                          onClick={() => {
+                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
+                                          setPage(1);
+                                          }}
+                                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                          }`}
+                                      >
+                                          {label}
+                                      </button>
+                                      );
+                                  })}
+                                  </div>
+                              </div>
+                              </>
+                          )}
+                          </div>
+                      </motion.div>
+                      )}
+                  </AnimatePresence>
 
-                <AnimatePresence>
-                    {showSizes && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
-                    >
-                        <div className="flex flex-col gap-6 items-center p-6">
-                        {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
-                            <div className="w-full text-center">
-                            <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
-                            <div className="flex flex-wrap justify-center gap-2">
-                                {tallasBalon.map((size) => {
-                                const isActive = filterSizes.includes(size);
-                                return (
-                                    <button
-                                    key={size}
-                                    onClick={() => {
-                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                        setPage(1);
-                                    }}
-                                    className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                    }`}
-                                    >
-                                    {size}
-                                    </button>
-                                );
-                                })}
-                            </div>
-                            </div>
-                        ) : (
-                            <>
-                            <div className="w-full text-center">
-                                <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                {tallasAdulto.map((size) => {
-                                    const isActive = filterSizes.includes(size);
-                                    return (
-                                    <button
-                                        key={size}
-                                        onClick={() => {
-                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                        setPage(1);
-                                        }}
-                                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        {size}
-                                    </button>
-                                    );
-                                })}
-                                </div>
-                            </div>
-                            <div className="w-full text-center">
-                                <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                {tallasNino.map(({ size, label }) => {
-                                    const isActive = filterSizes.includes(size);
-                                    return (
-                                    <button
-                                        key={size}
-                                        onClick={() => {
-                                        setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                        setPage(1);
-                                        }}
-                                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                        isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        {label}
-                                    </button>
-                                    );
-                                })}
-                                </div>
-                            </div>
-                            </>
-                        )}
-                        </div>
-                    </motion.div>
-                    )}
-                </AnimatePresence>
-
-                <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
-                    <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
-                    <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
-                    VER MEDIDAS
-                    </button>
+                  <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
+                      <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
+                      <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
+                      VER MEDIDAS
+                      </button>
+                  </div>
                 </div>
-                </div>
 
-                <div id="products-section" className="px-4 grid grid-cols-2 gap-y-8 gap-x-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:gap-x-8">
-                {filteredProducts.length > 0 ? (
-                    filteredProducts.map((product, index) => (
-                    <ProductCard
-                        key={getPid(product)}
-                        product={product}
-                        index={index}
-                        onClick={() => handleProductClick(product)}
-                        user={user}
-                    />
-                    ))
-                ) : (
-                    <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
-                    {filterSizes.length > 0
-                        ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
-                        : storeView !== 'todos'
-                        ? `No hay inventario disponible para la tienda seleccionada.`
-                        : 'No tenemos productos disponibles en este momento.'}
-                    </div>
-                )}
+                {/* 👇⭐ ESTA ES LA LÍNEA QUE CAMBIÓ: EL CONTENEDOR DE LA GRILLA ⭐👇 */}
+                <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+                  {/* Celular: 1 columna, Tablet: 2 columnas, Escritorio grande: 3 columnas, con buen margen */}
+                  <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                  {filteredProducts.length > 0 ? (
+                      filteredProducts.map((product, index) => (
+                      <ProductCard
+                          key={getPid(product)}
+                          product={product}
+                          index={index}
+                          onClick={() => handleProductClick(product)}
+                          user={user}
+                      />
+                      ))
+                  ) : (
+                      <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
+                      {filterSizes.length > 0
+                          ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
+                          : storeView !== 'todos'
+                          ? `No hay inventario disponible para la tienda seleccionada.`
+                          : 'No tenemos productos disponibles en este momento.'}
+                      </div>
+                  )}
+                  </div>
                 </div>
 
                 {pages > 1 && (
-                <div className="mt-8 mb-8 flex flex-col items-center gap-3">
+                <div className="mt-12 mb-12 flex flex-col items-center gap-3">
                     <nav className="flex items-center justify-center gap-2">
                     <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -605,7 +598,6 @@ function MainApp() {
           </Routes>
         </main>
 
-        {/* ================= FOOTER GLOBAL ================= */}
         <Footer />
         {!anyModalOpen && <FloatingWhatsapp />}
         
@@ -614,7 +606,6 @@ function MainApp() {
   );
 }
 
-// ⭐ ENVOLVEMOS TODA LA APLICACIÓN CON EL ENRUTADOR OFICIAL ⭐
 export default function AppWrapper() {
   return (
     <Router>

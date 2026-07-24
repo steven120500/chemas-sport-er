@@ -393,7 +393,7 @@ router.delete('/:id', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '21', 10), 1), 100);
     const q     = (req.query.q || '').trim();
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
