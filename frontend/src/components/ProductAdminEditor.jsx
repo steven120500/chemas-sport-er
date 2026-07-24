@@ -319,7 +319,7 @@ export default function ProductAdminEditor({
                   <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-black text-gray-800">Temporada 26-27 (Sello Rojo)</span>
+                  <span className="text-sm font-black text-gray-800">Temporada 26-27</span>
                   <span className="text-xs text-gray-400 font-medium">Muestra el sello circular vintage en la chema.</span>
                 </div>
               </label>
