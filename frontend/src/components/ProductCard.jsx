@@ -87,10 +87,23 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onClick(product)}
-      className={`group/card relative w-full bg-white rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-black p-0 transition-shadow duration-300 cursor-pointer overflow-hidden flex flex-col justify-between font-sans shadow-sm hover:shadow-2xl
+      // 🛑 NOTA: Se retiró 'overflow-hidden' de aquí para que el sticker pueda salirse del borde de la tarjeta
+      className={`group/card relative w-full bg-white rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-black p-0 transition-shadow duration-300 cursor-pointer flex flex-col justify-between font-sans shadow-sm hover:shadow-2xl
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
       `}
     >
+     {/* 🌟 ETIQUETA "NEW" FLOTANTE (Normal en móvil, más grande en desktop) 🌟 */}
+     {isNuevo && !isTotalAgotado && (
+        <div className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 z-50 w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
+          <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
+            <polygon points="50,0 58,15 74,8 77,24 94,22 91,38 100,48 91,59 95,76 78,77 74,93 58,85 50,100 42,85 26,93 22,77 5,76 9,59 0,48 9,38 6,22 23,24 26,8 42,15" />
+          </svg>
+          <span className="absolute text-white font-black text-xs sm:text-base tracking-tighter uppercase select-none">
+            NEW
+          </span>
+        </div>
+      )}
+
       {/* ⭐ ESTILOS CSS PARA BRILLOS Y ANIMACIONES ⭐ */}
       <style>
         {`
@@ -187,20 +200,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         </div>
 
         {/* --- COLUMNA DERECHA: IMAGEN (Hover solo si NO está agotado) --- */}
-        <div className="col-span-6 relative w-full h-full">
+        <div className="col-span-6 relative w-full h-full z-10">
           
-          {/* ⭐ ETIQUETA "NEW" ⭐ */}
-          {isNuevo && !isTotalAgotado && (
-            <div className="absolute top-1/2 -left-4 sm:-left-7 -translate-y-1/2 z-30 w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none">
-              <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
-                <polygon points="50,0 58,15 74,8 77,24 94,22 91,38 100,48 91,59 95,76 78,77 74,93 58,85 50,100 42,85 26,93 22,77 5,76 9,59 0,48 9,38 6,22 23,24 26,8 42,15" />
-              </svg>
-              <span className="absolute text-white font-black text-[9px] sm:text-xs tracking-tighter uppercase select-none">
-                NEW
-              </span>
-            </div>
-          )}
-
           {/* Contenedor de la Imagen */}
           <div className="relative w-full h-full bg-[#f4f4f4] overflow-hidden rounded-r-[16px] sm:rounded-r-[24px]">
             {(() => {

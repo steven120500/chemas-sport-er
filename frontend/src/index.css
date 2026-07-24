@@ -283,10 +283,3 @@ button:focus-visible {
   animation: spin-slow 10s linear infinite;
 }
 
-
-@media (min-width: 640px) {
-  .desktop-filter-width {
-    width: 1000px !important; /* Cambia este valor a tu gusto (ej. 800px, 900px) */
-    max-width: 90vw !important;
-  }
-}
