@@ -51,6 +51,13 @@ function diffProduct(prev, next) {
     changes.push(`Mundial 2026: ${prevMundial ? 'Sí' : 'No'} → ${nextMundial ? 'Sí' : 'No'}`);
   }
 
+  const prevTemp = Boolean(prev.isTemporada2627);
+  const nextTemp = Boolean(next.isTemporada2627);
+  
+  if (prevTemp !== nextTemp) {
+    changes.push(`Temporada 26-27: ${prevTemp ? 'Sí' : 'No'} → ${nextTemp ? 'Sí' : 'No'}`);
+  }
+
   changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
   changes.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
 
@@ -119,7 +126,8 @@ router.post('/', upload.any(), async (req, res) => {
       images,
       imageSrc,
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
-      isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true
+      isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
+      isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true
     });
 
     await History.create({
@@ -242,6 +250,11 @@ router.put('/:id', async (req, res) => {
       update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     }
 
+    // 🔥 CAPTURA DEL CAMPO TEMPORADA 26-27 🔥
+    if (req.body.isTemporada2627 !== undefined) {
+      update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
+    }
+
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -274,7 +287,7 @@ router.put('/:id', async (req, res) => {
       update.imageSrc = normalized[0]?.url || '';
     }
 
-    // 1. Guardado principal en MongoDB (Lo único que bloquea la respuesta HTTP)
+    // 1. Guardado principal en MongoDB
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
@@ -283,7 +296,7 @@ router.put('/:id', async (req, res) => {
 
     const updatedObj = updated.toObject();
 
-    // ⭐ 2. RESPONDEMOS AL FRONTEND DE INMEDIATO (Eliminando el tiempo de espera) ⭐
+    // ⭐ 2. RESPONDEMOS AL FRONTEND DE INMEDIATO ⭐
     res.status(200).json(updatedObj);
 
     // 3. PROCESO EN SEGUNDO PLANO (Fire & Forget): Historial, Popularidad y WebSockets
@@ -457,8 +470,9 @@ router.get('/', async (req, res) => {
       ]));
     }
 
+    // ⭐ PROYECCIÓN ACTUALIZADA CON isTemporada2627 ⭐
     const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 lockedBy';
+      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
 
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
