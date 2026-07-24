@@ -100,7 +100,7 @@ export default function FilterBar({
       {/* 3. MODAL UBICADO EXACTAMENTE EN EL CENTRO PERO ABAJO */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-end justify-center p-0 sm:pb-8">
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-end p-0 sm:pb-8 pointer-events-none">
             
             {/* Backdrop oscuro con blur */}
             <motion.div
@@ -108,42 +108,24 @@ export default function FilterBar({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
             />
 
-            {/* 
-              👇 AQUÍ PUEDES MODIFICAR EL ANCHO EXCLUSIVAMENTE PARA DESKTOP 
-              - 'w-full' rige para móvil (ocupa todo el ancho abajo).
-              - 'sm:max-w-4xl' rige para computadora.
-            */}
             <motion.div
               initial={{ y: "100%", opacity: 0, scale: 0.95 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: "100%", opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans"
+              className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto"
             >
               <div>
-                {/* Cabecera con título, botón de Borrar condicional y botón de cerrar */}
+                {/* Cabecera con título y botón de cerrar (Ya no necesitamos el botón borrar de arriba) */}
                 <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
-                    
-                    {/* Botón de Borrar Filtros (Aparece solo si hay filtros activos) */}
-                    {hasActiveFilters && (
-                      <button
-                        onClick={handleClearFilters}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-zinc-800 rounded-full text-xs font-bold uppercase transition-none border border-zinc-200"
-                      >
-                        <FaTrashAlt size={10} className="text-zinc-500" />
-                        Borrar
-                      </button>
-                    )}
-                  </div>
-
+                  <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
+                  
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="p-2.5 rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors"
+                    className="p-2.5 rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors cursor-pointer"
                   >
                     <FaTimes size={16} />
                   </button>
@@ -176,7 +158,7 @@ export default function FilterBar({
                               key={cat.label}
                               onClick={() => setFilterType(cat.value)}
                               className={`
-                                flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-none
+                                flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-none cursor-pointer
                                 ${isActive 
                                   ? 'bg-black text-white shadow-sm' 
                                   : 'bg-zinc-50 text-zinc-700 border border-zinc-200'}
@@ -224,7 +206,7 @@ export default function FilterBar({
                                       );
                                     }
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border ${
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
                                       ? "bg-black text-white border-black shadow-sm" 
                                       : "bg-zinc-50 text-zinc-700 border-zinc-200"
@@ -253,7 +235,7 @@ export default function FilterBar({
                                       );
                                     }
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border ${
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
                                       ? "bg-black text-white border-black shadow-sm" 
                                       : "bg-zinc-50 text-zinc-700 border-zinc-200"
@@ -277,7 +259,7 @@ export default function FilterBar({
               <div className="pt-4 border-t border-zinc-100 mt-4">
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm tracking-wider uppercase shadow-xl transition-none"
+                  className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm tracking-wider uppercase shadow-xl transition-none cursor-pointer"
                 >
                   Aplicar filtros
                 </button>
@@ -287,6 +269,28 @@ export default function FilterBar({
           </div>
         )}
       </AnimatePresence>
+
+  
+      <AnimatePresence>
+        {hasActiveFilters && !isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 40, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="fixed sm:bottom-20 bottom-16 left-0 right-0 z-50 flex justify-center items-center pointer-events-none"
+          >
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-2.5 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-[0_10px_25px_-5px_rgba(220,38,38,0.6)] border-2 border-white/30 active:scale-95 transition-transform cursor-pointer pointer-events-auto"
+            >
+              <FaTrashAlt size={10} />
+              <span>Borrar filtros</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

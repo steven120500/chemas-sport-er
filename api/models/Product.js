@@ -103,6 +103,14 @@ const productSchema = new mongoose.Schema(
     },
 
     /* =========================
+       🔥 NUEVO CAMPO PARA TEMPORADA 26-27 🔥
+       ========================= */
+    isTemporada2627: {
+      type: Boolean,
+      default: false
+    },
+
+    /* =========================
        NUEVOS CAMPOS PARA BLOQUEO (CANDADO)
        ========================= */
     lockedBy: { 

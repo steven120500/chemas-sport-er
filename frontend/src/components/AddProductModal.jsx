@@ -80,6 +80,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [isNew, setIsNew] = useState(false);   
   const [hidden, setHidden] = useState(false); 
   const [isMundial2026, setIsMundial2026] = useState(false); 
+  // 🔥 NUEVO ESTADO PARA EL SELLO TEMPORADA 26-27 🔥
+  const [isTemporada2627, setIsTemporada2627] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -185,6 +187,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("isNew", isNew ? "true" : "false");
       formData.append("hidden", hidden ? "true" : "false"); 
       formData.append("isMundial2026", isMundial2026 ? "true" : "false");
+      // 🔥 ENVIAMOS AL BACKEND LA OPCIÓN DE TEMPORADA 26-27 🔥
+      formData.append("isTemporada2627", isTemporada2627 ? "true" : "false");
 
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
@@ -219,8 +223,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
 
-
-      
       {/* 🔥 FONDO DIFUMINADO PREMIUM 🔥 */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
@@ -426,6 +428,16 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                   <input type="checkbox" checked={isMundial2026} onChange={(e) => setIsMundial2026(e.target.checked)} className="sr-only" />
                   <div className={`w-11 h-6 rounded-full transition-colors ${isMundial2026 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
                   <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isMundial2026 ? 'transform translate-x-5' : ''}`}></div>
+                </div>
+              </label>
+
+              {/* 🔥 NUEVO SWITCH: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
+              <label className="flex items-center justify-between cursor-pointer group">
+                <span className="text-sm font-bold text-gray-800 select-none">Temporada 26-27 (Sello)</span>
+                <div className="relative flex items-center">
+                  <input type="checkbox" checked={isTemporada2627} onChange={(e) => setIsTemporada2627(e.target.checked)} className="sr-only" />
+                  <div className={`w-11 h-6 rounded-full transition-colors ${isTemporada2627 ? 'bg-red-600' : 'bg-gray-300'}`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
                 </div>
               </label>
             </div>

@@ -46,6 +46,9 @@ export default function ProductAdminEditor({
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
+  // 🔥 1. NUEVO ESTADO PARA EL SELLO DE TEMPORADA 26-27 🔥
+  const [editedIsTemporada2627, setEditedIsTemporada2627] = useState(product?.isTemporada2627 || false);
+  
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
   const [buyerName, setBuyerName] = useState("");
@@ -132,14 +135,22 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
+      // 🔥 2. SE AGREGÓ isTemporada2627 AL PAYLOAD PARA EL BACKEND 🔥
       const payload = {
-        name: editedName.trim(), price: Math.max(0, parseInt(editedPrice, 10) || 0),
-        discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0), type: editedType.trim(),
-        stock: cleanStock, bodega: cleanBodega,
+        name: editedName.trim(), 
+        price: Math.max(0, parseInt(editedPrice, 10) || 0),
+        discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0), 
+        type: editedType.trim(),
+        stock: cleanStock, 
+        bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
-        imageAlt: editedName.trim(), hidden: editedHidden, isMundial2026: editedIsMundial2026, customerName: clientName,
+        imageAlt: editedName.trim(), 
+        hidden: editedHidden, 
+        isMundial2026: editedIsMundial2026,
+        isTemporada2627: editedIsTemporada2627, 
+        customerName: clientName,
       };
 
       let tiendaModificada = [];
@@ -297,6 +308,19 @@ export default function ProductAdminEditor({
                 <div className="flex flex-col">
                   <span className="text-sm font-black text-gray-800">Torneo: Mundial 2026</span>
                   <span className="text-xs text-gray-400 font-medium">Aparecerá en el filtro especial.</span>
+                </div>
+              </label>
+
+              {/* 🔥 3. NUEVA OPCIÓN EN INTERFAZ: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
+              <label className="flex items-center gap-4 cursor-pointer group">
+                <div className="relative flex items-center">
+                  <input type="checkbox" checked={editedIsTemporada2627} onChange={(e) => setEditedIsTemporada2627(e.target.checked)} className="sr-only" />
+                  <div className={`w-11 h-6 rounded-full transition-colors ${editedIsTemporada2627 ? 'bg-red-600' : 'bg-gray-300'}`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-gray-800">Temporada 26-27 (Sello Rojo)</span>
+                  <span className="text-xs text-gray-400 font-medium">Muestra el sello circular vintage en la chema.</span>
                 </div>
               </label>
             </div>

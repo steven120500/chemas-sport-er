@@ -94,7 +94,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
     >
      {/* 🌟 ETIQUETA "NEW" FLOTANTE (Normal en móvil, más grande en desktop) 🌟 */}
      {isNuevo && !isTotalAgotado && (
-        <div className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 z-50 w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
+        <div className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 z-40 w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
           <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
             <polygon points="50,0 58,15 74,8 77,24 94,22 91,38 100,48 91,59 95,76 78,77 74,93 58,85 50,100 42,85 26,93 22,77 5,76 9,59 0,48 9,38 6,22 23,24 26,8 42,15" />
           </svg>
@@ -169,7 +169,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             </div>
           </div>
 
-          {/* ⭐ BLOQUE CENTRAL IZQUIERDO: TÍTULO Y PRECIO ⭐ */}
+          {/* ⭐ BLOQUE CENTRAL IZQUIERDO: TÍTULO, PRECIO Y SELLO ⭐ */}
           <div className="flex flex-col my-auto py-1.5 sm:py-2">
             
             <h3 className="text-[11px] sm:text-lg font-extrabold text-black uppercase tracking-tight leading-snug line-clamp-3">
@@ -194,6 +194,37 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                 </span>
               )}
             </div>
+
+           {/* 🔥 NUEVO SELLO ROJO CIRCULAR SIN ESTRELLAS (TEMPORADA 26-27) 🔥 */}
+           {product.isTemporada2627 === true && (
+              <div className="mt-3 sm:mt-6 transform -rotate-12 select-none pointer-events-none transition-transform duration-300 group-hover/card:rotate-0 self-start">
+                
+                {/* Contenedor Circular Externo con animación de giro en Hover */}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 sm:border-[3px] border-dashed border-gray-600 bg-[#fef2f2] flex items-center justify-center relative shadow-[0_0_10px_rgba(220,38,38,0.25)] transition-transform duration-700 group-hover/card:rotate-180">
+                  
+                  {/* Anillo Interno Sólido (Le da la vuelta perfecta al texto) */}
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-600 flex flex-col items-center justify-center text-center p-1 bg-white/50">
+                    
+                    {/* Texto TEMP */}
+                    <span className="text-xs sm:text-[11px] font-black tracking-widest text-gray-600 uppercase leading-none">
+                      TEMP
+                    </span>
+
+                    {/* 👇 LÍNEA DIVISORIA 100% CENTRADA CON mx-auto 👇 */}
+                    <div className="w-10 sm:w-18 border-t border-gray-600 my-1.5 sm:my-1.5 mx-auto"></div>
+
+                    {/* Número Central (26-27) */}
+                    <span className="text-xs sm:text-[15px] font-black text-gray-600 tracking-tighter leading-none">
+                      26-27
+                    </span>
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
           </div>
 
           <div className="h-1"></div>
