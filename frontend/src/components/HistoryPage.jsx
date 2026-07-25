@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash } from "react-icons/fa";
+import { FaFilter, FaMinusCircle, FaHistory, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -116,7 +116,6 @@ export default function HistoryPage({ isSuperUser = false }) {
       const finalStore = overrideStore !== undefined ? overrideStore : selectedStore;
       const finalQ = overrideQ !== undefined ? overrideQ : q;
 
-      // Si hay filtros activos, aumentamos el límite hasta 1000 para que el backend mande todo de un solo golpe
       const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalQ.trim());
       const limitVal = activeTab === "history" ? (isFiltering ? "1000" : "30") : "3000";
 
@@ -254,25 +253,7 @@ export default function HistoryPage({ isSuperUser = false }) {
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
-  /* ⭐ FILTRADO EN FRONTEND DE RESPALDO (Por si el backend aún no se ha actualizado) ⭐ */
-  const filteredLogs = useMemo(() => {
-    let result = logs;
-    const term = q.trim().toLowerCase();
-    
-    if (term) {
-      result = result.filter((log) => {
-        const itemText = String(log.item || "").toLowerCase();
-        const detailsText = typeof log.details === "string" ? log.details.toLowerCase() : JSON.stringify(log.details || "").toLowerCase();
-        const userText = String(log.user || "").toLowerCase();
-        
-        return itemText.includes(term) || detailsText.includes(term) || userText.includes(term);
-      });
-    }
-
-    if (selectedUser) result = result.filter((log) => log.user === selectedUser);
-    if (selectedStore) result = result.filter((log) => String(log.details || "").includes(selectedStore));
-    return result;
-  }, [logs, q, selectedUser, selectedStore]);
+  const filteredLogs = logs;
 
   const restasMensuales = useMemo(() => {
     const counts = {};
@@ -303,7 +284,7 @@ export default function HistoryPage({ isSuperUser = false }) {
         
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-gray-500 bg-transparent hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs"
+          className="flex items-center gap-2 text-gray-500 bg-transparent hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs cursor-pointer"
         >
           <FaChevronLeft size={14} /> Volver al catálogo
         </button>
@@ -320,7 +301,7 @@ export default function HistoryPage({ isSuperUser = false }) {
               <button
                 onClick={askClear}
                 disabled={loading || logs.length === 0}
-                className="flex items-center gap-2 px-5 py-3 bg-red-50 border border-red-200 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-40"
+                className="flex items-center gap-2 px-5 py-3 bg-red-50 border border-red-200 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-40 cursor-pointer"
                 title="Eliminar todos los registros"
               >
                 <FaTrash size={12} /> Eliminar Historial
@@ -329,31 +310,69 @@ export default function HistoryPage({ isSuperUser = false }) {
           </div>
 
           <div className="flex bg-gray-100 p-1 rounded-2xl mb-8">
-            <button onClick={() => setActiveTab("history")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === "history" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}><FaHistory /> Historial Detallado</button>
-            <button onClick={() => setActiveTab("count")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === "count" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}><FaMinusCircle /> Conteo Mensual</button>
+            <button onClick={() => setActiveTab("history")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "history" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}><FaHistory /> Historial Detallado</button>
+            <button onClick={() => setActiveTab("count")} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "count" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}><FaMinusCircle /> Conteo Mensual</button>
           </div>
           
           {activeTab === "history" && (
             <div className="animate-fade-in-up">
-              <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col gap-3">
+              <div className="bg-gray-50/80 p-3 sm:p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col gap-3">
                 
-                {/* ⭐ BUSCADOR CORREGIDO CON CONDICIONAL IF PARA EL TECLADO ENTER ⭐ */}
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={q} 
-                    onChange={(e) => setQ(e.target.value)} 
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setPage(1);
-                        fetchLogs(undefined, undefined, undefined, 1);
-                      }
-                    }}
-                    placeholder="Buscar por producto o nombre del cliente..." 
-                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
-                  />
-                  <button onClick={() => { setPage(1); fetchLogs(undefined, undefined, undefined, 1); }} className="px-5 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shrink-0 cursor-pointer shadow-sm">Buscar</button>
-                  <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 rounded-xl border flex items-center justify-center transition-all shrink-0 cursor-pointer ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}><FaFilter size={14} /></button>
+                {/* ⭐ BUSCADOR OPTIMIZADO PARA MÓVIL (INPUT ARRIBA 100%, BOTONES ABAJO EN CELULAR) ⭐ */}
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  
+                  {/* Caja de texto (Ocupa todo el ancho en móvil) */}
+                  <div className="relative w-full">
+                    <input 
+                      type="text" 
+                      value={q} 
+                      onChange={(e) => setQ(e.target.value)} 
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setPage(1);
+                          fetchLogs(undefined, undefined, undefined, 1);
+                        }
+                      }}
+                      placeholder="Buscar por producto o cliente..." 
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                    />
+                    {q.trim() !== "" && (
+  <button
+    type="button"
+    onClick={() => {
+      setQ("");
+      setPage(1);
+      fetchLogs(undefined, undefined, undefined, 1, undefined, undefined, "");
+    }}
+    className="absolute right-3.5 top-2 -translate-y-1/2 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center p-0 shadow-md shrink-0 transition-transform active:scale-90 z-10"
+    title="Limpiar búsqueda"
+  >
+    <FaTimes className="w-3 h-3 text-white shrink-0 block" />
+  </button>
+)}
+                    
+                  </div>
+                  
+                  {/* Botones de acción: Se ponen al lado en PC, y debajo ordenados en Móvil */}
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button 
+                      onClick={() => { setPage(1); fetchLogs(undefined, undefined, undefined, 1); }} 
+                      className="flex-1 sm:flex-none px-6 py-3.5 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shrink-0 cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                      title="Buscar"
+                    >
+                      <FaSearch size={12} />
+                      <span>Buscar</span>
+                    </button>
+
+                    <button 
+                      onClick={() => setShowFilters(!showFilters)} 
+                      className={`px-5 py-3.5 rounded-xl border flex items-center justify-center transition-all shrink-0 cursor-pointer ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}
+                      title="Filtros avanzados"
+                    >
+                      <FaFilter size={13} />
+                    </button>
+                  </div>
+
                 </div>
 
                 {showFilters && (
@@ -364,7 +383,6 @@ export default function HistoryPage({ isSuperUser = false }) {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
                       
-                      {/* ⭐ SELECTORES DE EMPLEADO Y TIENDA ⭐ */}
                       <div className="w-full">
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Empleado (Usuario)</label>
                         <select 
