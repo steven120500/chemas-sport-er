@@ -101,26 +101,37 @@ export default function HistoryPage({ isSuperUser = false }) {
     setSelectedLogs([]);
   }, [page, activeTab, q, startDate, endDate, selectedMonth, selectedUser, selectedStore]);
 
-  const fetchLogs = async (overrideStart, overrideEnd, overrideMonth, overridePage) => {
+  /* ⭐ FETCH MEJORADO: Trae más registros y pasa parámetros al servidor ⭐ */
+  const fetchLogs = async (overrideStart, overrideEnd, overrideMonth, overridePage, overrideUser, overrideStore, overrideQ) => {
     setLoading(true);
     setErrMsg("");
     try {
       const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
       const currentPage = overridePage !== undefined ? overridePage : page;
 
-      const params = new URLSearchParams({
-        page: String(activeTab === "history" ? currentPage : 1),
-        limit: activeTab === "history" ? "30" : "3000",
-        _: String(Date.now()), 
-      });
-
       const finalStart = overrideStart !== undefined ? overrideStart : startDate;
       const finalEnd = overrideEnd !== undefined ? overrideEnd : endDate;
       const finalMonth = overrideMonth !== undefined ? overrideMonth : selectedMonth;
+      const finalUser = overrideUser !== undefined ? overrideUser : selectedUser;
+      const finalStore = overrideStore !== undefined ? overrideStore : selectedStore;
+      const finalQ = overrideQ !== undefined ? overrideQ : q;
+
+      // Si hay filtros activos, aumentamos el límite a 500 para traer todos los de ese empleado/búsqueda juntos
+      const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalQ.trim());
+      const limitVal = activeTab === "history" ? (isFiltering ? "500" : "30") : "3000";
+
+      const params = new URLSearchParams({
+        page: String(activeTab === "history" ? currentPage : 1),
+        limit: limitVal,
+        _: String(Date.now()), 
+      });
 
       if (activeTab === "history") {
         if (finalStart) params.append("startDate", finalStart);
         if (finalEnd) params.append("endDate", finalEnd);
+        if (finalUser) params.append("user", finalUser);
+        if (finalStore) params.append("store", finalStore);
+        if (finalQ.trim()) params.append("q", finalQ.trim());
       } else if (activeTab === "count") {
         if (finalMonth) params.append("month", finalMonth);
       }
@@ -201,7 +212,7 @@ export default function HistoryPage({ isSuperUser = false }) {
 
   const handleClearFilters = () => {
     setStartDate(""); setEndDate(""); setSelectedUser(""); setSelectedStore(""); setQ(""); setPage(1);
-    fetchLogs("", "", undefined, 1); 
+    fetchLogs("", "", undefined, 1, "", "", ""); 
     toastHOT.success("Filtros limpiados.", { duration: 1500 });
   };
 
@@ -243,10 +254,21 @@ export default function HistoryPage({ isSuperUser = false }) {
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
+  /* ⭐ FILTRADO INSTANTÁNEO EN FRONTEND PARA MAYOR SEGURIDAD ⭐ */
   const filteredLogs = useMemo(() => {
     let result = logs;
     const term = q.trim().toLowerCase();
-    if (term) result = result.filter((log) => String(log.item || "").toLowerCase().includes(term));
+    
+    if (term) {
+      result = result.filter((log) => {
+        const itemText = String(log.item || "").toLowerCase();
+        const detailsText = typeof log.details === "string" ? log.details.toLowerCase() : JSON.stringify(log.details || "").toLowerCase();
+        const userText = String(log.user || "").toLowerCase();
+        
+        return itemText.includes(term) || detailsText.includes(term) || userText.includes(term);
+      });
+    }
+
     if (selectedUser) result = result.filter((log) => log.user === selectedUser);
     if (selectedStore) result = result.filter((log) => String(log.details || "").includes(selectedStore));
     return result;
@@ -288,7 +310,6 @@ export default function HistoryPage({ isSuperUser = false }) {
 
         <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 sm:p-8 animate-fade-in-up">
           
-          {/* ⭐ ENCABEZADO CON EL BOTÓN DE BORRAR ESTRICTO PARA SUPER USUARIO ⭐ */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 mt-2">
             <div className="text-center sm:text-left">
               <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 shadow-sm">Administración</span>
@@ -315,9 +336,19 @@ export default function HistoryPage({ isSuperUser = false }) {
           {activeTab === "history" && (
             <div className="animate-fade-in-up">
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col gap-3">
+                
+                {/* ⭐ BUSCADOR INSTANTÁNEO Y CON BOTÓN ENTER ⭐ */}
                 <div className="flex gap-2">
-                  <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto..." className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" />
-                  <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 rounded-xl border flex items-center justify-center transition-all ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}><FaFilter size={14} /></button>
+                  <input 
+                    type="text" 
+                    value={q} 
+                    onChange={(e) => setQ(e.target.value)} 
+                    onKeyDown={(e) => e.key === "Enter" && fetchLogs(undefined, undefined, undefined, 1)}
+                    placeholder="Buscar por producto o nombre del cliente..." 
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                  />
+                  <button onClick={() => fetchLogs(undefined, undefined, undefined, 1)} className="px-5 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shrink-0">Buscar</button>
+                  <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 rounded-xl border flex items-center justify-center transition-all shrink-0 ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}><FaFilter size={14} /></button>
                 </div>
 
                 {showFilters && (
@@ -327,11 +358,45 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <div className="w-full"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Hasta Fecha</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer" /></div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="w-full"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Usuario</label><select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"><option value="">Todos</option>{uniqueUsers.map((u) => (<option key={u} value={u}>{u}</option>))}</select></div>
-                      <div className="w-full"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tienda</label><select value={selectedStore} onChange={(e) => setSelectedStore(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"><option value="">Todas</option><option value="Tienda #1">Tienda #1</option><option value="Tienda #2">Tienda #2</option></select></div>
+                      
+                      {/* ⭐ SELECTOR DE EMPLEADO QUE ACTUALIZA AL INSTANTE ⭐ */}
+                      <div className="w-full">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Empleado (Usuario)</label>
+                        <select 
+                          value={selectedUser} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedUser(val);
+                            setPage(1);
+                            fetchLogs(undefined, undefined, undefined, 1, val);
+                          }} 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Todos los empleados</option>
+                          {uniqueUsers.map((u) => (<option key={u} value={u}>{u}</option>))}
+                        </select>
+                      </div>
+
+                      <div className="w-full">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tienda</label>
+                        <select 
+                          value={selectedStore} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedStore(val);
+                            setPage(1);
+                            fetchLogs(undefined, undefined, undefined, 1, undefined, val);
+                          }} 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Todas</option>
+                          <option value="Tienda #1">Tienda #1</option>
+                          <option value="Tienda #2">Tienda #2</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                      <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md">Buscar Fechas</button>
+                      <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md">Aplicar Filtros</button>
                       <button onClick={handleClearFilters} className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors">Limpiar</button>
                     </div>
                   </div>
@@ -343,7 +408,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                 {!loading && errMsg && <p className="text-red-500 font-bold text-center py-6 text-sm">{errMsg}</p>}
 
                 {!loading && !errMsg && filteredLogs.length === 0 && (
-                  <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-gray-500 font-bold uppercase tracking-wide text-xs">No hay cambios registrados.</p></div>
+                  <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100"><p className="text-gray-500 font-bold uppercase tracking-wide text-xs">No hay cambios registrados con estos criterios.</p></div>
                 )}
 
                 {!loading && !errMsg && filteredLogs.length > 0 && (
