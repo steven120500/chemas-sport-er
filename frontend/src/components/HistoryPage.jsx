@@ -101,7 +101,7 @@ export default function HistoryPage({ isSuperUser = false }) {
     setSelectedLogs([]);
   }, [page, activeTab, q, startDate, endDate, selectedMonth, selectedUser, selectedStore]);
 
-  /* ⭐ FETCH MEJORADO: Trae más registros y pasa parámetros al servidor ⭐ */
+  /* ⭐ FETCH POTENCIADO: Envía todos los filtros al backend y aumenta el límite cuando buscas ⭐ */
   const fetchLogs = async (overrideStart, overrideEnd, overrideMonth, overridePage, overrideUser, overrideStore, overrideQ) => {
     setLoading(true);
     setErrMsg("");
@@ -116,9 +116,9 @@ export default function HistoryPage({ isSuperUser = false }) {
       const finalStore = overrideStore !== undefined ? overrideStore : selectedStore;
       const finalQ = overrideQ !== undefined ? overrideQ : q;
 
-      // Si hay filtros activos, aumentamos el límite a 500 para traer todos los de ese empleado/búsqueda juntos
+      // Si hay filtros activos, aumentamos el límite hasta 1000 para que el backend mande todo de un solo golpe
       const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalQ.trim());
-      const limitVal = activeTab === "history" ? (isFiltering ? "500" : "30") : "3000";
+      const limitVal = activeTab === "history" ? (isFiltering ? "1000" : "30") : "3000";
 
       const params = new URLSearchParams({
         page: String(activeTab === "history" ? currentPage : 1),
@@ -254,7 +254,7 @@ export default function HistoryPage({ isSuperUser = false }) {
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
-  /* ⭐ FILTRADO INSTANTÁNEO EN FRONTEND PARA MAYOR SEGURIDAD ⭐ */
+  /* ⭐ FILTRADO EN FRONTEND DE RESPALDO (Por si el backend aún no se ha actualizado) ⭐ */
   const filteredLogs = useMemo(() => {
     let result = logs;
     const term = q.trim().toLowerCase();
@@ -337,18 +337,23 @@ export default function HistoryPage({ isSuperUser = false }) {
             <div className="animate-fade-in-up">
               <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col gap-3">
                 
-                {/* ⭐ BUSCADOR INSTANTÁNEO Y CON BOTÓN ENTER ⭐ */}
+                {/* ⭐ BUSCADOR CORREGIDO CON CONDICIONAL IF PARA EL TECLADO ENTER ⭐ */}
                 <div className="flex gap-2">
                   <input 
                     type="text" 
                     value={q} 
                     onChange={(e) => setQ(e.target.value)} 
-                    onKeyDown={(e) => e.key === "Enter" && fetchLogs(undefined, undefined, undefined, 1)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setPage(1);
+                        fetchLogs(undefined, undefined, undefined, 1);
+                      }
+                    }}
                     placeholder="Buscar por producto o nombre del cliente..." 
                     className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
                   />
-                  <button onClick={() => fetchLogs(undefined, undefined, undefined, 1)} className="px-5 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shrink-0">Buscar</button>
-                  <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 rounded-xl border flex items-center justify-center transition-all shrink-0 ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}><FaFilter size={14} /></button>
+                  <button onClick={() => { setPage(1); fetchLogs(undefined, undefined, undefined, 1); }} className="px-5 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shrink-0 cursor-pointer shadow-sm">Buscar</button>
+                  <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 rounded-xl border flex items-center justify-center transition-all shrink-0 cursor-pointer ${showFilters ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}><FaFilter size={14} /></button>
                 </div>
 
                 {showFilters && (
@@ -359,17 +364,12 @@ export default function HistoryPage({ isSuperUser = false }) {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
                       
-                      {/* ⭐ SELECTOR DE EMPLEADO QUE ACTUALIZA AL INSTANTE ⭐ */}
+                      {/* ⭐ SELECTORES DE EMPLEADO Y TIENDA ⭐ */}
                       <div className="w-full">
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Empleado (Usuario)</label>
                         <select 
                           value={selectedUser} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSelectedUser(val);
-                            setPage(1);
-                            fetchLogs(undefined, undefined, undefined, 1, val);
-                          }} 
+                          onChange={(e) => setSelectedUser(e.target.value)} 
                           className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
                         >
                           <option value="">Todos los empleados</option>
@@ -381,12 +381,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tienda</label>
                         <select 
                           value={selectedStore} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSelectedStore(val);
-                            setPage(1);
-                            fetchLogs(undefined, undefined, undefined, 1, undefined, val);
-                          }} 
+                          onChange={(e) => setSelectedStore(e.target.value)} 
                           className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
                         >
                           <option value="">Todas</option>
@@ -396,8 +391,8 @@ export default function HistoryPage({ isSuperUser = false }) {
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                      <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md">Aplicar Filtros</button>
-                      <button onClick={handleClearFilters} className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors">Limpiar</button>
+                      <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md cursor-pointer">Aplicar Filtros</button>
+                      <button onClick={handleClearFilters} className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors cursor-pointer">Limpiar</button>
                     </div>
                   </div>
                 )}
@@ -471,9 +466,9 @@ export default function HistoryPage({ isSuperUser = false }) {
 
                 {!loading && totalPages > 1 && (
                   <div className="flex items-center justify-center gap-4 mt-8 pt-6 border-t border-gray-100">
-                    <button onClick={handlePrevPage} disabled={page === 1} className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-2"><FaChevronLeft /> Anterior</button>
+                    <button onClick={handlePrevPage} disabled={page === 1} className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-2 cursor-pointer"><FaChevronLeft /> Anterior</button>
                     <span className="text-xs font-bold text-gray-500">Pág {page} de {totalPages}</span>
-                    <button onClick={handleNextPage} disabled={page === totalPages} className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-2">Siguiente <FaChevronRight /></button>
+                    <button onClick={handleNextPage} disabled={page === totalPages} className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-bold disabled:opacity-30 flex items-center gap-2 cursor-pointer">Siguiente <FaChevronRight /></button>
                   </div>
                 )}
 
@@ -487,7 +482,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                  <div className="text-xs font-black text-gray-400 uppercase tracking-widest text-center sm:text-left w-full sm:w-auto">Seleccionar Mes:</div>
                  <div className="flex gap-3 w-full sm:w-auto">
                      <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="flex-1 sm:flex-none bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer" />
-                     <button onClick={() => fetchLogs()} className="bg-black text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md whitespace-nowrap">Buscar</button>
+                     <button onClick={() => fetchLogs()} className="bg-black text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md whitespace-nowrap cursor-pointer">Buscar</button>
                  </div>
               </div>
               {loading ? ( <p className="text-gray-400 font-bold text-center py-8 uppercase tracking-widest text-xs">Calculando restas mensuales...</p> ) : (
@@ -515,7 +510,7 @@ export default function HistoryPage({ isSuperUser = false }) {
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-up">
            <button 
                 onClick={handleCopyMultiple} 
-                className="bg-black text-white px-8 py-5 rounded-full shadow-2xl font-black uppercase tracking-widest text-sm flex items-center gap-3 hover:scale-105 transition-transform"
+                className="bg-black text-white px-8 py-5 rounded-full shadow-2xl font-black uppercase tracking-widest text-sm flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer"
            >
               JUNTAR Y COPIAR ({selectedLogs.length})
            </button>

@@ -7,6 +7,7 @@ const categories = [
   { label: "Nuevo", value: "Nuevo" },         
   { label: "Nacional", value: "Nacional" },
   { label: "Mundial 2026", value: "Mundial 2026" }, 
+  { label: "Temp 26-27", value: "Temp 26-27" }, 
   { label: "Populares", value: "Populares" }, 
   { label: "Ofertas", value: "Ofertas" },     
   { label: "Player", value: "Player" },
@@ -119,7 +120,7 @@ export default function FilterBar({
               className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto"
             >
               <div>
-                {/* Cabecera con título y botón de cerrar (Ya no necesitamos el botón borrar de arriba) */}
+                {/* Cabecera con título y botón de cerrar */}
                 <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-6">
                   <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
                   

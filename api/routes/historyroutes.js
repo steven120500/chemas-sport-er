@@ -15,56 +15,62 @@ router.get('/', async (req, res) => {
     const endDate   = (req.query.endDate || '').trim();
     const month     = (req.query.month || '').trim();
 
-    // Si hay un filtro activo (como el nombre del cliente o un usuario),
-    // permitimos que el límite suba hasta 1000 para traer todos los datos juntos.
+    // Si hay un filtro activo, permitimos que el límite suba hasta 1000
     const isFiltering = Boolean(q || userParam || store || startDate || endDate || month);
     const defaultLimit = isFiltering ? 1000 : 30;
     const limit = Math.min(Math.max(parseInt(req.query.limit || String(defaultLimit), 10), 1), 3000);
 
-    const find = {};
+    // 🔥 USAMOS UN ARREGLO $and PARA QUE NINGÚN FILTRO CHOQUE CON OTRO 🔥
+    const andConditions = [];
 
     /* ⭐ 1. BUSCADOR INTEGRAL (Camiseta, Cliente, Acción o Vendedor) ⭐ */
     if (q) {
-      find.$or = [
-        { item: { $regex: q, $options: 'i' } },
-        { details: { $regex: q, $options: 'i' } }, // 👈 AQUÍ ENCUENTRA AL CLIENTE
-        { action: { $regex: q, $options: 'i' } },
-        { user: { $regex: q, $options: 'i' } }
-      ];
+      andConditions.push({
+        $or: [
+          { item: { $regex: q, $options: 'i' } },
+          { details: { $regex: q, $options: 'i' } }, // 👈 ENCUENTRA AL CLIENTE AQUÍ
+          { action: { $regex: q, $options: 'i' } },
+          { user: { $regex: q, $options: 'i' } }
+        ]
+      });
     }
 
     /* ⭐ 2. FILTRO POR EMPLEADO (USUARIO) ⭐ */
     if (userParam) {
-      find.user = userParam;
+      andConditions.push({ user: userParam });
     }
 
     /* ⭐ 3. FILTRO POR TIENDA ⭐ */
     if (store) {
-      find.details = { $regex: store, $options: 'i' };
+      andConditions.push({ details: { $regex: store, $options: 'i' } });
     }
 
     /* ⭐ 4. FILTRO POR FECHAS O MES ⭐ */
     if (startDate || endDate) {
-      find.date = {};
+      const dateQuery = {};
       if (startDate) {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
-        find.date.$gte = start;
+        dateQuery.$gte = start;
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        find.date.$lte = end;
+        dateQuery.$lte = end;
       }
+      andConditions.push({ date: dateQuery });
     } else if (month) {
       // Formato esperado: YYYY-MM (ej: 2026-07)
       const [y, m] = month.split('-').map(Number);
       if (y && m) {
         const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
         const end = new Date(y, m, 0, 23, 59, 59, 999);
-        find.date = { $gte: start, $lte: end };
+        andConditions.push({ date: { $gte: start, $lte: end } });
       }
     }
+
+    // Construimos la consulta final limpiamente
+    const find = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const [items, total] = await Promise.all([
       History.find(find)

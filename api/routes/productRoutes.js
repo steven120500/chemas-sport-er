@@ -449,6 +449,10 @@ router.get('/', async (req, res) => {
     else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     }
+    // 🔥 FILTRO AÑADIDO PARA LA TEMPORADA 26-27 🔥
+    else if (type === 'Temp 26-27') {
+      find.isTemporada2627 = true;
+    }
     else if (type) {
       find.type = type;
     }
