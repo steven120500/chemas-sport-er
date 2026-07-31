@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaSlidersH, FaTimes, FaCheck, FaChevronDown, FaTrashAlt } from "react-icons/fa";
 
@@ -45,36 +45,62 @@ export default function FilterBar({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState(""); 
+  
+  // Estado local para que el teclado escriba fluido
+  const [localSearch, setLocalSearch] = useState(searchTerm || "");
 
   // Detecta si hay algún filtro activo (categoría distinta de vacío o tallas seleccionadas)
   const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0);
+
+  // ⭐ MOTOR ULTRA RÁPIDO ESTILO FUTSTORE (150ms) ⭐
+  useEffect(() => {
+    if (localSearch.trim() === "") {
+      if (searchTerm !== "") setSearchTerm(""); 
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setSearchTerm(localSearch.trim());
+    }, 150); 
+
+    return () => clearTimeout(timeout);
+  }, [localSearch, searchTerm, setSearchTerm]);
+
+  // Sincronización externa (por si se limpia desde afuera)
+  useEffect(() => {
+    if (searchTerm === "") {
+      setLocalSearch("");
+    }
+  }, [searchTerm]);
 
   // Función para limpiar los filtros
   const handleClearFilters = () => {
     if (setFilterType) setFilterType("");
     if (setFilterSizes) setFilterSizes([]);
+    setLocalSearch("");
+    setSearchTerm("");
   };
 
   return (
     <div className="w-full flex flex-col gap-4 pt-3 mb-6 mt-4 px-4 max-w-4xl mx-auto">
       
-      {/* 1. BARRA DE BÚSQUEDA INSTANTÁNEA */}
+      {/* 1. BARRA DE BÚSQUEDA SÚPER LIMPIA Y RÁPIDA */}
       <motion.div
         className="w-full flex justify-center"
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <div className="relative w-full max-w-md">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="relative w-full max-w-md group">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-black transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
             placeholder="Buscar camiseta..."
-            className="w-full pl-11 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-sm text-black"
           />
         </div>
       </motion.div>
@@ -98,12 +124,11 @@ export default function FilterBar({
         </button>
       </motion.div>
 
-      {/* 3. MODAL UBICADO EXACTAMENTE EN EL CENTRO PERO ABAJO */}
+      {/* 3. MODAL DE FILTROS */}
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-end p-0 sm:pb-8 pointer-events-none">
             
-            {/* Backdrop oscuro con blur */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -120,10 +145,8 @@ export default function FilterBar({
               className="relative w-full sm:max-w-4xl bg-white rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-2xl p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto"
             >
               <div>
-                {/* Cabecera con título y botón de cerrar */}
                 <div className="flex items-center justify-between border-b border-zinc-100 pb-4 mb-6">
                   <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
-                  
                   <button
                     onClick={() => setIsOpen(false)}
                     className="p-2.5 rounded-full bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors cursor-pointer"
@@ -132,10 +155,8 @@ export default function FilterBar({
                   </button>
                 </div>
 
-                {/* Acordeones limpios */}
                 <div className="flex flex-col divide-y divide-zinc-100">
-                  
-                  {/* Acordeón de Versión / Categoría */}
+                  {/* Acordeón Categoría */}
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
@@ -174,7 +195,7 @@ export default function FilterBar({
                     )}
                   </div>
 
-                  {/* Acordeón de Talla */}
+                  {/* Acordeón Talla */}
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "talla" ? "" : "talla")}
@@ -191,7 +212,6 @@ export default function FilterBar({
                         exit={{ opacity: 0, height: 0 }}
                         className="flex flex-col gap-4 pt-3 pb-2"
                       >
-                        {/* Tallas Adulto */}
                         <div>
                           <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Adulto</p>
                           <div className="flex flex-wrap gap-1.5">
@@ -220,7 +240,6 @@ export default function FilterBar({
                           </div>
                         </div>
 
-                        {/* Tallas Niño */}
                         <div>
                           <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Niño</p>
                           <div className="flex flex-wrap gap-1.5">
@@ -248,15 +267,12 @@ export default function FilterBar({
                             })}
                           </div>
                         </div>
-
                       </motion.div>
                     )}
                   </div>
-
                 </div>
               </div>
 
-              {/* Botón Inferior Fijo de Aplicar */}
               <div className="pt-4 border-t border-zinc-100 mt-4">
                 <button
                   onClick={() => setIsOpen(false)}
@@ -271,9 +287,8 @@ export default function FilterBar({
         )}
       </AnimatePresence>
 
-  
       <AnimatePresence>
-        {hasActiveFilters && !isOpen && (
+        {(hasActiveFilters || localSearch.trim() !== "") && !isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 40, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
