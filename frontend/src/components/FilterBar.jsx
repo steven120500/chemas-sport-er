@@ -58,7 +58,7 @@ export default function FilterBar({
   return (
     <div className="w-full flex flex-col gap-4 pt-3 mb-6 mt-4 px-4 max-w-4xl mx-auto">
       
-      {/* 1. BARRA DE BÚSQUEDA */}
+      {/* 1. BARRA DE BÚSQUEDA INSTANTÁNEA */}
       <motion.div
         className="w-full flex justify-center"
         initial={{ opacity: 0, y: -6 }}
@@ -91,7 +91,7 @@ export default function FilterBar({
             setIsOpen(true);
             onToggleTallas?.();
           }}
-          className="flex items-center gap-2.5 px-6 py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95"
+          className="flex items-center gap-2.5 px-6 py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95 cursor-pointer"
         >
           <FaSlidersH className="text-xs text-zinc-400" />
           Filtrar

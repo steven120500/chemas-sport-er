@@ -45,7 +45,11 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  if (loadingProducts && !products.length) return <LoadingOverlay message="Cargando producto..." />;
+  if (loadingProducts && !products.length) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+    </div>
+  );
   if (!loadingProducts && !product) return <Navigate to="/" replace />;
   if (!product) return null;
 
@@ -91,6 +95,10 @@ function MainApp() {
 
   const navigate = useNavigate();
 
+  // ⭐ REF PARA CANCELAR PETICIONES VIEJAS Y ACELERAR EL BUSCADOR ⭐
+  const abortControllerRef = useRef(null);
+  const pageTopRef = useRef(null);
+
   const anyModalOpen =
     showAddModal ||
     showLogin ||
@@ -131,6 +139,14 @@ function MainApp() {
       user?.roles?.includes("delete");
 
     setLoading(true);
+
+    // ⭐ SI EL USUARIO SIGUE ESCRIBIENDO, CANCELAMOS LA PETICIÓN ANTERIOR ⭐
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     try {
       const params = new URLSearchParams({
         page: String(p),
@@ -147,9 +163,8 @@ function MainApp() {
       }
 
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
-        headers: {
-          "x-admin": isAdmin ? "true" : "false"
-        }
+        headers: { "x-admin": isAdmin ? "true" : "false" },
+        signal // Adjuntamos la señal de cancelación
       });
 
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -158,11 +173,18 @@ function MainApp() {
       setProducts(json.items);
       setTotal(json.total);
       setPage(json.page);
-    } catch {
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        // La petición fue cancelada porque el usuario escribió otra letra rápido, no hacemos nada.
+        return;
+      }
       setProducts([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      // Solo quitamos el loading si esta fue la última petición válida
+      if (!signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -192,8 +214,6 @@ function MainApp() {
       setAllProductsForCounts([]);
     }
   };
-
-  const pageTopRef = useRef(null);
   
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
@@ -258,10 +278,17 @@ function MainApp() {
   ];
   const tallasBalon = ['3', '4', '5']; 
 
+  const removeAccents = (str) => {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  };
+
   const filteredProducts = products.filter((product) => {
     if (!canEdit && product.hidden === true) return false;
 
-    const matchName = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = removeAccents(searchTerm.toLowerCase());
+    const normalizedProductName = removeAccents(product.name.toLowerCase());
+    
+    const matchName = normalizedProductName.includes(normalizedSearch);
     if (!matchName) return false;
 
     if (!filterType || filterType === 'Todos') return true;
@@ -270,8 +297,6 @@ function MainApp() {
     if (filterType === 'Populares') return product.isPopular === true;
     if (filterType === 'Nuevo') return true; 
     if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
-    
-    // ⭐ FILTRO AGREGADO PARA TEMPORADA 26-27 ⭐
     if (filterType === 'Temp 26-27') return product.isTemporada2627 === true;
 
     if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
@@ -362,8 +387,6 @@ function MainApp() {
 
             <Route path="/" element={
               <>
-                {loading && <LoadingOverlay message="Cargando productos..." />}
-
                 {!loading && allProductsForCounts?.length > 0 && (
                 <Cantidad products={allProductsForCounts} isSuperUser={isSuperUser} />
                 )}
@@ -379,8 +402,9 @@ function MainApp() {
                 )}
 
                 <Bienvenido onNavigate={(type) => {
-                setFilterType(type);
-                setPage(1);
+                  setFilterType(type);
+                  setLoading(true);
+                  setPage(1);
                 }} />
 
                 <div ref={pageTopRef} />
@@ -393,7 +417,7 @@ function MainApp() {
                     </span>
                     <div className="flex gap-2">
                         <button
-                        onClick={() => { setStoreView('todos'); setPage(1); }}
+                        onClick={() => { setStoreView('todos'); setLoading(true); setPage(1); }}
                         className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'todos' 
                             ? 'bg-black text-white border-black shadow-md' 
@@ -403,7 +427,7 @@ function MainApp() {
                         Todas
                         </button>
                         <button
-                        onClick={() => { setStoreView('tienda1'); setPage(1); }}
+                        onClick={() => { setStoreView('tienda1'); setLoading(true); setPage(1); }}
                         className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'tienda1' 
                             ? 'bg-black text-white border-black shadow-md' 
@@ -413,7 +437,7 @@ function MainApp() {
                         Tienda #1
                         </button>
                         <button
-                        onClick={() => { setStoreView('tienda2'); setPage(1); }}
+                        onClick={() => { setStoreView('tienda2'); setLoading(true); setPage(1); }}
                         className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'tienda2' 
                             ? 'bg-black text-white border-black shadow-md' 
@@ -426,14 +450,32 @@ function MainApp() {
                     </div>
                 </div>
                 )}
-<FilterBar
-  searchTerm={searchTerm}
-  setSearchTerm={setSearchTerm}
-  filterType={filterType}
-  setFilterType={(t) => { setFilterType(t); setPage(1); }}
-  filterSizes={filterSizes}
-  setFilterSizes={(sizes) => { setFilterSizes(sizes); setPage(1); }}
-/>
+                
+                {/* ⭐ LOS FILTROS ACTIVAN EL LOADING INMEDIATAMENTE PARA MOSTRAR EL SKELETON ⭐ */}
+                <FilterBar
+                  searchTerm={searchTerm}
+                  setSearchTerm={(val) => {
+                    if (val !== searchTerm) {
+                      setSearchTerm(val);
+                      setLoading(true);
+                      setPage(1);
+                    }
+                  }}
+                  filterType={filterType}
+                  setFilterType={(t) => { 
+                    if (t !== filterType) {
+                      setFilterType(t); 
+                      setLoading(true); 
+                      setPage(1); 
+                    }
+                  }}
+                  filterSizes={filterSizes}
+                  setFilterSizes={(sizes) => { 
+                    setFilterSizes(sizes); 
+                    setLoading(true); 
+                    setPage(1); 
+                  }}
+                />
                 
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
                   <AnimatePresence>
@@ -532,7 +574,16 @@ function MainApp() {
 
                 <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
                   <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {filteredProducts.length > 0 ? (
+                  {loading ? (
+                    /* 🔥 EFECTO SKELETON (CARGA INLINE) MOSTRADO INMEDIATAMENTE 🔥 */
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-4 rounded-3xl border border-gray-100">
+                        <div className="w-full h-[350px] bg-gray-200 rounded-2xl"></div>
+                        <div className="w-3/4 h-5 bg-gray-200 rounded-full mt-2"></div>
+                        <div className="w-1/2 h-5 bg-gray-200 rounded-full"></div>
+                      </div>
+                    ))
+                  ) : filteredProducts.length > 0 ? (
                       filteredProducts.map((product, index) => (
                       <ProductCard
                           key={getPid(product)}
@@ -554,7 +605,7 @@ function MainApp() {
                   </div>
                 </div>
 
-                {pages > 1 && (
+                {pages > 1 && !loading && (
                 <div className="mt-12 mb-12 flex flex-col items-center gap-3">
                     <nav className="flex items-center justify-center gap-2">
                     <button
