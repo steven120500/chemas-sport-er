@@ -509,4 +509,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+/* ================= OBTENER UN PRODUCTO POR ID DIRECTO ================= */
+router.get('/:id', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id).lean();
+    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener producto' });
+  }
+});
+
 export default router;

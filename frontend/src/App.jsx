@@ -37,26 +37,53 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
+// ⭐ ACTUALIZACIÓN: PRODUCT DETAIL WRAPPER MEJORADO PARA LINKS DIRECTOS ⭐
 function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
   const { id } = useParams();
-  const product = products.find(p => getPid(p) === id);
+  const [localProduct, setLocalProduct] = useState(null);
+  const [isFetchingId, setIsFetchingId] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+    
+    // 1. Primero busca si el producto ya cargó en la lista de la pantalla (Navegación normal)
+    const found = products.find(p => getPid(p) === id);
+    if (found) {
+      setLocalProduct(found);
+      setIsFetchingId(false);
+    } else {
+      // 2. Si el cliente entró por link directo y no está en la página actual, lo pide al servidor
+      fetch(`${API_BASE}/api/products/${id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("No encontrado");
+          return res.json();
+        })
+        .then(data => {
+          setLocalProduct(data);
+          setIsFetchingId(false);
+        })
+        .catch(() => {
+          setError(true);
+          setIsFetchingId(false);
+        });
+    }
+  }, [id, products]);
 
-  if (loadingProducts && !products.length) return (
+  // Pantalla de carga mientras trae el producto
+  if (loadingProducts || isFetchingId) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
     </div>
   );
-  if (!loadingProducts && !product) return <Navigate to="/" replace />;
-  if (!product) return null;
+  
+  // Solo lo expulsa al inicio si de verdad hubo error o el ID no existe en MongoDB
+  if (error || (!isFetchingId && !localProduct)) return <Navigate to="/" replace />;
 
   return (
     <ProductScreen
-      key={`${getPid(product)}-${product.updatedAt || ''}`}
-      product={product}
+      key={`${getPid(localProduct)}-${localProduct.updatedAt || ''}`}
+      product={localProduct}
       onClose={onClose}
       onUpdate={onUpdate}
       canEdit={canEdit}
