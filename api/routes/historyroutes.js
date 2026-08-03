@@ -11,12 +11,13 @@ router.get('/', async (req, res) => {
     const q         = (req.query.q || '').trim();
     const userParam = (req.query.user || '').trim();
     const store     = (req.query.store || '').trim();
+    const type      = (req.query.type || '').trim(); // ⭐ AQUÍ EXTRAEMOS EL TIPO
     const startDate = (req.query.startDate || '').trim();
     const endDate   = (req.query.endDate || '').trim();
     const month     = (req.query.month || '').trim();
 
     // Si hay un filtro activo, permitimos que el límite suba hasta 1000
-    const isFiltering = Boolean(q || userParam || store || startDate || endDate || month);
+    const isFiltering = Boolean(q || userParam || store || type || startDate || endDate || month);
     const defaultLimit = isFiltering ? 1000 : 30;
     const limit = Math.min(Math.max(parseInt(req.query.limit || String(defaultLimit), 10), 1), 3000);
 
@@ -45,7 +46,13 @@ router.get('/', async (req, res) => {
       andConditions.push({ details: { $regex: store, $options: 'i' } });
     }
 
-    /* ⭐ 4. FILTRO POR FECHAS O MES ⭐ */
+    /* ⭐ 4. FILTRO POR TIPO DE ARTÍCULO ⭐ */
+    if (type) {
+      // Busca exactamente "(Tipo)" dentro del nombre del ítem (ej: "(Player)", "(Niño)")
+      andConditions.push({ item: { $regex: `\\(${type}\\)`, $options: 'i' } });
+    }
+
+    /* ⭐ 5. FILTRO POR FECHAS O MES ⭐ */
     if (startDate || endDate) {
       const dateQuery = {};
       if (startDate) {

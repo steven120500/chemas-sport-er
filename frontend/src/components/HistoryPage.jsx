@@ -78,6 +78,7 @@ export default function HistoryPage({ isSuperUser = false }) {
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal()); 
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedStore, setSelectedStore] = useState("");
+  const [selectedType, setSelectedType] = useState(""); // Nuevo estado para Tipo
   const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -99,10 +100,10 @@ export default function HistoryPage({ isSuperUser = false }) {
 
   useEffect(() => {
     setSelectedLogs([]);
-  }, [page, activeTab, q, startDate, endDate, selectedMonth, selectedUser, selectedStore]);
+  }, [page, activeTab, q, startDate, endDate, selectedMonth, selectedUser, selectedStore, selectedType]);
 
   /* ⭐ FETCH POTENCIADO: Envía todos los filtros al backend y aumenta el límite cuando buscas ⭐ */
-  const fetchLogs = async (overrideStart, overrideEnd, overrideMonth, overridePage, overrideUser, overrideStore, overrideQ) => {
+  const fetchLogs = async (overrideStart, overrideEnd, overrideMonth, overridePage, overrideUser, overrideStore, overrideQ, overrideType) => {
     setLoading(true);
     setErrMsg("");
     try {
@@ -114,9 +115,10 @@ export default function HistoryPage({ isSuperUser = false }) {
       const finalMonth = overrideMonth !== undefined ? overrideMonth : selectedMonth;
       const finalUser = overrideUser !== undefined ? overrideUser : selectedUser;
       const finalStore = overrideStore !== undefined ? overrideStore : selectedStore;
+      const finalType = overrideType !== undefined ? overrideType : selectedType;
       const finalQ = overrideQ !== undefined ? overrideQ : q;
 
-      const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalQ.trim());
+      const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalType || finalQ.trim());
       const limitVal = activeTab === "history" ? (isFiltering ? "1000" : "30") : "3000";
 
       const params = new URLSearchParams({
@@ -130,6 +132,7 @@ export default function HistoryPage({ isSuperUser = false }) {
         if (finalEnd) params.append("endDate", finalEnd);
         if (finalUser) params.append("user", finalUser);
         if (finalStore) params.append("store", finalStore);
+        if (finalType) params.append("type", finalType); // Filtro tipo enviado a la API
         if (finalQ.trim()) params.append("q", finalQ.trim());
       } else if (activeTab === "count") {
         if (finalMonth) params.append("month", finalMonth);
@@ -210,8 +213,8 @@ export default function HistoryPage({ isSuperUser = false }) {
   }
 
   const handleClearFilters = () => {
-    setStartDate(""); setEndDate(""); setSelectedUser(""); setSelectedStore(""); setQ(""); setPage(1);
-    fetchLogs("", "", undefined, 1, "", "", ""); 
+    setStartDate(""); setEndDate(""); setSelectedUser(""); setSelectedStore(""); setSelectedType(""); setQ(""); setPage(1);
+    fetchLogs("", "", undefined, 1, "", "", "", ""); 
     toastHOT.success("Filtros limpiados.", { duration: 1500 });
   };
 
@@ -318,10 +321,9 @@ export default function HistoryPage({ isSuperUser = false }) {
             <div className="animate-fade-in-up">
               <div className="bg-gray-50/80 p-3 sm:p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col gap-3">
                 
-                {/* ⭐ BUSCADOR OPTIMIZADO PARA MÓVIL (INPUT ARRIBA 100%, BOTONES ABAJO EN CELULAR) ⭐ */}
+                {/* ⭐ BUSCADOR OPTIMIZADO PARA MÓVIL ⭐ */}
                 <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                   
-                  {/* Caja de texto (Ocupa todo el ancho en móvil) */}
                   <div className="relative w-full">
                     <input 
                       type="text" 
@@ -337,23 +339,21 @@ export default function HistoryPage({ isSuperUser = false }) {
                       className="w-full bg-white border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
                     />
                     {q.trim() !== "" && (
-  <button
-    type="button"
-    onClick={() => {
-      setQ("");
-      setPage(1);
-      fetchLogs(undefined, undefined, undefined, 1, undefined, undefined, "");
-    }}
-    className="absolute right-3.5 top-2 -translate-y-1/2 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center p-0 shadow-md shrink-0 transition-transform active:scale-90 z-10"
-    title="Limpiar búsqueda"
-  >
-    <FaTimes className="w-3 h-3 text-white shrink-0 block" />
-  </button>
-)}
-                    
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQ("");
+                          setPage(1);
+                          fetchLogs(undefined, undefined, undefined, 1, undefined, undefined, "");
+                        }}
+                        className="absolute right-3.5 top-2 -translate-y-1/2 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center p-0 shadow-md shrink-0 transition-transform active:scale-90 z-10"
+                        title="Limpiar búsqueda"
+                      >
+                        <FaTimes className="w-3 h-3 text-white shrink-0 block" />
+                      </button>
+                    )}
                   </div>
                   
-                  {/* Botones de acción: Se ponen al lado en PC, y debajo ordenados en Móvil */}
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button 
                       onClick={() => { setPage(1); fetchLogs(undefined, undefined, undefined, 1); }} 
@@ -381,6 +381,8 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <div className="w-full"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Desde Fecha</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer" /></div>
                         <div className="w-full"><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Hasta Fecha</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer" /></div>
                     </div>
+                    
+                    {/* FILAS DE SELECTORES */}
                     <div className="flex flex-col sm:flex-row gap-3">
                       
                       <div className="w-full">
@@ -407,7 +409,31 @@ export default function HistoryPage({ isSuperUser = false }) {
                           <option value="Tienda #2">Tienda #2</option>
                         </select>
                       </div>
+
+                      {/* ⭐ NUEVO FILTRO TIPO ⭐ */}
+                      <div className="w-full">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tipo de Artículo</label>
+                        <select 
+                          value={selectedType} 
+                          onChange={(e) => setSelectedType(e.target.value)} 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Todos los tipos</option>
+                          <option value="Player">Player</option>
+                          <option value="Niño">Niño</option>
+                          <option value="Mujer">Mujer</option>
+                          <option value="Abrigo">Abrigo</option>
+                          <option value="Balón">Balón</option>
+                          <option value="Fan">Fan</option>
+                          <option value="Nacional">Nacional</option>
+                          <option value="MLB">MLB</option>
+                          <option value="Retro">Retro</option>
+                          <option value="F1">F1</option>
+                          <option value="NFL">NFL</option>
+                        </select>
+                      </div>
                     </div>
+
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
                       <button onClick={() => { setPage(1); fetchLogs(startDate, endDate, undefined, 1); }} className="w-full bg-black text-white border border-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-colors shadow-md cursor-pointer">Aplicar Filtros</button>
                       <button onClick={handleClearFilters} className="w-full bg-gray-100 text-gray-600 border border-gray-200 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors cursor-pointer">Limpiar</button>
@@ -436,7 +462,8 @@ export default function HistoryPage({ isSuperUser = false }) {
                        return (
                         <li key={log._id || idx} className={`relative bg-white border-2 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-4 ${isSelected ? 'border-black bg-gray-50' : 'border-gray-100'}`}>
                           
-                          <div className="flex items-start gap-4 flex-1">
+                          {/* ⭐ SOLUCIÓN DEL BOTÓN FUERA DEL BORDE: min-w-0 para obligar a comprimirse ⭐ */}
+                          <div className="flex items-start gap-4 flex-1 min-w-0">
                             <div className="mt-1">
                                 <input 
                                     type="checkbox" 
@@ -445,12 +472,14 @@ export default function HistoryPage({ isSuperUser = false }) {
                                     className="w-5 h-5 accent-black cursor-pointer"
                                 />
                             </div>
-                            <div className="w-full">
+                            <div className="w-full min-w-0">
                                 <div className="mb-2"><strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong></div>
                                 <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
                                 <small className="flex items-center gap-1.5 text-gray-400 block mt-2 font-semibold text-xs"><FaCalendarAlt size={10} className="mb-0.5" />{dateStr} — {timeStr}</small>
+                                
+                                {/* ⭐ SOLUCIÓN TEXTO LARGO: break-all para URLs como la de Cloudinary ⭐ */}
                                 {log.details && (
-                                <pre className="mt-4 bg-white border border-gray-200 p-4 rounded-xl text-[11px] overflow-x-auto text-gray-600 font-mono whitespace-pre-wrap shadow-inner">
+                                <pre className="mt-4 bg-white border border-gray-200 p-4 rounded-xl text-[11px] overflow-hidden break-all whitespace-pre-wrap text-gray-600 font-mono shadow-inner">
                                     {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
                                 </pre>
                                 )}
