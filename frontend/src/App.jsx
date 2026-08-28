@@ -29,7 +29,7 @@ import WorldCupIntro from './components/WorldCupIntro';
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 function buildPages(page, pages) {
-  const out = new Set([1, pages, page, page - 1, page - 2, page + 1, page + 2]);
+  const out = new Set();
   return [...out]
     .filter((n) => n >= 1 && n <= pages)
     .sort((a, b) => a - b);
@@ -394,7 +394,6 @@ function MainApp() {
             setShowUserListModal={setShowUserListModal}
             setShowHistoryModal={() => navigate('/history')}
             canSeeHistory={canSeeHistory}
-            // 👇 Le pasamos los filtros al nuevo Header Combinado
             filterType={filterType}
             setFilterType={(t) => { 
               if (t !== filterType) {
@@ -439,10 +438,20 @@ function MainApp() {
                 </button>
                 )}
 
+                {/* 👇 MODIFICADO: Validación y scroll garantizado al presionar el botón múltiples veces */}
                 <Bienvenido onNavigate={(type) => {
-                  setFilterType(type);
-                  setLoading(true);
-                  setPage(1);
+                  if (filterType !== type) {
+                    setFilterType(type);
+                    setLoading(true);
+                    setPage(1);
+                  } else {
+                    if (pageTopRef.current) {
+                      pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                      const section = document.getElementById('products-section');
+                      if (section) section.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }
                 }} />
 
                 <div ref={pageTopRef} />

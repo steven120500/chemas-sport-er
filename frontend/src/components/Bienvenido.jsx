@@ -11,7 +11,7 @@ const productosNuevos = [
   { id: 8, equipo: 'PSG', tipo: 'Visita', img: '/PSG2.png' },
 ];
 
-const FILTRO_OBJETIVO = 'Temp 26-27'; // 🎯 Exactamente el nombre de tu filtro
+const FILTRO_OBJETIVO = 'Temp 26-27';
 
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -24,16 +24,26 @@ const Bienvenido = ({ onNavigate }) => {
   }, []);
 
   const handleIrAProductos = (categoria = FILTRO_OBJETIVO) => {
-    if (onNavigate) onNavigate(categoria);
-    setTimeout(() => {
-      const section =
-        document.getElementById('products-section') ||
-        document.getElementById('filter-bar') ||
-        document.getElementById('catalogo');
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (onNavigate) {
+      onNavigate(categoria);
+    }
+
+    const doScroll = () => {
+      const targets = ['products-section', 'filter-bar', 'catalogo', 'productos'];
+      for (const id of targets) {
+        const el = document.getElementById(id);
+        if (el) {
+          const yOffset = -20;
+          const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+          return;
+        }
       }
-    }, 100);
+    };
+
+    doScroll();
+    setTimeout(doScroll, 100);
+    setTimeout(doScroll, 300);
   };
 
   const marqueeItems = [...productosNuevos, ...productosNuevos];
@@ -81,7 +91,7 @@ const Bienvenido = ({ onNavigate }) => {
         </h1>
       </div>
 
-      {/* 🚀 CARRUSEL INFINITO (Al tocar cualquier camiseta también filtra por Temp 26-27) */}
+      {/* 🚀 CARRUSEL INFINITO */}
       <div className="relative z-20 w-full overflow-hidden py-1 md:py-2">
         <div className="absolute top-0 left-0 bottom-0 w-12 md:w-36 bg-gradient-to-r from-black via-black/80 to-transparent z-30 pointer-events-none" />
         <div className="absolute top-0 right-0 bottom-0 w-12 md:w-36 bg-gradient-to-l from-black via-black/80 to-transparent z-30 pointer-events-none" />
@@ -90,8 +100,7 @@ const Bienvenido = ({ onNavigate }) => {
           {marqueeItems.map((item, index) => (
             <div
               key={`${item.id}-${index}`}
-              onClick={() => handleIrAProductos(FILTRO_OBJETIVO)}
-              className="group relative cursor-pointer w-56 md:w-72 lg:w-80 bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-xl border border-white/15 hover:border-white/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-1.5 shrink-0"
+              className="group relative cursor-default w-56 md:w-72 lg:w-80 bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-xl border border-white/15 hover:border-white/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-1.5 shrink-0"
             >
               <div className="absolute inset-0 bg-white/5 rounded-3xl blur-xl group-hover:bg-white/10 transition-all pointer-events-none" />
 
@@ -122,7 +131,7 @@ const Bienvenido = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* ⚡ BOTÓN PRINCIPAL: ENVÍA 'Temp 26-27' */}
+      {/* ⚡ BOTÓN PRINCIPAL */}
       <div className="relative z-20 flex flex-col items-center w-full mt-1 md:mt-2">
         <button
           onClick={() => handleIrAProductos(FILTRO_OBJETIVO)}
