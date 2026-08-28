@@ -15,10 +15,8 @@ const KID_SIZES = ["16", "18", "20", "22", "24", "26", "28"];
 const BALL_SIZES = ["3", "4", "5"];
 
 export default function ProductCard({ product, onClick, user, index = 0 }) {
-  // 🔥 ESCUDO ANTI-PANTALLA BLANCA 🔥
   if (!product) return null;
 
-  // 🔍 Extracción robusta de la imagen principal y secundaria adaptada al esquema de la BD
   const primaryImg = product.imageSrc;
   const secondaryImg = 
     product.secondaryImage || 
@@ -30,7 +28,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
     null;
 
   const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
-
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
   
@@ -78,21 +75,16 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
   return (
     <motion.div
-      // ⭐ ANIMACIÓN DE APARICIÓN AL INICIO ⭐
       initial={{ opacity: 0, y: 25, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.35), ease: "easeOut" }}
-      
-      // ⭐ ANIMACIONES DE INTERACCIÓN MODERNAS ⭐
       whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onClick(product)}
-      // 🛑 NOTA: Se retiró 'overflow-hidden' de aquí para que el sticker pueda salirse del borde de la tarjeta
       className={`group/card relative w-full bg-white rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-black p-0 transition-shadow duration-300 cursor-pointer flex flex-col justify-between font-sans shadow-sm hover:shadow-2xl
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
       `}
     >
-     {/* 🌟 ETIQUETA "NEW" FLOTANTE (Normal en móvil, más grande en desktop) 🌟 */}
      {isNuevo && !isTotalAgotado && (
         <div className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 z-40 w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
           <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
@@ -104,7 +96,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         </div>
       )}
 
-      {/* ⭐ ESTILOS CSS PARA BRILLOS Y ANIMACIONES ⭐ */}
       <style>
         {`
           @keyframes minimalShine {
@@ -119,46 +110,61 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
           @media (min-width: 768px) {
             .shine-desktop-tipo { animation: platinumGlow 2.2s infinite ease-in-out; display: inline-block; }
           }
+
+          /* 🔥 ANIMACIÓN INVERTIDA: Aparece inmediatamente al 0% */
+          @keyframes swapContinuo {
+            0%, 45% { opacity: 1; }
+            55%, 100% { opacity: 0; }
+          }
+          
+          /* 🔥 INDICADORES SINCRONIZADOS Y CON RESPUESTA INMEDIATA */
+          @keyframes dot1Sync {
+            0%, 45% { opacity: 0.4; width: 6px; background-color: #9ca3af; }
+            55%, 100% { opacity: 1; width: 14px; background-color: #000; }
+          }
+          @keyframes dot2Sync {
+            0%, 45% { opacity: 1; width: 14px; background-color: #000; }
+            55%, 100% { opacity: 0.4; width: 6px; background-color: #9ca3af; }
+          }
+
+          .group\\/card:hover .img-secundaria-animada {
+            animation: swapContinuo 1.5s infinite;
+          }
+          .group\\/card:hover .dot-1-animada {
+            animation: dot1Sync 1.5s infinite;
+          }
+          .group\\/card:hover .dot-2-animada {
+            animation: dot2Sync 1.5s infinite;
+          }
         `}
       </style>
 
-      {/* =========================================================================
-          ⭐ CUERPO DEL CARD: GRILLA 6 vs 6 RESPONSIVA ⭐
-          ========================================================================= */}
       <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px]">
         
-        {/* --- COLUMNA IZQUIERDA: INFORMACIÓN Y ETIQUETAS --- */}
+        {/* --- COLUMNA IZQUIERDA: INFORMACIÓN --- */}
         <div className="col-span-6 flex flex-col justify-between p-3.5 sm:p-6 pr-2 sm:pr-5 z-10">
           
-          {/* ⭐ BLOQUE SUPERIOR IZQUIERDO: TIPO Y ETIQUETAS ⭐ */}
           <div className="flex flex-col gap-1.5 sm:gap-2 items-start w-full">
-            
-            {/* 🔸 Categoría / Tipo */}
             {product.type && (
               <span className="shine-desktop-tipo bg-gray-600 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm">
                 {product.type}
               </span>
             )}
 
-            {/* 🔹 ETIQUETAS */}
             <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-              
-              {/* ⭐ Popular */}
               {product.isPopular === true && (
                 <>
-                  <span className="sm:hidden shine-sutil bg-yellow-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Popular">
+                  <span className="sm:hidden shine-sutil bg-yellow-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center">
                     <FaStar size={9} />
                   </span>
-                  <span className="hidden sm:inline-flex shine-sutil bg-yellow-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm" title="Producto Popular">
+                  <span className="hidden sm:inline-flex shine-sutil bg-yellow-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     POPULAR
                   </span>
                 </>
               )}
-
-              {/* 🟩 Oferta */}
               {hasDiscount && !isTotalAgotado && (
                 <>
-                  <span className="sm:hidden shine-sutil bg-green-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center" title="Oferta">
+                  <span className="sm:hidden shine-sutil bg-green-600 text-white p-1.5 rounded-full shadow-sm flex items-center justify-center">
                     <FaTag size={9} />
                   </span>
                   <span className="hidden sm:inline-flex shine-sutil bg-green-600 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
@@ -169,9 +175,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             </div>
           </div>
 
-          {/* ⭐ BLOQUE CENTRAL IZQUIERDO: TÍTULO, PRECIO Y SELLO ⭐ */}
           <div className="flex flex-col my-auto py-1.5 sm:py-2">
-            
             <h3 className="text-[11px] sm:text-lg font-extrabold text-black uppercase tracking-tight leading-snug line-clamp-3">
               {product.name}
             </h3>
@@ -195,45 +199,32 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               )}
             </div>
 
-           {/* 🔥 NUEVO SELLO ROJO CIRCULAR SIN ESTRELLAS (TEMPORADA 26-27) 🔥 */}
            {product.isTemporada2627 === true && (
               <div className="mt-3 sm:mt-6 transform -rotate-12 select-none pointer-events-none transition-transform duration-300 group-hover/card:rotate-0 self-start">
-                
-                {/* Contenedor Circular Externo con animación de giro en Hover */}
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 sm:border-[3px] border-dashed border-gray-600 bg-[#fef2f2] flex items-center justify-center relative shadow-[0_0_10px_rgba(220,38,38,0.25)] transition-transform duration-700 group-hover/card:rotate-180">
-                  
-                  {/* Anillo Interno Sólido (Le da la vuelta perfecta al texto) */}
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-600 flex flex-col items-center justify-center text-center p-1 bg-white/50">
-                    
-                    {/* Texto TEMP */}
-                    <span className="text-xs sm:text-[11px] font-black tracking-widest text-gray-600 uppercase leading-none">
-                      TEMP
-                    </span>
-
-                    {/* 👇 LÍNEA DIVISORIA 100% CENTRADA CON mx-auto 👇 */}
+                    <span className="text-xs sm:text-[11px] font-black tracking-widest text-gray-600 uppercase leading-none">TEMP</span>
                     <div className="w-10 sm:w-18 border-t border-gray-600 my-1.5 sm:my-1.5 mx-auto"></div>
-
-                    {/* Número Central (26-27) */}
-                    <span className="text-xs sm:text-[15px] font-black text-gray-600 tracking-tighter leading-none">
-                      26-27
-                    </span>
-
+                    <span className="text-xs sm:text-[15px] font-black text-gray-600 tracking-tighter leading-none">26-27</span>
                   </div>
-
                 </div>
-
               </div>
             )}
-
           </div>
 
-          <div className="h-1"></div>
+          <div className="mt-auto pt-2 flex items-end h-6 sm:h-8">
+            {(!isTotalAgotado && secondaryImg) && (
+              <div className="flex justify-start items-center gap-1.5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
+                <div className="h-1.5 rounded-full dot-1-animada w-[14px] bg-black"></div>
+                <div className="h-1.5 rounded-full dot-2-animada w-[6px] bg-gray-400 opacity-40"></div>
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* --- COLUMNA DERECHA: IMAGEN (Hover solo si NO está agotado) --- */}
+        {/* --- COLUMNA DERECHA: IMÁGENES --- */}
         <div className="col-span-6 relative w-full h-full z-10">
-          
-          {/* Contenedor de la Imagen */}
           <div className="relative w-full h-full bg-[#f4f4f4] overflow-hidden rounded-r-[16px] sm:rounded-r-[24px]">
             {(() => {
               const screenWidth = window.innerWidth;
@@ -242,30 +233,29 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               else if (screenWidth >= 768) H = 1000;
 
               const pImg = cldUrl(primaryImg, 640, H) || primaryImg;
-              // Si está agotado, ignoramos la secundaria para que no haga nada al pasar el mouse
               const sImg = !isTotalAgotado && secondaryImg ? (cldUrl(secondaryImg, 640, H) || secondaryImg) : null;
 
               return (
                 <>
-                  {/* 🖼️ Imagen Principal */}
                   <img
                     src={pImg}
                     alt={product.imageAlt || product.name}
-                    className={`w-full h-full object-cover object-center transition-transform duration-700 ease-out ${
+                    className={`w-full h-full object-cover object-center transition-transform duration-700 ease-out z-10 ${
                       !isTotalAgotado ? "group-hover/card:scale-110" : ""
                     } ${
                       isTotalAgotado ? "grayscale-[90%] opacity-40 blur-[1px]" : ""
-                    } ${sImg ? "group-hover/card:opacity-0 transition-opacity duration-300" : ""}`}
+                    }`}
                     loading="lazy"
                     decoding="async"
                   />
 
-                  {/* 🖼️ Imagen Secundaria (Solo hace hover si NO está agotado y existe) */}
                   {sImg && (
                     <img
                       src={sImg}
                       alt={`${product.name} secundaria`}
-                      className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-500 ease-out opacity-0 group-hover/card:opacity-100 group-hover/card:scale-110`}
+                      className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 ease-out opacity-0 z-20 img-secundaria-animada ${
+                        !isTotalAgotado ? "group-hover/card:scale-110" : ""
+                      }`}
                       loading="lazy"
                       decoding="async"
                     />
@@ -274,9 +264,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               );
             })()}
 
-            {/* 🛑 SELLO DE AGOTADO EN EL MEDIO DE LA TARJETA (MÓVIL Y PC) */}
             {isTotalAgotado && (
-              <div className="absolute inset-0 z-30 flex items-center justify-center p-2 pointer-events-none">
+              <div className="absolute inset-0 z-40 flex items-center justify-center p-2 pointer-events-none">
                 <div className="bg-black border-2 border-white text-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-2xl transform -rotate-6 backdrop-blur-md">
                   <span className="text-xs sm:text-base font-black uppercase tracking-widest text-center block text-gray-500 drop-shadow">
                     AGOTADO
@@ -285,9 +274,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               </div>
             )}
 
-            {/* 🟫 OVERLAY SI ESTÁ OCULTO */}
             {isAdmin && product.hidden && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30 flex items-center justify-center p-1">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-1">
                 <span className="text-white text-[9px] font-bold text-center uppercase tracking-wider">
                   Oculto
                 </span>
@@ -298,32 +286,21 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
       </div>
 
-      {/* =========================================================================
-          ⭐ PANEL DE LOGÍSTICA PARA SUPERUSUARIOS ⭐
-          ========================================================================= */}
       {user?.isSuperUser && (
         <div className="px-3 sm:px-6 pb-3 pt-2 border-t border-dashed border-gray-300 text-[11px] sm:text-xs text-left w-full font-sans">
           {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
             <>
               <p className="font-bold mt-1 text-black">Tienda #1</p>
-              {stockAgotadas.length > 0 && (
-                <p className="text-red-600 font-semibold">Agotado: {stockAgotadas.join(" ")}</p>
-              )}
-              {stockQueda1.length > 0 && (
-                <p className="text-green-600 font-semibold">Queda 1: {stockQueda1.join(" ")}</p>
-              )}
+              {stockAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {stockAgotadas.join(" ")}</p>}
+              {stockQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {stockQueda1.join(" ")}</p>}
             </>
           )}
 
           {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
             <>
               <p className="font-bold mt-2 text-black">Tienda #2</p>
-              {bodegaAgotadas.length > 0 && (
-                <p className="text-red-600 font-semibold">Agotado: {bodegaAgotadas.join(" ")}</p>
-              )}
-              {bodegaQueda1.length > 0 && (
-                <p className="text-green-600 font-semibold">Queda 1: {bodegaQueda1.join(" ")}</p>
-              )}
+              {bodegaAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodegaAgotadas.join(" ")}</p>}
+              {bodegaQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodegaQueda1.join(" ")}</p>}
             </>
           )}
 
@@ -332,9 +309,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               <p className="font-bold text-red-700 mb-0.5">🚨 Traspasos urgentes:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosUrgentes.map((t, i) => (
-                  <li key={i}>
-                    Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)
-                  </li>
+                  <li key={i}>Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)</li>
                 ))}
               </ul>
             </div>
@@ -345,16 +320,13 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               <p className="font-bold text-yellow-700 mb-0.5">📦 Traspasos sugeridos:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosSugeridos.map((t, i) => (
-                  <li key={i}>
-                    Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)
-                  </li>
+                  <li key={i}>Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)</li>
                 ))}
               </ul>
             </div>
           )}
         </div>
       )}
-
     </motion.div>
   );
 }
