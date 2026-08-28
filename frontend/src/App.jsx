@@ -37,7 +37,6 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
-// ⭐ ACTUALIZACIÓN: PRODUCT DETAIL WRAPPER MEJORADO PARA LINKS DIRECTOS ⭐
 function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
   const { id } = useParams();
   const [localProduct, setLocalProduct] = useState(null);
@@ -46,14 +45,12 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // 1. Primero busca si el producto ya cargó en la lista de la pantalla (Navegación normal)
+
     const found = products.find(p => getPid(p) === id);
     if (found) {
       setLocalProduct(found);
       setIsFetchingId(false);
     } else {
-      // 2. Si el cliente entró por link directo y no está en la página actual, lo pide al servidor
       fetch(`${API_BASE}/api/products/${id}`)
         .then(res => {
           if (!res.ok) throw new Error("No encontrado");
@@ -70,14 +67,12 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
     }
   }, [id, products]);
 
-  // Pantalla de carga mientras trae el producto
   if (loadingProducts || isFetchingId) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
     </div>
   );
-  
-  // Solo lo expulsa al inicio si de verdad hubo error o el ID no existe en MongoDB
+
   if (error || (!isFetchingId && !localProduct)) return <Navigate to="/" replace />;
 
   return (
@@ -96,10 +91,21 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
 
 function MainApp() {
   const [showIntro, setShowIntro] = useState(true); 
+
+  // 🔥 SALVAVIDAS: Si la intro se queda pegada, se cierra sola a los 4.5 segundos 🔥
+  useEffect(() => {
+    if (showIntro) {
+      const fallbackTimer = setTimeout(() => {
+        setShowIntro(false);
+      }, 4500);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [showIntro]);
+
   const [products, setProducts] = useState([]);
   const [allProductsForCounts, setAllProductsForCounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [savedScroll, setSavedScroll] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,7 +128,6 @@ function MainApp() {
 
   const navigate = useNavigate();
 
-  // ⭐ REF PARA CANCELAR PETICIONES VIEJAS Y ACELERAR EL BUSCADOR ⭐
   const abortControllerRef = useRef(null);
   const pageTopRef = useRef(null);
 
@@ -167,7 +172,6 @@ function MainApp() {
 
     setLoading(true);
 
-    // ⭐ SI EL USUARIO SIGUE ESCRIBIENDO, CANCELAMOS LA PETICIÓN ANTERIOR ⭐
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -191,7 +195,7 @@ function MainApp() {
 
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
         headers: { "x-admin": isAdmin ? "true" : "false" },
-        signal // Adjuntamos la señal de cancelación
+        signal
       });
 
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -202,13 +206,11 @@ function MainApp() {
       setPage(json.page);
     } catch (err) {
       if (err.name === 'AbortError') {
-        // La petición fue cancelada porque el usuario escribió otra letra rápido, no hacemos nada.
         return;
       }
       setProducts([]);
       setTotal(0);
     } finally {
-      // Solo quitamos el loading si esta fue la última petición válida
       if (!signal.aborted) {
         setLoading(false);
       }
@@ -241,7 +243,7 @@ function MainApp() {
       setAllProductsForCounts([]);
     }
   };
-  
+
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
     if (pageTopRef.current) {
@@ -314,7 +316,7 @@ function MainApp() {
 
     const normalizedSearch = removeAccents(searchTerm.toLowerCase());
     const normalizedProductName = removeAccents(product.name.toLowerCase());
-    
+
     const matchName = normalizedProductName.includes(normalizedSearch);
     if (!matchName) return false;
 
@@ -340,7 +342,7 @@ function MainApp() {
       </AnimatePresence>
 
       <div className={showIntro ? "hidden" : "flex flex-col min-h-screen bg-white"}>
-        
+
         {/* ================= MODALES GLOBALES ================= */}
         {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
         {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} currentUser={user} token={user?.token} />}
@@ -392,6 +394,15 @@ function MainApp() {
             setShowUserListModal={setShowUserListModal}
             setShowHistoryModal={() => navigate('/history')}
             canSeeHistory={canSeeHistory}
+            // 👇 Le pasamos los filtros al nuevo Header Combinado
+            filterType={filterType}
+            setFilterType={(t) => { 
+              if (t !== filterType) {
+                setFilterType(t); 
+                setLoading(true); 
+                setPage(1); 
+              }
+            }}
           />
         )}
 
@@ -477,8 +488,7 @@ function MainApp() {
                     </div>
                 </div>
                 )}
-                
-                {/* ⭐ LOS FILTROS ACTIVAN EL LOADING INMEDIATAMENTE PARA MOSTRAR EL SKELETON ⭐ */}
+
                 <FilterBar
                   searchTerm={searchTerm}
                   setSearchTerm={(val) => {
@@ -503,7 +513,7 @@ function MainApp() {
                     setPage(1); 
                   }}
                 />
-                
+
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
                   <AnimatePresence>
                       {showSizes && (
@@ -602,7 +612,6 @@ function MainApp() {
                 <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
                   <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {loading ? (
-                    /* 🔥 EFECTO SKELETON (CARGA INLINE) MOSTRADO INMEDIATAMENTE 🔥 */
                     Array.from({ length: 6 }).map((_, i) => (
                       <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-4 rounded-3xl border border-gray-100">
                         <div className="w-full h-[350px] bg-gray-200 rounded-2xl"></div>
@@ -679,7 +688,7 @@ function MainApp() {
 
         <Footer />
         {!anyModalOpen && <FloatingWhatsapp />}
-        
+
       </div>
     </>
   );
