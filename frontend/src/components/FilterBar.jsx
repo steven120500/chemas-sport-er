@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaSlidersH, FaTimes, FaCheck, FaChevronDown, FaTrashAlt } from "react-icons/fa";
+import { FaTimes, FaCheck, FaChevronDown, FaTrashAlt } from "react-icons/fa";
 
 const categories = [
   { label: "Todos", value: "" },
@@ -45,35 +45,37 @@ export default function FilterBar({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState(""); 
-  
-  // Estado local para que el teclado escriba fluido
   const [localSearch, setLocalSearch] = useState(searchTerm || "");
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  // Detecta si hay algún filtro activo (categoría distinta de vacío o tallas seleccionadas)
   const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0);
 
-  // ⭐ MOTOR ULTRA RÁPIDO ESTILO FUTSTORE (150ms) ⭐
+  // Detector de scroll para la animación de la barra sticky
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   useEffect(() => {
     if (localSearch.trim() === "") {
       if (searchTerm !== "") setSearchTerm(""); 
       return;
     }
-
     const timeout = setTimeout(() => {
       setSearchTerm(localSearch.trim());
     }, 150); 
-
     return () => clearTimeout(timeout);
   }, [localSearch, searchTerm, setSearchTerm]);
 
-  // Sincronización externa (por si se limpia desde afuera)
   useEffect(() => {
     if (searchTerm === "") {
       setLocalSearch("");
     }
   }, [searchTerm]);
 
-  // Función para limpiar los filtros
   const handleClearFilters = () => {
     if (setFilterType) setFilterType("");
     if (setFilterSizes) setFilterSizes([]);
@@ -82,53 +84,58 @@ export default function FilterBar({
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 pt-3 mb-6 mt-4 px-4 max-w-4xl mx-auto">
-      
-      {/* 1. BARRA DE BÚSQUEDA SÚPER LIMPIA Y RÁPIDA */}
-      <motion.div
-        className="w-full flex justify-center"
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+    <>
+      <div 
+        className={`sticky top-0 z-40 w-full bg-white transition-all duration-300 md:static md:bg-transparent md:shadow-none md:border-none ${
+          isScrolled ? "shadow-md border-b border-zinc-300" : "shadow-sm border-b border-zinc-200"
+        }`}
       >
-        <div className="relative w-full max-w-md group">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-black transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Buscar camiseta..."
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-sm text-black"
-          />
-        </div>
-      </motion.div>
-
-      {/* 2. BOTÓN "FILTRAR Y ORDENAR" */}
-      <motion.div 
-        className="w-full flex justify-center"
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <button
-          onClick={() => {
-            setIsOpen(true);
-            onToggleTallas?.();
-          }}
-          className="flex items-center gap-2.5 px-6 py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95 cursor-pointer"
+        <div 
+          className={`w-full max-w-4xl mx-auto px-4 flex flex-row gap-3 items-center md:flex-col md:gap-4 transition-all duration-300 ${
+            isScrolled ? "py-2 md:pt-6 md:pb-0" : "py-3 md:pt-6 md:pb-0"
+          }`}
         >
-          <FaSlidersH className="text-xs text-zinc-400" />
-          Filtrar
-        </button>
-      </motion.div>
+          
+          <motion.div
+            className="relative w-full max-w-md group flex-1 md:flex-none"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <input
+              type="text"
+              placeholder="Buscar camiseta..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="w-full pl-5 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-inner text-black"
+            />
+          </motion.div>
 
-      {/* 3. MODAL DE FILTROS */}
+          <motion.div 
+            className="flex shrink-0 justify-center"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <button
+              onClick={() => {
+                setIsOpen(true);
+                onToggleTallas?.();
+              }}
+              className="flex items-center justify-center px-6 py-3 md:py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95 cursor-pointer"
+            >
+              Filtrar
+            </button>
+          </motion.div>
+
+        </div>
+      </div>
+
+      <div className="mb-4 md:mb-6"></div>
+
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-end p-0 sm:pb-8 pointer-events-none">
-            
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -136,7 +143,6 @@ export default function FilterBar({
               onClick={() => setIsOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
             />
-
             <motion.div
               initial={{ y: "100%", opacity: 0, scale: 0.95 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -156,7 +162,6 @@ export default function FilterBar({
                 </div>
 
                 <div className="flex flex-col divide-y divide-zinc-100">
-                  {/* Acordeón Categoría */}
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
@@ -165,7 +170,6 @@ export default function FilterBar({
                       <span>Versión / Categoría</span>
                       <FaChevronDown className={`text-xs text-zinc-500 transition-transform duration-300 ${activeAccordion === "categoria" ? "rotate-180" : ""}`} />
                     </button>
-
                     {activeAccordion === "categoria" && (
                       <motion.div 
                         initial={{ opacity: 0, height: 0 }}
@@ -195,7 +199,6 @@ export default function FilterBar({
                     )}
                   </div>
 
-                  {/* Acordeón Talla */}
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "talla" ? "" : "talla")}
@@ -204,7 +207,6 @@ export default function FilterBar({
                       <span>Talla</span>
                       <FaChevronDown className={`text-xs text-zinc-500 transition-transform duration-300 ${activeAccordion === "talla" ? "rotate-180" : ""}`} />
                     </button>
-
                     {activeAccordion === "talla" && (
                       <motion.div 
                         initial={{ opacity: 0, height: 0 }}
@@ -272,7 +274,6 @@ export default function FilterBar({
                   </div>
                 </div>
               </div>
-
               <div className="pt-4 border-t border-zinc-100 mt-4">
                 <button
                   onClick={() => setIsOpen(false)}
@@ -281,7 +282,6 @@ export default function FilterBar({
                   Aplicar filtros
                 </button>
               </div>
-
             </motion.div>
           </div>
         )}
@@ -306,7 +306,6 @@ export default function FilterBar({
           </motion.div>
         )}
       </AnimatePresence>
-
-    </div>
+    </>
   );
 }
