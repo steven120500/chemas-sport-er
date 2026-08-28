@@ -120,6 +120,7 @@ export default function FilterBar({
             <button
               onClick={() => {
                 setIsOpen(true);
+                setActiveAccordion(""); 
                 onToggleTallas?.();
               }}
               className="flex items-center justify-center px-6 py-3 md:py-3.5 bg-zinc-900 text-white rounded-full hover:bg-black transition-all shadow-md text-xs font-bold tracking-wider uppercase active:scale-95 cursor-pointer"
@@ -182,7 +183,10 @@ export default function FilterBar({
                           return (
                             <button
                               key={cat.label}
-                              onClick={() => setFilterType(cat.value)}
+                              onClick={() => {
+                                setFilterType(cat.value);
+                                setIsOpen(false); // Cierra al seleccionar categoría
+                              }}
                               className={`
                                 flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-none cursor-pointer
                                 ${isActive 
@@ -228,6 +232,7 @@ export default function FilterBar({
                                         prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
                                       );
                                     }
+                                    setIsOpen(false); // Cierra al seleccionar talla
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
@@ -256,6 +261,7 @@ export default function FilterBar({
                                         prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
                                       );
                                     }
+                                    setIsOpen(false); // Cierra al seleccionar talla
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
@@ -274,12 +280,15 @@ export default function FilterBar({
                   </div>
                 </div>
               </div>
+              
+              {/* Si quieres que se cierre solo, este botón ya no es tan necesario, 
+                  pero lo dejo como una opción extra por si el usuario abre el modal y decide cerrarlo desde aquí */}
               <div className="pt-4 border-t border-zinc-100 mt-4">
                 <button
                   onClick={() => setIsOpen(false)}
                   className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm tracking-wider uppercase shadow-xl transition-none cursor-pointer"
                 >
-                  Aplicar filtros
+                  Cerrar
                 </button>
               </div>
             </motion.div>
