@@ -28,11 +28,19 @@ import WorldCupIntro from './components/WorldCupIntro';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
+// 🎯 FUNCIÓN DE PÁGINAS 100% GARANTIZADA
 function buildPages(page, pages) {
-  const out = new Set();
-  return [...out]
-    .filter((n) => n >= 1 && n <= pages)
-    .sort((a, b) => a - b);
+  const pageNumbers = [];
+  for (let i = 1; i <= pages; i++) {
+    if (
+      i === 1 ||
+      i === pages ||
+      (i >= page - 2 && i <= page + 2)
+    ) {
+      pageNumbers.push(i);
+    }
+  }
+  return pageNumbers;
 }
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
@@ -437,7 +445,6 @@ function MainApp() {
                 </button>
                 )}
 
-                {/* 👇 MODIFICADO: Recibe 'type' y 'search' para filtrar por equipo y categoría */}
                 <Bienvenido onNavigate={(type, search = '') => {
                   setSearchTerm(search);
                   setFilterType(type);
@@ -649,44 +656,50 @@ function MainApp() {
                 </div>
 
                 {pages > 1 && !loading && (
-                <div className="mt-12 mb-12 flex flex-col items-center gap-3">
-                    <nav className="flex items-center justify-center gap-2">
-                    <button
+                  <div className="mt-12 mb-12 flex flex-col items-center gap-3">
+                    <nav className="flex items-center justify-center gap-1.5 sm:gap-2">
+                      <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-                    >
-                        <FaChevronLeft />
-                    </button>
-                    {(() => {
+                        className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                      >
+                        <FaChevronLeft size={12} />
+                      </button>
+
+                      {(() => {
                         const nums = buildPages(page, pages);
                         return nums.map((n, i) => {
-                        const prev = nums[i - 1];
-                        const showDots = i > 0 && n - prev > 1;
-                        return (
-                            <span key={n} className="flex">
-                            {showDots && <span className="px-2">…</span>}
-                            <button
+                          const prev = nums[i - 1];
+                          const showDots = i > 0 && n - prev > 1;
+                          const isCurrent = n === page;
+
+                          return (
+                            <span key={n} className="flex items-center gap-1.5">
+                              {showDots && <span className="px-1.5 text-zinc-400 font-bold text-xs">...</span>}
+                              <button
                                 onClick={() => setPage(n)}
-                                className={`px-2 text-sm text-white py-0.5 bg-black rounded ${
-                                n === page ? 'bg-gray-600' : 'hover:bg-gray-300'
+                                className={`min-w-[36px] h-9 px-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                                  isCurrent
+                                    ? 'bg-black text-white shadow-md scale-105'
+                                    : 'bg-gray-400 text-zinc-700 hover:bg-zinc-200'
                                 }`}
-                            >
+                              >
                                 {n}
-                            </button>
+                              </button>
                             </span>
-                        );
+                          );
                         });
-                    })()}
-                    <button
+                      })()}
+
+                      <button
                         onClick={() => setPage((p) => Math.min(pages, p + 1))}
                         disabled={page === pages}
-                        className="px-2 py-1 text-sm text-white bg-black rounded border disabled:opacity-50"
-                    >
-                        <FaChevronRight />
-                    </button>
+                        className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                      >
+                        <FaChevronRight size={12} />
+                      </button>
                     </nav>
-                </div>
+                  </div>
                 )}
               </>
             } />

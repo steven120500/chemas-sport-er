@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const FILTRO_OBJETIVO = 'Temp 26-27';
 
@@ -63,6 +63,13 @@ const productosNuevos = [
 
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(false);
+  const scrollRef = useRef(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftStart = useRef(0);
+  const hasMoved = useRef(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const animationFrameId = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -71,7 +78,77 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🔄 Auto-scroll continuo a 60 FPS
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    const speed = isMobile ? 0.8 : 1.0;
+
+    const step = () => {
+      if (!isInteracting && !isDragging.current && scrollContainer) {
+        scrollContainer.scrollLeft += speed;
+
+        const maxScroll = scrollContainer.scrollWidth / 3;
+        if (scrollContainer.scrollLeft >= maxScroll * 2) {
+          scrollContainer.scrollLeft -= maxScroll;
+        } else if (scrollContainer.scrollLeft <= 0) {
+          scrollContainer.scrollLeft += maxScroll;
+        }
+      }
+      animationFrameId.current = requestAnimationFrame(step);
+    };
+
+    animationFrameId.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animationFrameId.current);
+  }, [isInteracting, isMobile]);
+
+  // 🖱️ Arrastre con Mouse (Desktop)
+  const handleMouseDown = (e) => {
+    isDragging.current = true;
+    hasMoved.current = false;
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeftStart.current = scrollRef.current.scrollLeft;
+    setIsInteracting(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.4;
+    if (Math.abs(x - startX.current) > 5) {
+      hasMoved.current = true;
+    }
+    scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
+
+    const maxScroll = scrollRef.current.scrollWidth / 3;
+    if (scrollRef.current.scrollLeft >= maxScroll * 2) {
+      scrollRef.current.scrollLeft -= maxScroll;
+      scrollLeftStart.current -= maxScroll;
+    } else if (scrollRef.current.scrollLeft <= 0) {
+      scrollRef.current.scrollLeft += maxScroll;
+      scrollLeftStart.current += maxScroll;
+    }
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isDragging.current = false;
+    setTimeout(() => setIsInteracting(false), 1200);
+  };
+
+  // 📱 Control táctil (Celular / Tablet)
+  const handleTouchStart = () => {
+    setIsInteracting(true);
+  };
+
+  const handleTouchEnd = () => {
+    setTimeout(() => setIsInteracting(false), 1500);
+  };
+
   const handleIrAProductos = (categoria = FILTRO_OBJETIVO, busqueda = '') => {
+    if (hasMoved.current) return;
+
     if (onNavigate) {
       onNavigate(categoria, busqueda);
     }
@@ -86,29 +163,17 @@ const Bienvenido = ({ onNavigate }) => {
     }, 100);
   };
 
-  const marqueeItems = [...productosNuevos, ...productosNuevos];
+  const marqueeItems = [...productosNuevos, ...productosNuevos, ...productosNuevos];
 
   return (
     <section
       className="relative w-full overflow-hidden flex flex-col justify-center items-center font-sans py-4 md:py-8 gap-3 md:gap-5 text-white select-none"
     >
-      {/* 🔮 Animaciones CSS */}
+      {/* 🔮 Animación de flotación */}
       <style>{`
-        @keyframes infiniteScroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
         @keyframes floatItem {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-6px); }
-        }
-        .anim-marquee {
-          display: flex;
-          width: max-content;
-          animation: infiniteScroll 30s linear infinite;
-        }
-        .anim-marquee:hover {
-          animation-play-state: paused;
         }
         .anim-float {
           animation: floatItem 4s ease-in-out infinite;
@@ -124,72 +189,95 @@ const Bienvenido = ({ onNavigate }) => {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/75 to-black/95 z-10 pointer-events-none" />
 
-      {/* 🏆 ENCABEZADO */}
-      <div className="relative z-20 flex flex-col items-center text-center px-4 max-w-4xl mx-auto mb-1 md:mb-2">
-        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-white drop-shadow-2xl">
-          NUEVA TEMPORADA 26-27
-        </h1>
-      </div>
+  
 
-      {/* 🚀 CARRUSEL INFINITO */}
-      <div className="relative z-20 w-full overflow-hidden py-1 md:py-2">
+      {/* 🚀 CINTA DESLIZABLE */}
+      <div className="relative z-20 w-full overflow-hidden py-2 md:py-4">
         <div className="absolute top-0 left-0 bottom-0 w-12 md:w-36 bg-gradient-to-r from-black via-black/80 to-transparent z-30 pointer-events-none" />
         <div className="absolute top-0 right-0 bottom-0 w-12 md:w-36 bg-gradient-to-l from-black via-black/80 to-transparent z-30 pointer-events-none" />
 
-        <div className="anim-marquee gap-4 md:gap-7 px-4">
-          {marqueeItems.map((item, index) => (
-            <div
-              key={`${item.id}-${index}`}
-              className="group relative w-56 md:w-72 lg:w-80 bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-xl border border-white/15 hover:border-white/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-1.5 shrink-0"
-            >
-              <div className="absolute inset-0 bg-white/5 rounded-3xl blur-xl group-hover:bg-white/10 transition-all pointer-events-none" />
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="flex gap-6 md:gap-8 px-6 overflow-x-auto cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-2"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {marqueeItems.map((item, index) => {
+            const isPSG = item.equipo === 'PSG';
 
-              {/* Tag superior */}
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="text-[10px] md:text-xs font-extrabold tracking-[0.3em] text-white uppercase">
-                  TEMP 26-27
-                </span>
+            return (
+              <div
+                key={`${item.id}-${index}`}
+                /* 👇 Configuración condicional: PSG con su propio ancho y el resto con tus medidas */
+                className={`group relative bg-black hover:bg-gray-600 backdrop-blur-xl border border-white/15 hover:border-gray-600 rounded-3xl shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
+                  isPSG
+                    ? "w-100 sm:w-80 md:w-80 lg:w-96 p-10 md:p-36"
+                    : "w-78 sm:w-50 md:w-50 lg:w-78 p-6 md:p-28"
+                }`}
+              >
+                <div className="absolute inset-0 bg-white/5 rounded-3xl blur-xl group-hover:bg-white/10 transition-all pointer-events-none" />
+
+                {/* Tag superior */}
+                <div className="relative z-10 flex items-center justify-between pointer-events-none">
+                  <span className="text-xs font-extrabold tracking-[0.25em] text-white uppercase whitespace-nowrap">
+                    TEMP 26-27
+                  </span>
+                </div>
+
+                {/* Camiseta (PSG escalada independientemente) */}
+                <div className="relative z-10 flex items-center justify-center my-4 md:my-6 h-48 sm:h-56 md:h-64 pointer-events-none overflow-visible">
+                  <div 
+                    style={{
+                      transform: isPSG
+                        ? (isMobile ? 'scale(1.45)' : 'scale(2.00)')
+                        : (isMobile ? 'scale(1.00)' : 'scale(1.10)')
+                    }}
+                    className="flex items-center justify-center h-full w-full transition-transform duration-300"
+                  >
+                    <img
+                      src={item.img}
+                      alt={`${item.equipo} ${item.tipo}`}
+                      draggable={false}
+                      className="anim-float max-h-full w-auto object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.95)] select-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Nombre, tipo y botón */}
+                <div className="relative z-10 mt-2 border-t border-white/10 pt-3 md:pt-4 text-center">
+                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide group-hover:text-amber-300 transition-colors truncate pointer-events-none">
+                    {item.equipo}
+                  </h3>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mt-0.5 pointer-events-none">
+                    {item.tipo}
+                  </p>
+
+                  <button
+                    onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
+                    className="mt-3.5 w-full py-2.5 px-4 rounded-full bg-white/10 hover:bg-white text-white hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/20 hover:border-white shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                  >
+                    <span>Ver {item.equipo}</span>
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-
-              {/* Camiseta */}
-              <div className="relative z-10 flex items-center justify-center my-2 md:my-4 h-36 md:h-48 lg:h-52">
-                <img
-                  src={item.img}
-                  alt={`${item.equipo} ${item.tipo}`}
-                  className="anim-float max-h-full w-auto object-contain drop-shadow-[0_18px_25px_rgba(0,0,0,0.95)] transition-transform duration-300 group-hover:scale-110"
-                />
-              </div>
-
-              {/* Nombre del equipo y tipo */}
-              <div className="relative z-10 mt-1 border-t border-white/10 pt-2.5 md:pt-3 text-center">
-                <h3 className="text-sm md:text-base font-black uppercase text-white tracking-wide group-hover:text-amber-300 transition-colors truncate">
-                  {item.equipo}
-                </h3>
-                <p className="text-[11px] md:text-xs font-bold uppercase tracking-widest text-gray-400 mt-0.5">
-                  {item.tipo}
-                </p>
-
-                {/* 🔘 BOTÓN EN CADA CAJA: Activa Temp 26-27 + Busca el Equipo */}
-                <button
-                  onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
-                  className="mt-3 w-full py-2 px-3 rounded-full bg-white/10 hover:bg-white text-white hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/20 hover:border-white shadow-md cursor-pointer"
-                >
-                  <span>Ver {item.equipo}</span>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* ⚡ BOTÓN INFERIOR GENERAL (Muestra todos los de Temp 26-27 sin filtrar por equipo) */}
-      <div className="relative z-20 flex flex-col items-center w-full mt-1 md:mt-2">
+      {/* ⚡ BOTÓN INFERIOR GENERAL */}
+      <div className="relative z-20 flex flex-col items-center w-full mt-2 md:mt-3">
         <button
           onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')}
-          className="group px-8 py-3 md:px-12 md:py-3.5 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-gray-100 shadow-[0_10px_30px_rgba(255,255,255,0.25)] flex items-center gap-3 cursor-pointer"
+          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-gray-100 shadow-[0_10px_30px_rgba(255,255,255,0.25)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
         >
           <span>VER TODA LA COLECCIÓN</span>
           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
