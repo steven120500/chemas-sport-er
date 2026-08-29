@@ -92,7 +92,6 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
 function MainApp() {
   const [showIntro, setShowIntro] = useState(true); 
 
-  // 🔥 SALVAVIDAS: Si la intro se queda pegada, se cierra sola a los 4.5 segundos 🔥
   useEffect(() => {
     if (showIntro) {
       const fallbackTimer = setTimeout(() => {
@@ -438,19 +437,18 @@ function MainApp() {
                 </button>
                 )}
 
-                {/* 👇 MODIFICADO: Validación y scroll garantizado al presionar el botón múltiples veces */}
-                <Bienvenido onNavigate={(type) => {
-                  if (filterType !== type) {
-                    setFilterType(type);
-                    setLoading(true);
-                    setPage(1);
+                {/* 👇 MODIFICADO: Recibe 'type' y 'search' para filtrar por equipo y categoría */}
+                <Bienvenido onNavigate={(type, search = '') => {
+                  setSearchTerm(search);
+                  setFilterType(type);
+                  setLoading(true);
+                  setPage(1);
+
+                  if (pageTopRef.current) {
+                    pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
                   } else {
-                    if (pageTopRef.current) {
-                      pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
-                    } else {
-                      const section = document.getElementById('products-section');
-                      if (section) section.scrollIntoView({ behavior: 'smooth' });
-                    }
+                    const section = document.getElementById('products-section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth' });
                   }
                 }} />
 

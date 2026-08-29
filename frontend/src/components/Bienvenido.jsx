@@ -1,17 +1,65 @@
 import React, { useState, useEffect } from 'react';
 
-const productosNuevos = [
-  { id: 1, equipo: 'Real Madrid', tipo: 'Casa', img: '/Real1.png' },
-  { id: 2, equipo: 'Barcelona', tipo: 'Casa', img: '/Barcelona1.png' },
-  { id: 3, equipo: 'Bayern Múnich', tipo: 'Casa', img: '/Bayern1.png' },
-  { id: 4, equipo: 'PSG', tipo: 'Casa', img: '/PSG1.png' },
-  { id: 5, equipo: 'Real Madrid', tipo: 'Visita', img: '/Real2.png' },
-  { id: 6, equipo: 'Barcelona', tipo: 'Visita', img: '/Barcelona2.png' },
-  { id: 7, equipo: 'Bayern Múnich', tipo: 'Visita', img: '/Bayern2.png' },
-  { id: 8, equipo: 'PSG', tipo: 'Visita', img: '/PSG2.png' },
-];
-
 const FILTRO_OBJETIVO = 'Temp 26-27';
+
+const productosNuevos = [
+  {
+    id: 1,
+    equipo: 'Real Madrid',
+    busqueda: 'Real Madrid',
+    tipo: 'Casa',
+    img: '/Real1.png',
+  },
+  {
+    id: 2,
+    equipo: 'Barcelona',
+    busqueda: 'Barcelona',
+    tipo: 'Casa',
+    img: '/Barcelona1.png',
+  },
+  {
+    id: 3,
+    equipo: 'Bayern Múnich',
+    busqueda: 'Bayern',
+    tipo: 'Casa',
+    img: '/Bayern1.png',
+  },
+  {
+    id: 4,
+    equipo: 'PSG',
+    busqueda: 'PSG',
+    tipo: 'Casa',
+    img: '/PSG1.png',
+  },
+  {
+    id: 5,
+    equipo: 'Real Madrid',
+    busqueda: 'Real Madrid',
+    tipo: 'Visita',
+    img: '/Real2.png',
+  },
+  {
+    id: 6,
+    equipo: 'Barcelona',
+    busqueda: 'Barcelona',
+    tipo: 'Visita',
+    img: '/Barcelona2.png',
+  },
+  {
+    id: 7,
+    equipo: 'Bayern Múnich',
+    busqueda: 'Bayern',
+    tipo: 'Visita',
+    img: '/Bayern2.png',
+  },
+  {
+    id: 8,
+    equipo: 'PSG',
+    busqueda: 'PSG',
+    tipo: 'Visita',
+    img: '/PSG2.png',
+  },
+];
 
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -23,27 +71,19 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleIrAProductos = (categoria = FILTRO_OBJETIVO) => {
+  const handleIrAProductos = (categoria = FILTRO_OBJETIVO, busqueda = '') => {
     if (onNavigate) {
-      onNavigate(categoria);
+      onNavigate(categoria, busqueda);
     }
-
-    const doScroll = () => {
-      const targets = ['products-section', 'filter-bar', 'catalogo', 'productos'];
-      for (const id of targets) {
-        const el = document.getElementById(id);
-        if (el) {
-          const yOffset = -20;
-          const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-          return;
-        }
+    setTimeout(() => {
+      const section =
+        document.getElementById('products-section') ||
+        document.getElementById('filter-bar') ||
+        document.getElementById('catalogo');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    };
-
-    doScroll();
-    setTimeout(doScroll, 100);
-    setTimeout(doScroll, 300);
+    }, 100);
   };
 
   const marqueeItems = [...productosNuevos, ...productosNuevos];
@@ -100,16 +140,18 @@ const Bienvenido = ({ onNavigate }) => {
           {marqueeItems.map((item, index) => (
             <div
               key={`${item.id}-${index}`}
-              className="group relative cursor-default w-56 md:w-72 lg:w-80 bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-xl border border-white/15 hover:border-white/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-1.5 shrink-0"
+              className="group relative w-56 md:w-72 lg:w-80 bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-xl border border-white/15 hover:border-white/40 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:-translate-y-1.5 shrink-0"
             >
               <div className="absolute inset-0 bg-white/5 rounded-3xl blur-xl group-hover:bg-white/10 transition-all pointer-events-none" />
 
+              {/* Tag superior */}
               <div className="relative z-10 flex items-center justify-between">
                 <span className="text-[10px] md:text-xs font-extrabold tracking-[0.3em] text-white uppercase">
                   TEMP 26-27
                 </span>
               </div>
 
+              {/* Camiseta */}
               <div className="relative z-10 flex items-center justify-center my-2 md:my-4 h-36 md:h-48 lg:h-52">
                 <img
                   src={item.img}
@@ -118,6 +160,7 @@ const Bienvenido = ({ onNavigate }) => {
                 />
               </div>
 
+              {/* Nombre del equipo y tipo */}
               <div className="relative z-10 mt-1 border-t border-white/10 pt-2.5 md:pt-3 text-center">
                 <h3 className="text-sm md:text-base font-black uppercase text-white tracking-wide group-hover:text-amber-300 transition-colors truncate">
                   {item.equipo}
@@ -125,19 +168,30 @@ const Bienvenido = ({ onNavigate }) => {
                 <p className="text-[11px] md:text-xs font-bold uppercase tracking-widest text-gray-400 mt-0.5">
                   {item.tipo}
                 </p>
+
+                {/* 🔘 BOTÓN EN CADA CAJA: Activa Temp 26-27 + Busca el Equipo */}
+                <button
+                  onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
+                  className="mt-3 w-full py-2 px-3 rounded-full bg-white/10 hover:bg-white text-white hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/20 hover:border-white shadow-md cursor-pointer"
+                >
+                  <span>Ver {item.equipo}</span>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ⚡ BOTÓN PRINCIPAL */}
+      {/* ⚡ BOTÓN INFERIOR GENERAL (Muestra todos los de Temp 26-27 sin filtrar por equipo) */}
       <div className="relative z-20 flex flex-col items-center w-full mt-1 md:mt-2">
         <button
-          onClick={() => handleIrAProductos(FILTRO_OBJETIVO)}
+          onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')}
           className="group px-8 py-3 md:px-12 md:py-3.5 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-gray-100 shadow-[0_10px_30px_rgba(255,255,255,0.25)] flex items-center gap-3 cursor-pointer"
         >
-          <span>VER COLECCIÓN</span>
+          <span>VER TODA LA COLECCIÓN</span>
           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 8l4 4m0 0l-4 4m4-4H3" />
           </svg>

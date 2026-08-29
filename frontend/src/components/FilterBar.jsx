@@ -50,7 +50,7 @@ export default function FilterBar({
 
   const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0);
 
-  // Detector de scroll para la animación de la barra sticky
+  // Detector de scroll para la barra sticky
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -59,28 +59,25 @@ export default function FilterBar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // ✅ 1. Sincroniza el texto en la barra cuando se presiona un botón desde afuera (Bienvenido)
   useEffect(() => {
-    if (localSearch.trim() === "") {
-      if (searchTerm !== "") setSearchTerm(""); 
-      return;
-    }
-    const timeout = setTimeout(() => {
-      setSearchTerm(localSearch.trim());
-    }, 150); 
-    return () => clearTimeout(timeout);
-  }, [localSearch, searchTerm, setSearchTerm]);
-
-  useEffect(() => {
-    if (searchTerm === "") {
-      setLocalSearch("");
-    }
+    setLocalSearch(searchTerm || "");
   }, [searchTerm]);
+
+  // ✅ 2. Cuando el usuario escribe a mano en la barra
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setLocalSearch(val);
+    if (setSearchTerm) {
+      setSearchTerm(val);
+    }
+  };
 
   const handleClearFilters = () => {
     if (setFilterType) setFilterType("");
     if (setFilterSizes) setFilterSizes([]);
     setLocalSearch("");
-    setSearchTerm("");
+    if (setSearchTerm) setSearchTerm("");
   };
 
   return (
@@ -106,7 +103,7 @@ export default function FilterBar({
               type="text"
               placeholder="Buscar camiseta..."
               value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={handleInputChange}
               className="w-full pl-5 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-inner text-black"
             />
           </motion.div>
@@ -185,7 +182,7 @@ export default function FilterBar({
                               key={cat.label}
                               onClick={() => {
                                 setFilterType(cat.value);
-                                setIsOpen(false); // Cierra al seleccionar categoría
+                                setIsOpen(false);
                               }}
                               className={`
                                 flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-none cursor-pointer
@@ -232,7 +229,7 @@ export default function FilterBar({
                                         prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
                                       );
                                     }
-                                    setIsOpen(false); // Cierra al seleccionar talla
+                                    setIsOpen(false);
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
@@ -261,7 +258,7 @@ export default function FilterBar({
                                         prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
                                       );
                                     }
-                                    setIsOpen(false); // Cierra al seleccionar talla
+                                    setIsOpen(false);
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
@@ -281,8 +278,6 @@ export default function FilterBar({
                 </div>
               </div>
               
-              {/* Si quieres que se cierre solo, este botón ya no es tan necesario, 
-                  pero lo dejo como una opción extra por si el usuario abre el modal y decide cerrarlo desde aquí */}
               <div className="pt-4 border-t border-zinc-100 mt-4">
                 <button
                   onClick={() => setIsOpen(false)}
