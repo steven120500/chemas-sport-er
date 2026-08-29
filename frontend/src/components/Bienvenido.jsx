@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 
 const FILTRO_OBJETIVO = 'Temp 26-27';
@@ -64,12 +65,12 @@ const productosNuevos = [
 const Bienvenido = ({ onNavigate }) => {
   const [isMobile, setIsMobile] = useState(false);
   const scrollRef = useRef(null);
+  const scrollPos = useRef(0); // 👈 Acumulador de precisión decimal para celulares
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
   const hasMoved = useRef(false);
   const [isInteracting, setIsInteracting] = useState(false);
-  const animationFrameId = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -78,32 +79,40 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🔄 Auto-scroll continuo a 60 FPS
+  // 🔄 Auto-scroll continuo garantizado para PC y Celulares
   useEffect(() => {
     const scrollContainer = scrollRef.current;
     if (!scrollContainer) return;
 
-    const speed = isMobile ? 0.8 : 1.0;
+    scrollPos.current = scrollContainer.scrollLeft;
+    const speed = isMobile ? 0.9 : 1.1;
 
+    let id;
     const step = () => {
       if (!isInteracting && !isDragging.current && scrollContainer) {
-        scrollContainer.scrollLeft += speed;
+        scrollPos.current += speed;
 
         const maxScroll = scrollContainer.scrollWidth / 3;
-        if (scrollContainer.scrollLeft >= maxScroll * 2) {
-          scrollContainer.scrollLeft -= maxScroll;
-        } else if (scrollContainer.scrollLeft <= 0) {
-          scrollContainer.scrollLeft += maxScroll;
+        if (maxScroll > 0) {
+          if (scrollPos.current >= maxScroll * 2) {
+            scrollPos.current -= maxScroll;
+          } else if (scrollPos.current <= 0) {
+            scrollPos.current += maxScroll;
+          }
         }
+        scrollContainer.scrollLeft = scrollPos.current;
+      } else if (scrollContainer) {
+        // Mantiene sincronizada la posición mientras el usuario toca o arrastra
+        scrollPos.current = scrollContainer.scrollLeft;
       }
-      animationFrameId.current = requestAnimationFrame(step);
+      id = requestAnimationFrame(step);
     };
 
-    animationFrameId.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animationFrameId.current);
+    id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
   }, [isInteracting, isMobile]);
 
-  // 🖱️ Arrastre con Mouse (Desktop)
+  // 🖱️ Control de arrastre con Mouse (Desktop)
   const handleMouseDown = (e) => {
     isDragging.current = true;
     hasMoved.current = false;
@@ -121,14 +130,19 @@ const Bienvenido = ({ onNavigate }) => {
       hasMoved.current = true;
     }
     scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
+    scrollPos.current = scrollRef.current.scrollLeft;
 
     const maxScroll = scrollRef.current.scrollWidth / 3;
-    if (scrollRef.current.scrollLeft >= maxScroll * 2) {
-      scrollRef.current.scrollLeft -= maxScroll;
-      scrollLeftStart.current -= maxScroll;
-    } else if (scrollRef.current.scrollLeft <= 0) {
-      scrollRef.current.scrollLeft += maxScroll;
-      scrollLeftStart.current += maxScroll;
+    if (maxScroll > 0) {
+      if (scrollRef.current.scrollLeft >= maxScroll * 2) {
+        scrollRef.current.scrollLeft -= maxScroll;
+        scrollLeftStart.current -= maxScroll;
+        scrollPos.current -= maxScroll;
+      } else if (scrollRef.current.scrollLeft <= 0) {
+        scrollRef.current.scrollLeft += maxScroll;
+        scrollLeftStart.current += maxScroll;
+        scrollPos.current += maxScroll;
+      }
     }
   };
 
@@ -137,12 +151,15 @@ const Bienvenido = ({ onNavigate }) => {
     setTimeout(() => setIsInteracting(false), 1200);
   };
 
-  // 📱 Control táctil (Celular / Tablet)
+  // 📱 Control táctil para Celular
   const handleTouchStart = () => {
     setIsInteracting(true);
   };
 
   const handleTouchEnd = () => {
+    if (scrollRef.current) {
+      scrollPos.current = scrollRef.current.scrollLeft;
+    }
     setTimeout(() => setIsInteracting(false), 1500);
   };
 
@@ -189,7 +206,12 @@ const Bienvenido = ({ onNavigate }) => {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/75 to-black/95 z-10 pointer-events-none" />
 
-  
+      {/* 🏆 ENCABEZADO */}
+      <div className="relative z-20 flex flex-col items-center text-center px-4 max-w-4xl mx-auto mb-1 md:mb-2 pointer-events-none">
+        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-white drop-shadow-2xl">
+          NUEVA TEMPORADA 26-27
+        </h1>
+      </div>
 
       {/* 🚀 CINTA DESLIZABLE */}
       <div className="relative z-20 w-full overflow-hidden py-2 md:py-4">
@@ -204,6 +226,7 @@ const Bienvenido = ({ onNavigate }) => {
           onMouseLeave={handleMouseUpOrLeave}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
           className="flex gap-6 md:gap-8 px-6 overflow-x-auto cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-2"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
@@ -213,7 +236,6 @@ const Bienvenido = ({ onNavigate }) => {
             return (
               <div
                 key={`${item.id}-${index}`}
-                /* 👇 Configuración condicional: PSG con su propio ancho y el resto con tus medidas */
                 className={`group relative bg-black hover:bg-gray-600 backdrop-blur-xl border border-white/15 hover:border-gray-600 rounded-3xl shadow-2xl flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
                   isPSG
                     ? "w-100 sm:w-80 md:w-80 lg:w-96 p-10 md:p-36"
@@ -229,7 +251,7 @@ const Bienvenido = ({ onNavigate }) => {
                   </span>
                 </div>
 
-                {/* Camiseta (PSG escalada independientemente) */}
+                {/* Camiseta */}
                 <div className="relative z-10 flex items-center justify-center my-4 md:my-6 h-48 sm:h-56 md:h-64 pointer-events-none overflow-visible">
                   <div 
                     style={{
