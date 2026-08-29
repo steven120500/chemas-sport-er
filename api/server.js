@@ -1,12 +1,12 @@
 import express from 'express';
-import http from 'http'; // 👈 1. Importamos http nativo de Node
-import { Server } from 'socket.io'; // 👈 2. Importamos el Server de Socket.io
+import http from 'http';
+import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import compression from 'compression';
 import connectDB from './config/db.js';
 
-import attachUser from './middleware/attachUser.js';   // ⭐ IMPORTANTE
+import attachUser from './middleware/attachUser.js';
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
@@ -31,7 +31,7 @@ const allowedOrigins = [
   "https://www.chemasporter.com"
 ];
 
-// ⭐ 1. CORS DE EXPRESS BLINDADO PARA TUS CABECERAS PERSONALIZADAS ⭐
+// ⭐ CORS DE EXPRESS
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
@@ -39,15 +39,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 🚀 LÍMITE AMPLIADO PARA FOTOS EN BASE64
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-/* 👇👇👇 CONFIGURACIÓN DE WEBSOCKETS OPTIMIZADA PARA RENDER 👇👇👇 */
-
-// 3. Creamos el servidor HTTP envolviendo a la app de Express
+/* 👇 CONFIGURACIÓN DE WEBSOCKETS 👇 */
 const server = http.createServer(app);
 
-// ⭐ 4. INICIALIZACIÓN BLINDADA CONTRA EL ERROR 502 DE RENDER ⭐
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -55,15 +53,13 @@ const io = new Server(server, {
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
   },
-  transports: ['websocket', 'polling'], // 👈 Obligatorio para que Render no tire 502
-  pingTimeout: 60000,                   // 👈 60 segundos de paciencia para evitar desconexiones
-  pingInterval: 25000                   // 👈 Mantiene viva la conexión en la nube
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
-// 5. Guardamos 'io' en app para poder usarlo desde nuestros archivos de rutas (productRoutes)
 app.set('io', io);
 
-// 6. Escuchamos cuando alguien entra a la página
 io.on('connection', (socket) => {
   console.log('🟢 Nuevo administrador conectado en vivo:', socket.id);
   
@@ -71,8 +67,7 @@ io.on('connection', (socket) => {
     console.log('🔴 Administrador desconectado:', socket.id);
   });
 });
-/* 👆👆👆 FIN DE CONFIGURACIÓN WEBSOCKETS 👆👆👆 */
-
+/* 👆 FIN DE CONFIGURACIÓN WEBSOCKETS 👆 */
 
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', t: Date.now() });
@@ -84,7 +79,6 @@ app.get('/api/ping', (_req, res) => {
 
 await connectDB();
 
-/* ⭐⭐⭐ SE AGREGA AQUÍ ⭐⭐⭐ */
 app.use(attachUser);
 
 /* -------- rutas -------- */
@@ -103,5 +97,4 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// 7. Servidor escuchando
 server.listen(PORT, () => console.log(`🚀 Servidor en tiempo real corriendo en puerto ${PORT}`));

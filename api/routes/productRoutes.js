@@ -125,6 +125,7 @@ router.post('/', upload.any(), async (req, res) => {
       bodega: cleanBodega,
       images,
       imageSrc,
+      imageSrc2: images?.url || '',
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
       isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
       isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true
@@ -196,7 +197,7 @@ router.post('/:id/unlock', async (req, res) => {
   }
 });
 
-/* ======================== Actualizar Producto (OPTIMIZADO) ====================== */
+/* ======================== Actualizar Producto (CORREGIDO) ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
@@ -250,11 +251,11 @@ router.put('/:id', async (req, res) => {
       update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     }
 
-    // 🔥 CAPTURA DEL CAMPO TEMPORADA 26-27 🔥
     if (req.body.isTemporada2627 !== undefined) {
       update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
     }
 
+    // 📸 PROCESAMIENTO ORDENADO DE IMÁGENES
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -262,32 +263,36 @@ router.put('/:id', async (req, res) => {
 
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
-      const normalized = [];
-      const uploadTasks = [];
 
-      for (const raw of incomingImages.slice(0, 2)) {
-        if (!raw) continue;
-        if (typeof raw === 'string' && raw.startsWith('data:')) {
-          uploadTasks.push(
-            cloudinary.uploader.upload(raw, { folder: 'products', resource_type: 'image' })
-              .then(up => ({ public_id: up.public_id, url: up.secure_url }))
-          );
-        } else {
-          const found = prevList.find(i => i.url === raw);
-          normalized.push(found || { public_id: null, url: raw });
-        }
-      }
+      // Procesamos en paralelo pero manteniendo exactamente el orden de los índices (0, 1)
+      const processedImages = await Promise.all(
+        incomingImages.map(async (raw) => {
+          if (!raw) return null;
+          const strVal = typeof raw === 'string' ? raw : (raw.url || raw.src || '');
+          if (!strVal) return null;
 
-      if (uploadTasks.length > 0) {
-        const uploadedNew = await Promise.all(uploadTasks);
-        normalized.push(...uploadedNew);
-      }
+          // Si es una foto nueva en Base64, se sube a Cloudinary
+          if (strVal.startsWith('data:')) {
+            const up = await cloudinary.uploader.upload(strVal, {
+              folder: 'products',
+              resource_type: 'image'
+            });
+            return { public_id: up.public_id, url: up.secure_url };
+          } else {
+            // Si ya es una URL existente en Cloudinary
+            const found = prevList.find(i => i.url === strVal);
+            return found || { public_id: null, url: strVal };
+          }
+        })
+      );
 
-      update.images = normalized;
-      update.imageSrc = normalized[0]?.url || '';
+      const finalImages = processedImages.filter(Boolean);
+      update.images = finalImages;
+      update.imageSrc = finalImages[0]?.url || '';
+      update.imageSrc2 = finalImages?.url || '';
     }
 
-    // 1. Guardado principal en MongoDB
+    // 1. Guardado en MongoDB
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
@@ -296,10 +301,10 @@ router.put('/:id', async (req, res) => {
 
     const updatedObj = updated.toObject();
 
-    // ⭐ 2. RESPONDEMOS AL FRONTEND DE INMEDIATO ⭐
+    // 2. Respondemos al frontend inmediatamente
     res.status(200).json(updatedObj);
 
-    // 3. PROCESO EN SEGUNDO PLANO (Fire & Forget): Historial, Popularidad y WebSockets
+    // 3. Proceso en segundo plano (Historial, popularidad y sockets)
     setTimeout(async () => {
       try {
         if (restadas > 0) {
@@ -310,7 +315,7 @@ router.put('/:id', async (req, res) => {
         }
 
         const now = new Date();
-        const totalMonth = updated.popularCountHistory
+        const totalMonth = (updated.popularCountHistory || [])
           .filter(entry => {
             const d = new Date(entry.date);
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -449,7 +454,6 @@ router.get('/', async (req, res) => {
     else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     }
-    // 🔥 FILTRO BLINDADO PARA LA TEMPORADA 26-27 (BOOLEANO O TEXTO) 🔥
     else if (type === 'Temp 26-27' || type === 'Temporada 26-27') {
       find.$or = [
         { isTemporada2627: true },
@@ -460,7 +464,6 @@ router.get('/', async (req, res) => {
       find.type = type;
     }
     
-    /* 🔥 FILTRO MÁGICO DE BASE DE DATOS PARA EVITAR HUECOS 🔥 */
     const allSizesArray = Array.from(ALL_SIZES);
     const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -477,7 +480,6 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    // ⭐ PROYECCIÓN ACTUALIZADA CON isTemporada2627 ⭐
     const projection =
       'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
 
@@ -493,7 +495,8 @@ router.get('/', async (req, res) => {
       Product.countDocuments(find),
     ]);
 
-    res.set('Cache-Control', 'public, max-age=20');
+    // 🚀 IMPORTANTE: Eliminamos el Cache-Control de 20s para que las fotos actualizadas se vean de inmediato
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     res.json({
       items,
