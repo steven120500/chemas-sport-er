@@ -155,7 +155,7 @@ export default function Header({
           ======================================================== */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity"
           onClick={() => setSidebarOpen(false)}
         >
           <div
