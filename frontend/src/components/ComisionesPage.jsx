@@ -44,14 +44,19 @@ function parseSaleDetails(log) {
   let totalUnidades = 0;
 
   try {
-    // ⭐ REGEX CORREGIDO: Soporta Tienda #1, Tienda #2 y cualquier espacio
-    const regex = /(Tienda\s*#\s*\d+|Tienda|Bodega)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
+    // ⭐ REGEX BLINDADO: Captura Tienda #1, Tienda #2, Tallas y Flechas
+    const regex = /(?:(Tienda\s*#\s*\d+|Tienda|Bodega)\s*)?\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
-      const tienda = String(m || "Tienda #1").trim();
-      const talla = String(m || "U").trim();
-      const oldV = parseInt(m, 10) || 0;
-      const newV = parseInt(m, 10) || 0;
+      const tiendaCaptured = m;
+      const tallaCaptured = m;
+      const oldStr = m;
+      const newStr = m;
+
+      const tienda = String(tiendaCaptured || (detailsStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1")).trim();
+      const talla = String(tallaCaptured || "U").trim();
+      const oldV = parseInt(oldStr, 10) || 0;
+      const newV = parseInt(newStr, 10) || 0;
 
       if (oldV > newV) {
         const cantidad = oldV - newV;
@@ -74,7 +79,7 @@ function parseSaleDetails(log) {
     totalUnidades = 1;
   }
 
-  // Texto legible agrupado: ej "2x M, 1x L"
+  // Texto legible agrupado: ej "2x XL, M" o "XL"
   const tallasTexto = Object.entries(tallasAgrupadas)
     .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
     .join(", ");
@@ -152,7 +157,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       .filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
 
-  // Ranking ordenado por total de prendas vendidas reales
+  // Ranking ordenado por total de prendas vendidas
   const ranking = useMemo(() => {
     const conteo = {};
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
@@ -195,33 +200,41 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
-  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Llama a products o history)
-  const ejecutarAnulacion = async (logId) => {
+  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Con reintento y envío de datos)
+  const ejecutarAnulacion = async (venta) => {
     try {
+      const payload = {
+        item: venta.item,
+        items: venta.items,
+        totalUnidades: venta.totalUnidades
+      };
+
       // 1. Intentamos anular en /api/products/anular/
-      let res = await fetch(`${API_BASE}/api/products/anular/${logId}`, {
+      let res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "x-super": storedUser?.isSuperUser ? "true" : "false"
-        }
+        },
+        body: JSON.stringify(payload)
       });
 
-      // 2. Si no está en products, intenta en /api/history/anular/
+      // 2. Si no responde en products, intenta en /api/history/anular/
       if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/history/anular/${logId}`, {
+        res = await fetch(`${API_BASE}/api/history/anular/${venta._id}`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
             "x-super": storedUser?.isSuperUser ? "true" : "false"
-          }
+          },
+          body: JSON.stringify(payload)
         });
       }
 
-      if (!res.ok) throw new Error("Error en servidor al anular");
+      if (!res.ok) throw new Error("Error en el servidor al anular");
 
-      // Actualizar vista local inmediatamente (recalcula ranking y tabla)
-      setLogs((prev) => prev.filter((l) => l._id !== logId));
+      // Actualizar vista local inmediatamente
+      setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
       });
@@ -242,7 +255,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <button
             onClick={() => {
               toastHOT.dismiss(t.id);
-              ejecutarAnulacion(venta._id);
+              ejecutarAnulacion(venta);
             }}
             className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
           >
@@ -632,7 +645,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           {venta.cliente}
                         </td>
                         
-                        {/* ⭐ MUESTRA TODAS LAS PRENDAS Y TALLAS VENDIDAS */}
+                        {/* ⭐ MUESTRA TODAS LAS PRENDAS Y TALLAS REALES */}
                         <td className="py-3.5 px-3 text-zinc-700">
                           <span className="font-bold text-black block">{venta.item}</span>
                           {venta.tallasTexto && (
@@ -653,7 +666,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           {venta.totalUnidades}
                         </td>
 
-                        {/* 🗑️ BASURERO CON CONFIRMACIÓN */}
+                        {/* 🗑️ BOTÓN DE BASURERO */}
                         <td className="py-3.5 px-3 text-center">
                           <button
                             onClick={() => confirmarAnulacion(venta)}

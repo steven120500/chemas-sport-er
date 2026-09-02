@@ -43,17 +43,17 @@ function diffProduct(prev, next) {
   if (prev.discountPrice !== next.discountPrice)
     changes.push(`descuento: ${prev.discountPrice} → ${next.discountPrice}`);
   if (prev.type !== next.type) changes.push(`tipo: "${prev.type}" → "${next.type}"`);
-  
+
   const prevMundial = Boolean(prev.isMundial2026);
   const nextMundial = Boolean(next.isMundial2026);
-  
+
   if (prevMundial !== nextMundial) {
     changes.push(`Mundial 2026: ${prevMundial ? 'Sí' : 'No'} → ${nextMundial ? 'Sí' : 'No'}`);
   }
 
   const prevTemp = Boolean(prev.isTemporada2627);
   const nextTemp = Boolean(next.isTemporada2627);
-  
+
   if (prevTemp !== nextTemp) {
     changes.push(`Temporada 26-27: ${prevTemp ? 'Sí' : 'No'} → ${nextTemp ? 'Sí' : 'No'}`);
   }
@@ -149,7 +149,6 @@ router.post('/', upload.any(), async (req, res) => {
 
 /* ==================== RUTAS DE BLOQUEO (CANDADO) ================== */
 
-// 🔒 PONER CANDADO
 router.post('/:id/lock', async (req, res) => {
   try {
       const product = await Product.findById(req.params.id);
@@ -180,7 +179,6 @@ router.post('/:id/lock', async (req, res) => {
   }
 });
 
-// 🔓 QUITAR CANDADO
 router.post('/:id/unlock', async (req, res) => {
   try {
       const product = await Product.findById(req.params.id);
@@ -203,13 +201,7 @@ router.put('/:id', async (req, res) => {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // 👤 Vendedor exacto
-    const user = (
-      req.body.sellerName ||
-      req.body.user ||
-      whoDidIt(req) ||
-      'Sistema'
-    ).trim();
+    const user = (req.body.sellerName || req.body.user || whoDidIt(req) || 'Sistema').trim();
 
     if (prev.lockedBy && prev.lockedBy !== user) {
       const lockAge = new Date() - prev.lockedAt;
@@ -230,7 +222,6 @@ router.put('/:id', async (req, res) => {
     }
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
 
-    // ⭐ CÁLCULO COMPLETO DE PRENDAS REBAJADAS (Cuenta Tienda #1 y Tienda #2)
     let restadas = 0;
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
       const before = Number(prev.stock?.[size] ?? 0);
@@ -256,19 +247,10 @@ router.put('/:id', async (req, res) => {
       lockedAt: null
     };
 
-    if (req.body.hidden !== undefined) {
-      update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
-    }
-    
-    if (req.body.isMundial2026 !== undefined) {
-      update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
-    }
+    if (req.body.hidden !== undefined) update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
+    if (req.body.isMundial2026 !== undefined) update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
+    if (req.body.isTemporada2627 !== undefined) update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
 
-    if (req.body.isTemporada2627 !== undefined) {
-      update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
-    }
-
-    // 📸 PROCESAMIENTO ORDENADO DE IMÁGENES
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
       try { incomingImages = JSON.parse(incomingImages); } catch { incomingImages = undefined; }
@@ -276,7 +258,6 @@ router.put('/:id', async (req, res) => {
 
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
-
       const processedImages = await Promise.all(
         incomingImages.map(async (raw) => {
           if (!raw) return null;
@@ -284,10 +265,7 @@ router.put('/:id', async (req, res) => {
           if (!strVal) return null;
 
           if (strVal.startsWith('data:')) {
-            const up = await cloudinary.uploader.upload(strVal, {
-              folder: 'products',
-              resource_type: 'image'
-            });
+            const up = await cloudinary.uploader.upload(strVal, { folder: 'products', resource_type: 'image' });
             return { public_id: up.public_id, url: up.secure_url };
           } else {
             const found = prevList.find(i => i.url === strVal);
@@ -295,80 +273,68 @@ router.put('/:id', async (req, res) => {
           }
         })
       );
-
       const finalImages = processedImages.filter(Boolean);
       update.images = finalImages;
       update.imageSrc = finalImages[0]?.url || '';
       update.imageSrc2 = finalImages?.url || '';
     }
 
-    // 1. Guardado en MongoDB
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     );
-
     const updatedObj = updated.toObject();
 
-    // 2. Respondemos al frontend inmediatamente
     res.status(200).json(updatedObj);
 
-    // ========================================================
-    // 3. REGISTRO EN SEGUNDO PLANO: Historial y Comisiones
-    // ========================================================
     setTimeout(async () => {
       try {
         const nombreCliente = (req.body.customerName || "").trim();
-        
-        // ⭐ REGLA ESTRICTA: Solo es venta si el frontend envía explícitamente isSale: true
         const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
         if (esVenta) {
-          updated.popularCountHistory.push({
-            date: new Date().toISOString(),
-            quantity: restadas
-          });
-
+          updated.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
           const now = new Date();
           const totalMonth = (updated.popularCountHistory || [])
             .filter(entry => {
               const d = new Date(entry.date);
               return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-            })
-            .reduce((sum, e) => sum + e.quantity, 0);
-
+            }).reduce((sum, e) => sum + e.quantity, 0);
           updated.isPopular = totalMonth >= 10;
           await updated.save();
         }
 
         let tiendasModificadas = [];
-        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) {
-          tiendasModificadas.push("Tienda #1");
-        }
-        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) {
-          tiendasModificadas.push("Tienda #2");
-        }
+        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) tiendasModificadas.push("Tienda #1");
+        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) tiendasModificadas.push("Tienda #2");
         const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
 
         const changes = diffProduct(prev, updatedObj);
-        if (changes.length) {
-          let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
-          let detalleCompleto = changes.join(' | ');
+        
+        // 🔥 SOLUCIÓN: Si es una venta y viene con details exactos, los priorizamos
+        let detalleText = '';
+        if (esVenta && req.body.details) {
+          detalleText = req.body.details;
+        } else if (changes.length) {
+          detalleText = changes.join(' | ');
+        }
 
+        if (detalleText) {
+          let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
+          
           if (esVenta && nombreCliente && nombreCliente !== "No especificado") {
-            detalleCompleto = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+            detalleText = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleText}`;
           } else {
-            detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
+            detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
           }
 
-          // 💾 Guardado en el modelo History
           await History.create({
             user: user,
             action: accionTexto,
             item: `${updated.name} (${updated.type})`,
             date: new Date(),
-            details: detalleCompleto
+            details: detalleText
           });
         }
 
@@ -380,9 +346,8 @@ router.put('/:id', async (req, res) => {
         };
 
         const io = req.app.get('io');
-        if (io) {
-          io.emit('productoActualizado', updatedObj);
-        }
+        if (io) io.emit('productoActualizado', updatedObj);
+
       } catch (bgError) {
         console.error('Error analítico en segundo plano en PUT /api/products/:id:', bgError);
       }
@@ -390,13 +355,11 @@ router.put('/:id', async (req, res) => {
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Error al actualizar producto' });
-    }
+    if (!res.headersSent) res.status(500).json({ error: 'Error al actualizar producto' });
   }
 });
 
-/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK (CORREGIDO) ================== */
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
     const log = await History.findById(req.params.id);
@@ -404,23 +367,21 @@ router.post('/anular/:id', async (req, res) => {
 
     const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-    // 1. Regex corregido: captura Tienda #1 y Tienda #2 con sus cantidades exactas
     const regex = /(Tienda\s*#\s*\d+|Tienda|Bodega)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
     let match;
     const restas = [];
 
     while ((match = regex.exec(detailsStr)) !== null) {
-      const tienda = String(match || "").trim();
-      const talla = String(match || "").trim();
-      const oldV = parseInt(match, 10) || 0;
-      const newV = parseInt(match, 10) || 0;
+      const tienda = String(match[1] || "").trim();
+      const talla = String(match[2] || "").trim();
+      const oldV = parseInt(match[3], 10) || 0;
+      const newV = parseInt(match[4], 10) || 0;
 
       if (oldV > newV) {
         restas.push({ tienda, talla, cantidad: oldV - newV });
       }
     }
 
-    // 2. Buscamos el producto por nombre exacto o aproximado
     const cleanItemName = (log.item || "").split("(")[0].trim();
     const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") })
@@ -442,14 +403,10 @@ router.post('/anular/:id', async (req, res) => {
       product.bodega = updatedBodega;
       await product.save();
 
-      // Notificamos vía WebSocket para que todas las pantallas reflejen el stock devuelto
       const io = req.app.get('io');
-      if (io) {
-        io.emit('productoActualizado', product.toObject());
-      }
+      if (io) io.emit('productoActualizado', product.toObject());
     }
 
-    // 3. Eliminamos el registro del historial (se descuenta del ranking de comisiones de inmediato)
     await History.findByIdAndDelete(req.params.id);
 
     res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente." });
@@ -468,7 +425,6 @@ router.delete('/:id', async (req, res) => {
     for (const img of product.images || []) {
       if (img.public_id) await cloudinary.uploader.destroy(img.public_id);
     }
-
     await product.deleteOne();
 
     await History.create({
@@ -480,7 +436,6 @@ router.delete('/:id', async (req, res) => {
     });
 
     res.json({ message: 'Producto eliminado' });
-
   } catch (err) {
     console.error('DELETE /api/products/:id error:', err);
     res.status(500).json({ error: 'Error al eliminar producto' });
@@ -496,54 +451,33 @@ router.get('/', async (req, res) => {
     const type  = (req.query.type || '').trim();
     const sizes = (req.query.sizes || '').trim();
     const storeView = (req.query.storeView || '').trim(); 
-    
     const sortParam = req.query.sort; 
 
     const find = {};
-
     const user = req.user || {};
     let canSeeHidden = false;
 
-    if (
-      user.isSuperUser ||
-      (user.roles || []).includes("edit") ||
-      (user.roles || []).includes("ver_ocultos")
-    ) {
+    if (user.isSuperUser || (user.roles || []).includes("edit") || (user.roles || []).includes("ver_ocultos") || req.headers["x-admin"] === "true") {
       canSeeHidden = true;
     }
 
-    if (req.headers["x-admin"] === "true") {
-      canSeeHidden = true;
-    }
+    if (!canSeeHidden) find.hidden = { $ne: true };
 
-    if (!canSeeHidden) {
-      find.hidden = { $ne: true };
-    }
-
-    /* Filtro buscador */
     if (q) find.name = { $regex: q, $options: 'i' };
 
-    /* Filtro tipo */
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
       find.$expr = { $lt: ['$discountPrice', '$price'] };
-    } 
-    else if (type === 'Populares') {
+    } else if (type === 'Populares') {
       find.isPopular = true;
-    }
-    else if (type === 'Mundial 2026') {
+    } else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
-    }
-    else if (type === 'Temp 26-27' || type === 'Temporada 26-27') {
-      find.$or = [
-        { isTemporada2627: true },
-        { type: { $regex: '26-27', $options: 'i' } }
-      ];
-    }
-    else if (type) {
+    } else if (type === 'Temp 26-27' || type === 'Temporada 26-27') {
+      find.$or = [{ isTemporada2627: true }, { type: { $regex: '26-27', $options: 'i' } }];
+    } else if (type) {
       find.type = type;
     }
-    
+
     const allSizesArray = Array.from(ALL_SIZES);
     const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -560,30 +494,16 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    const projection =
-      'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
-
+    const projection = 'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([
-      Product.find(find)
-        .select(projection)
-        .sort(sortOptions) 
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
+      Product.find(find).select(projection).sort(sortOptions).skip((page - 1) * limit).limit(limit).lean(),
       Product.countDocuments(find),
     ]);
 
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-
-    res.json({
-      items,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      limit,
-    });
+    res.json({ items, total, page, pages: Math.ceil(total / limit), limit });
 
   } catch (err) {
     console.error('GET /api/products error:', err);

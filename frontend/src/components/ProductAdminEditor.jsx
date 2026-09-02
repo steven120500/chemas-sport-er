@@ -123,7 +123,6 @@ export default function ProductAdminEditor({
     return decreased;
   };
 
-  // 💾 Guardado con control estricto de si es venta o no
   const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -135,6 +134,7 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
+      // 🔥 SOLUCIÓN: Agregamos "details" para enviarle el texto exacto al servidor
       const payload = {
         name: editedName.trim(), 
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
@@ -150,8 +150,9 @@ export default function ProductAdminEditor({
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
         customerName: isSale ? (clientName || "Cliente General / Tienda") : "Ajuste de inventario",
-        isSale: Boolean(isSale),     // 👈 Solo es true si presionan REGISTRAR VENTA
-        sellerName: displayName,     // 👈 Vendedor logueado
+        isSale: Boolean(isSale),
+        sellerName: displayName,
+        details: getInventoryChanges().join(" | "), 
       };
 
       let tiendaModificada = [];
@@ -203,7 +204,6 @@ export default function ProductAdminEditor({
 
   return (
     <>
-      {/* CUADRICULA DE IMÁGENES Y FORMULARIO */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start w-full">
         <div className="w-full">
           <div className="flex gap-4 justify-center flex-wrap bg-gray-50/50 p-8 rounded-3xl border border-gray-200">
@@ -316,7 +316,6 @@ export default function ProductAdminEditor({
                 </div>
               </label>
 
-              {/* 🔥 NUEVA OPCIÓN EN INTERFAZ: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input type="checkbox" checked={editedIsTemporada2627} onChange={(e) => setEditedIsTemporada2627(e.target.checked)} className="sr-only" />
@@ -377,9 +376,6 @@ export default function ProductAdminEditor({
         </div>
       </div>
 
-      {/* ========================================================
-          🛒 MODAL: REGISTRAR VENTA O SOLO ACTUALIZAR (2 BOTONES)
-          ======================================================== */}
       {showBuyerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative">
@@ -390,9 +386,7 @@ export default function ProductAdminEditor({
               <input type="text" placeholder="Ej: Emanuel Espinoza" className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} autoFocus />
             </div>
             
-            {/* 🔘 LOS DOS BOTONES CON CONTROL ESTRICTO DE VENTA */}
             <div className="flex gap-3 w-full">
-              {/* REGISTRAR VENTA: Envía isSale: true */}
               <button 
                 type="button" 
                 onClick={() => { 
@@ -406,7 +400,6 @@ export default function ProductAdminEditor({
                 REGISTRAR VENTA
               </button>
 
-              {/* SOLO ACTUALIZAR: Envía isSale: false */}
               <button 
                 type="button" 
                 onClick={() => { 
