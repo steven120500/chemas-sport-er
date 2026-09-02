@@ -197,13 +197,13 @@ router.post('/:id/unlock', async (req, res) => {
   }
 });
 
-/* ======================== Actualizar Producto ====================== */
+/* ======================== Actualizar Producto (CONTROL DE VENTAS) ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // 👤 Identificación del vendedor que hace la modificación
+    // 👤 Identificación del vendedor
     const user = (
       req.body.sellerName ||
       req.body.user ||
@@ -316,10 +316,10 @@ router.put('/:id', async (req, res) => {
       try {
         const nombreCliente = (req.body.customerName || "").trim();
         
-        // ⭐ Identificamos si es venta real o solo ajuste de inventario
-        const esVenta = req.body.isSale !== false && restadas > 0 && nombreCliente !== "Ajuste de inventario";
+        // ⭐ REGLA ESTRICTA: Solo es venta si el frontend envía explícitamente isSale: true
+        const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
-        // Si fue VENTA, suma a las estadísticas de popularidad
+        // Solo si es VENTA REAL suma a las estadísticas de popularidad
         if (esVenta) {
           updated.popularCountHistory.push({
             date: new Date().toISOString(),
@@ -349,6 +349,7 @@ router.put('/:id', async (req, res) => {
 
         const changes = diffProduct(prev, updatedObj);
         if (changes.length) {
+          // Si es venta: 'vendió / rebajó stock'. Si es solo ajuste: 'ajustó stock'
           let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           let detalleCompleto = changes.join(' | ');
 
@@ -358,7 +359,7 @@ router.put('/:id', async (req, res) => {
             detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
           }
 
-          // 💾 Guardado asignado al vendedor exacto
+          // 💾 Guardado en el modelo History
           await History.create({
             user: user,
             action: accionTexto,
@@ -408,8 +409,8 @@ router.post('/anular/:id', async (req, res) => {
     while ((match = regex.exec(detailsStr)) !== null) {
       const tienda = match;
       const talla = match;
-      const oldV = parseInt(match, 10);
-      const newV = parseInt(match, 10);
+      const oldV = parseInt(match, 10) || 0;
+      const newV = parseInt(match, 10) || 0;
       if (oldV > newV) {
         restas.push({ tienda, talla, cantidad: oldV - newV });
       }

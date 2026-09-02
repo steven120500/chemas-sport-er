@@ -46,7 +46,6 @@ export default function ProductAdminEditor({
   const [editedType, setEditedType] = useState(product?.type || "Player");
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
-  // 🔥 1. NUEVO ESTADO PARA EL SELLO DE TEMPORADA 26-27 🔥
   const [editedIsTemporada2627, setEditedIsTemporada2627] = useState(product?.isTemporada2627 || false);
   
   const [loading, setLoading] = useState(false);
@@ -124,7 +123,8 @@ export default function ProductAdminEditor({
     return decreased;
   };
 
-  const handleSave = async (clientName = "") => {
+  // 💾 Guardado con control estricto de si es venta o no
+  const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
     const id = product?._id || product?.id;
     if (!id || !isLikelyObjectId(id)) return toast.error("ID de producto inválido");
@@ -135,7 +135,6 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
-      // 🔥 2. SE AGREGÓ isTemporada2627 AL PAYLOAD PARA EL BACKEND 🔥
       const payload = {
         name: editedName.trim(), 
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
@@ -150,7 +149,9 @@ export default function ProductAdminEditor({
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
-        customerName: clientName,
+        customerName: isSale ? (clientName || "Cliente General / Tienda") : "Ajuste de inventario",
+        isSale: Boolean(isSale),     // 👈 Solo es true si presionan REGISTRAR VENTA
+        sellerName: displayName,     // 👈 Vendedor logueado
       };
 
       let tiendaModificada = [];
@@ -162,10 +163,14 @@ export default function ProductAdminEditor({
       const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
 
       const localUpdatedProduct = { ...viewProduct, ...payload };
-      onSaveSuccess(localUpdatedProduct); // Cierra y actualiza la vista local al instante
-      toast.success(etiquetaTienda ? `Cambio realizado en ${etiquetaTienda} correctamente.` : "Cambios guardados correctamente.");
+      onSaveSuccess(localUpdatedProduct);
 
-      // Sincronización silenciosa
+      if (isSale) {
+        toast.success(etiquetaTienda ? `Venta registrada en ${etiquetaTienda}.` : "Venta registrada correctamente.");
+      } else {
+        toast.success(etiquetaTienda ? `Cambio realizado en ${etiquetaTienda}.` : "Cambios guardados correctamente.");
+      }
+
       fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "PUT", headers: { "Content-Type": "application/json", "x-user": displayName },
         body: JSON.stringify(payload),
@@ -184,7 +189,7 @@ export default function ProductAdminEditor({
 
     try {
       setLoading(true);
-      onDeleteSuccess(id); // Cierra y actualiza parent
+      onDeleteSuccess(id);
       toast.success("Producto eliminado correctamente.");
 
       fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -311,7 +316,7 @@ export default function ProductAdminEditor({
                 </div>
               </label>
 
-              {/* 🔥 3. NUEVA OPCIÓN EN INTERFAZ: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
+              {/* 🔥 NUEVA OPCIÓN EN INTERFAZ: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input type="checkbox" checked={editedIsTemporada2627} onChange={(e) => setEditedIsTemporada2627(e.target.checked)} className="sr-only" />
@@ -343,8 +348,19 @@ export default function ProductAdminEditor({
                         <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales.</p>
                       )}
                       <div className="flex gap-3 justify-center mt-2">
-                        <button onClick={() => { toastHOT.dismiss(t.id); if (checkHasDeduction()) setShowBuyerModal(true); else handleSave(""); }} className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer">SÍ, GUARDAR</button>
-                        <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer">CANCELAR</button>
+                        <button 
+                          onClick={() => { 
+                            toastHOT.dismiss(t.id); 
+                            if (checkHasDeduction()) setShowBuyerModal(true); 
+                            else handleSave("", false); 
+                          }} 
+                          className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer"
+                        >
+                          SÍ, GUARDAR
+                        </button>
+                        <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer">
+                          CANCELAR
+                        </button>
                       </div>
                     </div>
                   ), { duration: 8000 }
@@ -374,19 +390,30 @@ export default function ProductAdminEditor({
               <input type="text" placeholder="Ej: Emanuel Espinoza" className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} autoFocus />
             </div>
             
-            {/* 🔘 LOS DOS BOTONES */}
+            {/* 🔘 LOS DOS BOTONES CON CONTROL ESTRICTO DE VENTA */}
             <div className="flex gap-3 w-full">
+              {/* REGISTRAR VENTA: Envía isSale: true */}
               <button 
                 type="button" 
-                onClick={() => { setShowBuyerModal(false); handleSave(buyerName || "Cliente General / Tienda"); setBuyerName(""); }} 
+                onClick={() => { 
+                  setShowBuyerModal(false); 
+                  handleSave(buyerName.trim() || "Cliente General / Tienda", true); 
+                  setBuyerName(""); 
+                }} 
                 disabled={loading} 
                 className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 REGISTRAR VENTA
               </button>
+
+              {/* SOLO ACTUALIZAR: Envía isSale: false */}
               <button 
                 type="button" 
-                onClick={() => { setShowBuyerModal(false); handleSave("No especificado"); setBuyerName(""); }} 
+                onClick={() => { 
+                  setShowBuyerModal(false); 
+                  handleSave("Ajuste de inventario", false); 
+                  setBuyerName(""); 
+                }} 
                 disabled={loading} 
                 className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
               >
