@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
-  FaFilePdf, FaTrash 
+  FaFilePdf, FaTrash, FaLock 
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -29,7 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS Y TALLAS
+// 🛡️ PARSEO INDESTRUCTIBLE DE MÚLTIPLES PRENDAS Y TALLAS
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -44,19 +44,15 @@ function parseSaleDetails(log) {
   let totalUnidades = 0;
 
   try {
-    // ⭐ REGEX BLINDADO: Captura Tienda #1, Tienda #2, Tallas y Flechas
-    const regex = /(?:(Tienda\s*#\s*\d+|Tienda|Bodega)\s*)?\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
+    const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
-      const tiendaCaptured = m;
-      const tallaCaptured = m;
-      const oldStr = m;
-      const newStr = m;
+      const talla = String(m[1]).trim();
+      const oldV = parseInt(m[2], 10) || 0;
+      const newV = parseInt(m[3], 10) || 0;
 
-      const tienda = String(tiendaCaptured || (detailsStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1")).trim();
-      const talla = String(tallaCaptured || "U").trim();
-      const oldV = parseInt(oldStr, 10) || 0;
-      const newV = parseInt(newStr, 10) || 0;
+      const subStr = detailsStr.substring(0, m.index);
+      const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
       if (oldV > newV) {
         const cantidad = oldV - newV;
@@ -72,19 +68,17 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Fallback si fue venta directa sin formato de tallas
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     tallasAgrupadas["U"] = 1;
     totalUnidades = 1;
   }
 
-  // Texto legible agrupado: ej "2x XL, M" o "XL"
   const tallasTexto = Object.entries(tallasAgrupadas)
     .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
     .join(", ");
 
-  return { cliente, vendedor, items, totalUnidades, tallasTexto };
+  return { cliente, vendedor, items, totalUnidades, tallasTexto, rawDetails: detailsStr };
 }
 
 export default function ComisionesPage({ isSuperUser = false, user = null }) {
@@ -157,7 +151,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       .filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
 
-  // Ranking ordenado por total de prendas vendidas
   const ranking = useMemo(() => {
     const conteo = {};
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
@@ -178,9 +171,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         unidades: stats.unidades,
         totalComision: stats.unidades * comisionPorPrenda,
       }))
-      .filter((item) => isSuperUser || item.unidades > 0)
+      .filter((item) => storedUser?.isSuperUser || item.unidades > 0)
       .sort((a, b) => b.unidades - a.unidades);
-  }, [ventasFiltradas, comisionPorPrenda, isSuperUser]);
+  }, [ventasFiltradas, comisionPorPrenda, storedUser?.isSuperUser]);
 
   const tablaVentas = useMemo(() => {
     if (!searchFilter.trim()) return ventasFiltradas;
@@ -200,7 +193,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
-  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Con reintento y envío de datos)
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -209,7 +201,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         totalUnidades: venta.totalUnidades
       };
 
-      // 1. Intentamos anular en /api/products/anular/
       let res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
         method: "POST",
         headers: { 
@@ -219,7 +210,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         body: JSON.stringify(payload)
       });
 
-      // 2. Si no responde en products, intenta en /api/history/anular/
       if (!res.ok) {
         res = await fetch(`${API_BASE}/api/history/anular/${venta._id}`, {
           method: "POST",
@@ -233,7 +223,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
       if (!res.ok) throw new Error("Error en el servidor al anular");
 
-      // Actualizar vista local inmediatamente
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
@@ -272,7 +261,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-  // 📄 GENERACIÓN DEL PDF BLANCO Y NEGRO
   const generarPDFBlancoYNegro = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return alert("Por favor permite las ventanas emergentes para generar el PDF.");
@@ -383,7 +371,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <td>${fStr}</td>
                     <td class="font-bold">${v.vendedor}</td>
                     <td>${v.cliente}</td>
-                    <td>${v.item}${v.tallasTexto ? `(${v.tallasTexto})` : ""}</td>
+                    <td>${v.item}${v.tallasTexto ? ` (${v.tallasTexto})` : ""}</td>
                     <td class="text-right font-bold">${v.totalUnidades}</td>
                   </tr>
                 `;
@@ -413,7 +401,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     <div className="min-h-screen bg-zinc-50 pt-8 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black">
       <div className="max-w-6xl mx-auto">
         
-        {/* 🔙 Volver */}
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-2 text-zinc-500 hover:text-black transition-colors mb-6 font-bold uppercase tracking-widest text-xs cursor-pointer bg-transparent border-0"
@@ -421,9 +408,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <FaChevronLeft size={13} /> Volver al catálogo
         </button>
 
-        {/* ========================================================
-            🏆 CABECERA CON BOTÓN DE PDF Y SELECTORES
-            ======================================================== */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black text-white text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm">
@@ -442,7 +426,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <button
               onClick={generarPDFBlancoYNegro}
               className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
-              title="Descargar o imprimir reporte en PDF"
             >
               <FaFilePdf size={14} />
               <span>Exportar PDF</span>
@@ -458,26 +441,28 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               />
             </div>
 
-            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
-              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>
+            {/* 🔥 BLOQUEO DE EDICIÓN PARA VENDEDORES NORMALES 🔥 */}
+            <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${storedUser?.isSuperUser ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
+              {!storedUser?.isSuperUser ? (
+                <FaLock className="text-zinc-400" size={10} title="Solo administradores" />
+              ) : (
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>
+              )}
               <input
                 type="number"
                 min="0"
                 step="100"
                 value={comisionPorPrenda}
                 onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)}
-                className="w-20 bg-transparent text-sm font-black text-black outline-none"
+                disabled={!storedUser?.isSuperUser}
+                className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!storedUser?.isSuperUser ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`}
               />
             </div>
           </div>
         </div>
 
-        {/* ========================================================
-            🥇 PODIO DEL TOP 3
-            ======================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
           
-          {/* 🥈 2do Lugar */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
             <div className="w-12 h-12 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
               🥈
@@ -497,7 +482,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* 🥇 1er Lugar */}
           <div className="bg-gradient-to-b from-amber-500/10 via-white to-white rounded-3xl p-7 border-2 border-amber-400 shadow-xl flex flex-col items-center text-center relative order-1 md:order-2 -mt-4 md:-mt-6">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-black flex items-center justify-center text-3xl font-black mb-3 shadow-md">
               🥇
@@ -520,7 +504,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* 🥉 3er Lugar */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-3">
             <div className="w-12 h-12 rounded-full bg-amber-700/20 text-amber-800 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
               🥉
@@ -542,7 +525,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
         </div>
 
-        {/* 📊 Resto del Ranking */}
         {restoRanking.length > 0 && (
           <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">
@@ -572,9 +554,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
         )}
 
-        {/* ========================================================
-            📋 TABLA DETALLADA CON TALLAS EXACTAS Y ANULACIÓN
-            ======================================================== */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
@@ -645,13 +624,19 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           {venta.cliente}
                         </td>
                         
-                        {/* ⭐ MUESTRA TODAS LAS PRENDAS Y TALLAS REALES */}
                         <td className="py-3.5 px-3 text-zinc-700">
                           <span className="font-bold text-black block">{venta.item}</span>
                           {venta.tallasTexto && (
                             <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 font-mono text-[10px] font-bold">
                               Tallas: {venta.tallasTexto}
                             </span>
+                          )}
+                          
+                          {venta.tallasTexto === "U" && (
+                            <div className="text-[9px] text-red-500 mt-1.5 leading-tight font-medium bg-red-50 p-1.5 rounded-lg border border-red-100">
+                              <strong className="block mb-0.5">⚠️ Error de lectura. El servidor guardó:</strong>
+                              {venta.rawDetails}
+                            </div>
                           )}
                         </td>
 
@@ -661,12 +646,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           </span>
                         </td>
                         
-                        {/* ⭐ CANTIDAD TOTAL SUMADA REAL */}
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">
                           {venta.totalUnidades}
                         </td>
 
-                        {/* 🗑️ BOTÓN DE BASURERO */}
                         <td className="py-3.5 px-3 text-center">
                           <button
                             onClick={() => confirmarAnulacion(venta)}
