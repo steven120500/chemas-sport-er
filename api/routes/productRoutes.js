@@ -197,13 +197,20 @@ router.post('/:id/unlock', async (req, res) => {
   }
 });
 
-/* ======================== Actualizar Producto (CORREGIDO) ====================== */
+/* ======================== Actualizar Producto (CONEXIÓN VENTAS) ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    const user = whoDidIt(req);
+    // 👤 Identificación del vendedor que hace la modificación
+    const user = (
+      req.body.sellerName ||
+      req.body.user ||
+      whoDidIt(req) ||
+      'Sistema'
+    ).trim();
+
     if (prev.lockedBy && prev.lockedBy !== user) {
       const lockAge = new Date() - prev.lockedAt;
       if (lockAge < 600000) {
@@ -223,6 +230,7 @@ router.put('/:id', async (req, res) => {
     }
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
 
+    // Cálculo de prendas rebajadas
     let restadas = 0;
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
       const before = Number(prev.stock?.[size] ?? 0);
@@ -264,14 +272,12 @@ router.put('/:id', async (req, res) => {
     if (Array.isArray(incomingImages)) {
       const prevList = prev.images || [];
 
-      // Procesamos en paralelo pero manteniendo exactamente el orden de los índices (0, 1)
       const processedImages = await Promise.all(
         incomingImages.map(async (raw) => {
           if (!raw) return null;
           const strVal = typeof raw === 'string' ? raw : (raw.url || raw.src || '');
           if (!strVal) return null;
 
-          // Si es una foto nueva en Base64, se sube a Cloudinary
           if (strVal.startsWith('data:')) {
             const up = await cloudinary.uploader.upload(strVal, {
               folder: 'products',
@@ -279,7 +285,6 @@ router.put('/:id', async (req, res) => {
             });
             return { public_id: up.public_id, url: up.secure_url };
           } else {
-            // Si ya es una URL existente en Cloudinary
             const found = prevList.find(i => i.url === strVal);
             return found || { public_id: null, url: strVal };
           }
@@ -304,26 +309,34 @@ router.put('/:id', async (req, res) => {
     // 2. Respondemos al frontend inmediatamente
     res.status(200).json(updatedObj);
 
-    // 3. Proceso en segundo plano (Historial, popularidad y sockets)
+    // ========================================================
+    // 3. REGISTRO EN SEGUNDO PLANO: Historial y Comisiones
+    // ========================================================
     setTimeout(async () => {
       try {
-        if (restadas > 0) {
+        const nombreCliente = (req.body.customerName || "").trim();
+        
+        // ⭐ Identificamos si es venta real o solo ajuste de inventario
+        const esVenta = req.body.isSale !== false && restadas > 0 && nombreCliente !== "Ajuste de inventario";
+
+        // Si fue VENTA, suma a las estadísticas de popularidad
+        if (esVenta) {
           updated.popularCountHistory.push({
             date: new Date().toISOString(),
             quantity: restadas
           });
+
+          const now = new Date();
+          const totalMonth = (updated.popularCountHistory || [])
+            .filter(entry => {
+              const d = new Date(entry.date);
+              return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            })
+            .reduce((sum, e) => sum + e.quantity, 0);
+
+          updated.isPopular = totalMonth >= 10;
+          await updated.save();
         }
-
-        const now = new Date();
-        const totalMonth = (updated.popularCountHistory || [])
-          .filter(entry => {
-            const d = new Date(entry.date);
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-          })
-          .reduce((sum, e) => sum + e.quantity, 0);
-
-        updated.isPopular = totalMonth >= 10;
-        await updated.save();
 
         let tiendasModificadas = [];
         if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) {
@@ -333,19 +346,19 @@ router.put('/:id', async (req, res) => {
           tiendasModificadas.push("Tienda #2");
         }
         const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
-        const nombreCliente = (req.body.customerName || "").trim();
 
         const changes = diffProduct(prev, updatedObj);
         if (changes.length) {
-          let accionTexto = restadas > 0 ? 'vendió / rebajó stock' : 'actualizó producto';
+          let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           let detalleCompleto = changes.join(' | ');
 
-          if (nombreCliente && nombreCliente !== "No especificado") {
+          if (esVenta && nombreCliente && nombreCliente !== "No especificado") {
             detalleCompleto = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleCompleto}`;
           } else {
             detalleCompleto = `🏬 ${etiquetaTienda} | ${detalleCompleto}`;
           }
 
+          // 💾 Guardado asignado al vendedor exacto
           await History.create({
             user: user,
             action: accionTexto,
@@ -359,7 +372,7 @@ router.put('/:id', async (req, res) => {
           user: user,
           store: etiquetaTienda,
           customer: nombreCliente,
-          action: restadas > 0 ? "rebajó stock" : "editó"
+          action: esVenta ? "rebajó stock" : "editó"
         };
 
         const io = req.app.get('io');
@@ -495,7 +508,6 @@ router.get('/', async (req, res) => {
       Product.countDocuments(find),
     ]);
 
-    // 🚀 IMPORTANTE: Eliminamos el Cache-Control de 20s para que las fotos actualizadas se vean de inmediato
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     res.json({

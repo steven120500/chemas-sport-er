@@ -16,7 +16,7 @@ function transformCloudinary(url, maxW) {
     const parts = u.pathname.split("/upload/");
     if (parts.length < 2) return url;
     const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW},dpr_auto`;
-    u.pathname = `${parts[0]}/upload/${transforms}/${parts[1]}`;
+    u.pathname = `${parts[0]}/upload/${transforms}/${parts}`;
     return u.toString();
   } catch {
     return url;
@@ -145,7 +145,7 @@ export default function ProductAdminEditor({
         bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
-        imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
+        imageSrc2: typeof localImages?.src === "string" ? localImages.src : null,
         imageAlt: editedName.trim(), 
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
@@ -361,9 +361,11 @@ export default function ProductAdminEditor({
         </div>
       </div>
 
-      {/* MODAL DE COMPRADOR */}
+      {/* ========================================================
+          🛒 MODAL: REGISTRAR VENTA O SOLO ACTUALIZAR (2 BOTONES)
+          ======================================================== */}
       {showBuyerModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative">
             <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">👤</div>
             <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
@@ -371,9 +373,25 @@ export default function ProductAdminEditor({
             <div className="w-full relative mb-6">
               <input type="text" placeholder="Ej: Emanuel Espinoza" className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} autoFocus />
             </div>
+            
+            {/* 🔘 LOS DOS BOTONES */}
             <div className="flex gap-3 w-full">
-              <button type="button" onClick={() => { setShowBuyerModal(false); handleSave(buyerName || "Cliente General / Tienda"); setBuyerName(""); }} disabled={loading} className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg cursor-pointer">CONFIRMAR</button>
-              <button type="button" onClick={() => { setShowBuyerModal(false); handleSave("No especificado"); setBuyerName(""); }} disabled={loading} className="px-5 bg-gray-100 text-gray-600 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider cursor-pointer">Omitir</button>
+              <button 
+                type="button" 
+                onClick={() => { setShowBuyerModal(false); handleSave(buyerName || "Cliente General / Tienda"); setBuyerName(""); }} 
+                disabled={loading} 
+                className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                REGISTRAR VENTA
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setShowBuyerModal(false); handleSave("No especificado"); setBuyerName(""); }} 
+                disabled={loading} 
+                className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                SOLO ACTUALIZAR
+              </button>
             </div>
           </div>
         </div>
