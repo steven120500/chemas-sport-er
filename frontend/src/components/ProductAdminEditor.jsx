@@ -123,6 +123,7 @@ export default function ProductAdminEditor({
     return decreased;
   };
 
+  // 🔥 ESPERAR AL SERVIDOR ANTES DE CERRAR LA VENTANA 🔥
   const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -134,7 +135,6 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
-      // 🔥 SOLUCIÓN: Agregamos "details" para enviarle el texto exacto al servidor
       const payload = {
         name: editedName.trim(), 
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
@@ -144,7 +144,7 @@ export default function ProductAdminEditor({
         bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
-        imageSrc2: typeof localImages?.src === "string" ? localImages.src : null,
+        imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: editedName.trim(), 
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
@@ -163,8 +163,19 @@ export default function ProductAdminEditor({
       if (tallasVisibles.some((size) => parseInt(bodegaVieja[size] ?? 0, 10) !== parseInt(cleanBodega[size] ?? 0, 10))) tiendaModificada.push("Tienda #2");
       const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
 
-      const localUpdatedProduct = { ...viewProduct, ...payload };
-      onSaveSuccess(localUpdatedProduct);
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+        method: "PUT", 
+        headers: { "Content-Type": "application/json", "x-user": displayName },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        if (res.status === 413) throw new Error("La foto es demasiado pesada.");
+        throw new Error("Error en el servidor al guardar.");
+      }
+
+      const dbUpdatedProduct = await res.json();
+      onSaveSuccess(dbUpdatedProduct);
 
       if (isSale) {
         toast.success(etiquetaTienda ? `Venta registrada en ${etiquetaTienda}.` : "Venta registrada correctamente.");
@@ -172,14 +183,11 @@ export default function ProductAdminEditor({
         toast.success(etiquetaTienda ? `Cambio realizado en ${etiquetaTienda}.` : "Cambios guardados correctamente.");
       }
 
-      fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
-        method: "PUT", headers: { "Content-Type": "application/json", "x-user": displayName },
-        body: JSON.stringify(payload),
-      }).catch((err) => console.error("Error servidor:", err));
-
     } catch (err) {
+      console.error("Error al guardar:", err);
+      toast.error(err.message === "La foto es demasiado pesada." ? "La foto pesa mucho. Intenta subir una más ligera." : "Error al procesar datos");
+    } finally {
       setLoading(false);
-      toast.error("Error al procesar datos");
     }
   };
 
