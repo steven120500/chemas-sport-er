@@ -29,6 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
+// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS Y TALLAS
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -39,20 +40,24 @@ function parseSaleDetails(log) {
   const itemGeneral = String(log?.item || "Camiseta").trim();
 
   const items = [];
+  const tallasAgrupadas = {};
   let totalUnidades = 0;
 
   try {
-    const regex = /(Tienda #)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
+    // ⭐ REGEX CORREGIDO: Soporta Tienda #1, Tienda #2 y cualquier espacio
+    const regex = /(Tienda\s*#\s*\d+|Tienda|Bodega)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
-      const tienda = String(m.at(1) || "Tienda #1");
-      const talla = String(m.at(2) || "U");
-      const oldV = parseInt(m.at(3), 10) || 0;
-      const newV = parseInt(m.at(4), 10) || 0;
+      const tienda = String(m || "Tienda #1").trim();
+      const talla = String(m || "U").trim();
+      const oldV = parseInt(m, 10) || 0;
+      const newV = parseInt(m, 10) || 0;
 
       if (oldV > newV) {
         const cantidad = oldV - newV;
         totalUnidades += cantidad;
+        tallasAgrupadas[talla] = (tallasAgrupadas[talla] || 0) + cantidad;
+        
         for (let i = 0; i < cantidad; i++) {
           items.push({ tienda, talla, nombre: itemGeneral });
         }
@@ -62,12 +67,19 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
+  // Fallback si fue venta directa sin formato de tallas
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
+    tallasAgrupadas["U"] = 1;
     totalUnidades = 1;
   }
 
-  return { cliente, vendedor, items, totalUnidades };
+  // Texto legible agrupado: ej "2x M, 1x L"
+  const tallasTexto = Object.entries(tallasAgrupadas)
+    .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
+    .join(", ");
+
+  return { cliente, vendedor, items, totalUnidades, tallasTexto };
 }
 
 export default function ComisionesPage({ isSuperUser = false, user = null }) {
@@ -140,7 +152,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       .filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
 
-  // Ranking ordenado
+  // Ranking ordenado por total de prendas vendidas reales
   const ranking = useMemo(() => {
     const conteo = {};
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
@@ -183,21 +195,38 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
-  // 🗑️ LÓGICA DE ANULACIÓN DE VENTA
+  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Llama a products o history)
   const ejecutarAnulacion = async (logId) => {
     try {
-      const res = await fetch(`${API_BASE}/api/history/anular/${logId}`, {
+      // 1. Intentamos anular en /api/products/anular/
+      let res = await fetch(`${API_BASE}/api/products/anular/${logId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          "x-super": storedUser?.isSuperUser ? "true" : "false"
+        }
       });
-      if (!res.ok) throw new Error("Error al anular");
 
-      // Actualizar vista local al instante
+      // 2. Si no está en products, intenta en /api/history/anular/
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/history/anular/${logId}`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-super": storedUser?.isSuperUser ? "true" : "false"
+          }
+        });
+      }
+
+      if (!res.ok) throw new Error("Error en servidor al anular");
+
+      // Actualizar vista local inmediatamente (recalcula ranking y tabla)
       setLogs((prev) => prev.filter((l) => l._id !== logId));
-      toastHOT.success("Venta anulada. Inventario restablecido y comisión descontada.", {
+      toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
       });
     } catch (err) {
+      console.error(err);
       toastHOT.error("No se pudo anular la venta.");
     }
   };
@@ -206,8 +235,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
         <p className="font-black text-sm mb-1">¿Anular esta venta?</p>
-        <p className="text-xs text-zinc-500 mb-3">
-          Se sumará(n) <strong>{venta.totalUnidades} camiseta(s)</strong> de vuelta al stock y se descontará del vendedor <strong>{venta.vendedor}</strong>.
+        <p className="text-xs text-zinc-600 mb-3">
+          Se sumarán <strong>{venta.totalUnidades} camiseta(s)</strong> ({venta.tallasTexto || "talla vendida"}) al stock y se descontará del vendedor <strong>{venta.vendedor}</strong>.
         </p>
         <div className="flex gap-2 justify-center">
           <button
@@ -230,7 +259,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-  // 📄 GENERACIÓN DEL PDF EN BLANCO Y NEGRO PURO (CHEMA SPORT ER)
+  // 📄 GENERACIÓN DEL PDF BLANCO Y NEGRO
   const generarPDFBlancoYNegro = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return alert("Por favor permite las ventanas emergentes para generar el PDF.");
@@ -328,7 +357,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <th style="width: 15%;">Fecha</th>
                 <th style="width: 20%;">Vendedor</th>
                 <th style="width: 25%;">Cliente</th>
-                <th style="width: 30%;">Artículo / Talla</th>
+                <th style="width: 30%;">Artículo / Tallas</th>
                 <th class="text-right" style="width: 10%;">Cant.</th>
               </tr>
             </thead>
@@ -336,13 +365,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               ${ventasFiltradas.map((v) => {
                 const d = v.date ? new Date(v.date) : null;
                 const fStr = d ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}` : "-";
-                const tallas = (v.items || []).map(i => i.talla).join(", ");
                 return `
                   <tr>
                     <td>${fStr}</td>
                     <td class="font-bold">${v.vendedor}</td>
                     <td>${v.cliente}</td>
-                    <td>${v.item} ${tallas ? `(Tallas: ${tallas})` : ""}</td>
+                    <td>${v.item}${v.tallasTexto ? `(${v.tallasTexto})` : ""}</td>
                     <td class="text-right font-bold">${v.totalUnidades}</td>
                   </tr>
                 `;
@@ -398,7 +426,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* 📄 BOTÓN DE PDF EN BLANCO Y NEGRO */}
             <button
               onClick={generarPDFBlancoYNegro}
               className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
@@ -408,7 +435,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <span>Exportar PDF</span>
             </button>
 
-            {/* Selector de Mes */}
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <FaCalendarAlt className="text-zinc-400" />
               <input
@@ -419,7 +445,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               />
             </div>
 
-            {/* Comisión / Prenda */}
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>
               <input
@@ -435,7 +460,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </div>
 
         {/* ========================================================
-            🥇 PODIO DEL TOP 3 (TARJETAS GRANDES)
+            🥇 PODIO DEL TOP 3
             ======================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
           
@@ -535,7 +560,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         )}
 
         {/* ========================================================
-            📋 TABLA DETALLADA CON BASURERO PARA ANULAR VENTAS
+            📋 TABLA DETALLADA CON TALLAS EXACTAS Y ANULACIÓN
             ======================================================== */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           
@@ -557,7 +582,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-            
+              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             </div>
           </div>
 
@@ -579,7 +604,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Fecha</th>
                     <th className="py-3 px-3">Vendedor</th>
                     <th className="py-3 px-3">Cliente</th>
-                    <th className="py-3 px-3">Prenda / Talla</th>
+                    <th className="py-3 px-3">Artículo / Tallas</th>
                     <th className="py-3 px-3">Tienda</th>
                     <th className="py-3 px-3 text-right">Cant.</th>
                     <th className="py-3 px-3 text-center">Anular</th>
@@ -606,24 +631,29 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         <td className="py-3.5 px-3 font-bold text-zinc-800">
                           {venta.cliente}
                         </td>
+                        
+                        {/* ⭐ MUESTRA TODAS LAS PRENDAS Y TALLAS VENDIDAS */}
                         <td className="py-3.5 px-3 text-zinc-700">
-                          <span className="font-bold text-black">{venta.item}</span>
-                          {venta.items && venta.items.length > 0 && (
-                            <span className="block text-[10px] text-zinc-400 font-mono">
-                              Tallas: {venta.items.map((i) => i.talla).join(", ")}
+                          <span className="font-bold text-black block">{venta.item}</span>
+                          {venta.tallasTexto && (
+                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 font-mono text-[10px] font-bold">
+                              Tallas: {venta.tallasTexto}
                             </span>
                           )}
                         </td>
+
                         <td className="py-3.5 px-3">
                           <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
                             {venta.items[0]?.tienda || "Tienda #1"}
                           </span>
                         </td>
+                        
+                        {/* ⭐ CANTIDAD TOTAL SUMADA REAL */}
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">
                           {venta.totalUnidades}
                         </td>
 
-                        {/* 🗑️ BOTÓN DE BASURERO: ANULA LA VENTA Y DEVUELVE EL STOCK */}
+                        {/* 🗑️ BASURERO CON CONFIRMACIÓN */}
                         <td className="py-3.5 px-3 text-center">
                           <button
                             onClick={() => confirmarAnulacion(venta)}

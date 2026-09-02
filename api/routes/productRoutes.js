@@ -203,7 +203,7 @@ router.put('/:id', async (req, res) => {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // 👤 Identificación del vendedor
+    // 👤 Vendedor exacto
     const user = (
       req.body.sellerName ||
       req.body.user ||
@@ -230,11 +230,16 @@ router.put('/:id', async (req, res) => {
     }
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
 
-    // Cálculo de prendas rebajadas
+    // ⭐ CÁLCULO COMPLETO DE PRENDAS REBAJADAS (Cuenta Tienda #1 y Tienda #2)
     let restadas = 0;
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
       const before = Number(prev.stock?.[size] ?? 0);
       const after  = Number(nextStock?.[size] ?? 0);
+      if (before > after) restadas += (before - after);
+    }
+    for (const size of new Set([...Object.keys(prev.bodega || {}), ...Object.keys(nextBodega || {})])) {
+      const before = Number(prev.bodega?.[size] ?? 0);
+      const after  = Number(nextBodega?.[size] ?? 0);
       if (before > after) restadas += (before - after);
     }
 
@@ -319,7 +324,6 @@ router.put('/:id', async (req, res) => {
         // ⭐ REGLA ESTRICTA: Solo es venta si el frontend envía explícitamente isSale: true
         const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
-        // Solo si es VENTA REAL suma a las estadísticas de popularidad
         if (esVenta) {
           updated.popularCountHistory.push({
             date: new Date().toISOString(),
@@ -349,7 +353,6 @@ router.put('/:id', async (req, res) => {
 
         const changes = diffProduct(prev, updatedObj);
         if (changes.length) {
-          // Si es venta: 'vendió / rebajó stock'. Si es solo ajuste: 'ajustó stock'
           let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           let detalleCompleto = changes.join(' | ');
 
@@ -393,7 +396,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK (CORREGIDO) ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
     const log = await History.findById(req.params.id);
@@ -401,34 +404,37 @@ router.post('/anular/:id', async (req, res) => {
 
     const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-    // 1. Extraemos qué prendas, tallas y tienda se habían restado
-    const regex = /(Tienda #)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
+    // 1. Regex corregido: captura Tienda #1 y Tienda #2 con sus cantidades exactas
+    const regex = /(Tienda\s*#\s*\d+|Tienda|Bodega)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
     let match;
     const restas = [];
 
     while ((match = regex.exec(detailsStr)) !== null) {
-      const tienda = match;
-      const talla = match;
+      const tienda = String(match || "").trim();
+      const talla = String(match || "").trim();
       const oldV = parseInt(match, 10) || 0;
       const newV = parseInt(match, 10) || 0;
+
       if (oldV > newV) {
         restas.push({ tienda, talla, cantidad: oldV - newV });
       }
     }
 
-    // 2. Buscamos el producto por su nombre para regresarle el stock
+    // 2. Buscamos el producto por nombre exacto o aproximado
     const cleanItemName = (log.item || "").split("(")[0].trim();
-    const product = await Product.findOne({ name: { $regex: new RegExp(`^${cleanItemName}$`, "i") } });
+    const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") })
+      || await Product.findOne({ name: new RegExp(escaped, "i") });
 
     if (product && restas.length > 0) {
       const updatedStock = { ...(product.stock || {}) };
       const updatedBodega = { ...(product.bodega || {}) };
 
       restas.forEach(({ tienda, talla, cantidad }) => {
-        if (tienda === "Tienda #1") {
-          updatedStock[talla] = (updatedStock[talla] || 0) + cantidad;
-        } else if (tienda === "Tienda #2") {
+        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
           updatedBodega[talla] = (updatedBodega[talla] || 0) + cantidad;
+        } else {
+          updatedStock[talla] = (updatedStock[talla] || 0) + cantidad;
         }
       });
 
@@ -436,14 +442,14 @@ router.post('/anular/:id', async (req, res) => {
       product.bodega = updatedBodega;
       await product.save();
 
-      // Notificamos vía WebSocket a todas las pantallas abiertas
+      // Notificamos vía WebSocket para que todas las pantallas reflejen el stock devuelto
       const io = req.app.get('io');
       if (io) {
         io.emit('productoActualizado', product.toObject());
       }
     }
 
-    // 3. Eliminamos el registro del historial (se resta automáticamente del ranking de comisiones)
+    // 3. Eliminamos el registro del historial (se descuenta del ranking de comisiones de inmediato)
     await History.findByIdAndDelete(req.params.id);
 
     res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente." });
