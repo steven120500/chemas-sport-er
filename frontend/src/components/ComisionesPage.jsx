@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
-  FaFilePdf, FaTrash, FaLock 
+  FaFilePdf, FaTrash, FaLock, FaExclamationTriangle
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -193,6 +193,62 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
+  // 🔥 LÓGICA DE RESETEO GLOBAL (SOLO SUPERADMIN) 🔥
+  const ejecutarResetGlobal = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/history`, {
+        method: "DELETE",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-super": storedUser?.isSuperUser ? "true" : "false"
+        }
+      });
+
+      if (!res.ok) throw new Error("Error en el servidor al reiniciar");
+
+      setLogs([]);
+      toastHOT.success("Historial reiniciado. Comisiones puestas en cero.", {
+        style: { background: "#000", color: "#fff", fontWeight: "bold" }
+      });
+    } catch (err) {
+      console.error(err);
+      toastHOT.error("No se pudo reiniciar el historial.");
+    }
+  };
+
+  const confirmarResetGlobal = () => {
+    toastHOT((t) => (
+      <div className="text-center p-2 text-black font-sans">
+        <div className="flex justify-center text-red-600 mb-2">
+          <FaExclamationTriangle size={24} />
+        </div>
+        <p className="font-black text-sm mb-1 text-red-600 uppercase tracking-widest">¿Reiniciar todo el mes?</p>
+        <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
+          Esto eliminará <strong>absolutamente todas</strong> las ventas y pondrá a todos los vendedores en cero. <br/><br/>
+          <span className="font-bold text-black">Ojo:</span> Esta acción no afecta el stock, solo limpia la tabla de comisiones. No se puede deshacer.
+        </p>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => {
+              toastHOT.dismiss(t.id);
+              ejecutarResetGlobal();
+            }}
+            className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer shadow-md"
+          >
+            SÍ, BORRAR TODO
+          </button>
+          <button
+            onClick={() => toastHOT.dismiss(t.id)}
+            className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
+          >
+            CANCELAR
+          </button>
+        </div>
+      </div>
+    ), { duration: 8000 });
+  };
+
+  // 🗑️ LÓGICA DE ANULACIÓN INDIVIDUAL
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -423,6 +479,19 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            
+            {/* 🔥 BOTÓN DE RESETEO: Exclusivo para SuperAdmin 🔥 */}
+            {storedUser?.isSuperUser && (
+              <button
+                onClick={confirmarResetGlobal}
+                className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer border border-red-200"
+                title="Borrar todo el historial de ventas del mes"
+              >
+                <FaTrash size={14} />
+                <span className="hidden sm:inline">Reiniciar</span>
+              </button>
+            )}
+
             <button
               onClick={generarPDFBlancoYNegro}
               className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
@@ -441,7 +510,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               />
             </div>
 
-            {/* 🔥 BLOQUEO DE EDICIÓN PARA VENDEDORES NORMALES 🔥 */}
             <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${storedUser?.isSuperUser ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
               {!storedUser?.isSuperUser ? (
                 <FaLock className="text-zinc-400" size={10} title="Solo administradores" />
@@ -574,7 +642,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+             
             </div>
           </div>
 

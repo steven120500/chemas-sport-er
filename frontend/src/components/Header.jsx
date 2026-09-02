@@ -206,7 +206,7 @@ export default function Header({
                     >
                       <div className="flex items-center gap-3">
                         <FaBoxOpen size={16} className="text-zinc-400" />
-                        <span>Apartados/Pedidos</span>
+                        <span>Pedidos</span>
                       </div>
                       <FaChevronRight size={12} className="text-zinc-500" />
                     </button>
