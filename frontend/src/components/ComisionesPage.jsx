@@ -29,7 +29,6 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO INDESTRUCTIBLE DE MÚLTIPLES PRENDAS Y TALLAS
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -193,7 +192,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
-  // 🔥 LÓGICA DE RESETEO GLOBAL (SOLO SUPERADMIN) 🔥
   const ejecutarResetGlobal = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/history`, {
@@ -248,7 +246,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
-  // 🗑️ LÓGICA DE ANULACIÓN INDIVIDUAL
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -454,14 +451,16 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 pt-8 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black">
+    // 🔥 CAMBIO: Aumenté el pt-8 a pt-36 para que la página baje y no se esconda detrás de tu menú
+    <div className="min-h-screen bg-zinc-50 pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black">
       <div className="max-w-6xl mx-auto">
         
+        {/* 🔥 CAMBIO: Diseño de botón tipo pastilla más elegante y visible */}
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-zinc-500 hover:text-black transition-colors mb-6 font-bold uppercase tracking-widest text-xs cursor-pointer bg-transparent border-0"
+          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-600 hover:text-gray-200 hover:bg-black px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
         >
-          <FaChevronLeft size={13} /> Volver al catálogo
+          <FaChevronLeft size={12} /> Volver al catálogo
         </button>
 
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -480,7 +479,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
           <div className="flex flex-wrap items-center gap-3">
             
-            {/* 🔥 BOTÓN DE RESETEO: Exclusivo para SuperAdmin 🔥 */}
             {storedUser?.isSuperUser && (
               <button
                 onClick={confirmarResetGlobal}
@@ -642,7 +640,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-             
+              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             </div>
           </div>
 

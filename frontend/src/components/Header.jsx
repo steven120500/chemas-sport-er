@@ -196,20 +196,7 @@ export default function Header({
                   {/* Opciones del menú (Botones negros con hover gris suave) */}
                   <nav className="space-y-2.5">
                     
-                    {/* 📦 1. Apartados/Pedidos */}
-                    <button
-                      onClick={() => {
-                        navigate('/apartados');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full bg-black hover:bg-zinc-800 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FaBoxOpen size={16} className="text-zinc-400" />
-                        <span>Pedidos</span>
-                      </div>
-                      <FaChevronRight size={12} className="text-zinc-500" />
-                    </button>
+                    
 
                     {/* 💰 2. Comisiones */}
                     <button
