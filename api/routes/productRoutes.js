@@ -197,7 +197,7 @@ router.post('/:id/unlock', async (req, res) => {
   }
 });
 
-/* ======================== Actualizar Producto (CONEXIÓN VENTAS) ====================== */
+/* ======================== Actualizar Producto ====================== */
 router.put('/:id', async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
@@ -389,6 +389,66 @@ router.put('/:id', async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error al actualizar producto' });
     }
+  }
+});
+
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
+router.post('/anular/:id', async (req, res) => {
+  try {
+    const log = await History.findById(req.params.id);
+    if (!log) return res.status(404).json({ error: "Registro de venta no encontrado" });
+
+    const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+
+    // 1. Extraemos qué prendas, tallas y tienda se habían restado
+    const regex = /(Tienda #)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
+    let match;
+    const restas = [];
+
+    while ((match = regex.exec(detailsStr)) !== null) {
+      const tienda = match;
+      const talla = match;
+      const oldV = parseInt(match, 10);
+      const newV = parseInt(match, 10);
+      if (oldV > newV) {
+        restas.push({ tienda, talla, cantidad: oldV - newV });
+      }
+    }
+
+    // 2. Buscamos el producto por su nombre para regresarle el stock
+    const cleanItemName = (log.item || "").split("(")[0].trim();
+    const product = await Product.findOne({ name: { $regex: new RegExp(`^${cleanItemName}$`, "i") } });
+
+    if (product && restas.length > 0) {
+      const updatedStock = { ...(product.stock || {}) };
+      const updatedBodega = { ...(product.bodega || {}) };
+
+      restas.forEach(({ tienda, talla, cantidad }) => {
+        if (tienda === "Tienda #1") {
+          updatedStock[talla] = (updatedStock[talla] || 0) + cantidad;
+        } else if (tienda === "Tienda #2") {
+          updatedBodega[talla] = (updatedBodega[talla] || 0) + cantidad;
+        }
+      });
+
+      product.stock = updatedStock;
+      product.bodega = updatedBodega;
+      await product.save();
+
+      // Notificamos vía WebSocket a todas las pantallas abiertas
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('productoActualizado', product.toObject());
+      }
+    }
+
+    // 3. Eliminamos el registro del historial (se resta automáticamente del ranking de comisiones)
+    await History.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente." });
+  } catch (error) {
+    console.error("Error al anular venta:", error);
+    res.status(500).json({ error: "Error interno al anular la venta" });
   }
 });
 

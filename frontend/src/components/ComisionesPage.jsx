@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  FaChevronLeft, FaTrophy, FaMedal, FaSearch, 
-  FaCalendarAlt, FaStore, FaMoneyBillWave, FaTshirt 
+  FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
+  FaFilePdf, FaTrash 
 } from "react-icons/fa";
+import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -14,41 +15,54 @@ function ymLocal(d = new Date()) {
   return `${y}-${m}`;
 }
 
-const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
+const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie", "Melissa", "Ashly"];
 
-// Parsea los detalles del log para extraer cliente, vendedor, prendas y cantidades
+function extractClienteSeguro(detailsStr) {
+  if (typeof detailsStr !== "string") return "Cliente General";
+  const idx = detailsStr.indexOf("Cliente:");
+  if (idx === -1) return "Cliente General";
+  
+  const after = detailsStr.substring(idx + 8);
+  const endIdx = after.indexOf("|");
+  const raw = endIdx !== -1 ? after.substring(0, endIdx) : after;
+  const clean = String(raw || "").trim();
+  return clean || "Cliente General";
+}
+
 function parseSaleDetails(log) {
-  const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+  const detailsStr = typeof log?.details === "string" 
+    ? log.details 
+    : JSON.stringify(log?.details || "");
 
-  let cliente = "Cliente General";
-  const matchCliente = detailsStr.match(/Cliente:\s*([^|]+)/i);
-  if (matchCliente && matchCliente) cliente = matchCliente.trim();
+  const cliente = extractClienteSeguro(detailsStr);
+  const vendedor = String(log?.user || "Sistema").trim();
+  const itemGeneral = String(log?.item || "Camiseta").trim();
 
-  const vendedor = log.user || "Sistema";
-  const itemGeneral = log.item || "Camiseta";
-
-  const regex = /(Tienda #)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
-  let match;
   const items = [];
   let totalUnidades = 0;
 
-  while ((match = regex.exec(detailsStr)) !== null) {
-    const tienda = match;
-    const talla = match;
-    const oldV = parseInt(match, 10);
-    const newV = parseInt(match, 10);
+  try {
+    const regex = /(Tienda #)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
+    let m;
+    while ((m = regex.exec(detailsStr)) !== null) {
+      const tienda = String(m.at(1) || "Tienda #1");
+      const talla = String(m.at(2) || "U");
+      const oldV = parseInt(m.at(3), 10) || 0;
+      const newV = parseInt(m.at(4), 10) || 0;
 
-    if (oldV > newV) {
-      const cantidad = oldV - newV;
-      totalUnidades += cantidad;
-      for (let i = 0; i < cantidad; i++) {
-        items.push({ tienda, talla, nombre: itemGeneral });
+      if (oldV > newV) {
+        const cantidad = oldV - newV;
+        totalUnidades += cantidad;
+        for (let i = 0; i < cantidad; i++) {
+          items.push({ tienda, talla, nombre: itemGeneral });
+        }
       }
     }
+  } catch (e) {
+    console.error("Error al procesar tallas:", e);
   }
 
-  // Si no hubo formato de tallas pero fue marcado como venta
-  if (items.length === 0 && (log.action || "").toLowerCase().includes("vend")) {
+  if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     totalUnidades = 1;
   }
@@ -62,7 +76,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
-  const [comisionPorPrenda, setComisionPorPrenda] = useState(1000); // ₡1.000 por defecto por camiseta
+  const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
 
   const storedUser = useMemo(() => {
     try {
@@ -73,14 +87,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   }, []);
 
-  // Carga de historial desde el backend
   const fetchVentas = async () => {
     setLoading(true);
     try {
       const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
       const params = new URLSearchParams({
         page: "1",
-        limit: "2000",
+        limit: "3000",
         month: selectedMonth,
         _: String(Date.now()),
       });
@@ -110,15 +123,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedMonth]);
 
-  // Filtramos solo los registros que representen ventas reales
   const ventasFiltradas = useMemo(() => {
+    if (!Array.isArray(logs)) return [];
     return logs
       .map((log) => {
         const parsed = parseSaleDetails(log);
-        const actionStr = String(log.action || "").toLowerCase();
-        const detailsStr = String(log.details || "").toLowerCase();
+        const actionStr = String(log?.action || "").toLowerCase();
+        const detailsStr = String(log?.details || "").toLowerCase();
 
-        // Es venta si la acción lo dice o si tiene cliente asignado que no sea ajuste
         const esVenta = 
           actionStr.includes("vend") || 
           (parsed.totalUnidades > 0 && !detailsStr.includes("ajuste de inventario"));
@@ -128,7 +140,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       .filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
 
-  // 🏆 Cálculo del Ranking por Vendedor
+  // Ranking ordenado
   const ranking = useMemo(() => {
     const conteo = {};
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
@@ -153,30 +165,214 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       .sort((a, b) => b.unidades - a.unidades);
   }, [ventasFiltradas, comisionPorPrenda, isSuperUser]);
 
-  // Lista de ventas para la tabla inferior con buscador
   const tablaVentas = useMemo(() => {
     if (!searchFilter.trim()) return ventasFiltradas;
     const q = searchFilter.toLowerCase();
     return ventasFiltradas.filter((v) =>
       v.vendedor.toLowerCase().includes(q) ||
       v.cliente.toLowerCase().includes(q) ||
-      (v.item || "").toLowerCase().includes(q)
+      String(v.item || "").toLowerCase().includes(q)
     );
   }, [ventasFiltradas, searchFilter]);
 
-  const top1 = ranking[0];
-  const top2 = ranking;
-  const top3 = ranking;
+  const top1 = ranking.at(0) || null;
+  const top2 = ranking.at(1) || null;
+  const top3 = ranking.at(2) || null;
   const restoRanking = ranking.slice(3);
 
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
+  // 🗑️ LÓGICA DE ANULACIÓN DE VENTA
+  const ejecutarAnulacion = async (logId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/history/anular/${logId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res.ok) throw new Error("Error al anular");
+
+      // Actualizar vista local al instante
+      setLogs((prev) => prev.filter((l) => l._id !== logId));
+      toastHOT.success("Venta anulada. Inventario restablecido y comisión descontada.", {
+        style: { background: "#000", color: "#fff", fontWeight: "bold" }
+      });
+    } catch (err) {
+      toastHOT.error("No se pudo anular la venta.");
+    }
+  };
+
+  const confirmarAnulacion = (venta) => {
+    toastHOT((t) => (
+      <div className="text-center p-2 text-black font-sans">
+        <p className="font-black text-sm mb-1">¿Anular esta venta?</p>
+        <p className="text-xs text-zinc-500 mb-3">
+          Se sumará(n) <strong>{venta.totalUnidades} camiseta(s)</strong> de vuelta al stock y se descontará del vendedor <strong>{venta.vendedor}</strong>.
+        </p>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => {
+              toastHOT.dismiss(t.id);
+              ejecutarAnulacion(venta._id);
+            }}
+            className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
+          >
+            Sí, Anular
+          </button>
+          <button
+            onClick={() => toastHOT.dismiss(t.id)}
+            className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), { duration: 6000 });
+  };
+
+  // 📄 GENERACIÓN DEL PDF EN BLANCO Y NEGRO PURO (CHEMA SPORT ER)
+  const generarPDFBlancoYNegro = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return alert("Por favor permite las ventanas emergentes para generar el PDF.");
+
+    const fechaHoy = new Date().toLocaleDateString("es-CR");
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Reporte Comisiones - ${selectedMonth} - Chema Sport ER</title>
+          <style>
+            @page { size: letter; margin: 15mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #000; background: #fff; margin: 0; padding: 0; font-size: 11px; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase; margin: 0; }
+            .subtitle { font-size: 11px; color: #444; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }
+            .meta { text-align: right; font-size: 10px; color: #333; }
+            
+            .summary-box { display: flex; border: 1px solid #000; margin-bottom: 25px; }
+            .summary-item { flex: 1; padding: 10px 15px; border-right: 1px solid #000; }
+            .summary-item:last-child { border-right: none; }
+            .summary-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+            .summary-value { font-size: 18px; font-weight: 900; margin-top: 4px; }
+
+            .section-title { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 25px; margin-bottom: 10px; }
+
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th { text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1.5px solid #000; padding: 6px 4px; }
+            td { padding: 6px 4px; border-bottom: 1px solid #e0e0e0; font-size: 10px; }
+            tr:last-child td { border-bottom: 1px solid #000; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 800; }
+
+            .footer { margin-top: 35px; border-top: 1px solid #000; padding-top: 8px; font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">CHEMA SPORT ER</h1>
+              <p class="subtitle">Liquidación de Ventas y Comisiones</p>
+            </div>
+            <div class="meta">
+              <p><strong>Mes:</strong> ${selectedMonth}</p>
+              <p><strong>Fecha de Emisión:</strong> ${fechaHoy}</p>
+            </div>
+          </div>
+
+          <div class="summary-box">
+            <div class="summary-item">
+              <div class="summary-label">Prendas Vendidas</div>
+              <div class="summary-value">${totalPrendasMes} uds.</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Comisiones</div>
+              <div class="summary-value">₡${totalComisionesMes.toLocaleString("es-CR")}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Tarifa por Prenda</div>
+              <div class="summary-value">₡${comisionPorPrenda.toLocaleString("es-CR")}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Líder del Mes</div>
+              <div class="summary-value">${top1?.vendedor || "N/A"} (${top1?.unidades || 0})</div>
+            </div>
+          </div>
+
+          <div class="section-title">1. Resumen por Vendedor</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 10%;">Pos.</th>
+                <th style="width: 45%;">Vendedor</th>
+                <th class="text-right" style="width: 20%;">Prendas</th>
+                <th class="text-right" style="width: 25%;">Total Comisión</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ranking.map((r, i) => `
+                <tr>
+                  <td class="font-bold">${i + 1}º</td>
+                  <td class="font-bold">${r.vendedor}</td>
+                  <td class="text-right">${r.unidades}</td>
+                  <td class="text-right font-bold">₡${r.totalComision.toLocaleString("es-CR")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <div class="section-title">2. Registro Detallado de Ventas</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 15%;">Fecha</th>
+                <th style="width: 20%;">Vendedor</th>
+                <th style="width: 25%;">Cliente</th>
+                <th style="width: 30%;">Artículo / Talla</th>
+                <th class="text-right" style="width: 10%;">Cant.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ventasFiltradas.map((v) => {
+                const d = v.date ? new Date(v.date) : null;
+                const fStr = d ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}` : "-";
+                const tallas = (v.items || []).map(i => i.talla).join(", ");
+                return `
+                  <tr>
+                    <td>${fStr}</td>
+                    <td class="font-bold">${v.vendedor}</td>
+                    <td>${v.cliente}</td>
+                    <td>${v.item} ${tallas ? `(Tallas: ${tallas})` : ""}</td>
+                    <td class="text-right font-bold">${v.totalUnidades}</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Chema Sport ER — Documento Oficial de Rendición de Cuentas
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 pt-8 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black">
       <div className="max-w-6xl mx-auto">
         
-        {/* 🔙 Botón Volver */}
+        {/* 🔙 Volver */}
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-2 text-zinc-500 hover:text-black transition-colors mb-6 font-bold uppercase tracking-widest text-xs cursor-pointer bg-transparent border-0"
@@ -185,7 +381,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </button>
 
         {/* ========================================================
-            🏆 CABECERA Y FILTRO DE MES
+            🏆 CABECERA CON BOTÓN DE PDF Y SELECTORES
             ======================================================== */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -197,13 +393,23 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               Ranking de Vendedores
             </h1>
             <p className="text-zinc-500 text-sm font-medium mt-1">
-              Registro de ventas y cálculo de comisiones por prendas vendidas.
+              Registro de ventas y comisiones acumuladas del mes.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* 📄 BOTÓN DE PDF EN BLANCO Y NEGRO */}
+            <button
+              onClick={generarPDFBlancoYNegro}
+              className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
+              title="Descargar o imprimir reporte en PDF"
+            >
+              <FaFilePdf size={14} />
+              <span>Exportar PDF</span>
+            </button>
+
             {/* Selector de Mes */}
-            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2 rounded-2xl">
+            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <FaCalendarAlt className="text-zinc-400" />
               <input
                 type="month"
@@ -213,8 +419,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               />
             </div>
 
-            {/* Ajuste de Comisión por Prenda (Editable) */}
-            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2 rounded-2xl">
+            {/* Comisión / Prenda */}
+            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>
               <input
                 type="number"
@@ -233,14 +439,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             ======================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
           
-          {/* 🥈 SEGUNDO LUGAR */}
+          {/* 🥈 2do Lugar */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
             <div className="w-12 h-12 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
               🥈
             </div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">2º LUGAR</span>
             <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">
-              {top2?.vendedor || "Sin datos"}
+              {top2?.vendedor || "Sin ventas"}
             </h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
               <p className="text-3xl font-black text-black leading-none">
@@ -253,7 +459,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* 🥇 PRIMER LUGAR (MÁS ALTO Y DESTACADO) */}
+          {/* 🥇 1er Lugar */}
           <div className="bg-gradient-to-b from-amber-500/10 via-white to-white rounded-3xl p-7 border-2 border-amber-400 shadow-xl flex flex-col items-center text-center relative order-1 md:order-2 -mt-4 md:-mt-6">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-black flex items-center justify-center text-3xl font-black mb-3 shadow-md">
               🥇
@@ -262,7 +468,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               ★ LÍDER EN VENTAS ★
             </span>
             <h3 className="text-2xl sm:text-3xl font-black text-black mt-1 truncate max-w-full">
-              {top1?.vendedor || "Sin datos"}
+              {top1?.vendedor || "Sin ventas"}
             </h3>
             <div className="mt-4 w-full bg-amber-50/60 rounded-2xl p-4 border border-amber-200">
               <p className="text-4xl font-black text-black leading-none">
@@ -276,14 +482,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* 🥉 TERCER LUGAR */}
+          {/* 🥉 3er Lugar */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-3">
             <div className="w-12 h-12 rounded-full bg-amber-700/20 text-amber-800 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
               🥉
             </div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">3º LUGAR</span>
             <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">
-              {top3?.vendedor || "Sin datos"}
+              {top3?.vendedor || "Sin ventas"}
             </h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
               <p className="text-3xl font-black text-black leading-none">
@@ -298,7 +504,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
         </div>
 
-        {/* 📊 RESTO DEL RANKING (Posición 4 en adelante) */}
+        {/* 📊 Resto del Ranking */}
         {restoRanking.length > 0 && (
           <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">
@@ -329,7 +535,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         )}
 
         {/* ========================================================
-            📋 TABLA DETALLADA DE HISTORIAL DE VENTAS
+            📋 TABLA DETALLADA CON BASURERO PARA ANULAR VENTAS
             ======================================================== */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           
@@ -343,7 +549,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               </p>
             </div>
 
-            {/* Buscador de la tabla */}
             <div className="relative w-full sm:w-72">
               <input
                 type="text"
@@ -377,6 +582,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Prenda / Talla</th>
                     <th className="py-3 px-3">Tienda</th>
                     <th className="py-3 px-3 text-right">Cant.</th>
+                    <th className="py-3 px-3 text-center">Anular</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 font-medium">
@@ -415,6 +621,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         </td>
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">
                           {venta.totalUnidades}
+                        </td>
+
+                        {/* 🗑️ BOTÓN DE BASURERO: ANULA LA VENTA Y DEVUELVE EL STOCK */}
+                        <td className="py-3.5 px-3 text-center">
+                          <button
+                            onClick={() => confirmarAnulacion(venta)}
+                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                            title="Anular venta y restablecer inventario"
+                          >
+                            <FaTrash size={13} />
+                          </button>
                         </td>
                       </tr>
                     );
