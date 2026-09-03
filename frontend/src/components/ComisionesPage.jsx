@@ -143,9 +143,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         const actionStr = String(log?.action || "").toLowerCase();
         const detailsStr = String(log?.details || "").toLowerCase();
 
+        // 🔥 LÓGICA CORREGIDA: Excluir estrictamente si la acción fue un "ajuste" o "actualización"
         const esVenta = 
           actionStr.includes("vend") || 
-          (parsed.totalUnidades > 0 && !detailsStr.includes("ajuste de inventario"));
+          (parsed.totalUnidades > 0 && !actionStr.includes("ajust") && !actionStr.includes("actualiz") && !detailsStr.includes("ajuste"));
 
         return { ...log, ...parsed, esVenta };
       })
@@ -644,7 +645,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-              
+              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             </div>
           </div>
 
@@ -682,7 +683,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : "";
 
-                    // 🔥 RESTRICCIÓN DE BORRADO: Solo SuperAdmin o el mismo usuario
                     const canDelete = storedUser?.isSuperUser || storedUser?.username === venta.vendedor;
 
                     return (
