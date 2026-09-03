@@ -5,7 +5,7 @@ import Product from '../models/Product.js';
 const router = express.Router();
 
 /* ========================================================
-   🗑️ ANULAR VENTA: Limpieza de ID exacta y devolución de stock
+   🗑️ ANULAR VENTA: Devuelve el stock y elimina de comisiones
    ======================================================== */
 router.post('/anular/:id', async (req, res) => {
   try {
@@ -20,10 +20,10 @@ router.post('/anular/:id', async (req, res) => {
 
     const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-    // 🎯 2. Extraemos el ID limpio de 24 caracteres (sin corchetes ni texto "ID:")
+    // 🎯 2. Extraemos el ID limpio de 24 caracteres (por desestructuración segura)
     const rawIdSearch = `${req.body?.productId || ''} ${log?.productId || ''} ${detailsStr}`;
-    const idMatch = rawIdSearch.match(/([a-f0-9]{24})/i);
-    const cleanProductId = idMatch ? idMatch : null;
+    const [, idLimpio] = rawIdSearch.match(/([a-f0-9]{24})/i) || [];
+    const cleanProductId = idLimpio || null;
 
     let product = null;
 
@@ -31,11 +31,11 @@ router.post('/anular/:id', async (req, res) => {
     if (cleanProductId) {
       product = await Product.findById(cleanProductId);
       if (product) {
-        console.log("🎯 [ANULAR] ¡Camiseta encontrada por ID exacto!:", product.name);
+        console.log("🎯 [ANULAR] ¡Camiseta encontrada por ID directo!:", product.name);
       }
     }
 
-    // Respaldo por nombre si era una venta antigua sin ID
+    // Respaldo por nombre si era una venta vieja sin ID
     if (!product) {
       const rawItemName = String(req.body?.item || log.item || "").trim();
       const cleanItemName = rawItemName.replace(/\s*\([^)]*\)$/, "").trim();
@@ -72,24 +72,26 @@ router.post('/anular/:id', async (req, res) => {
       });
     }
 
-    // 3. Obtenemos las tallas válidas (filtrando para que el ID nunca sea tomado como talla)
+    // 3. Obtenemos las tallas válidas a devolver
     let prendas = [];
     if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
-      prendas = req.body.items.filter(it => it.talla && it.talla !== "U" && !it.talla.includes("ID:"));
+      prendas = req.body.items.filter(it => it.talla && it.talla !== "U");
     }
 
     if (prendas.length === 0) {
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
       let m;
       while ((m = regex.exec(detailsStr)) !== null) {
-        const talla = String(m || "").trim().toUpperCase();
-        const oldV = parseInt(m, 10) || 0;
-        const newV = parseInt(m, 10) || 0;
+        const [matchCompleto, tallaCapturada, valorViejo, valorNuevo] = m;
+        const talla = String(tallaCapturada || "").trim().toUpperCase();
+        const oldV = Number(valorViejo) || 0;
+        const newV = Number(valorNuevo) || 0;
         const subStr = detailsStr.substring(0, m.index);
         const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
-        // Filtramos cualquier ID para que solo tome tallas reales
-        if (oldV > newV && talla && talla !== "U" && !talla.includes("ID:")) {
+        if (talla.includes("ID") || talla.length > 5) continue;
+
+        if (oldV > newV && talla && talla !== "U") {
           const cantidad = oldV - newV;
           for (let i = 0; i < cantidad; i++) {
             prendas.push({ tienda, talla });
@@ -102,7 +104,7 @@ router.post('/anular/:id', async (req, res) => {
       return res.status(400).json({ error: "No se detectaron tallas válidas para devolver en este registro." });
     }
 
-    console.log("📦 [ANULAR] Tallas que se devolverán:", prendas);
+    console.log("📦 [ANULAR] Tallas a devolver:", prendas);
 
     // 4. Sumamos las unidades a Tienda #1 o Tienda #2
     const updatedStock = { ...(product.stock || {}) };
@@ -110,7 +112,7 @@ router.post('/anular/:id', async (req, res) => {
 
     prendas.forEach(({ tienda, talla }) => {
       const tUpper = String(talla || "").trim().toUpperCase();
-      if (tUpper && tUpper !== "U" && !tUpper.includes("ID:")) {
+      if (tUpper && tUpper !== "U") {
         const t = String(tienda || "");
         if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
           updatedBodega[tUpper] = (Number(updatedBodega[tUpper]) || 0) + 1;
@@ -129,7 +131,7 @@ router.post('/anular/:id', async (req, res) => {
 
     console.log("💾 [ANULAR] Stock devuelto con éxito a:", updatedProduct.name);
 
-    // Notificar en tiempo real por WebSockets
+    // Notificar por WebSockets
     const io = req.app.get('io');
     if (io && updatedProduct) {
       io.emit('productoActualizado', updatedProduct.toObject());
