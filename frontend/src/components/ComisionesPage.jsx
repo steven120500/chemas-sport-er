@@ -29,7 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS Y TALLAS
+// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS, TALLAS Y PRODUCT_ID
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -38,6 +38,13 @@ function parseSaleDetails(log) {
   const cliente = extractClienteSeguro(detailsStr);
   const vendedor = String(log?.user || "Sistema").trim();
   const itemGeneral = String(log?.item || "Camiseta").trim();
+
+  // 🆔 Extraer productId si existe en el log o dentro del detalle
+  let productId = log?.productId || null;
+  if (!productId) {
+    const mId = detailsStr.match(/\[ID:([a-f0-9]{24})\]/i) || detailsStr.match(/ID:([a-f0-9]{24})/i);
+    if (mId && mId) productId = mId;
+  }
 
   const items = [];
   const tallasAgrupadas = {};
@@ -48,14 +55,14 @@ function parseSaleDetails(log) {
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
       const [, tallaCapturada, oldStr, newStr] = m;
-      const talla = String(tallaCapturada || "U").trim();
+      const talla = String(tallaCapturada || "U").trim().toUpperCase();
       const oldV = parseInt(oldStr, 10) || 0;
       const newV = parseInt(newStr, 10) || 0;
 
       const subStr = detailsStr.substring(0, m.index);
       const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
-      if (oldV > newV) {
+      if (oldV > newV && talla !== "U") {
         const cantidad = oldV - newV;
         totalUnidades += cantidad;
         tallasAgrupadas[talla] = (tallasAgrupadas[talla] || 0) + cantidad;
@@ -69,7 +76,7 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Fallback si fue venta directa sin formato de tallas
+  // Fallback si fue venta directa sin desglose de tallas
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     tallasAgrupadas["U"] = 1;
@@ -80,7 +87,7 @@ function parseSaleDetails(log) {
     .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
     .join(", ");
 
-  return { cliente, vendedor, items, totalUnidades, tallasTexto, rawDetails: detailsStr };
+  return { cliente, vendedor, items, totalUnidades, tallasTexto, productId, rawDetails: detailsStr };
 }
 
 export default function ComisionesPage({ isSuperUser = false, user = null }) {
@@ -249,16 +256,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
-  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Llama a /sales o /products)
+  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (CON ID EXACTO)
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
+        productId: venta.productId || null, // 👈 Enviamos el ID si existe
         item: venta.item,
         items: venta.items || [],
         totalUnidades: venta.totalUnidades || 1
       };
 
-      // 1. Intenta en /api/sales/anular/
+      // 1. Enviamos a /api/sales/anular/
       let res = await fetch(`${API_BASE}/api/sales/anular/${venta._id}`, {
         method: "POST",
         headers: { 
@@ -268,7 +276,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         body: JSON.stringify(payload)
       });
 
-      // 2. Si no responde /api/sales, intenta en /api/products/anular/
+      // 2. Si da 404, reintenta en /api/products/anular/
       if (!res.ok && res.status === 404) {
         res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
           method: "POST",
@@ -283,10 +291,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       const resData = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(resData.error || `Error ${res.status} del servidor`);
+        throw new Error(resData.error || `Error ${res.status} del servidor al anular`);
       }
 
-      // Elimina la fila y descuenta del podio de comisiones al instante
+      // Elimina la fila de la tabla y descuenta de comisiones de inmediato
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
@@ -688,7 +696,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : "";
 
-                    // Permiso para anular
                     const canDelete = Boolean(
                       storedUser?.isSuperUser ||
                       (storedUser?.roles || []).includes("admin") ||
@@ -753,7 +760,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </div>
 
       </div>
-
-      </div>
+    </div>
   );
 }

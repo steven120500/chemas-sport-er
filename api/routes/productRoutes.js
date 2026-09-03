@@ -132,11 +132,12 @@ router.post('/', upload.any(), async (req, res) => {
     });
 
     await History.create({
-      user: whoDidIt(req),
-      action: 'creó producto',
-      item: `${product.name} (${product.type})`,
+      productId: prev._id, // 👈 GUARDA EL ID DEL PRODUCTO
+      user: user,
+      action: accionTexto,
+      item: `${updated.name} (${updated.type})`,
       date: new Date(),
-      details: `imagen: ${imageSrc} | descuento: ${product.discountPrice}`,
+      details: detalleText.includes("[ID:") ? detalleText : `[ID:${prev._id}] | ${detalleText}`
     });
 
     res.status(201).json(product);

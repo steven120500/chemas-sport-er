@@ -136,6 +136,7 @@ export default function ProductAdminEditor({
       const cleanBodega = clean(editedBodega);
 
       const payload = {
+        productId: id, // 👈 1. ID EXACTO DEL PRODUCTO
         name: editedName.trim(), 
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
         discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0), 
@@ -152,10 +153,10 @@ export default function ProductAdminEditor({
         customerName: clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario"),
         sellerName: displayName,
         user: displayName,
-        isSale: Boolean(isSale), // 👈 ¡ESTA LÍNEA ES LA QUE FALTABA!
-        details: getInventoryChanges().join(" | "), 
+        isSale: Boolean(isSale),
+        details: `[ID:${id}] | ${getInventoryChanges().join(" | ")}`, // 👈 2. ID EN LOS DETALLES
       };
-
+      
       let tiendaModificada = [];
       const stockViejo = viewProduct?.stock || {};
       const bodegaVieja = viewProduct?.bodega || {};
