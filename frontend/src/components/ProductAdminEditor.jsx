@@ -206,6 +206,7 @@ export default function ProductAdminEditor({
     }
   };
 
+
   const handleDelete = async () => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -213,15 +214,24 @@ export default function ProductAdminEditor({
 
     try {
       setLoading(true);
+      
+      // 1. Obligamos al sistema a esperar que el servidor lo elimine primero
+      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
+        method: "DELETE", 
+        headers: { "Content-Type": "application/json", "x-user": displayName },
+      });
+
+      if (!res.ok) throw new Error("Error en el servidor al eliminar");
+
+      // 2. Una vez confirmado el borrado, actualizamos la pantalla automáticamente
       onDeleteSuccess(id);
       toast.success("Producto eliminado correctamente.");
 
-      fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
-        method: "DELETE", headers: { "Content-Type": "application/json", "x-user": displayName },
-      }).catch((err) => console.error("Error servidor:", err));
     } catch (err) {
+      console.error("Error al eliminar:", err);
+      toast.error("Error al eliminar el producto");
+    } finally {
       setLoading(false);
-      toast.error("Error al eliminar");
     }
   };
 

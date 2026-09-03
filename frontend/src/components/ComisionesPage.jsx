@@ -666,7 +666,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              
             </div>
           </div>
 
@@ -706,8 +706,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
                     const canDelete = Boolean(
                       storedUser?.isSuperUser ||
-                      (storedUser?.roles || []).includes("admin") ||
-                      (storedUser?.roles || []).includes("history") ||
                       String(storedUser?.username || "").toLowerCase() === String(venta.vendedor || "").toLowerCase()
                     );
 

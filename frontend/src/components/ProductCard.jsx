@@ -274,11 +274,15 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               </div>
             )}
 
+            {/* 🔥 Etiqueta de OCULTO rediseñada con Blur y Sello Oficial */}
             {isAdmin && product.hidden && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-1">
-                <span className="text-white text-[9px] font-bold text-center uppercase tracking-wider">
-                  Oculto
-                </span>
+              <div className="absolute inset-0 bg-white/30 backdrop-blur-[2px] z-40 flex items-center justify-center pointer-events-none p-2 rounded-r-[16px] sm:rounded-r-[24px]">
+                <div className="bg-black text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 transform -rotate-3 border border-white/20">
+                 
+                  <span className="text-xs font-black uppercase tracking-widest text-center shadow-sm">
+                    OCULTO
+                  </span>
+                </div>
               </div>
             )}
           </div>

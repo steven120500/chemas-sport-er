@@ -11,7 +11,10 @@ const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna
 
 // 🛡️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR
 function parseLogDetails(log) {
-  const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+  let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+
+  // 🔥 SOLUCIÓN: Limpiamos el ID del texto antes de buscar las tallas para que no se confunda
+  detailsStr = detailsStr.replace(/\[ID:[^\]]+\]\s*\|\s*/g, "");
 
   let cliente = "No especificado";
   const matchCliente = detailsStr.match(/Cliente:\s*([^|]+)/i);
@@ -428,7 +431,10 @@ export default function HistoryPage({ isSuperUser = false }) {
                               
                               {log.details && (
                               <pre className="mt-4 bg-white border border-gray-200 p-4 rounded-xl text-[11px] overflow-hidden break-all whitespace-pre-wrap text-gray-600 font-mono shadow-inner">
-                                  {typeof log.details === "string" ? log.details : JSON.stringify(log.details, null, 2)}
+                                  {(typeof log.details === "string" 
+                                      ? log.details 
+                                      : JSON.stringify(log.details, null, 2)
+                                  ).replace(/\[ID:[^\]]+\]\s*\|\s*/g, "")}
                               </pre>
                               )}
                           </div>
