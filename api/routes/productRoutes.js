@@ -323,7 +323,8 @@ router.put('/:id', async (req, res) => {
         if (detalleText) {
           let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           
-          if (esVenta && nombreCliente && nombreCliente !== "No especificado") {
+          // 🔥 Se guarda el nombre del cliente incluso si es un ajuste de inventario
+          if (nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario") {
             detalleText = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleText}`;
           } else {
             detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
@@ -364,54 +365,58 @@ router.put('/:id', async (req, res) => {
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
-    const { item, items } = req.body; // 👈 Ahora sí recibimos la data procesada del frontend
+    const { item, items } = req.body; 
 
-    // 1. Borramos la venta de la tabla del historial de inmediato
-    await History.findByIdAndDelete(req.params.id);
-
-    // 2. Si el panel no logró enviar las tallas, terminamos aquí
+    // 1. Si el panel no logró enviar las tallas, solo borramos el registro
     if (!items || !Array.isArray(items) || items.length === 0) {
+      await History.findByIdAndDelete(req.params.id);
       return res.json({ success: true, message: "Historial borrado (no se detectaron tallas para devolver)." });
     }
 
-    // 3. Buscamos el producto físico en la base de datos ignorando "(Player)", "(Fan)", etc.
+    // 2. Buscamos el producto físico en la base de datos ignorando "(Player)", "(Fan)", etc.
     const cleanItemName = (item || "").split("(")[0].trim();
     const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") })
       || await Product.findOne({ name: new RegExp(escaped, "i") });
 
-    // 4. Si el producto existe, le sumamos las tallas de vuelta a su inventario
-    if (product) {
-      const updatedStock = { ...(product.stock || {}) };
-      const updatedBodega = { ...(product.bodega || {}) };
-
-      // El frontend envía un objeto por CADA camiseta devuelta
-      items.forEach(({ tienda, talla }) => {
-        if (talla && talla !== "U") {
-          if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
-            updatedBodega[talla] = (updatedBodega[talla] || 0) + 1;
-          } else {
-            updatedStock[talla] = (updatedStock[talla] || 0) + 1;
-          }
-        }
-      });
-
-      product.stock = updatedStock;
-      product.bodega = updatedBodega;
-      await product.save();
-
-      // Avisamos en tiempo real para que las tarjetas del catálogo se actualicen
-      const io = req.app.get('io');
-      if (io) io.emit('productoActualizado', product.toObject());
+    if (!product) {
+       await History.findByIdAndDelete(req.params.id);
+       return res.json({ success: true, message: "Historial borrado. (El producto original ya no existe en el catálogo)." });
     }
 
-    res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente." });
+    // 3. Clonamos las tallas actuales
+    const updatedStock = { ...(product.stock || {}) };
+    const updatedBodega = { ...(product.bodega || {}) };
+
+    // 4. Sumamos de vuelta a la Tienda correcta
+    items.forEach(({ tienda, talla }) => {
+      if (talla && talla !== "U") {
+        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
+          updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
+        } else {
+          updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
+        }
+      }
+    });
+
+    // 5. 🔥 ESTA ES LA MAGIA: Obligamos a la base de datos a guardar
+    product.stock = updatedStock;
+    product.bodega = updatedBodega;
+    product.markModified('stock');
+    product.markModified('bodega');
+    await product.save();
+
+    // 6. Borramos el historial y avisamos en tiempo real
+    await History.findByIdAndDelete(req.params.id);
+    const io = req.app.get('io');
+    if (io) io.emit('productoActualizado', product.toObject());
+
+    res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente a la tienda correspondiente." });
   } catch (error) {
     console.error("Error al anular venta:", error);
     res.status(500).json({ error: "Error interno al anular la venta" });
   }
 });
-
 
 
 /* ========================== Eliminar Producto ========================= */

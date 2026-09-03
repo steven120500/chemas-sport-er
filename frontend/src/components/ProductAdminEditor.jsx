@@ -149,8 +149,7 @@ export default function ProductAdminEditor({
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
-        customerName: isSale ? (clientName || "Cliente General / Tienda") : "Ajuste de inventario",
-        isSale: Boolean(isSale),
+        customerName: clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario"),
         sellerName: displayName,
         details: getInventoryChanges().join(" | "), 
       };
@@ -412,7 +411,7 @@ export default function ProductAdminEditor({
                 type="button" 
                 onClick={() => { 
                   setShowBuyerModal(false); 
-                  handleSave("Ajuste de inventario", false); 
+                  handleSave(buyerName.trim(), false);
                   setBuyerName(""); 
                 }} 
                 disabled={loading} 
