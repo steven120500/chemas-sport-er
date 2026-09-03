@@ -338,7 +338,7 @@ router.put('/:id', async (req, res) => {
             details: detalleText
           });
         }
-
+        
         updatedObj._lastEditMeta = {
           user: user,
           store: etiquetaTienda,
