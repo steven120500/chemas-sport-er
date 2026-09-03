@@ -98,6 +98,7 @@ router.post('/', upload.any(), async (req, res) => {
     const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
+    const imageSrc2 = images[1]?.url || ''; // 🔥 Corrección: Se toma la posición correcta para la segunda imagen
 
     let stock = {};
     try {
@@ -125,12 +126,13 @@ router.post('/', upload.any(), async (req, res) => {
       bodega: cleanBodega,
       images,
       imageSrc,
-      imageSrc2: images?.url || '',
+      imageSrc2,
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
       isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
       isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true
     });
 
+    // 🔥 Corrección: Historial limpio sin variables inexistentes para evitar Error 500
     await History.create({
       user: whoDidIt(req),
       action: 'creó producto',
@@ -276,7 +278,7 @@ router.put('/:id', async (req, res) => {
       const finalImages = processedImages.filter(Boolean);
       update.images = finalImages;
       update.imageSrc = finalImages[0]?.url || '';
-      update.imageSrc2 = finalImages?.url || '';
+      update.imageSrc2 = finalImages[1]?.url || ''; // 🔥 Corrección para guardar la segunda imagen correctamente
     }
 
     const updated = await Product.findByIdAndUpdate(
@@ -288,11 +290,8 @@ router.put('/:id', async (req, res) => {
 
     res.status(200).json(updatedObj);
 
-
-
     setTimeout(async () => {
       try {
-        // 1. Declaración única del cliente y verificación de venta
         const nombreCliente = (req.body.customerName || "").trim();
         const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
@@ -315,7 +314,6 @@ router.put('/:id', async (req, res) => {
 
         const changes = diffProduct(prev, updatedObj);
         
-        // 2. Nombre del cliente garantizado para toda venta
         const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
           ? nombreCliente
           : (esVenta ? "Cliente General / Tienda" : "");
@@ -336,7 +334,6 @@ router.put('/:id', async (req, res) => {
             detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
           }
 
-          // 💾 Guardamos con el ID del producto
           await History.create({
             productId: prev._id,
             user: user,
@@ -362,7 +359,6 @@ router.put('/:id', async (req, res) => {
       }
     }, 0);
 
-
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
     if (!res.headersSent) res.status(500).json({ error: 'Error al actualizar producto' });
@@ -370,6 +366,78 @@ router.put('/:id', async (req, res) => {
 });
 
 
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
+router.post('/anular/:id', async (req, res) => {
+  try {
+    const { item, items } = req.body; 
+
+    // 1. Si el panel no logró enviar las tallas, solo borramos el registro
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      await History.findByIdAndDelete(req.params.id);
+      return res.json({ success: true, message: "Historial borrado (no se detectaron tallas)." });
+    }
+
+    // 2. 🔥 EXTRAER NOMBRE Y TIPO EXACTOS para evitar confusiones de modelo
+    let nameQuery = (item || "").trim();
+    let typeQuery = null;
+
+    const lastParen = nameQuery.lastIndexOf("(");
+    if (lastParen !== -1) {
+      typeQuery = nameQuery.substring(lastParen + 1, nameQuery.length - 1).trim(); 
+      nameQuery = nameQuery.substring(0, lastParen).trim(); 
+    }
+
+    const escapedName = nameQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // 3. Buscar el producto exacto
+    let queryExact = { name: new RegExp(`^${escapedName}$`, "i") };
+    if (typeQuery) queryExact.type = new RegExp(`^${typeQuery}$`, "i");
+
+    let product = await Product.findOne(queryExact);
+
+    // Fallback por si hay variación en el tipo
+    if (!product) {
+      product = await Product.findOne({ name: new RegExp(escapedName, "i") });
+    }
+
+    if (!product) {
+       await History.findByIdAndDelete(req.params.id);
+       return res.json({ success: true, message: "Historial borrado (El producto original ya no existe)." });
+    }
+
+    // 4. Clonamos las tallas actuales
+    const updatedStock = { ...(product.stock || {}) };
+    const updatedBodega = { ...(product.bodega || {}) };
+
+    // 5. Sumamos de vuelta a la Tienda correcta
+    items.forEach(({ tienda, talla }) => {
+      if (talla && talla !== "U") {
+        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
+          updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
+        } else {
+          updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
+        }
+      }
+    });
+
+    // 6. 🔥 Obligamos a la base de datos a guardar el inventario modificado
+    product.stock = updatedStock;
+    product.bodega = updatedBodega;
+    product.markModified('stock');
+    product.markModified('bodega');
+    await product.save();
+
+    // 7. Borramos el historial y avisamos en tiempo real
+    await History.findByIdAndDelete(req.params.id);
+    const io = req.app.get('io');
+    if (io) io.emit('productoActualizado', product.toObject());
+
+    res.json({ success: true, message: "Venta anulada y stock devuelto al producto y tienda correctos." });
+  } catch (error) {
+    console.error("Error al anular venta:", error);
+    res.status(500).json({ error: "Error interno al anular la venta" });
+  }
+});
 
 
 /* ========================== Eliminar Producto ========================= */
