@@ -1,7 +1,8 @@
 import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client'; // 👈 1. IMPORTANTE: CONEXIÓN EN VIVO
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -135,6 +136,7 @@ function MainApp() {
   const pages = Math.max(1, Math.ceil(total / limit));
 
   const navigate = useNavigate();
+  const location = useLocation(); // 👈 Detecta cambios de ruta
 
   const abortControllerRef = useRef(null);
   const pageTopRef = useRef(null);
@@ -251,6 +253,40 @@ function MainApp() {
       setAllProductsForCounts([]);
     }
   };
+
+  // 🟢 CONEXIÓN WEBSOCKET: ACTUALIZA CUALQUIER CAMISETA EN TIEMPO REAL SIN F5
+  useEffect(() => {
+    const socket = io(API_BASE, {
+      transports: ['websocket', 'polling'],
+    });
+
+    socket.on('productoActualizado', (updatedProd) => {
+      if (!updatedProd) return;
+      const pid = getPid(updatedProd);
+
+      // Reemplaza la camiseta modificada/devuelta en la lista activa
+      setProducts((prev) =>
+        prev.map((p) => (getPid(p) === pid ? { ...p, ...updatedProd } : p))
+      );
+
+      // Actualiza también los conteos generales
+      setAllProductsForCounts((prev) =>
+        prev.map((p) => (getPid(p) === pid ? { ...p, ...updatedProd } : p))
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  // 🔄 REFRESCAR INVENTARIO SILENCIOSAMENTE AL VOLVER A LA TIENDA
+  useEffect(() => {
+    if (location.pathname === '/') {
+      fetchProducts({ page, q: searchTerm, type: filterType });
+      fetchAllForCounts();
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     fetchProducts({ page, q: searchTerm, type: filterType });
@@ -413,7 +449,7 @@ function MainApp() {
           />
         )}
 
-        {/* ================= SISTEMA DE RUTAS PRINCIPALES ================= */}
+        {/* ================= SISTEMA DE RUTAS ================= */}
         <main className="flex-1 w-full relative">
           <Routes>
             <Route path="/history" element={<HistoryPage isSuperUser={isSuperUser} />} />
@@ -430,7 +466,7 @@ function MainApp() {
               />
             } />
 
-<Route path="/comisiones" element={<ComisionesPage isSuperUser={isSuperUser} user={user} />} />
+            <Route path="/comisiones" element={<ComisionesPage isSuperUser={isSuperUser} user={user} />} />
 
             <Route path="/" element={
               <>

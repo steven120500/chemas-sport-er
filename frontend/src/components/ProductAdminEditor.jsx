@@ -100,25 +100,33 @@ export default function ProductAdminEditor({
     });
   };
 
+  // 🔍 Compara el stock usando viewProduct o product para no perder datos
   const getInventoryChanges = () => {
     const changes = [];
+    const baseStock = viewProduct?.stock || product?.stock || {};
+    const baseBodega = viewProduct?.bodega || product?.bodega || {};
+
     tallasVisibles.forEach((size) => {
-      const oldStock = parseInt(viewProduct?.stock?.[size] ?? 0, 10);
+      const oldStock = parseInt(baseStock[size] ?? 0, 10);
       const newStock = parseInt(editedStock?.[size] ?? 0, 10);
       if (oldStock !== newStock) changes.push(`Tienda #1 [${size}]: ${oldStock} -> ${newStock}`);
 
-      const oldBodega = parseInt(viewProduct?.bodega?.[size] ?? 0, 10);
+      const oldBodega = parseInt(baseBodega[size] ?? 0, 10);
       const newBodega = parseInt(editedBodega?.[size] ?? 0, 10);
       if (oldBodega !== newBodega) changes.push(`Tienda #2 [${size}]: ${oldBodega} -> ${newBodega}`);
     });
     return changes;
   };
 
+  // 🚨 Detecta rebajas de stock usando viewProduct o product
   const checkHasDeduction = () => {
     let decreased = false;
+    const baseStock = viewProduct?.stock || product?.stock || {};
+    const baseBodega = viewProduct?.bodega || product?.bodega || {};
+
     tallasVisibles.forEach((size) => {
-      if (parseInt(viewProduct?.stock?.[size] ?? 0, 10) > parseInt(editedStock?.[size] ?? 0, 10)) decreased = true;
-      if (parseInt(viewProduct?.bodega?.[size] ?? 0, 10) > parseInt(editedBodega?.[size] ?? 0, 10)) decreased = true;
+      if (parseInt(baseStock[size] ?? 0, 10) > parseInt(editedStock?.[size] ?? 0, 10)) decreased = true;
+      if (parseInt(baseBodega[size] ?? 0, 10) > parseInt(editedBodega?.[size] ?? 0, 10)) decreased = true;
     });
     return decreased;
   };
@@ -135,8 +143,12 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
+      // ⭐ NOMBRE EXACTO DEL CLIENTE PARA EL HISTORIAL
+      const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
+      const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
+
       const payload = {
-        productId: id, // 👈 1. ID EXACTO DEL PRODUCTO
+        productId: id,
         name: editedName.trim(), 
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
         discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0), 
@@ -150,16 +162,17 @@ export default function ProductAdminEditor({
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
-        customerName: clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario"),
+        customerName: finalCustomer,
         sellerName: displayName,
         user: displayName,
         isSale: Boolean(isSale),
-        details: `[ID:${id}] | ${getInventoryChanges().join(" | ")}`, // 👈 2. ID EN LOS DETALLES
+        // 👈 AQUÍ: Inyecta "👤 Cliente: [nombre]" garantizado en el texto de detalles del historial
+        details: `${clientTag}[ID:${id}] | ${getInventoryChanges().join(" | ")}`, 
       };
       
       let tiendaModificada = [];
-      const stockViejo = viewProduct?.stock || {};
-      const bodegaVieja = viewProduct?.bodega || {};
+      const stockViejo = viewProduct?.stock || product?.stock || {};
+      const bodegaVieja = viewProduct?.bodega || product?.bodega || {};
       
       if (tallasVisibles.some((size) => parseInt(stockViejo[size] ?? 0, 10) !== parseInt(cleanStock[size] ?? 0, 10))) tiendaModificada.push("Tienda #1");
       if (tallasVisibles.some((size) => parseInt(bodegaVieja[size] ?? 0, 10) !== parseInt(cleanBodega[size] ?? 0, 10))) tiendaModificada.push("Tienda #2");

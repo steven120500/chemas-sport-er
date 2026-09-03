@@ -313,10 +313,17 @@ router.put('/:id', async (req, res) => {
 
         const changes = diffProduct(prev, updatedObj);
         
-        // 🔥 SOLUCIÓN: Si es una venta y viene con details exactos, los priorizamos
+        // 1. Obtenemos el nombre del cliente garantizado
+        const nombreCliente = (req.body.customerName || "").trim();
+        const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
+          ? nombreCliente
+          : (esVenta ? "Cliente General / Tienda" : "");
+
+        // 2. Obtenemos los detalles de las tallas modificadas
         let detalleText = '';
         if (esVenta && req.body.details) {
-          detalleText = req.body.details;
+          // Limpiamos si venía repetido el cliente
+          detalleText = req.body.details.replace(/👤 Cliente:\s*[^|]+\|\s*/gi, "").trim();
         } else if (changes.length) {
           detalleText = changes.join(' | ');
         }
@@ -324,14 +331,16 @@ router.put('/:id', async (req, res) => {
         if (detalleText) {
           let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           
-          // 🔥 Se guarda el nombre del cliente incluso si es un ajuste de inventario
-          if (nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario") {
-            detalleText = `👤 Cliente: ${nombreCliente} | 🏬 ${etiquetaTienda} | ${detalleText}`;
+          // 3. Inyectamos obligatoriamente "👤 Cliente: [nombre]" en el historial
+          if (clienteFinal) {
+            detalleText = `👤 Cliente: ${clienteFinal} | 🏬 ${etiquetaTienda} | ${detalleText}`;
           } else {
             detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
           }
 
+          // 4. Guardamos en el modelo History con el ID del producto
           await History.create({
+            productId: prev._id, // 👈 Guarda el ID para anulación instantánea
             user: user,
             action: accionTexto,
             item: `${updated.name} (${updated.type})`,
