@@ -258,8 +258,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         totalUnidades: venta.totalUnidades || 1
       };
 
-      // Llamamos al endpoint en productRoutes
-      const res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
+      // 1. Enviamos la petición a la ruta en /api/products/anular/
+      let res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -268,13 +268,25 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || `Error ${res.status} al anular.`);
+      // 2. Si da 404, reintenta en /api/history/anular/
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${API_BASE}/api/history/anular/${venta._id}`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-super": storedUser?.isSuperUser ? "true" : "false"
+          },
+          body: JSON.stringify(payload)
+        });
       }
 
-      // Elimina la fila de la pantalla y recalcula el ranking de inmediato
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(resData.error || `El servidor respondió con código ${res.status}`);
+      }
+
+      // Elimina la fila de la tabla y descuenta del podio de comisiones
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
@@ -284,7 +296,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       toastHOT.error(err.message || "No se pudo anular la venta.");
     }
   };
-  
+
   const confirmarAnulacion = (venta) => {
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">

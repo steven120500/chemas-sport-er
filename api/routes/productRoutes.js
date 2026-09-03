@@ -362,36 +362,41 @@ router.put('/:id', async (req, res) => {
 
 
 
-/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK (100% FUNCIONAL) ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
-    const { item, items } = req.body; 
-
-    // 1. Buscamos el registro en el historial para asegurar que exista
     const log = await History.findById(req.params.id);
     if (!log) {
-      return res.status(404).json({ error: "Registro de venta no encontrado" });
+      return res.status(404).json({ error: "Registro de venta no encontrado en el historial" });
     }
 
-    const itemName = String(item || log.item || "").trim();
-    const cleanItemName = itemName.split("(")[0].trim();
+    const rawItemName = String(req.body?.item || log.item || "").trim();
+    const cleanItemName = rawItemName.split("(")[0].trim();
     const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // 2. Buscamos el producto físico en la base de datos (por nombre completo o sin categoría)
-    let product = await Product.findOne({ name: itemName });
+    // 1. Buscamos el producto por nombre completo o nombre limpio
+    let product = await Product.findOne({ name: rawItemName });
     if (!product) {
       product = await Product.findOne({ name: cleanItemName });
+    }
+    if (!product) {
+      product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") });
     }
     if (!product) {
       product = await Product.findOne({ name: new RegExp(escaped, "i") });
     }
 
-    // 3. Obtenemos las tallas a devolver (vienen del body o se leen del detalle guardado)
-    let prendasADevolver = [];
-    if (Array.isArray(items) && items.length > 0) {
-      prendasADevolver = items;
+    // 2. Extraemos las tallas y prendas a devolver
+    let restas = [];
+    if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
+      req.body.items.forEach((it) => {
+        restas.push({
+          tienda: it.tienda || "Tienda #1",
+          talla: it.talla || "U",
+          cantidad: 1,
+        });
+      });
     } else {
-      // Respaldo por si no vinieron en el body
       const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
       let m;
@@ -406,18 +411,18 @@ router.post('/anular/:id', async (req, res) => {
         if (oldV > newV) {
           const cantidad = oldV - newV;
           for (let i = 0; i < cantidad; i++) {
-            prendasADevolver.push({ tienda, talla });
+            restas.push({ tienda, talla, cantidad: 1 });
           }
         }
       }
     }
 
-    // 4. Si encontramos el producto y hay tallas, sumamos de vuelta al inventario
-    if (product && prendasADevolver.length > 0) {
+    // 3. Devolvemos las existencias al stock de Tienda #1 o Tienda #2
+    if (product && restas.length > 0) {
       const updatedStock = { ...(product.stock || {}) };
       const updatedBodega = { ...(product.bodega || {}) };
 
-      prendasADevolver.forEach(({ tienda, talla }) => {
+      restas.forEach(({ tienda, talla }) => {
         if (talla && talla !== "U") {
           const t = String(tienda || "");
           if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
@@ -430,16 +435,20 @@ router.post('/anular/:id', async (req, res) => {
 
       product.stock = updatedStock;
       product.bodega = updatedBodega;
+      
+      // ⭐ OBLIGATORIO: Forzar a Mongoose a persistir los cambios en MongoDB
+      product.markModified('stock');
+      product.markModified('bodega');
       await product.save();
 
-      // Notificamos vía WebSocket a todas las pantallas abiertas
+      // Notificar en tiempo real por WebSockets
       const io = req.app.get('io');
       if (io) {
         io.emit('productoActualizado', product.toObject());
       }
     }
 
-    // 5. Eliminamos el registro del historial (se descuenta del ranking al instante)
+    // 4. Eliminamos el registro de History (se descuenta del ranking de inmediato)
     await History.findByIdAndDelete(req.params.id);
 
     return res.status(200).json({ 
@@ -449,11 +458,9 @@ router.post('/anular/:id', async (req, res) => {
 
   } catch (error) {
     console.error("Error al anular venta:", error);
-    return res.status(500).json({ error: "Error interno al anular la venta: " + error.message });
+    return res.status(500).json({ error: "Error interno al anular: " + error.message });
   }
 });
-
- 
 
 
 /* ========================== Eliminar Producto ========================= */
