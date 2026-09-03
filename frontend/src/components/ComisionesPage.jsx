@@ -29,7 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO INDESTRUCTIBLE DE MÚLTIPLES PRENDAS Y TALLAS
+// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS Y TALLAS
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -47,9 +47,10 @@ function parseSaleDetails(log) {
     const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
-      const talla = String(m[1]).trim();
-      const oldV = parseInt(m[2], 10) || 0;
-      const newV = parseInt(m[3], 10) || 0;
+      const [, tallaCapturada, oldStr, newStr] = m;
+      const talla = String(tallaCapturada || "U").trim();
+      const oldV = parseInt(oldStr, 10) || 0;
+      const newV = parseInt(newStr, 10) || 0;
 
       const subStr = detailsStr.substring(0, m.index);
       const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
@@ -68,7 +69,7 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Fallback de emergencia
+  // Fallback si fue venta directa sin formato de tallas
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     tallasAgrupadas["U"] = 1;
@@ -143,7 +144,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         const actionStr = String(log?.action || "").toLowerCase();
         const detailsStr = String(log?.details || "").toLowerCase();
 
-        // 🔥 LÓGICA CORREGIDA: Excluir estrictamente si la acción fue un "ajuste" o "actualización"
         const esVenta = 
           actionStr.includes("vend") || 
           (parsed.totalUnidades > 0 && !actionStr.includes("ajust") && !actionStr.includes("actualiz") && !detailsStr.includes("ajuste"));
@@ -249,7 +249,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
-  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA
+  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA (Llama a /sales o /products)
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -258,8 +258,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         totalUnidades: venta.totalUnidades || 1
       };
 
-      // 1. Enviamos la petición a la ruta en /api/products/anular/
-      let res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
+      // 1. Intenta en /api/sales/anular/
+      let res = await fetch(`${API_BASE}/api/sales/anular/${venta._id}`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -268,9 +268,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         body: JSON.stringify(payload)
       });
 
-      // 2. Si da 404, reintenta en /api/history/anular/
+      // 2. Si no responde /api/sales, intenta en /api/products/anular/
       if (!res.ok && res.status === 404) {
-        res = await fetch(`${API_BASE}/api/history/anular/${venta._id}`, {
+        res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -283,10 +283,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       const resData = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(resData.error || `El servidor respondió con código ${res.status}`);
+        throw new Error(resData.error || `Error ${res.status} del servidor`);
       }
 
-      // Elimina la fila de la tabla y descuenta del podio de comisiones
+      // Elimina la fila y descuenta del podio de comisiones al instante
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
@@ -464,13 +464,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   return (
     <div className="min-h-screen bg-zinc-50 pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
-
-        
           
-        {/* 🔥 CAMBIO: Diseño de botón tipo pastilla más elegante y visible */}
         <button
           onClick={() => navigate("/")}
-          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-600 hover:text-gray-200 hover:bg-black px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
+          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
         >
           <FaChevronLeft size={12} /> Volver al catálogo
         </button>
@@ -490,7 +487,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            
             {storedUser?.isSuperUser && (
               <button
                 onClick={confirmarResetGlobal}
@@ -539,6 +535,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
         </div>
 
+        {/* Podio Top 3 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
           
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
@@ -603,6 +600,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
         </div>
 
+        {/* Resto del ranking */}
         {restoRanking.length > 0 && (
           <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">
@@ -632,8 +630,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
         )}
 
+        {/* Tabla de ventas */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
-          
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
@@ -690,7 +688,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : "";
 
-                    const canDelete = storedUser?.isSuperUser || storedUser?.username === venta.vendedor;
+                    // Permiso para anular
+                    const canDelete = Boolean(
+                      storedUser?.isSuperUser ||
+                      (storedUser?.roles || []).includes("admin") ||
+                      (storedUser?.roles || []).includes("history") ||
+                      String(storedUser?.username || "").toLowerCase() === String(venta.vendedor || "").toLowerCase()
+                    );
 
                     return (
                       <tr key={venta._id} className="hover:bg-zinc-50 transition-colors">
@@ -707,16 +711,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         <td className="py-3.5 px-3 text-zinc-700">
                           <span className="font-bold text-black block">{venta.item}</span>
                           {venta.tallasTexto && (
-                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 font-mono text-[10px] font-bold">
+                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">
                               Tallas: {venta.tallasTexto}
                             </span>
-                          )}
-                          
-                          {venta.tallasTexto === "U" && (
-                            <div className="text-[9px] text-red-500 mt-1.5 leading-tight font-medium bg-red-50 p-1.5 rounded-lg border border-red-100">
-                              <strong className="block mb-0.5">⚠️ Error de lectura. El servidor guardó:</strong>
-                              {venta.rawDetails}
-                            </div>
                           )}
                         </td>
 
@@ -740,7 +737,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                               <FaTrash size={13} />
                             </button>
                           ) : (
-                            <div className="p-2 text-zinc-200" title="Solo el creador o SuperAdmin pueden anular">
+                            <div className="p-2 text-zinc-300" title="Solo el creador o SuperAdmin pueden anular">
                               <FaLock size={11} />
                             </div>
                           )}
@@ -756,6 +753,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </div>
 
       </div>
-    </div>
+
+      </div>
   );
 }

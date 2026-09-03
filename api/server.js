@@ -11,6 +11,7 @@ import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
 import historyRoutes from './routes/historyroutes.js';
+import saleRoutes from './routes/saleRoutes.js'; // 👈 1. IMPORTAR RUTA DE VENTAS
 
 dotenv.config();
 
@@ -86,6 +87,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', pdfRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/sales', saleRoutes); // 👈 2. MONTAR LA RUTA DE VENTAS Y ANULACIÓN
 
 app.get('/', (_req, res) => res.send('Chema Sport ER API con WebSockets'));
 
