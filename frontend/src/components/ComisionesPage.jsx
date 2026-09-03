@@ -29,7 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO EXACTO DE MÚLTIPLES PRENDAS, TALLAS Y PRODUCT_ID
+// 🛡️ PARSEO EXACTO DE TALLAS (OCULTA EL ID INTERNO)
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -39,12 +39,9 @@ function parseSaleDetails(log) {
   const vendedor = String(log?.user || "Sistema").trim();
   const itemGeneral = String(log?.item || "Camiseta").trim();
 
-  // 🆔 Extraer productId si existe en el log o dentro del detalle
-  let productId = log?.productId || null;
-  if (!productId) {
-    const mId = detailsStr.match(/\[ID:([a-f0-9]{24})\]/i) || detailsStr.match(/ID:([a-f0-9]{24})/i);
-    if (mId && mId) productId = mId;
-  }
+  // Extraer productId limpio sin corchetes
+  const idMatch = `${log?.productId || ''} ${detailsStr}`.match(/([a-f0-9]{24})/i);
+  const productId = idMatch ? idMatch : null;
 
   const items = [];
   const tallasAgrupadas = {};
@@ -54,13 +51,17 @@ function parseSaleDetails(log) {
     const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
     let m;
     while ((m = regex.exec(detailsStr)) !== null) {
-      const [, tallaCapturada, oldStr, newStr] = m;
-      const talla = String(tallaCapturada || "U").trim().toUpperCase();
-      const oldV = parseInt(oldStr, 10) || 0;
-      const newV = parseInt(newStr, 10) || 0;
+      const talla = String(m || "").trim().toUpperCase();
+      const oldV = parseInt(m, 10) || 0;
+      const newV = parseInt(m, 10) || 0;
 
       const subStr = detailsStr.substring(0, m.index);
       const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+
+      // 🛑 IGNORA CUALQUIER ID PARA QUE NUNCA APAREZCA COMO TALLA
+      if (talla.includes("ID:") || talla.length > 5) {
+        continue;
+      }
 
       if (oldV > newV && talla !== "U") {
         const cantidad = oldV - newV;
@@ -76,7 +77,7 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Fallback si fue venta directa sin desglose de tallas
+  // Fallback si fue venta sin desglose de tallas
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     tallasAgrupadas["U"] = 1;

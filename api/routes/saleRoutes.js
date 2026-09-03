@@ -5,7 +5,7 @@ import Product from '../models/Product.js';
 const router = express.Router();
 
 /* ========================================================
-   🗑️ ANULAR VENTA: Devuelve el stock (Por ID o por Nombre)
+   🗑️ ANULAR VENTA: Limpieza de ID exacta y devolución de stock
    ======================================================== */
 router.post('/anular/:id', async (req, res) => {
   try {
@@ -20,24 +20,22 @@ router.post('/anular/:id', async (req, res) => {
 
     const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-    // 2. Intentamos obtener el ID exacto del producto (del body, del modelo o del texto)
-    let productId = req.body?.productId || log?.productId;
-    if (!productId) {
-      const mId = detailsStr.match(/\[ID:([a-f0-9]{24})\]/i) || detailsStr.match(/ID:([a-f0-9]{24})/i);
-      if (mId && mId) productId = mId;
-    }
+    // 🎯 2. Extraemos el ID limpio de 24 caracteres (sin corchetes ni texto "ID:")
+    const rawIdSearch = `${req.body?.productId || ''} ${log?.productId || ''} ${detailsStr}`;
+    const idMatch = rawIdSearch.match(/([a-f0-9]{24})/i);
+    const cleanProductId = idMatch ? idMatch : null;
 
     let product = null;
 
-    // 🎯 PRIORIDAD 1: Búsqueda infalible por ID de MongoDB
-    if (productId) {
-      product = await Product.findById(productId);
+    // Búsqueda directa por ID en MongoDB
+    if (cleanProductId) {
+      product = await Product.findById(cleanProductId);
       if (product) {
         console.log("🎯 [ANULAR] ¡Camiseta encontrada por ID exacto!:", product.name);
       }
     }
 
-    // 🔍 PRIORIDAD 2: Respaldo por nombre inteligente si no tenía ID
+    // Respaldo por nombre si era una venta antigua sin ID
     if (!product) {
       const rawItemName = String(req.body?.item || log.item || "").trim();
       const cleanItemName = rawItemName.replace(/\s*\([^)]*\)$/, "").trim();
@@ -60,7 +58,6 @@ router.post('/anular/:id', async (req, res) => {
           product = p;
           break;
         }
-
         const matches = targetWords.filter(word => pNorm.includes(word)).length;
         if (matches > maxMatches && matches >= 2) {
           maxMatches = matches;
@@ -70,32 +67,29 @@ router.post('/anular/:id', async (req, res) => {
     }
 
     if (!product) {
-      console.log("❌ [ANULAR] No se encontró la camiseta en el catálogo.");
       return res.status(404).json({ 
-        error: "No se encontró la camiseta en el catálogo para devolver el stock." 
+        error: "No se encontró la camiseta en el inventario para devolver el stock." 
       });
     }
 
-    console.log("✅ [ANULAR] Camiseta confirmada:", product.name);
-
-    // 3. Obtenemos las tallas y tiendas a devolver
+    // 3. Obtenemos las tallas válidas (filtrando para que el ID nunca sea tomado como talla)
     let prendas = [];
     if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
-      prendas = req.body.items.filter(it => it.talla && it.talla !== "U");
+      prendas = req.body.items.filter(it => it.talla && it.talla !== "U" && !it.talla.includes("ID:"));
     }
 
     if (prendas.length === 0) {
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
       let m;
       while ((m = regex.exec(detailsStr)) !== null) {
-        const [, tallaCapturada, oldStr, newStr] = m;
-        const talla = String(tallaCapturada || "").trim().toUpperCase();
-        const oldV = parseInt(oldStr, 10) || 0;
-        const newV = parseInt(newStr, 10) || 0;
+        const talla = String(m || "").trim().toUpperCase();
+        const oldV = parseInt(m, 10) || 0;
+        const newV = parseInt(m, 10) || 0;
         const subStr = detailsStr.substring(0, m.index);
         const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
-        if (oldV > newV && talla && talla !== "U") {
+        // Filtramos cualquier ID para que solo tome tallas reales
+        if (oldV > newV && talla && talla !== "U" && !talla.includes("ID:")) {
           const cantidad = oldV - newV;
           for (let i = 0; i < cantidad; i++) {
             prendas.push({ tienda, talla });
@@ -108,15 +102,15 @@ router.post('/anular/:id', async (req, res) => {
       return res.status(400).json({ error: "No se detectaron tallas válidas para devolver en este registro." });
     }
 
-    console.log("📦 [ANULAR] Tallas a devolver:", prendas);
+    console.log("📦 [ANULAR] Tallas que se devolverán:", prendas);
 
-    // 4. Sumamos las unidades al stock o bodega correspondiente
+    // 4. Sumamos las unidades a Tienda #1 o Tienda #2
     const updatedStock = { ...(product.stock || {}) };
     const updatedBodega = { ...(product.bodega || {}) };
 
     prendas.forEach(({ tienda, talla }) => {
       const tUpper = String(talla || "").trim().toUpperCase();
-      if (tUpper && tUpper !== "U") {
+      if (tUpper && tUpper !== "U" && !tUpper.includes("ID:")) {
         const t = String(tienda || "");
         if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
           updatedBodega[tUpper] = (Number(updatedBodega[tUpper]) || 0) + 1;
@@ -126,24 +120,24 @@ router.post('/anular/:id', async (req, res) => {
       }
     });
 
-    // 5. Guardado directo en MongoDB con findByIdAndUpdate
+    // 5. Guardado directo y forzado en MongoDB
     const updatedProduct = await Product.findByIdAndUpdate(
       product._id,
       { $set: { stock: updatedStock, bodega: updatedBodega } },
       { new: true }
     );
 
-    console.log("💾 [ANULAR] Stock restablecido exitosamente para:", updatedProduct.name);
+    console.log("💾 [ANULAR] Stock devuelto con éxito a:", updatedProduct.name);
 
-    // 6. Notificar por WebSocket a todas las pantallas abiertas
+    // Notificar en tiempo real por WebSockets
     const io = req.app.get('io');
     if (io && updatedProduct) {
       io.emit('productoActualizado', updatedProduct.toObject());
     }
 
-    // 7. Eliminamos el registro del historial (se descuenta del ranking)
+    // 6. Eliminamos la venta de History
     await History.findByIdAndDelete(logId);
-    console.log("✅ [ANULAR] Venta eliminada del historial con éxito.");
+    console.log("✅ [ANULAR] Venta eliminada de History exitosamente.");
 
     return res.status(200).json({ 
       success: true, 
