@@ -289,8 +289,11 @@ router.put('/:id', async (req, res) => {
 
     res.status(200).json(updatedObj);
 
+
+
     setTimeout(async () => {
       try {
+        // 1. Declaración única del cliente y verificación de venta
         const nombreCliente = (req.body.customerName || "").trim();
         const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
@@ -313,16 +316,13 @@ router.put('/:id', async (req, res) => {
 
         const changes = diffProduct(prev, updatedObj);
         
-        // 1. Obtenemos el nombre del cliente garantizado
-        const nombreCliente = (req.body.customerName || "").trim();
+        // 2. Nombre del cliente garantizado para toda venta
         const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
           ? nombreCliente
           : (esVenta ? "Cliente General / Tienda" : "");
 
-        // 2. Obtenemos los detalles de las tallas modificadas
         let detalleText = '';
         if (esVenta && req.body.details) {
-          // Limpiamos si venía repetido el cliente
           detalleText = req.body.details.replace(/👤 Cliente:\s*[^|]+\|\s*/gi, "").trim();
         } else if (changes.length) {
           detalleText = changes.join(' | ');
@@ -331,16 +331,15 @@ router.put('/:id', async (req, res) => {
         if (detalleText) {
           let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
           
-          // 3. Inyectamos obligatoriamente "👤 Cliente: [nombre]" en el historial
           if (clienteFinal) {
             detalleText = `👤 Cliente: ${clienteFinal} | 🏬 ${etiquetaTienda} | ${detalleText}`;
           } else {
             detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
           }
 
-          // 4. Guardamos en el modelo History con el ID del producto
+          // 💾 Guardamos con el ID del producto
           await History.create({
-            productId: prev._id, // 👈 Guarda el ID para anulación instantánea
+            productId: prev._id,
             user: user,
             action: accionTexto,
             item: `${updated.name} (${updated.type})`,
@@ -352,7 +351,7 @@ router.put('/:id', async (req, res) => {
         updatedObj._lastEditMeta = {
           user: user,
           store: etiquetaTienda,
-          customer: nombreCliente,
+          customer: clienteFinal || nombreCliente,
           action: esVenta ? "rebajó stock" : "editó"
         };
 
@@ -363,6 +362,7 @@ router.put('/:id', async (req, res) => {
         console.error('Error analítico en segundo plano en PUT /api/products/:id:', bgError);
       }
     }, 0);
+
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
