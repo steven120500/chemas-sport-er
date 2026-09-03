@@ -10,35 +10,49 @@ const router = express.Router();
 router.post('/anular/:id', async (req, res) => {
   try {
     const logId = req.params.id;
-    console.log("➡️ [ANULAR] Solicitud recibida para log ID:", logId);
+    console.log("➡️ [ANULAR] Solicitud para venta ID:", logId);
 
-    // 1. Buscamos el registro en la colección History
+    // 1. Buscamos el registro en History
     const log = await History.findById(logId);
     if (!log) {
-      console.log("❌ [ANULAR] El registro no existe en History:", logId);
       return res.status(404).json({ error: "Registro de venta no encontrado en el historial." });
     }
 
-    const itemName = String(req.body?.item || log.item || "").trim();
-    const cleanItemName = itemName.split("(")[0].trim();
-    console.log("🔍 [ANULAR] Buscando producto:", { itemName, cleanItemName });
+    // 2. Limpiamos el nombre quitando categorías como (Player), (Fan), (Retro)
+    const rawItemName = String(req.body?.item || log.item || "").trim();
+    const cleanItemName = rawItemName.replace(/\(.*?\)/g, "").trim();
 
-    // 2. Buscamos el producto en MongoDB (por nombre completo o sin categoría)
-    let product = await Product.findOne({ name: itemName });
+    // Función para comparar texto ignorando tildes y mayúsculas
+    const normalize = (str) =>
+      String(str || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+    const targetClean = normalize(cleanItemName);
+
+    // 3. Buscamos la camiseta en el catálogo de forma inteligente
+    const allProducts = await Product.find({}, '_id name stock bodega');
+    const product = allProducts.find((p) => {
+      const pNorm = normalize(p.name);
+      return pNorm === targetClean || pNorm.includes(targetClean) || targetClean.includes(pNorm);
+    });
+
     if (!product) {
-      product = await Product.findOne({ name: cleanItemName });
-    }
-    if (!product) {
-      const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      product = await Product.findOne({ name: new RegExp(escaped, "i") });
+      console.log("❌ [ANULAR] Camiseta no encontrada en catálogo:", cleanItemName);
+      return res.status(404).json({ 
+        error: `No se encontró la camiseta "${cleanItemName}" en el catálogo para devolver las tallas.` 
+      });
     }
 
-    // 3. Extraemos las tallas y cantidades a devolver
+    console.log("✅ [ANULAR] Camiseta encontrada:", product.name);
+
+    // 4. Obtenemos las tallas y cantidades a devolver
     let prendas = [];
     if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
       prendas = req.body.items;
     } else {
-      // Respaldo leyendo los detalles de texto
       const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
       let m;
@@ -58,45 +72,43 @@ router.post('/anular/:id', async (req, res) => {
       }
     }
 
-    console.log("📦 [ANULAR] Prendas detectadas para devolver:", prendas);
-
-    // 4. Si encontramos el producto, le sumamos las unidades de vuelta
-    if (product && prendas.length > 0) {
-      const updatedStock = { ...(product.stock || {}) };
-      const updatedBodega = { ...(product.bodega || {}) };
-
-      prendas.forEach(({ tienda, talla }) => {
-        if (talla && talla !== "U") {
-          const t = String(tienda || "");
-          if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
-            updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
-          } else {
-            updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
-          }
-        }
-      });
-
-      product.stock = updatedStock;
-      product.bodega = updatedBodega;
-
-      // Forzar a Mongoose a guardar objetos modificados
-      product.markModified('stock');
-      product.markModified('bodega');
-      await product.save();
-      console.log("💾 [ANULAR] Stock guardado en MongoDB con éxito para:", product.name);
-
-      // Notificar por WebSocket a todas las pantallas abiertas
-      const io = req.app.get('io');
-      if (io) {
-        io.emit('productoActualizado', product.toObject());
-      }
-    } else if (!product) {
-      console.log("⚠️ [ANULAR] El producto ya no existe en el catálogo. Se borrará solo del historial.");
+    if (prendas.length === 0) {
+      return res.status(400).json({ error: "No se detectaron tallas para restaurar en este registro." });
     }
 
-    // 5. Eliminamos la venta de History (se descuenta de comisiones de inmediato)
+    // 5. Sumamos las camisetas de vuelta a Tienda #1 o Tienda #2
+    const updatedStock = { ...(product.stock || {}) };
+    const updatedBodega = { ...(product.bodega || {}) };
+
+    prendas.forEach(({ tienda, talla }) => {
+      if (talla && talla !== "U") {
+        const t = String(tienda || "");
+        if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
+          updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
+        } else {
+          updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
+        }
+      }
+    });
+
+    // 6. Guardado directo y forzado en MongoDB
+    const updatedProduct = await Product.findByIdAndUpdate(
+      product._id,
+      { $set: { stock: updatedStock, bodega: updatedBodega } },
+      { new: true }
+    );
+
+    console.log("💾 [ANULAR] Stock devuelto con éxito en MongoDB");
+
+    // Notificar por WebSocket a todas las pantallas abiertas
+    const io = req.app.get('io');
+    if (io && updatedProduct) {
+      io.emit('productoActualizado', updatedProduct.toObject());
+    }
+
+    // 7. Eliminamos la venta del historial (se descuenta de comisiones)
     await History.findByIdAndDelete(logId);
-    console.log("✅ [ANULAR] Venta eliminada de History exitosamente.");
+    console.log("✅ [ANULAR] Venta eliminada del historial con éxito.");
 
     return res.status(200).json({ 
       success: true, 
