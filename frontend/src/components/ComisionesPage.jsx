@@ -15,7 +15,7 @@ function ymLocal(d = new Date()) {
   return `${y}-${m}`;
 }
 
-const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie", "Melissa", "Ashly"];
+const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Melissa", "Ashly"];
 
 function extractClienteSeguro(detailsStr) {
   if (typeof detailsStr !== "string") return "Cliente General";
@@ -29,6 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
+// 🛡️ PARSEO INDESTRUCTIBLE DE MÚLTIPLES PRENDAS Y TALLAS
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -67,6 +68,7 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
+  // Fallback de emergencia
   if (items.length === 0 && String(log?.action || "").toLowerCase().includes("vend")) {
     items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
     tallasAgrupadas["U"] = 1;
@@ -246,6 +248,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
+  // 🔥 LÓGICA DE ANULACIÓN QUE DEVUELVE LA TALLA AL PRODUCTO 🔥
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -451,10 +454,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   return (
-    // 🔥 CAMBIO: Aumenté el pt-8 a pt-36 para que la página baje y no se esconda detrás de tu menú
-    <div className="min-h-screen bg-zinc-50 pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black">
+    <div className="min-h-screen bg-zinc-50 pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
+
         
+          
         {/* 🔥 CAMBIO: Diseño de botón tipo pastilla más elegante y visible */}
         <button
           onClick={() => navigate("/")}
@@ -640,7 +644,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-              <FaSearch size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              
             </div>
           </div>
 
@@ -677,6 +681,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     const timeStr = dateObj
                       ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : "";
+
+                    // 🔥 RESTRICCIÓN DE BORRADO: Solo SuperAdmin o el mismo usuario
+                    const canDelete = storedUser?.isSuperUser || storedUser?.username === venta.vendedor;
 
                     return (
                       <tr key={venta._id} className="hover:bg-zinc-50 transition-colors">
@@ -717,13 +724,19 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         </td>
 
                         <td className="py-3.5 px-3 text-center">
-                          <button
-                            onClick={() => confirmarAnulacion(venta)}
-                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                            title="Anular venta y restablecer inventario"
-                          >
-                            <FaTrash size={13} />
-                          </button>
+                          {canDelete ? (
+                            <button
+                              onClick={() => confirmarAnulacion(venta)}
+                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                              title="Anular venta y restablecer inventario"
+                            >
+                              <FaTrash size={13} />
+                            </button>
+                          ) : (
+                            <div className="p-2 text-zinc-200" title="Solo el creador o SuperAdmin pueden anular">
+                              <FaLock size={11} />
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

@@ -359,43 +359,40 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+
+
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
-    const log = await History.findById(req.params.id);
-    if (!log) return res.status(404).json({ error: "Registro de venta no encontrado" });
+    const { item, items } = req.body; // 👈 Ahora sí recibimos la data procesada del frontend
 
-    const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+    // 1. Borramos la venta de la tabla del historial de inmediato
+    await History.findByIdAndDelete(req.params.id);
 
-    const regex = /(Tienda\s*#\s*\d+|Tienda|Bodega)\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/gi;
-    let match;
-    const restas = [];
-
-    while ((match = regex.exec(detailsStr)) !== null) {
-      const tienda = String(match[1] || "").trim();
-      const talla = String(match[2] || "").trim();
-      const oldV = parseInt(match[3], 10) || 0;
-      const newV = parseInt(match[4], 10) || 0;
-
-      if (oldV > newV) {
-        restas.push({ tienda, talla, cantidad: oldV - newV });
-      }
+    // 2. Si el panel no logró enviar las tallas, terminamos aquí
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.json({ success: true, message: "Historial borrado (no se detectaron tallas para devolver)." });
     }
 
-    const cleanItemName = (log.item || "").split("(")[0].trim();
+    // 3. Buscamos el producto físico en la base de datos ignorando "(Player)", "(Fan)", etc.
+    const cleanItemName = (item || "").split("(")[0].trim();
     const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") })
       || await Product.findOne({ name: new RegExp(escaped, "i") });
 
-    if (product && restas.length > 0) {
+    // 4. Si el producto existe, le sumamos las tallas de vuelta a su inventario
+    if (product) {
       const updatedStock = { ...(product.stock || {}) };
       const updatedBodega = { ...(product.bodega || {}) };
 
-      restas.forEach(({ tienda, talla, cantidad }) => {
-        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
-          updatedBodega[talla] = (updatedBodega[talla] || 0) + cantidad;
-        } else {
-          updatedStock[talla] = (updatedStock[talla] || 0) + cantidad;
+      // El frontend envía un objeto por CADA camiseta devuelta
+      items.forEach(({ tienda, talla }) => {
+        if (talla && talla !== "U") {
+          if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
+            updatedBodega[talla] = (updatedBodega[talla] || 0) + 1;
+          } else {
+            updatedStock[talla] = (updatedStock[talla] || 0) + 1;
+          }
         }
       });
 
@@ -403,11 +400,10 @@ router.post('/anular/:id', async (req, res) => {
       product.bodega = updatedBodega;
       await product.save();
 
+      // Avisamos en tiempo real para que las tarjetas del catálogo se actualicen
       const io = req.app.get('io');
       if (io) io.emit('productoActualizado', product.toObject());
     }
-
-    await History.findByIdAndDelete(req.params.id);
 
     res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente." });
   } catch (error) {
@@ -415,6 +411,8 @@ router.post('/anular/:id', async (req, res) => {
     res.status(500).json({ error: "Error interno al anular la venta" });
   }
 });
+
+
 
 /* ========================== Eliminar Producto ========================= */
 router.delete('/:id', async (req, res) => {

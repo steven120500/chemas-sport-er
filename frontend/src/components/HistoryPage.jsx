@@ -9,6 +9,7 @@ function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
 
+// 🛡️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR
 function parseLogDetails(log) {
   const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
@@ -19,16 +20,21 @@ function parseLogDetails(log) {
   const vendedor = log.user || "Sistema";
   const nombreChema = log.item || "No especificado";
 
-  const regex = /(Tienda #[12])\[(.*?)\]:\s*(\d+)\s*(?:->|→)\s*(\d+)/g;
-  let match;
   const items = [];
   let hasMatches = false;
 
+  // Busca cualquier cosa entre corchetes, ignorando espacios antes o después
+  const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
+  let match;
+
   while ((match = regex.exec(detailsStr)) !== null) {
-    const tienda = match[1];
-    const talla = match[2];
-    const oldV = parseInt(match[3], 10);
-    const newV = parseInt(match[4], 10);
+    const talla = String(match[1]).trim();
+    const oldV = parseInt(match[2], 10) || 0;
+    const newV = parseInt(match[3], 10) || 0;
+
+    // Detectar si fue Tienda 1 o 2 mirando hacia atrás en el texto
+    const subStr = detailsStr.substring(0, match.index);
+    const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
     if (oldV > newV) {
       hasMatches = true;
@@ -40,6 +46,7 @@ function parseLogDetails(log) {
     }
   }
 
+  // Fallback si la expresión no encontró nada (ej. un ajuste general sin tallas)
   if (!hasMatches) {
     const tiendaF = detailsStr.includes("Tienda #1") ? "Tienda #1" : (detailsStr.includes("Tienda #2") ? "Tienda #2" : "General");
     items.push(`- CAMISETA: ${nombreChema}\nTIENDA: ${tiendaF}`);
