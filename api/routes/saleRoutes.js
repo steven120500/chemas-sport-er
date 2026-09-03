@@ -20,7 +20,7 @@ router.post('/anular/:id', async (req, res) => {
 
     const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-    // 🎯 2. Extraemos el ID limpio de 24 caracteres (por desestructuración segura)
+    // 🎯 2. Extraemos el ID limpio de 24 caracteres
     const rawIdSearch = `${req.body?.productId || ''} ${log?.productId || ''} ${detailsStr}`;
     const [, idLimpio] = rawIdSearch.match(/([a-f0-9]{24})/i) || [];
     const cleanProductId = idLimpio || null;
@@ -66,12 +66,6 @@ router.post('/anular/:id', async (req, res) => {
       }
     }
 
-    if (!product) {
-      return res.status(404).json({ 
-        error: "No se encontró la camiseta en el inventario para devolver el stock." 
-      });
-    }
-
     // 3. Obtenemos las tallas válidas a devolver
     let prendas = [];
     if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
@@ -79,71 +73,84 @@ router.post('/anular/:id', async (req, res) => {
     }
 
     if (prendas.length === 0) {
+      // Limpiamos [ID:...] del texto antes de buscar tallas
+      const cleanDetails = detailsStr.replace(/\[ID:[^\]]+\]\s*\|?\s*/gi, "").trim();
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
       let m;
-      while ((m = regex.exec(detailsStr)) !== null) {
+
+      while ((m = regex.exec(cleanDetails)) !== null) {
         const [matchCompleto, tallaCapturada, valorViejo, valorNuevo] = m;
         const talla = String(tallaCapturada || "").trim().toUpperCase();
         const oldV = Number(valorViejo) || 0;
         const newV = Number(valorNuevo) || 0;
-        const subStr = detailsStr.substring(0, m.index);
+        const subStr = cleanDetails.substring(0, m.index);
         const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
         if (talla.includes("ID") || talla.length > 5) continue;
 
-        if (oldV > newV && talla && talla !== "U") {
-          const cantidad = oldV - newV;
+        const cantidad = Math.abs(oldV - newV);
+        if (cantidad > 0 && talla && talla !== "U") {
           for (let i = 0; i < cantidad; i++) {
             prendas.push({ tienda, talla });
           }
         }
       }
-    }
 
-    if (prendas.length === 0) {
-      return res.status(400).json({ error: "No se detectaron tallas válidas para devolver en este registro." });
-    }
-
-    console.log("📦 [ANULAR] Tallas a devolver:", prendas);
-
-    // 4. Sumamos las unidades a Tienda #1 o Tienda #2
-    const updatedStock = { ...(product.stock || {}) };
-    const updatedBodega = { ...(product.bodega || {}) };
-
-    prendas.forEach(({ tienda, talla }) => {
-      const tUpper = String(talla || "").trim().toUpperCase();
-      if (tUpper && tUpper !== "U") {
-        const t = String(tienda || "");
-        if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
-          updatedBodega[tUpper] = (Number(updatedBodega[tUpper]) || 0) + 1;
-        } else {
-          updatedStock[tUpper] = (Number(updatedStock[tUpper]) || 0) + 1;
+      // Respaldo seguro si solo tenía [talla]
+      if (prendas.length === 0) {
+        const [, fallbackTalla] = cleanDetails.match(/\[([A-Z0-9]+)\]/i) || [];
+        if (fallbackTalla) {
+          const t = String(fallbackTalla).toUpperCase();
+          const tienda = cleanDetails.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+          prendas.push({ tienda, talla: t });
         }
       }
-    });
-
-    // 5. Guardado directo y forzado en MongoDB
-    const updatedProduct = await Product.findByIdAndUpdate(
-      product._id,
-      { $set: { stock: updatedStock, bodega: updatedBodega } },
-      { new: true }
-    );
-
-    console.log("💾 [ANULAR] Stock devuelto con éxito a:", updatedProduct.name);
-
-    // Notificar por WebSockets
-    const io = req.app.get('io');
-    if (io && updatedProduct) {
-      io.emit('productoActualizado', updatedProduct.toObject());
     }
 
-    // 6. Eliminamos la venta de History
+    // 4. Si encontramos el producto y tiene tallas válidas, devolvemos el stock
+    if (product && prendas.length > 0) {
+      const updatedStock = { ...(product.stock || {}) };
+      const updatedBodega = { ...(product.bodega || {}) };
+
+      prendas.forEach(({ tienda, talla }) => {
+        const tUpper = String(talla || "").trim().toUpperCase();
+        if (tUpper && tUpper !== "U") {
+          const t = String(tienda || "");
+          if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
+            updatedBodega[tUpper] = (Number(updatedBodega[tUpper]) || 0) + 1;
+          } else {
+            updatedStock[tUpper] = (Number(updatedStock[tUpper]) || 0) + 1;
+          }
+        }
+      });
+
+      // Guardado forzado y directo en MongoDB
+      const updatedProduct = await Product.findByIdAndUpdate(
+        product._id,
+        { $set: { stock: updatedStock, bodega: updatedBodega } },
+        { new: true }
+      );
+
+      console.log("💾 [ANULAR] Stock devuelto con éxito a:", updatedProduct.name);
+
+      // Notificar por WebSockets
+      const io = req.app.get('io');
+      if (io && updatedProduct) {
+        io.emit('productoActualizado', updatedProduct.toObject());
+      }
+    } else {
+      console.log("ℹ️ [ANULAR] Registro sin tallas físicas registradas; procediendo a limpiar del historial.");
+    }
+
+    // 5. Eliminamos la venta de History en todos los casos
     await History.findByIdAndDelete(logId);
     console.log("✅ [ANULAR] Venta eliminada de History exitosamente.");
 
     return res.status(200).json({ 
       success: true, 
-      message: `Venta anulada. Se devolvió el stock a ${updatedProduct.name}.` 
+      message: (product && prendas.length > 0)
+        ? `Venta anulada. Se devolvieron las tallas al stock de ${product.name}.`
+        : "Venta eliminada del historial correctamente."
     });
 
   } catch (error) {
