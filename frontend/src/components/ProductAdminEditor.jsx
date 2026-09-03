@@ -144,13 +144,15 @@ export default function ProductAdminEditor({
         bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
-        imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
+        imageSrc2: typeof localImages?.src === "string" ? localImages.src : null,
         imageAlt: editedName.trim(), 
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
         customerName: clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario"),
         sellerName: displayName,
+        user: displayName,
+        isSale: Boolean(isSale), // 👈 ¡ESTA LÍNEA ES LA QUE FALTABA!
         details: getInventoryChanges().join(" | "), 
       };
 

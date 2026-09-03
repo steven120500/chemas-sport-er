@@ -249,16 +249,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
-  // 🔥 LÓGICA DE ANULACIÓN QUE DEVUELVE LA TALLA AL PRODUCTO 🔥
+  // 🗑️ LÓGICA DE ANULACIÓN BLINDADA
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
         item: venta.item,
-        items: venta.items,
-        totalUnidades: venta.totalUnidades
+        items: venta.items || [],
+        totalUnidades: venta.totalUnidades || 1
       };
 
-      let res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
+      // Llamamos al endpoint en productRoutes
+      const res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -267,29 +268,23 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         body: JSON.stringify(payload)
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/history/anular/${venta._id}`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "x-super": storedUser?.isSuperUser ? "true" : "false"
-          },
-          body: JSON.stringify(payload)
-        });
+        throw new Error(data.error || `Error ${res.status} al anular.`);
       }
 
-      if (!res.ok) throw new Error("Error en el servidor al anular");
-
+      // Elimina la fila de la pantalla y recalcula el ranking de inmediato
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
       });
     } catch (err) {
-      console.error(err);
-      toastHOT.error("No se pudo anular la venta.");
+      console.error("Error al anular:", err);
+      toastHOT.error(err.message || "No se pudo anular la venta.");
     }
   };
-
+  
   const confirmarAnulacion = (venta) => {
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">

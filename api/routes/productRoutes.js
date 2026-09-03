@@ -338,7 +338,7 @@ router.put('/:id', async (req, res) => {
             details: detalleText
           });
         }
-        
+
         updatedObj._lastEditMeta = {
           user: user,
           store: etiquetaTienda,
@@ -367,56 +367,93 @@ router.post('/anular/:id', async (req, res) => {
   try {
     const { item, items } = req.body; 
 
-    // 1. Si el panel no logró enviar las tallas, solo borramos el registro
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      await History.findByIdAndDelete(req.params.id);
-      return res.json({ success: true, message: "Historial borrado (no se detectaron tallas para devolver)." });
+    // 1. Buscamos el registro en el historial para asegurar que exista
+    const log = await History.findById(req.params.id);
+    if (!log) {
+      return res.status(404).json({ error: "Registro de venta no encontrado" });
     }
 
-    // 2. Buscamos el producto físico en la base de datos ignorando "(Player)", "(Fan)", etc.
-    const cleanItemName = (item || "").split("(")[0].trim();
+    const itemName = String(item || log.item || "").trim();
+    const cleanItemName = itemName.split("(")[0].trim();
     const escaped = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const product = await Product.findOne({ name: new RegExp(`^${escaped}$`, "i") })
-      || await Product.findOne({ name: new RegExp(escaped, "i") });
 
+    // 2. Buscamos el producto físico en la base de datos (por nombre completo o sin categoría)
+    let product = await Product.findOne({ name: itemName });
     if (!product) {
-       await History.findByIdAndDelete(req.params.id);
-       return res.json({ success: true, message: "Historial borrado. (El producto original ya no existe en el catálogo)." });
+      product = await Product.findOne({ name: cleanItemName });
+    }
+    if (!product) {
+      product = await Product.findOne({ name: new RegExp(escaped, "i") });
     }
 
-    // 3. Clonamos las tallas actuales
-    const updatedStock = { ...(product.stock || {}) };
-    const updatedBodega = { ...(product.bodega || {}) };
+    // 3. Obtenemos las tallas a devolver (vienen del body o se leen del detalle guardado)
+    let prendasADevolver = [];
+    if (Array.isArray(items) && items.length > 0) {
+      prendasADevolver = items;
+    } else {
+      // Respaldo por si no vinieron en el body
+      const detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+      const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
+      let m;
+      while ((m = regex.exec(detailsStr)) !== null) {
+        const [, tallaCapturada, oldStr, newStr] = m;
+        const subStr = detailsStr.substring(0, m.index);
+        const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+        const talla = String(tallaCapturada || "U").trim();
+        const oldV = parseInt(oldStr, 10) || 0;
+        const newV = parseInt(newStr, 10) || 0;
 
-    // 4. Sumamos de vuelta a la Tienda correcta
-    items.forEach(({ tienda, talla }) => {
-      if (talla && talla !== "U") {
-        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
-          updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
-        } else {
-          updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
+        if (oldV > newV) {
+          const cantidad = oldV - newV;
+          for (let i = 0; i < cantidad; i++) {
+            prendasADevolver.push({ tienda, talla });
+          }
         }
       }
+    }
+
+    // 4. Si encontramos el producto y hay tallas, sumamos de vuelta al inventario
+    if (product && prendasADevolver.length > 0) {
+      const updatedStock = { ...(product.stock || {}) };
+      const updatedBodega = { ...(product.bodega || {}) };
+
+      prendasADevolver.forEach(({ tienda, talla }) => {
+        if (talla && talla !== "U") {
+          const t = String(tienda || "");
+          if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
+            updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
+          } else {
+            updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
+          }
+        }
+      });
+
+      product.stock = updatedStock;
+      product.bodega = updatedBodega;
+      await product.save();
+
+      // Notificamos vía WebSocket a todas las pantallas abiertas
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('productoActualizado', product.toObject());
+      }
+    }
+
+    // 5. Eliminamos el registro del historial (se descuenta del ranking al instante)
+    await History.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Venta anulada y stock devuelto exitosamente." 
     });
 
-    // 5. 🔥 ESTA ES LA MAGIA: Obligamos a la base de datos a guardar
-    product.stock = updatedStock;
-    product.bodega = updatedBodega;
-    product.markModified('stock');
-    product.markModified('bodega');
-    await product.save();
-
-    // 6. Borramos el historial y avisamos en tiempo real
-    await History.findByIdAndDelete(req.params.id);
-    const io = req.app.get('io');
-    if (io) io.emit('productoActualizado', product.toObject());
-
-    res.json({ success: true, message: "Venta anulada y stock devuelto exitosamente a la tienda correspondiente." });
   } catch (error) {
     console.error("Error al anular venta:", error);
-    res.status(500).json({ error: "Error interno al anular la venta" });
+    return res.status(500).json({ error: "Error interno al anular la venta: " + error.message });
   }
 });
+
+ 
 
 
 /* ========================== Eliminar Producto ========================= */
