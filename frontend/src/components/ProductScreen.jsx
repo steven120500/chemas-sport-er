@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaWhatsapp } from "react-icons/fa";
 import { io } from "socket.io-client";
 import ProductAdminEditor from "./ProductAdminEditor"; 
 
@@ -39,6 +39,9 @@ export default function ProductScreen({
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [idx, setIdx] = useState(0);
+  
+  // 🔥 ESTADO PARA GUARDAR LA TALLA SELECCIONADA POR EL CLIENTE
+  const [selectedSize, setSelectedSize] = useState("");
 
   const displayName = user?.username || user?.email || "ChemaSportER";
 
@@ -52,6 +55,7 @@ export default function ProductScreen({
   useEffect(() => {
     setViewProduct(product);
     setIdx(0);
+    setSelectedSize(""); // Limpia la talla si cambia de producto
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
@@ -158,6 +162,18 @@ export default function ProductScreen({
     return a + b; 
   };
 
+  // 🔥 MENSAJE CON FORMATO DE FORMULARIO, PRECIO, LINK OFICIAL DE LA PÁGINA Y SALTOS DE LÍNEA
+  const finalPrice = hasDiscount ? viewProduct?.discountPrice : viewProduct?.price;
+  const formattedPrice = `₡${Number(finalPrice || 0).toLocaleString("de-DE")}`;
+  
+  // Extraemos el ID del producto para armar el link de la tienda
+  const currentProductId = viewProduct?._id || viewProduct?.id || product?._id || product?.id || "";
+  const productLink = currentProductId ? `https://chemasporter.com/producto/${currentProductId}` : "https://chemasporter.com";
+
+  const whatsappMsg = `¡Hola! Me interesa realizar este pedido:\n\n*Camiseta:* ${viewProduct?.name || 'Producto'}\n\n*Talla:* ${selectedSize || ''}\n\n*Precio:* ${formattedPrice}\n\n*Enlace del producto:* ${productLink}`;
+
+  const whatsappUrl = `https://wa.me/50660369857?text=${encodeURIComponent(whatsappMsg)}`;
+
   return (
     <div className="full bg-white pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up">
       <div className="max-w-6xl mx-auto">
@@ -224,10 +240,32 @@ export default function ProductScreen({
                       const total = getTotalBySize(size);
                       const isAgotado = total === 0;
                       const isTienda2 = storeView === 'tienda2';
+                      const isSelected = selectedSize === size;
+
                       return (
-                          <div key={size} className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 transition-all select-none overflow-hidden ${isAgotado ? 'border-gray-100 bg-gray-50/50 opacity-60' : isTienda2 ? 'border-purple-200 bg-purple-50/30 shadow-sm' : 'border-gray-200 bg-white shadow-sm'}`}>
-                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isTienda2 ? 'text-purple-900' : 'text-gray-900'}`}>{size}</span>
-                              {canEdit && <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-300' : 'text-gray-500'}`}>{isAgotado ? 'Agotado' : `${total} disp.`}</span>}
+                          <div 
+                            key={size} 
+                            onClick={() => {
+                              if (!isAgotado) setSelectedSize(size);
+                            }}
+                            className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 transition-all select-none overflow-hidden 
+                              ${isAgotado 
+                                  ? 'border-gray-100 bg-gray-50/50 opacity-60 cursor-not-allowed' 
+                                  : isSelected
+                                      ? 'border-black bg-black shadow-lg scale-[1.02] cursor-pointer'
+                                      : isTienda2 
+                                          ? 'border-purple-200 bg-purple-50/30 shadow-sm cursor-pointer hover:border-purple-400' 
+                                          : 'border-gray-200 bg-white shadow-sm cursor-pointer hover:border-gray-300'
+                              }`}
+                          >
+                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : isTienda2 ? 'text-purple-900' : 'text-gray-900'}`}>
+                                {size}
+                              </span>
+                              {canEdit && (
+                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
+                                  {isAgotado ? 'Agotado' : `${total} disp.`}
+                                </span>
+                              )}
                               {isAgotado && <svg className="absolute inset-0 w-full h-full text-gray-300/80" preserveAspectRatio="none" viewBox="0 0 100 100"><line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>}
                           </div>
                       );
@@ -285,7 +323,28 @@ export default function ProductScreen({
                     >
                       ELIMINAR PRODUCTO
                     </button>
+
                   )}
+
+                  {/* 🔥 BOTÓN DE WHATSAPP DIRECTO CON VALIDACIÓN */}
+                  <a
+                    href={selectedSize ? whatsappUrl : '#'}
+                    onClick={(e) => {
+                      if (!selectedSize) {
+                        e.preventDefault();
+                        toastHOT.error("Debes seleccionar una talla antes de comprar.", { 
+                          style: { borderRadius: '12px', background: '#000', color: '#fff' }
+                        });
+                      }
+                    }}
+                    target={selectedSize ? "_blank" : "_self"}
+                    rel="noopener noreferrer"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
+                  >
+                    <FaWhatsapp size={22} />
+                    COMPRAR POR WHATSAPP
+                  </a>
+                  
                 </div>
               </div>
 
