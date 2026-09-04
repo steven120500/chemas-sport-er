@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaFilter, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
@@ -13,7 +14,7 @@ const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna
 function parseLogDetails(log) {
   let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-  // 🔥 SOLUCIÓN: Limpiamos el ID del texto antes de buscar las tallas para que no se confunda
+  // Limpiamos el ID del texto antes de buscar las tallas para que no se confunda
   detailsStr = detailsStr.replace(/\[ID:[^\]]+\]\s*\|\s*/g, "");
 
   let cliente = "No especificado";
@@ -26,28 +27,31 @@ function parseLogDetails(log) {
   const items = [];
   let hasMatches = false;
 
-  // Busca cualquier cosa entre corchetes, ignorando espacios antes o después
-  const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
-  let match;
+  // 🔥 SOLUCIÓN: Separamos por el carácter "|" para evaluar cada talla en su propio contexto
+  const segmentos = detailsStr.split('|');
 
-  while ((match = regex.exec(detailsStr)) !== null) {
-    const talla = String(match[1]).trim();
-    const oldV = parseInt(match[2], 10) || 0;
-    const newV = parseInt(match[3], 10) || 0;
+  segmentos.forEach(segmento => {
+    const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
+    let match;
 
-    // Detectar si fue Tienda 1 o 2 mirando hacia atrás en el texto
-    const subStr = detailsStr.substring(0, match.index);
-    const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+    while ((match = regex.exec(segmento)) !== null) {
+      const talla = String(match[1]).trim();
+      const oldV = parseInt(match[2], 10) || 0;
+      const newV = parseInt(match[3], 10) || 0;
 
-    if (oldV > newV) {
-      hasMatches = true;
-      const cantidad = oldV - newV;
+      // Ahora solo busca "Tienda #2" en este pequeño fragmento, no en todo el texto general
+      const tienda = segmento.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
 
-      for (let i = 0; i < cantidad; i++) {
-        items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nTIENDA: ${tienda}`);
+      if (oldV > newV) {
+        hasMatches = true;
+        const cantidad = oldV - newV;
+
+        for (let i = 0; i < cantidad; i++) {
+          items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nTIENDA: ${tienda}`);
+        }
       }
     }
-  }
+  });
 
   // Fallback si la expresión no encontró nada (ej. un ajuste general sin tallas)
   if (!hasMatches) {

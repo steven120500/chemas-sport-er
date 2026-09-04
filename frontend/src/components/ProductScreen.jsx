@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { io } from "socket.io-client";
-import ProductAdminEditor from "./ProductAdminEditor"; // 👈 IMPORTAMOS EL NUEVO EDITOR
+import ProductAdminEditor from "./ProductAdminEditor"; 
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -169,7 +169,6 @@ export default function ProductScreen({
         </button>
 
         {isEditing ? (
-          // 👈 AQUI LLAMAMOS AL NUEVO COMPONENTE ADMIN
           <ProductAdminEditor 
             product={product}
             viewProduct={viewProduct}
@@ -254,12 +253,24 @@ export default function ProductScreen({
                               <p className="font-black text-gray-800 mb-4 text-base">¿Eliminar este producto?</p>
                               <div className="flex gap-3 justify-center">
                                 <button
-                                  onClick={() => {
+                                  onClick={async () => {
                                     toastHOT.dismiss(t.id);
-                                    // Disparamos la lógica de borrar optimista llamando al backend
-                                    onUpdate?.(null, product._id || product.id);
-                                    onClose?.();
-                                    fetch(`${API_BASE}/api/products/${encodeURIComponent(product._id || product.id)}`, { method: "DELETE", headers: { "Content-Type": "application/json", "x-user": displayName }});
+                                    setLoading(true);
+                                    try {
+                                      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(product._id || product.id)}`, { 
+                                        method: "DELETE", 
+                                        headers: { "Content-Type": "application/json", "x-user": displayName }
+                                      });
+                                      if (!res.ok) throw new Error("Error en servidor al eliminar");
+                                      
+                                      toastHOT.success("Producto eliminado correctamente.");
+                                      onUpdate?.(null, product._id || product.id);
+                                      onClose?.();
+                                    } catch (err) {
+                                      toastHOT.error("Error al intentar eliminar.");
+                                      console.error(err);
+                                      setLoading(false);
+                                    }
                                   }}
                                   className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer"
                                 >

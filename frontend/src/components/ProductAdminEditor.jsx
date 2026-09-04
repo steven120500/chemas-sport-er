@@ -157,7 +157,8 @@ export default function ProductAdminEditor({
         bodega: cleanBodega,
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
-        imageSrc2: typeof localImages?.src === "string" ? localImages.src : null,
+        // 🔥 AQUÍ ESTABA EL ERROR: Agregado el [1] para que reconozca la segunda foto correctamente
+        imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: editedName.trim(), 
         hidden: editedHidden, 
         isMundial2026: editedIsMundial2026,
