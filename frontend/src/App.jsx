@@ -1,8 +1,8 @@
 import { Toaster } from 'react-hot-toast';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
-import { io } from 'socket.io-client'; // 👈 1. IMPORTANTE: CONEXIÓN EN VIVO
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -117,10 +117,27 @@ function MainApp() {
 
   const [savedScroll, setSavedScroll] = useState(0);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterSizes, setFilterSizes] = useState([]);
-  const [showSizes, setShowSizes] = useState(false);
+  // 🔥 1. IMPORTAMOS PARÁMETROS DE LA URL
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // 🔥 2. INICIALIZAMOS LOS ESTADOS LEYENDO LA URL SI HAY ALGO (para cuando pasas el link)
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+  const [filterType, setFilterType] = useState(searchParams.get('type') || '');
+  const [filterSizes, setFilterSizes] = useState(
+    searchParams.get('sizes') ? searchParams.get('sizes').split(',') : []
+  );
+  
+  // Muestra el panel de tallas automáticamente si venía una en el link
+  const [showSizes, setShowSizes] = useState(() => !!searchParams.get('sizes'));
+
+  // 🔥 3. FUNCIÓN PARA ACTUALIZAR URL EN TIEMPO REAL AL FILTRAR
+  const updateURLParams = (q, type, sizes) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (type) params.set('type', type);
+    if (sizes && sizes.length > 0) params.set('sizes', sizes.join(','));
+    setSearchParams(params, { replace: true });
+  };
 
   const [storeView, setStoreView] = useState('todos');
 
@@ -136,7 +153,7 @@ function MainApp() {
   const pages = Math.max(1, Math.ceil(total / limit));
 
   const navigate = useNavigate();
-  const location = useLocation(); // 👈 Detecta cambios de ruta
+  const location = useLocation();
 
   const abortControllerRef = useRef(null);
   const pageTopRef = useRef(null);
@@ -254,7 +271,6 @@ function MainApp() {
     }
   };
 
-  // 🟢 CONEXIÓN WEBSOCKET: ACTUALIZA CUALQUIER CAMISETA EN TIEMPO REAL SIN F5
   useEffect(() => {
     const socket = io(API_BASE, {
       transports: ['websocket', 'polling'],
@@ -264,12 +280,10 @@ function MainApp() {
       if (!updatedProd) return;
       const pid = getPid(updatedProd);
 
-      // Reemplaza la camiseta modificada/devuelta en la lista activa
       setProducts((prev) =>
         prev.map((p) => (getPid(p) === pid ? { ...p, ...updatedProd } : p))
       );
 
-      // Actualiza también los conteos generales
       setAllProductsForCounts((prev) =>
         prev.map((p) => (getPid(p) === pid ? { ...p, ...updatedProd } : p))
       );
@@ -280,7 +294,6 @@ function MainApp() {
     };
   }, []);
 
-  // 🔄 REFRESCAR INVENTARIO SILENCIOSAMENTE AL VOLVER A LA TIENDA
   useEffect(() => {
     if (location.pathname === '/') {
       fetchProducts({ page, q: searchTerm, type: filterType });
@@ -288,8 +301,14 @@ function MainApp() {
     }
   }, [location.pathname]);
 
+  // 🔥 4. ACTUALIZA LA BÚSQUEDA Y LA URL AL MISMO TIEMPO
   useEffect(() => {
+    if (location.pathname === '/') {
+      updateURLParams(searchTerm, filterType, filterSizes);
+    }
+    
     fetchProducts({ page, q: searchTerm, type: filterType });
+    
     if (pageTopRef.current) {
       pageTopRef.current.style.scrollMarginTop = '100px'; 
       pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -429,6 +448,7 @@ function MainApp() {
             onLogoClick={() => {
               setFilterType('');
               setSearchTerm('');
+              setFilterSizes([]);
               setPage(1);
               navigate('/');
             }}
@@ -562,6 +582,7 @@ function MainApp() {
                   filterSizes={filterSizes}
                   setFilterSizes={(sizes) => { 
                     setFilterSizes(sizes); 
+                    setShowSizes(true); // Muestra el panel si se filtró por talla externamente
                     setLoading(true); 
                     setPage(1); 
                   }}
