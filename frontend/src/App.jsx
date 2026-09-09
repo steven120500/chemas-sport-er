@@ -100,7 +100,12 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
 }
 
 function MainApp() {
-  const [showIntro, setShowIntro] = useState(true); 
+  // 🔥 1. IMPORTAMOS PARÁMETROS DE LA URL (Lo subimos al puro principio)
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // 🔥 2. SI HAY UN LINK DIRECTO, SALTAMOS LA ANIMACIÓN DE INICIO PARA NO HACER ESPERAR AL CLIENTE
+  const hasLinkFilters = !!(searchParams.get('q') || searchParams.get('type') || searchParams.get('sizes'));
+  const [showIntro, setShowIntro] = useState(!hasLinkFilters); 
 
   useEffect(() => {
     if (showIntro) {
@@ -117,20 +122,13 @@ function MainApp() {
 
   const [savedScroll, setSavedScroll] = useState(0);
 
-  // 🔥 1. IMPORTAMOS PARÁMETROS DE LA URL
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // 🔥 2. INICIALIZAMOS LOS ESTADOS LEYENDO LA URL SI HAY ALGO (para cuando pasas el link)
+  // 🔥 3. INICIALIZAMOS LOS ESTADOS LEYENDO LA URL SI HAY ALGO
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [filterType, setFilterType] = useState(searchParams.get('type') || '');
   const [filterSizes, setFilterSizes] = useState(
     searchParams.get('sizes') ? searchParams.get('sizes').split(',') : []
   );
-  
-  // Muestra el panel de tallas automáticamente si venía una en el link
-  const [showSizes, setShowSizes] = useState(() => !!searchParams.get('sizes'));
 
-  // 🔥 3. FUNCIÓN PARA ACTUALIZAR URL EN TIEMPO REAL AL FILTRAR
   const updateURLParams = (q, type, sizes) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
@@ -301,21 +299,29 @@ function MainApp() {
     }
   }, [location.pathname]);
 
-  // 🔥 4. ACTUALIZA LA BÚSQUEDA Y LA URL AL MISMO TIEMPO
+  // 🔥 4. ACTUALIZA LA BÚSQUEDA Y PIDE LOS DATOS (Sin el Scroll aquí)
   useEffect(() => {
     if (location.pathname === '/') {
       updateURLParams(searchTerm, filterType, filterSizes);
     }
     
     fetchProducts({ page, q: searchTerm, type: filterType });
-    
-    if (pageTopRef.current) {
-      pageTopRef.current.style.scrollMarginTop = '100px'; 
-      pageTopRef.current.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
   }, [page, searchTerm, filterType, filterSizes, storeView]);
+
+  // 🔥 5. SCROLL INMEDIATO (DIRECTO A LAS CAJAS GRISES)
+  useEffect(() => {
+    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || page > 1;
+    
+    // Solo 50 milisegundos de espera para que React alcance a poner el ancla "pageTopRef" en el DOM
+    setTimeout(() => {
+      if (hasFilters && pageTopRef.current) {
+        const yOffset = pageTopRef.current.getBoundingClientRect().top + window.scrollY - 140;
+        window.scrollTo({ top: yOffset, behavior: 'smooth' });
+      } else if (!hasFilters && page === 1) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 50); 
+  }, [searchTerm, filterType, filterSizes, page]);
 
   useEffect(() => {
     if (products.length > 0) fetchAllForCounts();
@@ -357,18 +363,6 @@ function MainApp() {
 
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
-
-  const tallasAdulto = ['S','M','L','XL','XXL','3XL','4XL'];
-  const tallasNino = [
-    { size:'16', label:'16 (Talla 2)' },
-    { size:'18', label:'18 (Talla 4)' },
-    { size:'20', label:'20 (Talla 6)' },
-    { size:'22', label:'22 (Talla 8)' },
-    { size:'24', label:'24 (Talla 10)' },
-    { size:'26', label:'26 (Talla 12)' },
-    { size:'28', label:'28 (Talla 14/16)' },
-  ];
-  const tallasBalon = ['3', '4', '5']; 
 
   const removeAccents = (str) => {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -518,8 +512,6 @@ function MainApp() {
                   }
                 }} />
 
-                <div ref={pageTopRef} />
-
                 {isSuperUser && (
                 <div className="w-full max-w-7xl mx-auto px-4 mt-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
@@ -582,99 +574,12 @@ function MainApp() {
                   filterSizes={filterSizes}
                   setFilterSizes={(sizes) => { 
                     setFilterSizes(sizes); 
-                    setShowSizes(true); // Muestra el panel si se filtró por talla externamente
                     setLoading(true); 
                     setPage(1); 
                   }}
                 />
 
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
-                  <AnimatePresence>
-                      {showSizes && (
-                      <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease: "easeInOut" }}
-                          className="overflow-hidden bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 mb-6"
-                      >
-                          <div className="flex flex-col gap-6 items-center p-6">
-                          {(filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') ? (
-                              <div className="w-full text-center">
-                              <h3 className="font-semibold mb-2 text-gray-700">Tamaño de Balón</h3>
-                              <div className="flex flex-wrap justify-center gap-2">
-                                  {tallasBalon.map((size) => {
-                                  const isActive = filterSizes.includes(size);
-                                  return (
-                                      <button
-                                      key={size}
-                                      onClick={() => {
-                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                          setPage(1);
-                                      }}
-                                      className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                      }`}
-                                      >
-                                      {size}
-                                      </button>
-                                  );
-                                  })}
-                              </div>
-                              </div>
-                          ) : (
-                              <>
-                              <div className="w-full text-center">
-                                  <h3 className="font-semibold mb-2 text-gray-700">Adulto</h3>
-                                  <div className="flex flex-wrap justify-center gap-2">
-                                  {tallasAdulto.map((size) => {
-                                      const isActive = filterSizes.includes(size);
-                                      return (
-                                      <button
-                                          key={size}
-                                          onClick={() => {
-                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                          setPage(1);
-                                          }}
-                                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                          }`}
-                                      >
-                                          {size}
-                                      </button>
-                                      );
-                                  })}
-                                  </div>
-                              </div>
-                              <div className="w-full text-center">
-                                  <h3 className="font-semibold mb-2 text-gray-700">Niño (Talla Costa Rica)</h3>
-                                  <div className="flex flex-wrap justify-center gap-2">
-                                  {tallasNino.map(({ size, label }) => {
-                                      const isActive = filterSizes.includes(size);
-                                      return (
-                                      <button
-                                          key={size}
-                                          onClick={() => {
-                                          setFilterSizes(prev => isActive ? prev.filter(s => s !== size) : [...prev, size]);
-                                          setPage(1);
-                                          }}
-                                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                          isActive ? 'bg-black text-white border-black shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                          }`}
-                                      >
-                                          {label}
-                                      </button>
-                                      );
-                                  })}
-                                  </div>
-                              </div>
-                              </>
-                          )}
-                          </div>
-                      </motion.div>
-                      )}
-                  </AnimatePresence>
-
                   <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
                       <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
                       <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
@@ -682,6 +587,9 @@ function MainApp() {
                       </button>
                   </div>
                 </div>
+
+                {/* 🔥 ANCLA PARA EL SCROLL LIGERAMENTE MÁS ABAJO */}
+                <div ref={pageTopRef} />
 
                 <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
                   <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
