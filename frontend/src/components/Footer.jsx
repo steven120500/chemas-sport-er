@@ -44,7 +44,7 @@ export default function Footer() {
             rel="noopener noreferrer"
             className="text-white font-bold underline hover:text-gray-800 font-medium"
           >
-            Steven Corrales Alfaro
+            Beesoft
           </a>
         </p>
       </div>
