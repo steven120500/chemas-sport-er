@@ -87,7 +87,9 @@ export default function ProductScreen({
     });
 
     return () => { socket.disconnect(); };
-  }, [product?._id, product?.id, isEditing, user]);
+    
+  // 🔥 LA SOLUCIÓN ESTÁ AQUÍ: Usamos user?.email para evitar el bucle asesino
+  }, [product?._id, product?.id, isEditing, user?.email]); 
 
   useEffect(() => {
     const handleUnload = () => { if (isEditing) navigator.sendBeacon(`${API_BASE}/api/products/${product?._id || product?.id}/unlock`); };

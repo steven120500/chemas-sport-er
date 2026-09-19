@@ -35,7 +35,7 @@ export default function Footer() {
 
        {/* Texto inferior */}
        <div className="mt-4 text-sm text-white space-y-1">
-        <p>© 2025 ChemaSport ER. Todos los derechos reservados.</p>
+        <p>© 2026 ChemaSport ER. Todos los derechos reservados.</p>
         <p>
           Diseñado por{" "}
           <a

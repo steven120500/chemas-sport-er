@@ -50,6 +50,7 @@ export default function ProductAdminEditor({
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
+  const [confirmCommission, setConfirmCommission] = useState(false); // 🔥 NUEVO ESTADO PARA CONFIRMAR COMISIÓN
   const [buyerName, setBuyerName] = useState("");
 
   const [localImages, setLocalImages] = useState([]);
@@ -384,8 +385,12 @@ export default function ProductAdminEditor({
                         <button 
                           onClick={() => { 
                             toastHOT.dismiss(t.id); 
-                            if (checkHasDeduction()) setShowBuyerModal(true); 
-                            else handleSave("", false); 
+                            if (checkHasDeduction()) {
+                              setConfirmCommission(false); // Resetea estado
+                              setShowBuyerModal(true);
+                            } else {
+                              handleSave("", false); 
+                            }
                           }} 
                           className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer"
                         >
@@ -410,43 +415,93 @@ export default function ProductAdminEditor({
         </div>
       </div>
 
+      {/* 🔥 MODAL MULTI-PASO DE VENTA */}
       {showBuyerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative">
-            <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">👤</div>
-            <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
-            <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
-            <div className="w-full relative mb-6">
-              <input type="text" placeholder="Ej: Emanuel Espinoza" className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} autoFocus />
-            </div>
             
-            <div className="flex gap-3 w-full">
-              <button 
-                type="button" 
-                onClick={() => { 
-                  setShowBuyerModal(false); 
-                  handleSave(buyerName.trim() || "Cliente General / Tienda", true); 
-                  setBuyerName(""); 
-                }} 
-                disabled={loading} 
-                className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                REGISTRAR VENTA
-              </button>
+            {!confirmCommission ? (
+              <>
+                {/* PASO 1: OBTENER EL NOMBRE */}
+                <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">👤</div>
+                <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
+                <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
+                <div className="w-full relative mb-6">
+                  <input 
+                    type="text" 
+                    placeholder="Ej: Emanuel Espinoza" 
+                    className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" 
+                    value={buyerName} 
+                    onChange={(e) => setBuyerName(e.target.value)} 
+                    autoFocus 
+                  />
+                </div>
+                
+                <div className="flex gap-3 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      // 🚫 Validación Obligatoria
+                      if (!buyerName.trim()) {
+                        toast.error("Debes ingresar el nombre del cliente para registrar la venta.");
+                        return;
+                      }
+                      // Si pasa, vamos a confirmar la comisión
+                      setConfirmCommission(true); 
+                    }} 
+                    disabled={loading} 
+                    className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    REGISTRAR VENTA
+                  </button>
 
-              <button 
-                type="button" 
-                onClick={() => { 
-                  setShowBuyerModal(false); 
-                  handleSave(buyerName.trim(), false);
-                  setBuyerName(""); 
-                }} 
-                disabled={loading} 
-                className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
-              >
-                SOLO ACTUALIZAR
-              </button>
-            </div>
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setShowBuyerModal(false); 
+                      handleSave(buyerName.trim(), false);
+                      setBuyerName(""); 
+                    }} 
+                    disabled={loading} 
+                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
+                  >
+                    SOLO ACTUALIZAR
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* PASO 2: CONFIRMAR LA COMISIÓN */}
+               
+                <h3 className="text-xl font-black text-gray-900 mb-2">Confirmar Comisión</h3>
+                <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">¿Seguro que quieres comisionar esta unidad a nombre de <strong className="text-black">{buyerName}</strong>?</p>
+                
+                <div className="flex gap-3 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setShowBuyerModal(false); 
+                      setConfirmCommission(false);
+                      handleSave(buyerName.trim(), true); 
+                      setBuyerName(""); 
+                    }} 
+                    disabled={loading} 
+                    className="flex-1 bg-green-600 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-green-700 transition-colors cursor-pointer"
+                  >
+                    SÍ, COMISIONAR
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setConfirmCommission(false)} 
+                    disabled={loading} 
+                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
+                  >
+                    NO, VOLVER
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
