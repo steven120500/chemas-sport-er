@@ -474,7 +474,7 @@ export default function ProductAdminEditor({
                 {/* PASO 2: CONFIRMAR LA COMISIÓN */}
                
                 <h3 className="text-xl font-black text-gray-900 mb-2">Confirmar Comisión</h3>
-                <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">¿Seguro que quieres comisionar esta unidad a nombre de <strong className="text-black">{buyerName}</strong>?</p>
+                <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">¿Seguro que hiciste una venta o un cambio? </p>
                 
                 <div className="flex gap-3 w-full">
                   <button 
@@ -483,12 +483,12 @@ export default function ProductAdminEditor({
                       setShowBuyerModal(false); 
                       setConfirmCommission(false);
                       handleSave(buyerName.trim(), true); 
-                      setBuyerName(""); 
+                      setBuyerName("");     
                     }} 
                     disabled={loading} 
                     className="flex-1 bg-green-600 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-green-700 transition-colors cursor-pointer"
                   >
-                    SÍ, COMISIONAR
+                    SÍ
                   </button>
 
                   <button 
