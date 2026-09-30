@@ -9,7 +9,7 @@ function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
 
-// 🛡️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
+// 🛡️️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
 function parseLogDetails(log) {
   let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
@@ -394,6 +394,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <option value="Retro">Retro</option>
                         <option value="F1">F1</option>
                         <option value="NFL">NFL</option>
+                        <option value="Llaveros">Llaveros</option> {/* 🔥 OPCIÓN DE LLAVEROS AÑADIDA AQUÍ */}
                       </select>
                     </div>
                   </div>

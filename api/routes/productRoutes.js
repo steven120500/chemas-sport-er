@@ -79,9 +79,9 @@ function uploadToCloudinary(buffer) {
 function sanitizeInv(obj) {
   const clean = {};
   for (const [size, qty] of Object.entries(obj || {})) {
-    if (!ALL_SIZES.has(String(size))) continue;
+    if (!size) continue;
     const n = Math.max(0, Math.trunc(Number(qty) || 0));
-    clean[size] = n;
+    clean[String(size).trim()] = n;
   }
   return clean;
 }
@@ -393,17 +393,16 @@ router.put('/:id', async (req, res) => {
 });
 
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
+/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
     const { item, items } = req.body; 
 
-    // 1. Si el panel no logró enviar las tallas, solo borramos el registro
     if (!items || !Array.isArray(items) || items.length === 0) {
       await History.findByIdAndDelete(req.params.id);
       return res.json({ success: true, message: "Historial borrado (no se detectaron tallas)." });
     }
 
-    // 2. 🔥 EXTRAER NOMBRE Y TIPO EXACTOS para evitar confusiones de modelo
     let nameQuery = (item || "").trim();
     let typeQuery = null;
 
@@ -415,13 +414,11 @@ router.post('/anular/:id', async (req, res) => {
 
     const escapedName = nameQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    // 3. Buscar el producto exacto
     let queryExact = { name: new RegExp(`^${escapedName}$`, "i") };
     if (typeQuery) queryExact.type = new RegExp(`^${typeQuery}$`, "i");
 
     let product = await Product.findOne(queryExact);
 
-    // Fallback por si hay variación en el tipo
     if (!product) {
       product = await Product.findOne({ name: new RegExp(escapedName, "i") });
     }
@@ -431,28 +428,24 @@ router.post('/anular/:id', async (req, res) => {
        return res.json({ success: true, message: "Historial borrado (El producto original ya no existe)." });
     }
 
-    // 4. Clonamos las tallas actuales
     const updatedTienda = { ...(product.tienda || {}) };
     const updatedStock = { ...(product.stock || {}) };
     const updatedBodega = { ...(product.bodega || {}) };
 
-    // 5. Sumamos de vuelta a la Tienda correcta
+    // 🔥 MODIFICADO: Acepta tanto tallas normales como la talla "U" (Llaveros) y cualquier otra manual
     items.forEach(({ tienda, talla }) => {
-      if (talla && talla !== "U") {
+      if (talla) {
         const ubicacionLower = (tienda || "").toLowerCase();
-        // Lógica actualizada para identificar las nuevas etiquetas
         if (ubicacionLower === "tienda") {
           updatedTienda[talla] = (Number(updatedTienda[talla]) || 0) + 1;
         } else if (ubicacionLower.includes("bodega 2") || ubicacionLower.includes("tienda #2")) {
           updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
         } else {
-          // Asumimos Bodega 1 por defecto (antes Tienda #1)
           updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
         }
       }
     });
 
-    // 6. 🔥 Obligamos a la base de datos a guardar el inventario modificado
     product.tienda = updatedTienda;
     product.stock = updatedStock;
     product.bodega = updatedBodega;
@@ -461,7 +454,6 @@ router.post('/anular/:id', async (req, res) => {
     product.markModified('bodega');
     await product.save();
 
-    // 7. Borramos el historial y avisamos en tiempo real
     await History.findByIdAndDelete(req.params.id);
     const io = req.app.get('io');
     if (io) io.emit('productoActualizado', product.toObject());

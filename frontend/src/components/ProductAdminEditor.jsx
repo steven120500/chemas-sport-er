@@ -37,7 +37,6 @@ export default function ProductAdminEditor({
   onDeleteSuccess,
   canDelete,
 }) {
-  // 🔥 Se ajustó el valor inicial para que abra en Bodega 1 ("stock") por defecto
   const [invMode, setInvMode] = useState("stock"); 
   const [editedTienda, setEditedTienda] = useState(product?.tienda || {}); 
   const [editedStock, setEditedStock] = useState(product?.stock || {}); 
@@ -69,9 +68,11 @@ export default function ProductAdminEditor({
     );
   }, [product]);
 
+  // 🔥 CONFIGURACIÓN PARA LLAVEROS 🔥
   const isNino = editedType === "Niño";
   const isBalon = editedType === "Balón" || editedType === "Balones";
-  const tallasVisibles = isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO;
+  const isLlavero = editedType === "Llaveros";
+  const tallasVisibles = isLlavero ? ["U"] : (isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO);
 
   const handleStockChange = (size, value) => {
     const val = parseInt(value, 10) || 0;
@@ -126,6 +127,9 @@ export default function ProductAdminEditor({
   };
 
   const checkHasDeduction = () => {
+    // 🔥 Si es llavero, saltamos la comprobación de venta para que no pida nombre ni genere comisión.
+    if (isLlavero) return false;
+
     let decreased = false;
     const baseTienda = viewProduct?.tienda || product?.tienda || {};
     const baseStock = viewProduct?.stock || product?.stock || {};
@@ -151,6 +155,7 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
+      // Si es llavero y hubo rebaja, lo pasamos como ajuste directo
       const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
       const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
 
@@ -277,8 +282,9 @@ export default function ProductAdminEditor({
         <div className="w-full flex flex-col">
           <div className="mb-8">
             <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Tipo</label>
+            {/* 🔥 OPCIÓN LLAVEROS AGREGADA AQUÍ 🔥 */}
             <select value={editedType} onChange={(e) => setEditedType(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl mb-4 bg-gray-50 font-semibold outline-none cursor-pointer">
-              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón"].map((t) => <option key={t} value={t}>{t}</option>)}
+              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón", "Llaveros"].map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Nombre</label>
@@ -300,7 +306,6 @@ export default function ProductAdminEditor({
             <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
               <p className="text-center font-bold text-gray-400 uppercase tracking-widest mb-5 text-xs">Modificando Inventario</p>
               
-              {/* 🔥 BOTONES REORDENADOS 🔥 */}
               <div className="flex gap-2 mb-6">
                 <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("stock")}>
                   <FaBoxOpen size={20} className="mb-1" />
@@ -397,7 +402,7 @@ export default function ProductAdminEditor({
                           onClick={() => { 
                             toastHOT.dismiss(t.id); 
                             if (checkHasDeduction()) {
-                              setConfirmCommission(false); // Resetea estado
+                              setConfirmCommission(false); 
                               setShowBuyerModal(true);
                             } else {
                               handleSave("", false); 
@@ -452,12 +457,10 @@ export default function ProductAdminEditor({
                   <button 
                     type="button" 
                     onClick={() => { 
-                      // 🚫 Validación Obligatoria
                       if (!buyerName.trim()) {
                         toast.error("Debes ingresar el nombre del cliente para registrar la venta.");
                         return;
                       }
-                      // Si pasa, vamos a confirmar la comisión
                       setConfirmCommission(true); 
                     }} 
                     disabled={loading} 

@@ -102,7 +102,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   }, []);
 
   const tallas = useMemo(() => {
-    const tipos = { ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"] };
+    const tipos = { 
+      ...tallaPorTipo, 
+      Balón: ["3", "4", "5"], 
+      Balones: ["3", "4", "5"],
+      Llaveros: ["U"] // 🔥 TALLA ÚNICA PARA LLAVEROS 🔥
+    };
     return tipos[type] || [];
   }, [type]);
 
@@ -313,7 +318,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
               <input
                 type="text"
-                placeholder="Ej. Real Madrid Local 24/25"
+                placeholder="Ej. Llavero Real Madrid"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
@@ -350,14 +355,15 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                 onChange={(e) => setType(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
               >
-                {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"] }).map((t) => (
+                {/* 🔥 AGREGADO "Llaveros" EN EL SELECT 🔥 */}
+                {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"] }).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* INVENTARIO (Botones estilo ProductAdminEditor reordenados) */}
+          {/* INVENTARIO (Botones reordenados: Bodega 1, Bodega 2, Tienda) */}
           <div className="mb-6">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 text-center">
               Gestionar Inventario Inicial

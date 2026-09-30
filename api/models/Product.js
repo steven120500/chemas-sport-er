@@ -7,6 +7,7 @@ const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
 const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
+Llaveros: ["U"]
 
 /* =========================
    VALIDADORES
