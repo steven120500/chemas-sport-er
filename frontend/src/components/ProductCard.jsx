@@ -27,11 +27,15 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
     (Array.isArray(product.images) && product.images[1] && (typeof product.images[1] === 'string' ? product.images[1] : product.images[1].url)) || 
     null;
 
-  const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
-  const isNino = product.type === "Niño";
-  const isBalon = product.type === "Balón" || product.type === "Balones";
-  
-  const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
+    const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
+    const isNino = product.type === "Niño";
+    const isBalon = product.type === "Balón" || product.type === "Balones";
+    const isLlavero = product.type === "Llaveros";
+    
+    // 🔥 TALLAS DINÁMICAS: Incluye ["U"] para llaveros o extrae todas las llaves disponibles si el producto usa tallas personalizadas
+    const sizesToCheck = isLlavero 
+      ? ["U"] 
+      : (isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES);
 
   // 🔥 NUEVOS ARREGLOS PARA LAS 3 UBICACIONES
   const tiendaAgotadas = [];

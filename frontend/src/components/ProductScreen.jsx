@@ -88,7 +88,6 @@ export default function ProductScreen({
 
     return () => { socket.disconnect(); };
     
-  // 🔥 LA SOLUCIÓN ESTÁ AQUÍ: Usamos user?.email para evitar el bucle asesino
   }, [product?._id, product?.id, isEditing, user?.email]); 
 
   useEffect(() => {
@@ -149,9 +148,12 @@ export default function ProductScreen({
     onClose();
   };
 
+  // 🔥 DETECCIÓN DE TALLAS VISIBLES (INCLUYENDO LLAVEROS)
   const isNino = viewProduct?.type === "Niño";
   const isBalon = viewProduct?.type === "Balón" || viewProduct?.type === "Balones";
-  const tallasVisibles = isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO;
+  const isLlavero = viewProduct?.type === "Llaveros";
+  const tallasVisibles = isLlavero ? ["U"] : (isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO);
+  
   const displayUrl = galleryFromProduct[idx] ? transformCloudinary(galleryFromProduct[idx], MODAL_IMG_MAX_W) : "";
   const hasDiscount = viewProduct?.discountPrice !== undefined && viewProduct?.discountPrice !== null && Number(viewProduct?.discountPrice) > 0;
   const hasMany = galleryFromProduct.length > 1;
@@ -168,15 +170,13 @@ export default function ProductScreen({
     return t + a + b; // Si está en "Todos", suma los 3
   };
 
-  // 🔥 MENSAJE CON FORMATO DE FORMULARIO, PRECIO, LINK OFICIAL DE LA PÁGINA Y SALTOS DE LÍNEA
   const finalPrice = hasDiscount ? viewProduct?.discountPrice : viewProduct?.price;
   const formattedPrice = `₡${Number(finalPrice || 0).toLocaleString("de-DE")}`;
   
-  // Extraemos el ID del producto para armar el link de la tienda
   const currentProductId = viewProduct?._id || viewProduct?.id || product?._id || product?.id || "";
   const productLink = currentProductId ? `https://chemasporter.com/producto/${currentProductId}` : "https://chemasporter.com";
 
-  const whatsappMsg = `¡Hola! Me interesa realizar este pedido:\n\n*Camiseta:* ${viewProduct?.name || 'Producto'}\n\n*Talla:* ${selectedSize || ''}\n\n*Precio:* ${formattedPrice}\n\n*Enlace del producto:* ${productLink}`;
+  const whatsappMsg = `¡Hola! Me interesa realizar este pedido:\n\n*Artículo:* ${viewProduct?.name || 'Producto'}\n\n*Talla/Unidad:* ${selectedSize || ''}\n\n*Precio:* ${formattedPrice}\n\n*Enlace del producto:* ${productLink}`;
 
   const whatsappUrl = `https://wa.me/50660369857?text=${encodeURIComponent(whatsappMsg)}`;
 
@@ -221,7 +221,7 @@ export default function ProductScreen({
               </div>
             </div>
 
-            {/* LADO DERECHO: INFO Y TALLAS */}
+            {/* LADO DERECHO: INFO Y TALLAS / UNIDADES */}
             <div className="w-full flex flex-col">
               <div className="mb-8">
                 <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm">{viewProduct?.type}</span>
@@ -241,7 +241,7 @@ export default function ProductScreen({
 
               <div className="mb-8">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  Selecciona una Talla {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
+                  {isLlavero ? 'Selecciona la Unidad' : 'Selecciona una Talla'} {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
                 </p>
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                   {tallasVisibles.map((size) => {
@@ -340,7 +340,7 @@ export default function ProductScreen({
                     onClick={(e) => {
                       if (!selectedSize) {
                         e.preventDefault();
-                        toastHOT.error("Debes seleccionar una talla antes de comprar.", { 
+                        toastHOT.error(isLlavero ? "Debes seleccionar la unidad antes de comprar." : "Debes seleccionar una talla antes de comprar.", { 
                           style: { borderRadius: '12px', background: '#000', color: '#fff' }
                         });
                       }
@@ -349,7 +349,7 @@ export default function ProductScreen({
                     rel="noopener noreferrer"
                     className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
                   >
-                    <FaWhatsapp size={22} />
+                    <FaWhatsapp size2={22} />
                     COMPRAR POR WHATSAPP
                   </a>
                   
