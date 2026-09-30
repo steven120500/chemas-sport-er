@@ -58,8 +58,10 @@ function diffProduct(prev, next) {
     changes.push(`Temporada 26-27: ${prevTemp ? 'Sí' : 'No'} → ${nextTemp ? 'Sí' : 'No'}`);
   }
 
-  changes.push(...diffInv('Tienda #1', prev.stock, next.stock));
-  changes.push(...diffInv('Tienda #2', prev.bodega, next.bodega));
+  // 🔥 ACTUALIZADO: Los 3 espacios con sus nuevos nombres para el historial
+  changes.push(...diffInv('Tienda', prev.tienda, next.tienda));
+  changes.push(...diffInv('Bodega 1', prev.stock, next.stock));
+  changes.push(...diffInv('Bodega 2', prev.bodega, next.bodega));
 
   return changes;
 }
@@ -98,7 +100,15 @@ router.post('/', upload.any(), async (req, res) => {
     const uploaded = await Promise.all(files.map(f => uploadToCloudinary(f.buffer)));
     const images = uploaded.map(u => ({ public_id: u.public_id, url: u.secure_url }));
     const imageSrc = images[0]?.url || '';
-    const imageSrc2 = images[1]?.url || ''; // 🔥 Corrección: Se toma la posición correcta para la segunda imagen
+    const imageSrc2 = images[1]?.url || ''; 
+
+    // 🔥 NUEVO: Recibe y limpia "tienda"
+    let tienda = {};
+    try {
+      if (typeof req.body.tienda === 'string') tienda = JSON.parse(req.body.tienda);
+      else if (typeof req.body.tienda === 'object') tienda = req.body.tienda;
+    } catch { tienda = {}; }
+    const cleanTienda = sanitizeInv(tienda);
 
     let stock = {};
     try {
@@ -106,7 +116,6 @@ router.post('/', upload.any(), async (req, res) => {
       else if (typeof req.body.sizes === 'string') stock = JSON.parse(req.body.sizes);
       else if (typeof req.body.stock === 'object') stock = req.body.stock;
     } catch { stock = {}; }
-
     const cleanStock = sanitizeInv(stock);
 
     let bodega = {};
@@ -114,7 +123,6 @@ router.post('/', upload.any(), async (req, res) => {
       if (typeof req.body.bodega === 'string') bodega = JSON.parse(req.body.bodega);
       else if (typeof req.body.bodega === 'object') bodega = req.body.bodega;
     } catch { bodega = {}; }
-
     const cleanBodega = sanitizeInv(bodega);
 
     const product = await Product.create({
@@ -122,6 +130,7 @@ router.post('/', upload.any(), async (req, res) => {
       price: Number(req.body.price),
       discountPrice: Number(req.body.discountPrice) || 0,
       type: String(req.body.type || '').trim(),
+      tienda: cleanTienda, // 🔥 Se guarda la nueva ubicación
       stock: cleanStock,
       bodega: cleanBodega,
       images,
@@ -132,7 +141,6 @@ router.post('/', upload.any(), async (req, res) => {
       isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true
     });
 
-    // 🔥 Corrección: Historial limpio sin variables inexistentes para evitar Error 500
     await History.create({
       user: whoDidIt(req),
       action: 'creó producto',
@@ -212,6 +220,13 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    // 🔥 NUEVO: Recibe y actualiza "tienda"
+    let incomingTienda = req.body.tienda;
+    if (typeof incomingTienda === 'string') {
+      try { incomingTienda = JSON.parse(incomingTienda); } catch {}
+    }
+    const nextTienda = incomingTienda ? sanitizeInv(incomingTienda) : prev.tienda;
+
     let incomingStock = req.body.stock;
     if (typeof incomingStock === 'string') {
       try { incomingStock = JSON.parse(incomingStock); } catch {}
@@ -225,11 +240,20 @@ router.put('/:id', async (req, res) => {
     const nextBodega = incomingBodega ? sanitizeInv(incomingBodega) : prev.bodega;
 
     let restadas = 0;
+    
+    // 🔥 NUEVO: Calcula ventas si se rebajó algo de "tienda"
+    for (const size of new Set([...Object.keys(prev.tienda || {}), ...Object.keys(nextTienda || {})])) {
+      const before = Number(prev.tienda?.[size] ?? 0);
+      const after  = Number(nextTienda?.[size] ?? 0);
+      if (before > after) restadas += (before - after);
+    }
+    
     for (const size of new Set([...Object.keys(prev.stock || {}), ...Object.keys(nextStock || {})])) {
       const before = Number(prev.stock?.[size] ?? 0);
       const after  = Number(nextStock?.[size] ?? 0);
       if (before > after) restadas += (before - after);
     }
+    
     for (const size of new Set([...Object.keys(prev.bodega || {}), ...Object.keys(nextBodega || {})])) {
       const before = Number(prev.bodega?.[size] ?? 0);
       const after  = Number(nextBodega?.[size] ?? 0);
@@ -243,6 +267,7 @@ router.put('/:id', async (req, res) => {
       discountPrice: Number.isFinite(Number(req.body.discountPrice))
         ? Math.trunc(Number(req.body.discountPrice))
         : prev.discountPrice,
+      tienda: nextTienda, // 🔥 Se actualiza la nueva ubicación
       stock: nextStock,
       bodega: nextBodega,
       lockedBy: null,
@@ -278,7 +303,7 @@ router.put('/:id', async (req, res) => {
       const finalImages = processedImages.filter(Boolean);
       update.images = finalImages;
       update.imageSrc = finalImages[0]?.url || '';
-      update.imageSrc2 = finalImages[1]?.url || ''; // 🔥 Corrección para guardar la segunda imagen correctamente
+      update.imageSrc2 = finalImages[1]?.url || ''; 
     }
 
     const updated = await Product.findByIdAndUpdate(
@@ -307,9 +332,11 @@ router.put('/:id', async (req, res) => {
           await updated.save();
         }
 
+        // 🔥 ACTUALIZADO: Etiquetas correctas para el historial
         let tiendasModificadas = [];
-        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) tiendasModificadas.push("Tienda #1");
-        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) tiendasModificadas.push("Tienda #2");
+        if (JSON.stringify(prev.tienda) !== JSON.stringify(nextTienda)) tiendasModificadas.push("Tienda");
+        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) tiendasModificadas.push("Bodega 1");
+        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) tiendasModificadas.push("Bodega 2");
         const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
 
         const changes = diffProduct(prev, updatedObj);
@@ -365,7 +392,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
@@ -406,23 +432,31 @@ router.post('/anular/:id', async (req, res) => {
     }
 
     // 4. Clonamos las tallas actuales
+    const updatedTienda = { ...(product.tienda || {}) };
     const updatedStock = { ...(product.stock || {}) };
     const updatedBodega = { ...(product.bodega || {}) };
 
     // 5. Sumamos de vuelta a la Tienda correcta
     items.forEach(({ tienda, talla }) => {
       if (talla && talla !== "U") {
-        if (tienda.includes("Tienda #2") || tienda.toLowerCase().includes("bodega")) {
+        const ubicacionLower = (tienda || "").toLowerCase();
+        // Lógica actualizada para identificar las nuevas etiquetas
+        if (ubicacionLower === "tienda") {
+          updatedTienda[talla] = (Number(updatedTienda[talla]) || 0) + 1;
+        } else if (ubicacionLower.includes("bodega 2") || ubicacionLower.includes("tienda #2")) {
           updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
         } else {
+          // Asumimos Bodega 1 por defecto (antes Tienda #1)
           updatedStock[talla] = (Number(updatedStock[talla]) || 0) + 1;
         }
       }
     });
 
     // 6. 🔥 Obligamos a la base de datos a guardar el inventario modificado
+    product.tienda = updatedTienda;
     product.stock = updatedStock;
     product.bodega = updatedBodega;
+    product.markModified('tienda');
     product.markModified('stock');
     product.markModified('bodega');
     await product.save();
@@ -487,17 +521,17 @@ router.get('/', async (req, res) => {
 
     if (!canSeeHidden) find.hidden = { $ne: true };
 
-    if (q) find.name = { $regex: q, $options: 'i' };
+    if (q) find.name = { $regex: q,$options: 'i' };
 
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
-      find.$expr = { $lt: ['$discountPrice', '$price'] };
+      find.$expr = {$lt: ['$discountPrice', '$price'] };
     } else if (type === 'Populares') {
       find.isPopular = true;
     } else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     } else if (type === 'Temp 26-27' || type === 'Temporada 26-27') {
-      find.$or = [{ isTemporada2627: true }, { type: { $regex: '26-27', $options: 'i' } }];
+      find.$or = [{ isTemporada2627: true }, { type: { $regex: '26-27',$options: 'i' } }];
     } else if (type) {
       find.type = type;
     }
@@ -505,20 +539,26 @@ router.get('/', async (req, res) => {
     const allSizesArray = Array.from(ALL_SIZES);
     const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-    if (storeView === 'tienda1') {
+    // 🔥 FILTRO ACTUALIZADO PARA LAS 3 UBICACIONES
+    if (storeView === 'tienda') {
+      const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
+      find.$or = checkSizes.map(size => ({ [`tienda.${size}`]: { $gt: 0 } }));
+    } else if (storeView === 'bodega1' || storeView === 'tienda1') {
       const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
       find.$or = checkSizes.map(size => ({ [`stock.${size}`]: { $gt: 0 } }));
-    } else if (storeView === 'tienda2') {
+    } else if (storeView === 'bodega2' || storeView === 'tienda2') {
       const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
       find.$or = checkSizes.map(size => ({ [`bodega.${size}`]: { $gt: 0 } }));
     } else if (sizesArr.length > 0) {
       find.$or = sizesArr.flatMap(size => ([
+        { [`tienda.${size}`]: { $gt: 0 } },
         { [`stock.${size}`]: { $gt: 0 } },
         { [`bodega.${size}`]: { $gt: 0 } },
       ]));
     }
 
-    const projection = 'name price discountPrice type imageSrc images stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
+    // 🔥 AÑADIMOS 'tienda' A LA PROYECCIÓN
+    const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([

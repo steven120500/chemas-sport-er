@@ -61,6 +61,8 @@ const productSchema = new mongoose.Schema(
 
     images: { type: [ImageSchema], default: [] },
 
+    // 🔥 LAS 3 UBICACIONES DE INVENTARIO 🔥
+    tienda: { type: Object, default: {}, validate: stockValidator }, // <-- NUEVO ESPACIO AÑADIDO
     stock: { type: Object, required: true, default: {}, validate: stockValidator },
     bodega: { type: Object, default: {}, validate: stockValidator },
 
