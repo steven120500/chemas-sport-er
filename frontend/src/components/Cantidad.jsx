@@ -6,12 +6,17 @@ const Cantidad = ({ products = [], isSuperUser = false }) => {
 
   if (!isSuperUser || !products.length) return null;
 
-  // Agrupar por tipo y sumar todas las tallas (stock + bodega)
+  // 🔥 ACTUALIZADO: Agrupar por tipo y sumar las 3 ubicaciones (tienda + stock + bodega)
   const counts = products.reduce((acc, product) => {
     const type = product.type || "Sin tipo";
+    const tiendaObj = product.tienda || {};
     const stockObj = product.stock || {};
     const bodegaObj = product.bodega || {};
 
+    const totalTienda = Object.values(tiendaObj).reduce(
+      (sum, qty) => sum + Number(qty || 0),
+      0
+    );
     const totalStock = Object.values(stockObj).reduce(
       (sum, qty) => sum + Number(qty || 0),
       0
@@ -21,13 +26,13 @@ const Cantidad = ({ products = [], isSuperUser = false }) => {
       0
     );
 
-    const totalForProduct = totalStock + totalBodega;
+    const totalForProduct = totalTienda + totalStock + totalBodega;
 
     acc[type] = (acc[type] || 0) + totalForProduct;
     return acc;
   }, {});
 
-  // Calcular total general (stock + bodega)
+  // Calcular total general de todas las ubicaciones
   const totalAll = Object.values(counts).reduce(
     (sum, qty) => sum + Number(qty),
     0
@@ -40,7 +45,7 @@ const Cantidad = ({ products = [], isSuperUser = false }) => {
         onClick={() => setOpen(!open)}
       >
         <span className="font-semibold text-lg tracking-wide">
-          
+          Ver Total
         </span>
         {open ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
       </div>
@@ -53,7 +58,7 @@ const Cantidad = ({ products = [], isSuperUser = false }) => {
               <span className="font-semibold">{qty.toLocaleString("de-DE")}</span>
             </div>
           ))}
-          <div className="flex gap-1 items-center font-semibold border-t border-white pt-1 mt-1">
+          <div className="flex gap-1 items-center font-semibold border-t border-white pt-1 mt-1 ml-2 pl-2">
             <span>Total general:</span>
             <span>{totalAll.toLocaleString("de-DE")}</span>
           </div>

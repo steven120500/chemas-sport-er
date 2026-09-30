@@ -29,7 +29,7 @@ function extractClienteSeguro(detailsStr) {
   return clean || "Cliente General";
 }
 
-// 🛡️ PARSEO DE TALLAS 100% SEGURO
+// 🛡️ PARSEO DE TALLAS 100% SEGURO PARA 3 UBICACIONES
 function parseSaleDetails(log) {
   const detailsStr = typeof log?.details === "string" 
     ? log.details 
@@ -39,12 +39,10 @@ function parseSaleDetails(log) {
   const vendedor = String(log?.user || "Sistema").trim();
   const itemGeneral = String(log?.item || "Camiseta").trim();
 
-  // 🆔 Extraer productId de 24 caracteres limpio
   const rawIdSearch = `${log?.productId || ''} ${detailsStr}`;
   const [, idHex] = rawIdSearch.match(/([a-f0-9]{24})/i) || [];
   const productId = idHex || null;
 
-  // 🧹 Limpiamos [ID:...] antes de leer las tallas
   const cleanDetails = detailsStr.replace(/\[ID:[^\]]+\]\s*\|?\s*/gi, "").trim();
 
   const items = [];
@@ -61,7 +59,14 @@ function parseSaleDetails(log) {
       const newV = Number(newStr) || 0;
 
       const subStr = cleanDetails.substring(0, m.index);
-      const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+      
+      // 🔥 IDENTIFICACIÓN DE 3 UBICACIONES PARA LA TABLA DE COMISIONES
+      let tienda = "Tienda";
+      if (subStr.includes("Bodega 2") || subStr.includes("Tienda #2")) {
+        tienda = "Bodega 2";
+      } else if (subStr.includes("Bodega 1") || subStr.includes("Tienda #1")) {
+        tienda = "Bodega 1";
+      }
 
       const cantidad = Math.abs(oldV - newV);
 
@@ -78,17 +83,21 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Respaldo seguro si no hubo flechas
+  // Respaldo si no hubo flechas de cambio
   if (items.length === 0) {
     const [, fallbackTalla] = cleanDetails.match(/\[([A-Z0-9]+)\]/i) || [];
     if (fallbackTalla) {
       const cleanFallback = String(fallbackTalla).toUpperCase();
-      const tiendaFallback = cleanDetails.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+      
+      let tiendaFallback = "Tienda";
+      if (cleanDetails.includes("Bodega 2") || cleanDetails.includes("Tienda #2")) tiendaFallback = "Bodega 2";
+      else if (cleanDetails.includes("Bodega 1") || cleanDetails.includes("Tienda #1")) tiendaFallback = "Bodega 1";
+
       items.push({ tienda: tiendaFallback, talla: cleanFallback, nombre: itemGeneral });
       tallasAgrupadas[cleanFallback] = 1;
       totalUnidades = 1;
     } else if (String(log?.action || "").toLowerCase().includes("vend")) {
-      items.push({ tienda: "Tienda #1", talla: "U", nombre: itemGeneral });
+      items.push({ tienda: "General", talla: "U", nombre: itemGeneral });
       tallasAgrupadas["U"] = 1;
       totalUnidades = 1;
     }
@@ -689,7 +698,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Vendedor</th>
                     <th className="py-3 px-3">Cliente</th>
                     <th className="py-3 px-3">Artículo / Tallas</th>
-                    <th className="py-3 px-3">Tienda</th>
+                    <th className="py-3 px-3">Ubicación</th>
                     <th className="py-3 px-3 text-right">Cant.</th>
                     <th className="py-3 px-3 text-center">Anular</th>
                   </tr>
@@ -732,7 +741,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
                         <td className="py-3.5 px-3">
                           <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
-                            {venta.items[0]?.tienda || "Tienda #1"}
+                            {venta.items[0]?.tienda || "Tienda"}
                           </span>
                         </td>
                         

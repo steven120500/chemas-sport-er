@@ -100,10 +100,10 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
 }
 
 function MainApp() {
-  // 🔥 1. IMPORTAMOS PARÁMETROS DE LA URL (Lo subimos al puro principio)
+  // 🔥 1. IMPORTAMOS PARÁMETROS DE LA URL
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // 🔥 2. SI HAY UN LINK DIRECTO, SALTAMOS LA ANIMACIÓN DE INICIO PARA NO HACER ESPERAR AL CLIENTE
+  // 🔥 2. SI HAY UN LINK DIRECTO, SALTAMOS LA ANIMACIÓN DE INICIO
   const hasLinkFilters = !!(searchParams.get('q') || searchParams.get('type') || searchParams.get('sizes'));
   const [showIntro, setShowIntro] = useState(!hasLinkFilters); 
 
@@ -122,7 +122,7 @@ function MainApp() {
 
   const [savedScroll, setSavedScroll] = useState(0);
 
-  // 🔥 3. INICIALIZAMOS LOS ESTADOS LEYENDO LA URL SI HAY ALGO
+  // 🔥 3. INICIALIZAMOS LOS ESTADOS LEYENDO LA URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [filterType, setFilterType] = useState(searchParams.get('type') || '');
   const [filterSizes, setFilterSizes] = useState(
@@ -299,7 +299,7 @@ function MainApp() {
     }
   }, [location.pathname]);
 
-  // 🔥 4. ACTUALIZA LA BÚSQUEDA Y PIDE LOS DATOS (Sin el Scroll aquí)
+  // 🔥 4. ACTUALIZA LA BÚSQUEDA Y PIDE LOS DATOS
   useEffect(() => {
     if (location.pathname === '/') {
       updateURLParams(searchTerm, filterType, filterSizes);
@@ -308,11 +308,10 @@ function MainApp() {
     fetchProducts({ page, q: searchTerm, type: filterType });
   }, [page, searchTerm, filterType, filterSizes, storeView]);
 
-  // 🔥 5. SCROLL INMEDIATO (DIRECTO A LAS CAJAS GRISES)
+  // 🔥 5. SCROLL INMEDIATO
   useEffect(() => {
     const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || page > 1;
     
-    // Solo 50 milisegundos de espera para que React alcance a poner el ancla "pageTopRef" en el DOM
     setTimeout(() => {
       if (hasFilters && pageTopRef.current) {
         const yOffset = pageTopRef.current.getBoundingClientRect().top + window.scrollY - 140;
@@ -512,16 +511,17 @@ function MainApp() {
                   }
                 }} />
 
+                {/* 🔥 VISTA DE INVENTARIO CON LOS 4 BOTONES NUEVOS 🔥 */}
                 {isSuperUser && (
                 <div className="w-full max-w-7xl mx-auto px-4 mt-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
                     <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
-                        📦 Vista de Inventario:
+                        Vista de Inventario:
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap justify-center">
                         <button
                         onClick={() => { setStoreView('todos'); setLoading(true); setPage(1); }}
-                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'todos' 
                             ? 'bg-black text-white border-black shadow-md' 
                             : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
@@ -530,24 +530,34 @@ function MainApp() {
                         Todas
                         </button>
                         <button
-                        onClick={() => { setStoreView('tienda1'); setLoading(true); setPage(1); }}
-                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                            storeView === 'tienda1' 
+                        onClick={() => { setStoreView('tienda'); setLoading(true); setPage(1); }}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'tienda' 
                             ? 'bg-black text-white border-black shadow-md' 
                             : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
                         }`}
                         >
-                        Tienda #1
+                        Tienda
                         </button>
                         <button
-                        onClick={() => { setStoreView('tienda2'); setLoading(true); setPage(1); }}
-                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
-                            storeView === 'tienda2' 
-                            ? 'bg-black text-white border-black shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                        onClick={() => { setStoreView('bodega1'); setLoading(true); setPage(1); }}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'bodega1' 
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-600 hover:text-blue-600'
                         }`}
                         >
-                        Tienda #2
+                        Bodega 1
+                        </button>
+                        <button
+                        onClick={() => { setStoreView('bodega2'); setLoading(true); setPage(1); }}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
+                            storeView === 'bodega2' 
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-600 hover:text-purple-600'
+                        }`}
+                        >
+                        Bodega 2
                         </button>
                     </div>
                     </div>
@@ -588,7 +598,6 @@ function MainApp() {
                   </div>
                 </div>
 
-                {/* 🔥 ANCLA PARA EL SCROLL LIGERAMENTE MÁS ABAJO */}
                 <div ref={pageTopRef} />
 
                 <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">

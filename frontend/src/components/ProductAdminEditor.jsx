@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes, FaStore, FaWarehouse } from "react-icons/fa";
+import { FaTimes, FaStore, FaWarehouse, FaBoxOpen } from "react-icons/fa";
 
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
@@ -37,9 +37,11 @@ export default function ProductAdminEditor({
   onDeleteSuccess,
   canDelete,
 }) {
-  const [invMode, setInvMode] = useState("stock");
-  const [editedStock, setEditedStock] = useState(product?.stock || {});
-  const [editedBodega, setEditedBodega] = useState(product?.bodega || {});
+  const [invMode, setInvMode] = useState("tienda"); 
+  const [editedTienda, setEditedTienda] = useState(product?.tienda || {}); 
+  const [editedStock, setEditedStock] = useState(product?.stock || {}); 
+  const [editedBodega, setEditedBodega] = useState(product?.bodega || {}); 
+  
   const [editedName, setEditedName] = useState(product?.name || "");
   const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
   const [editedDiscountPrice, setEditedDiscountPrice] = useState(product?.discountPrice ?? 0);
@@ -50,7 +52,7 @@ export default function ProductAdminEditor({
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
-  const [confirmCommission, setConfirmCommission] = useState(false); // 🔥 NUEVO ESTADO PARA CONFIRMAR COMISIÓN
+  const [confirmCommission, setConfirmCommission] = useState(false); 
   const [buyerName, setBuyerName] = useState("");
 
   const [localImages, setLocalImages] = useState([]);
@@ -71,11 +73,10 @@ export default function ProductAdminEditor({
   const tallasVisibles = isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO;
 
   const handleStockChange = (size, value) => {
-    if (invMode === "stock") {
-      setEditedStock((prev) => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
-    } else {
-      setEditedBodega((prev) => ({ ...prev, [size]: parseInt(value, 10) || 0 }));
-    }
+    const val = parseInt(value, 10) || 0;
+    if (invMode === "tienda") setEditedTienda(prev => ({ ...prev, [size]: val }));
+    else if (invMode === "stock") setEditedStock(prev => ({ ...prev, [size]: val }));
+    else setEditedBodega(prev => ({ ...prev, [size]: val }));
   };
 
   const handleImageChange = (e, index) => {
@@ -101,38 +102,42 @@ export default function ProductAdminEditor({
     });
   };
 
-  // 🔍 Compara el stock usando viewProduct o product para no perder datos
   const getInventoryChanges = () => {
     const changes = [];
+    const baseTienda = viewProduct?.tienda || product?.tienda || {};
     const baseStock = viewProduct?.stock || product?.stock || {};
     const baseBodega = viewProduct?.bodega || product?.bodega || {};
 
     tallasVisibles.forEach((size) => {
+      const oldTienda = parseInt(baseTienda[size] ?? 0, 10);
+      const newTienda = parseInt(editedTienda?.[size] ?? 0, 10);
+      if (oldTienda !== newTienda) changes.push(`Tienda [${size}]: ${oldTienda} -> ${newTienda}`);
+
       const oldStock = parseInt(baseStock[size] ?? 0, 10);
       const newStock = parseInt(editedStock?.[size] ?? 0, 10);
-      if (oldStock !== newStock) changes.push(`Tienda #1 [${size}]: ${oldStock} -> ${newStock}`);
+      if (oldStock !== newStock) changes.push(`Bodega 1 [${size}]: ${oldStock} -> ${newStock}`);
 
       const oldBodega = parseInt(baseBodega[size] ?? 0, 10);
       const newBodega = parseInt(editedBodega?.[size] ?? 0, 10);
-      if (oldBodega !== newBodega) changes.push(`Tienda #2 [${size}]: ${oldBodega} -> ${newBodega}`);
+      if (oldBodega !== newBodega) changes.push(`Bodega 2 [${size}]: ${oldBodega} -> ${newBodega}`);
     });
     return changes;
   };
 
-  // 🚨 Detecta rebajas de stock usando viewProduct o product
   const checkHasDeduction = () => {
     let decreased = false;
+    const baseTienda = viewProduct?.tienda || product?.tienda || {};
     const baseStock = viewProduct?.stock || product?.stock || {};
     const baseBodega = viewProduct?.bodega || product?.bodega || {};
 
     tallasVisibles.forEach((size) => {
+      if (parseInt(baseTienda[size] ?? 0, 10) > parseInt(editedTienda?.[size] ?? 0, 10)) decreased = true;
       if (parseInt(baseStock[size] ?? 0, 10) > parseInt(editedStock?.[size] ?? 0, 10)) decreased = true;
       if (parseInt(baseBodega[size] ?? 0, 10) > parseInt(editedBodega?.[size] ?? 0, 10)) decreased = true;
     });
     return decreased;
   };
 
-  // 🔥 ESPERAR AL SERVIDOR ANTES DE CERRAR LA VENTANA 🔥
   const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -141,10 +146,10 @@ export default function ProductAdminEditor({
     try {
       setLoading(true);
       const clean = (obj) => Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [k, Math.max(0, parseInt(v, 10) || 0)]));
+      const cleanTienda = clean(editedTienda);
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
-      // ⭐ NOMBRE EXACTO DEL CLIENTE PARA EL HISTORIAL
       const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
       const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
 
@@ -154,11 +159,11 @@ export default function ProductAdminEditor({
         price: Math.max(0, parseInt(editedPrice, 10) || 0),
         discountPrice: Math.max(0, parseInt(editedDiscountPrice, 10) || 0), 
         type: editedType.trim(),
-        stock: cleanStock, 
-        bodega: cleanBodega,
+        tienda: cleanTienda, 
+        stock: cleanStock,   
+        bodega: cleanBodega, 
         images: localImages.map((i) => i?.src).filter(Boolean),
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
-        // 🔥 AQUÍ ESTABA EL ERROR: Agregado el [1] para que reconozca la segunda foto correctamente
         imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: editedName.trim(), 
         hidden: editedHidden, 
@@ -168,16 +173,17 @@ export default function ProductAdminEditor({
         sellerName: displayName,
         user: displayName,
         isSale: Boolean(isSale),
-        // 👈 AQUÍ: Inyecta "👤 Cliente: [nombre]" garantizado en el texto de detalles del historial
         details: `${clientTag}[ID:${id}] | ${getInventoryChanges().join(" | ")}`, 
       };
       
       let tiendaModificada = [];
+      const tiendaVieja = viewProduct?.tienda || product?.tienda || {};
       const stockViejo = viewProduct?.stock || product?.stock || {};
       const bodegaVieja = viewProduct?.bodega || product?.bodega || {};
       
-      if (tallasVisibles.some((size) => parseInt(stockViejo[size] ?? 0, 10) !== parseInt(cleanStock[size] ?? 0, 10))) tiendaModificada.push("Tienda #1");
-      if (tallasVisibles.some((size) => parseInt(bodegaVieja[size] ?? 0, 10) !== parseInt(cleanBodega[size] ?? 0, 10))) tiendaModificada.push("Tienda #2");
+      if (tallasVisibles.some((size) => parseInt(tiendaVieja[size] ?? 0, 10) !== parseInt(cleanTienda[size] ?? 0, 10))) tiendaModificada.push("Tienda");
+      if (tallasVisibles.some((size) => parseInt(stockViejo[size] ?? 0, 10) !== parseInt(cleanStock[size] ?? 0, 10))) tiendaModificada.push("Bodega 1");
+      if (tallasVisibles.some((size) => parseInt(bodegaVieja[size] ?? 0, 10) !== parseInt(cleanBodega[size] ?? 0, 10))) tiendaModificada.push("Bodega 2");
       const etiquetaTienda = tiendaModificada.length > 0 ? tiendaModificada.join(" y ") : "";
 
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
@@ -217,7 +223,6 @@ export default function ProductAdminEditor({
     try {
       setLoading(true);
       
-      // 1. Obligamos al sistema a esperar que el servidor lo elimine primero
       const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
         method: "DELETE", 
         headers: { "Content-Type": "application/json", "x-user": displayName },
@@ -225,7 +230,6 @@ export default function ProductAdminEditor({
 
       if (!res.ok) throw new Error("Error en el servidor al eliminar");
 
-      // 2. Una vez confirmado el borrado, actualizamos la pantalla automáticamente
       onDeleteSuccess(id);
       toast.success("Producto eliminado correctamente.");
 
@@ -294,28 +298,33 @@ export default function ProductAdminEditor({
           <div className="mb-8">
             <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
               <p className="text-center font-bold text-gray-400 uppercase tracking-widest mb-5 text-xs">Modificando Inventario</p>
-              <div className="flex gap-3 mb-6">
-                <button className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "bg-black border-black text-white shadow-lg" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("stock")}>
-                  <FaStore size={22} className="mb-2" />
-                  <span className="font-black text-xs uppercase tracking-wider">Tienda #1</span>
+              
+              <div className="flex gap-2 mb-6">
+                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "tienda" ? "bg-black border-black text-white shadow-lg" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("tienda")}>
+                  <FaStore size={20} className="mb-1" />
+                  <span className="font-black text-[10px] uppercase tracking-wider">Tienda</span>
                 </button>
-                <button className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${invMode === "bodega" ? "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("bodega")}>
-                  <FaWarehouse size={22} className="mb-2" />
-                  <span className="font-black text-xs uppercase tracking-wider">Tienda #2</span>
+                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("stock")}>
+                  <FaBoxOpen size={20} className="mb-1" />
+                  <span className="font-black text-[10px] uppercase tracking-wider">Bodega 1</span>
+                </button>
+                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "bodega" ? "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("bodega")}>
+                  <FaWarehouse size={20} className="mb-1" />
+                  <span className="font-black text-[10px] uppercase tracking-wider">Bodega 2</span>
                 </button>
               </div>
 
-              <div className={`p-5 rounded-2xl transition-colors duration-300 ${invMode === "stock" ? "bg-gray-50" : "bg-purple-50/50"}`}>
+              <div className={`p-5 rounded-2xl transition-colors duration-300 ${invMode === "tienda" ? "bg-gray-50" : invMode === "stock" ? "bg-blue-50/50" : "bg-purple-50/50"}`}>
                 <div className="grid grid-cols-4 gap-x-3 gap-y-5">
                   {tallasVisibles.map((size) => {
-                    const currentVal = (invMode === "stock" ? editedStock : editedBodega)[size] ?? 0;
-                    const inputColors = invMode === "stock" ? "focus:border-black text-black border-gray-200" : "focus:border-purple-500 text-purple-900 border-purple-200";
-                    const labelColors = invMode === "stock" ? "text-gray-500" : "text-purple-600";
+                    const currentVal = invMode === "tienda" ? editedTienda[size] : invMode === "stock" ? editedStock[size] : editedBodega[size];
+                    const inputColors = invMode === "tienda" ? "focus:border-black text-black border-gray-200" : invMode === "stock" ? "focus:border-blue-500 text-blue-900 border-blue-200" : "focus:border-purple-500 text-purple-900 border-purple-200";
+                    const labelColors = invMode === "tienda" ? "text-gray-500" : invMode === "stock" ? "text-blue-600" : "text-purple-600";
 
                     return (
                       <div key={size} className="relative mt-2">
                         <div className={`absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-transparent px-2 text-[10px] font-black tracking-widest uppercase z-10 ${labelColors}`}>{size}</div>
-                        <input type="number" min="0" className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none transition-all ${inputColors} ${currentVal === 0 ? 'opacity-60 shadow-sm' : 'shadow-md'}`} value={currentVal} placeholder="0" onWheel={(e) => e.target.blur()} onChange={(e) => handleStockChange(size, e.target.value)} />
+                        <input type="number" min="0" className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none transition-all ${inputColors} ${!currentVal ? 'opacity-60 shadow-sm' : 'shadow-md'}`} value={currentVal || 0} placeholder="0" onWheel={(e) => e.target.blur()} onChange={(e) => handleStockChange(size, e.target.value)} />
                       </div>
                     );
                   })}

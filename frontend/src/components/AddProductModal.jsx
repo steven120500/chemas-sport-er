@@ -73,14 +73,16 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [price, setPrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
   const [type, setType] = useState("Player");
+  
+  // 🔥 LAS 3 UBICACIONES DE INVENTARIO 🔥
+  const [tienda, setTienda] = useState({});
   const [stock, setStock] = useState({});
   const [bodega, setBodega] = useState({});
-  const [mode, setMode] = useState("stock");
+  const [mode, setMode] = useState("tienda"); // Iniciamos en Tienda
 
   const [isNew, setIsNew] = useState(false);   
   const [hidden, setHidden] = useState(false); 
   const [isMundial2026, setIsMundial2026] = useState(false); 
-  // 🔥 NUEVO ESTADO PARA EL SELLO TEMPORADA 26-27 🔥
   const [isTemporada2627, setIsTemporada2627] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -149,8 +151,9 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     });
   };
 
-  const visibleInv = mode === "stock" ? stock : bodega;
-  const setVisibleInv = mode === "stock" ? setStock : setBodega;
+  // Lógica para asignar cantidades dependiendo de la pestaña activa
+  const visibleInv = mode === "tienda" ? tienda : mode === "stock" ? stock : bodega;
+  const setVisibleInv = mode === "tienda" ? setTienda : mode === "stock" ? setStock : setBodega;
 
   const handleInvChange = (size, value) => {
     const n = Math.max(0, parseInt(value, 10) || 0);
@@ -187,9 +190,10 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("isNew", isNew ? "true" : "false");
       formData.append("hidden", hidden ? "true" : "false"); 
       formData.append("isMundial2026", isMundial2026 ? "true" : "false");
-      // 🔥 ENVIAMOS AL BACKEND LA OPCIÓN DE TEMPORADA 26-27 🔥
       formData.append("isTemporada2627", isTemporada2627 ? "true" : "false");
 
+      // 🔥 ENVIAMOS LAS 3 UBICACIONES AL BACKEND 🔥
+      formData.append("tienda", JSON.stringify(tienda));
       formData.append("stock", JSON.stringify(stock));
       formData.append("bodega", JSON.stringify(bodega));
 
@@ -232,7 +236,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       {/* 🔥 CAJA DEL MODAL 🔥 */}
       <div 
         className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col z-10 animate-fade-in-up"
-        style={{ maxHeight: '85vh' }} // Forzamos una altura máxima estricta para garantizar el scroll
+        style={{ maxHeight: '85vh' }}
       >
         
         {/* 🔥 BOTÓN DE CERRAR 🔥 */}
@@ -352,40 +356,51 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             </div>
           </div>
 
-          {/* INVENTARIO (Botones estilo ProductModal) */}
+          {/* INVENTARIO (Botones estilo ProductAdminEditor) */}
           <div className="mb-6">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 text-center">
-              Gestionar Inventario
+              Gestionar Inventario Inicial
             </label>
             <div className="flex gap-2 mb-4">
               <button
                 type="button"
-                onClick={() => setMode('stock')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all ${
-                  mode === 'stock' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                onClick={() => setMode('tienda')}
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
+                  mode === 'tienda' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
                 }`}
               >
-                Tienda #1
+                Tienda
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('stock')}
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
+                  mode === 'stock' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300 hover:text-blue-500'
+                }`}
+              >
+                Bodega 1
               </button>
               <button
                 type="button"
                 onClick={() => setMode('bodega')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all ${
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
                   mode === 'bodega' ? 'bg-purple-600 text-white border-purple-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-purple-200 hover:text-purple-500'
                 }`}
               >
-                Tienda #2
+                Bodega 2
               </button>
             </div>
 
-            <div className={`p-4 sm:p-5 rounded-2xl transition-colors duration-300 ${mode === 'stock' ? 'bg-gray-50 border border-gray-100' : 'bg-purple-50/50 border border-purple-100'}`}>
+            <div className={`p-4 sm:p-5 rounded-2xl transition-colors duration-300 ${mode === 'tienda' ? 'bg-gray-50 border border-gray-100' : mode === 'stock' ? 'bg-blue-50/50 border border-blue-100' : 'bg-purple-50/50 border border-purple-100'}`}>
               <div className="grid grid-cols-4 gap-x-2 gap-y-4">
                 {tallas.map((size) => {
-                  const inputColors = mode === "stock" 
+                  const inputColors = mode === "tienda"
                       ? "focus:border-black text-black border-gray-200" 
+                      : mode === "stock" 
+                      ? "focus:border-blue-500 text-blue-900 border-blue-200"
                       : "focus:border-purple-500 text-purple-900 border-purple-200";
                   
-                  const labelColors = mode === "stock" ? "text-gray-500" : "text-purple-600";
+                  const labelColors = mode === "tienda" ? "text-gray-500" : mode === "stock" ? "text-blue-600" : "text-purple-600";
 
                   return (
                     <div key={size} className="relative mt-2">
@@ -407,7 +422,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             </div>
           </div>
 
-          {/* OPCIONES EXTRAS (Switches iOS) */}
+          {/* OPCIONES EXTRAS */}
           <div className="bg-gray-50/80 p-5 rounded-2xl border border-gray-100 mb-6">
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
               Opciones del Sistema
@@ -431,7 +446,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                 </div>
               </label>
 
-              {/* 🔥 NUEVO SWITCH: TEMPORADA 26-27 (SELLO ROJO) 🔥 */}
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="text-sm font-bold text-gray-800 select-none">Temporada 26-27 (Sello)</span>
                 <div className="relative flex items-center">

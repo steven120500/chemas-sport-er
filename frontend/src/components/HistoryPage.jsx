@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaFilter, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
@@ -10,11 +9,11 @@ function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
 
-// 🛡️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR
+// 🛡️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
 function parseLogDetails(log) {
   let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-  // Limpiamos el ID del texto antes de buscar las tallas para que no se confunda
+  // Limpiamos el ID del texto antes de buscar las tallas
   detailsStr = detailsStr.replace(/\[ID:[^\]]+\]\s*\|\s*/g, "");
 
   let cliente = "No especificado";
@@ -27,7 +26,6 @@ function parseLogDetails(log) {
   const items = [];
   let hasMatches = false;
 
-  // 🔥 SOLUCIÓN: Separamos por el carácter "|" para evaluar cada talla en su propio contexto
   const segmentos = detailsStr.split('|');
 
   segmentos.forEach(segmento => {
@@ -39,24 +37,32 @@ function parseLogDetails(log) {
       const oldV = parseInt(match[2], 10) || 0;
       const newV = parseInt(match[3], 10) || 0;
 
-      // Ahora solo busca "Tienda #2" en este pequeño fragmento, no en todo el texto general
-      const tienda = segmento.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+      // 🔥 Lógica actualizada para detectar Tienda, Bodega 1 y Bodega 2 (y soporte para historial viejo)
+      let tienda = "Tienda";
+      if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) {
+        tienda = "Bodega 2";
+      } else if (segmento.includes("Bodega 1") || segmento.includes("Tienda #1")) {
+        tienda = "Bodega 1";
+      }
 
       if (oldV > newV) {
         hasMatches = true;
         const cantidad = oldV - newV;
 
         for (let i = 0; i < cantidad; i++) {
-          items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nTIENDA: ${tienda}`);
+          items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nUBICACIÓN: ${tienda}`);
         }
       }
     }
   });
 
-  // Fallback si la expresión no encontró nada (ej. un ajuste general sin tallas)
   if (!hasMatches) {
-    const tiendaF = detailsStr.includes("Tienda #1") ? "Tienda #1" : (detailsStr.includes("Tienda #2") ? "Tienda #2" : "General");
-    items.push(`- CAMISETA: ${nombreChema}\nTIENDA: ${tiendaF}`);
+    let tiendaF = "General";
+    if (detailsStr.includes("Bodega 2") || detailsStr.includes("Tienda #2")) tiendaF = "Bodega 2";
+    else if (detailsStr.includes("Bodega 1") || detailsStr.includes("Tienda #1")) tiendaF = "Bodega 1";
+    else if (detailsStr.includes("Tienda")) tiendaF = "Tienda";
+    
+    items.push(`- CAMISETA: ${nombreChema}\nUBICACIÓN: ${tiendaF}`);
   }
 
   return { cliente, vendedor, items };
@@ -356,15 +362,16 @@ export default function HistoryPage({ isSuperUser = false }) {
                     </div>
 
                     <div className="w-full">
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tienda</label>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Ubicación</label>
                       <select 
                         value={selectedStore} 
                         onChange={(e) => setSelectedStore(e.target.value)} 
                         className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
                       >
                         <option value="">Todas</option>
-                        <option value="Tienda #1">Tienda #1</option>
-                        <option value="Tienda #2">Tienda #2</option>
+                        <option value="Tienda">Tienda</option>
+                        <option value="Bodega 1">Bodega 1</option>
+                        <option value="Bodega 2">Bodega 2</option>
                       </select>
                     </div>
 

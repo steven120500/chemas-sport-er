@@ -33,31 +33,40 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
   
   const sizesToCheck = isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 
-  const stockAgotadas = [];
-  const stockQueda1 = [];
-  const bodegaAgotadas = [];
-  const bodegaQueda1 = [];
+  // 🔥 NUEVOS ARREGLOS PARA LAS 3 UBICACIONES
+  const tiendaAgotadas = [];
+  const tiendaQueda1 = [];
+  const bodega1Agotadas = [];
+  const bodega1Queda1 = [];
+  const bodega2Agotadas = [];
+  const bodega2Queda1 = [];
   const traspasosUrgentes = [];
   const traspasosSugeridos = [];
 
   let totalInventory = 0;
 
   for (const size of sizesToCheck) {
+    const tiendaQty = Number(product.tienda?.[size] ?? 0);
     const stockQty = Number(product.stock?.[size] ?? 0);
     const bodeQty = Number(product.bodega?.[size] ?? 0);
 
-    totalInventory += (stockQty + bodeQty);
+    totalInventory += (tiendaQty + stockQty + bodeQty);
 
     if (user?.isSuperUser) {
-      if (stockQty === 0) stockAgotadas.push(size);
-      if (stockQty === 1) stockQueda1.push(size);
-      if (bodeQty === 0) bodegaAgotadas.push(size);
-      if (bodeQty === 1) bodegaQueda1.push(size);
+      if (tiendaQty === 0) tiendaAgotadas.push(size);
+      if (tiendaQty === 1) tiendaQueda1.push(size);
+      
+      if (stockQty === 0) bodega1Agotadas.push(size);
+      if (stockQty === 1) bodega1Queda1.push(size);
+      
+      if (bodeQty === 0) bodega2Agotadas.push(size);
+      if (bodeQty === 1) bodega2Queda1.push(size);
 
-      if (stockQty === 0 && bodeQty > 0) {
-        traspasosUrgentes.push({ talla: size, stock: stockQty, bodega: bodeQty });
-      } else if (stockQty === 1 && bodeQty > 0) {
-        traspasosSugeridos.push({ talla: size, stock: stockQty, bodega: bodeQty });
+      // 🔥 LÓGICA DE TRASPASOS INTELIGENTE: Si falta en Tienda pero hay en Bodegas
+      if (tiendaQty === 0 && (stockQty > 0 || bodeQty > 0)) {
+        traspasosUrgentes.push({ talla: size, tienda: tiendaQty, bodega1: stockQty, bodega2: bodeQty });
+      } else if (tiendaQty === 1 && (stockQty > 0 || bodeQty > 0)) {
+        traspasosSugeridos.push({ talla: size, tienda: tiendaQty, bodega1: stockQty, bodega2: bodeQty });
       }
     }
   }
@@ -292,28 +301,37 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
       {user?.isSuperUser && (
         <div className="px-3 sm:px-6 pb-3 pt-2 border-t border-dashed border-gray-300 text-[11px] sm:text-xs text-left w-full font-sans">
-          {(stockAgotadas.length > 0 || stockQueda1.length > 0) && (
+          
+          {(tiendaAgotadas.length > 0 || tiendaQueda1.length > 0) && (
             <>
-              <p className="font-bold mt-1 text-black">Tienda #1</p>
-              {stockAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {stockAgotadas.join(" ")}</p>}
-              {stockQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {stockQueda1.join(" ")}</p>}
+              <p className="font-bold mt-1 text-black">Tienda</p>
+              {tiendaAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {tiendaAgotadas.join(" ")}</p>}
+              {tiendaQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {tiendaQueda1.join(" ")}</p>}
             </>
           )}
 
-          {(bodegaAgotadas.length > 0 || bodegaQueda1.length > 0) && (
+          {(bodega1Agotadas.length > 0 || bodega1Queda1.length > 0) && (
             <>
-              <p className="font-bold mt-2 text-black">Tienda #2</p>
-              {bodegaAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodegaAgotadas.join(" ")}</p>}
-              {bodegaQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodegaQueda1.join(" ")}</p>}
+              <p className="font-bold mt-2 text-black">Bodega 1</p>
+              {bodega1Agotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodega1Agotadas.join(" ")}</p>}
+              {bodega1Queda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodega1Queda1.join(" ")}</p>}
+            </>
+          )}
+
+          {(bodega2Agotadas.length > 0 || bodega2Queda1.length > 0) && (
+            <>
+              <p className="font-bold mt-2 text-black">Bodega 2</p>
+              {bodega2Agotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodega2Agotadas.join(" ")}</p>}
+              {bodega2Queda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodega2Queda1.join(" ")}</p>}
             </>
           )}
 
           {traspasosUrgentes.length > 0 && (
             <div className="mt-2 bg-red-50 border-l-4 border-red-500 text-red-800 p-2 rounded">
-              <p className="font-bold text-red-700 mb-0.5">🚨 Traspasos urgentes:</p>
+              <p className="font-bold text-red-700 mb-0.5">🚨 Traspasos a Tienda urgentes:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosUrgentes.map((t, i) => (
-                  <li key={i}>Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)</li>
+                  <li key={i}>Talla <b>{t.talla}</b> (Bodega 1: {t.bodega1}, Bodega 2: {t.bodega2})</li>
                 ))}
               </ul>
             </div>
@@ -321,10 +339,10 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
           {traspasosSugeridos.length > 0 && (
             <div className="mt-2 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-2 rounded">
-              <p className="font-bold text-yellow-700 mb-0.5">📦 Traspasos sugeridos:</p>
+              <p className="font-bold text-yellow-700 mb-0.5">📦 Traspasos a Tienda sugeridos:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosSugeridos.map((t, i) => (
-                  <li key={i}>Talla <b>{t.talla}</b> ({t.stock} en T1, {t.bodega} en T2)</li>
+                  <li key={i}>Talla <b>{t.talla}</b> (Bodega 1: {t.bodega1}, Bodega 2: {t.bodega2})</li>
                 ))}
               </ul>
             </div>

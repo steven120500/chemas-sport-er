@@ -156,12 +156,16 @@ export default function ProductScreen({
   const hasDiscount = viewProduct?.discountPrice !== undefined && viewProduct?.discountPrice !== null && Number(viewProduct?.discountPrice) > 0;
   const hasMany = galleryFromProduct.length > 1;
 
+  // 🔥 LÓGICA DE SUMA PARA LOS 3 ESPACIOS
   const getTotalBySize = (size) => {
+    const t = parseInt(viewProduct?.tienda?.[size] ?? 0, 10) || 0; 
     const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0; 
     const b = parseInt(viewProduct?.bodega?.[size] ?? 0, 10) || 0; 
-    if (storeView === 'tienda1') return a;
-    if (storeView === 'tienda2') return b;
-    return a + b; 
+    
+    if (storeView === 'tienda') return t;
+    if (storeView === 'bodega1') return a;
+    if (storeView === 'bodega2') return b;
+    return t + a + b; // Si está en "Todos", suma los 3
   };
 
   // 🔥 MENSAJE CON FORMATO DE FORMULARIO, PRECIO, LINK OFICIAL DE LA PÁGINA Y SALTOS DE LÍNEA
@@ -236,12 +240,14 @@ export default function ProductScreen({
               </div>
 
               <div className="mb-8">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">Selecciona una Talla {storeView === 'tienda1' ? '(Tienda #1)' : storeView === 'tienda2' ? '(Tienda #2)' : ''}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  Selecciona una Talla {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
+                </p>
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                   {tallasVisibles.map((size) => {
                       const total = getTotalBySize(size);
                       const isAgotado = total === 0;
-                      const isTienda2 = storeView === 'tienda2';
+                      const isBodega2 = storeView === 'bodega2';
                       const isSelected = selectedSize === size;
 
                       return (
@@ -255,12 +261,12 @@ export default function ProductScreen({
                                   ? 'border-gray-100 bg-gray-50/50 opacity-60 cursor-not-allowed' 
                                   : isSelected
                                       ? 'border-black bg-black shadow-lg scale-[1.02] cursor-pointer'
-                                      : isTienda2 
+                                      : isBodega2 
                                           ? 'border-purple-200 bg-purple-50/30 shadow-sm cursor-pointer hover:border-purple-400' 
                                           : 'border-gray-200 bg-white shadow-sm cursor-pointer hover:border-gray-300'
                               }`}
                           >
-                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : isTienda2 ? 'text-purple-900' : 'text-gray-900'}`}>
+                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : isBodega2 ? 'text-purple-900' : 'text-gray-900'}`}>
                                 {size}
                               </span>
                               {canEdit && (
