@@ -78,7 +78,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [tienda, setTienda] = useState({});
   const [stock, setStock] = useState({});
   const [bodega, setBodega] = useState({});
-  const [mode, setMode] = useState("tienda"); // Iniciamos en Tienda
+  // 🔥 Iniciamos en Bodega 1 por defecto
+  const [mode, setMode] = useState("stock"); 
 
   const [isNew, setIsNew] = useState(false);   
   const [hidden, setHidden] = useState(false); 
@@ -356,7 +357,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             </div>
           </div>
 
-          {/* INVENTARIO (Botones estilo ProductAdminEditor) */}
+          {/* INVENTARIO (Botones estilo ProductAdminEditor reordenados) */}
           <div className="mb-6">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 text-center">
               Gestionar Inventario Inicial
@@ -364,17 +365,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             <div className="flex gap-2 mb-4">
               <button
                 type="button"
-                onClick={() => setMode('tienda')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
-                  mode === 'tienda' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                Tienda
-              </button>
-              <button
-                type="button"
                 onClick={() => setMode('stock')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
                   mode === 'stock' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300 hover:text-blue-500'
                 }`}
               >
@@ -383,11 +375,20 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <button
                 type="button"
                 onClick={() => setMode('bodega')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all ${
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
                   mode === 'bodega' ? 'bg-purple-600 text-white border-purple-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-purple-200 hover:text-purple-500'
                 }`}
               >
                 Bodega 2
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('tienda')}
+                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                  mode === 'tienda' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                Tienda
               </button>
             </div>
 

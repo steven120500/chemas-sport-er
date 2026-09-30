@@ -37,7 +37,8 @@ export default function ProductAdminEditor({
   onDeleteSuccess,
   canDelete,
 }) {
-  const [invMode, setInvMode] = useState("tienda"); 
+  // 🔥 Se ajustó el valor inicial para que abra en Bodega 1 ("stock") por defecto
+  const [invMode, setInvMode] = useState("stock"); 
   const [editedTienda, setEditedTienda] = useState(product?.tienda || {}); 
   const [editedStock, setEditedStock] = useState(product?.stock || {}); 
   const [editedBodega, setEditedBodega] = useState(product?.bodega || {}); 
@@ -299,11 +300,8 @@ export default function ProductAdminEditor({
             <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
               <p className="text-center font-bold text-gray-400 uppercase tracking-widest mb-5 text-xs">Modificando Inventario</p>
               
+              {/* 🔥 BOTONES REORDENADOS 🔥 */}
               <div className="flex gap-2 mb-6">
-                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "tienda" ? "bg-black border-black text-white shadow-lg" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("tienda")}>
-                  <FaStore size={20} className="mb-1" />
-                  <span className="font-black text-[10px] uppercase tracking-wider">Tienda</span>
-                </button>
                 <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("stock")}>
                   <FaBoxOpen size={20} className="mb-1" />
                   <span className="font-black text-[10px] uppercase tracking-wider">Bodega 1</span>
@@ -311,6 +309,10 @@ export default function ProductAdminEditor({
                 <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "bodega" ? "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("bodega")}>
                   <FaWarehouse size={20} className="mb-1" />
                   <span className="font-black text-[10px] uppercase tracking-wider">Bodega 2</span>
+                </button>
+                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "tienda" ? "bg-black border-black text-white shadow-lg" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("tienda")}>
+                  <FaStore size={20} className="mb-1" />
+                  <span className="font-black text-[10px] uppercase tracking-wider">Tienda</span>
                 </button>
               </div>
 
