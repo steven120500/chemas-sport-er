@@ -23,7 +23,6 @@ export default function Header({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   
-  // 🔥 REFERENCIAS PARA LA VALLA DESLIZABLE IMPARABLE
   const scrollRef = useRef(null);
   const [isDraggingCSS, setIsDraggingCSS] = useState(false);
   
@@ -31,6 +30,9 @@ export default function Header({
   const startX = useRef(0);
   const scrollLeftPos = useRef(0);
   const hasDragged = useRef(false); 
+  
+  // 🔥 NUEVO: Acumulador para evitar el bug de Safari/iPhone con decimales
+  const accumulator = useRef(0); 
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -39,17 +41,25 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 LÓGICA DE AUTO-SCROLL (VALLA)
+  // 🔥 LÓGICA DE AUTO-SCROLL BLINDADA PARA MÓVILES
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     let animationId;
-    const scrollSpeed = 0.6;
+    const scrollSpeed = 0.6; // Velocidad de la valla
 
     const autoScroll = () => {
       if (!isMouseDown.current) {
-        el.scrollLeft += scrollSpeed;
+        // SOLUCIÓN SAFARI: Acumulamos la velocidad decimal hasta tener al menos 1 píxel entero
+        accumulator.current += scrollSpeed;
+        
+        if (accumulator.current >= 1) {
+          const pixelsToMove = Math.floor(accumulator.current);
+          el.scrollLeft += pixelsToMove; // Movemos el scroll con números enteros
+          accumulator.current -= pixelsToMove; // Guardamos el decimal sobrante
+        }
+
         if (el.scrollLeft >= el.scrollWidth / 2) {
           el.scrollLeft = 0;
         }
@@ -126,7 +136,6 @@ export default function Header({
   ];
 
   return (
-    // 🔥 Ahora es "sticky top-0" siempre, tanto en celular como en compu 🔥
     <header
       className={`sticky top-0 z-50 w-full transition-colors duration-1000 shadow-md ${
         isDark ? "bg-black" : "bg-white"
