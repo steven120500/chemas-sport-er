@@ -17,11 +17,11 @@ const categories = [
   { label: "Mujer", value: "Mujer" },
   { label: "Niño", value: "Niño" },
   { label: "Abrigos", value: "Abrigos" },
-  { label: "F1", value: "F1" },
+  { label: "Llaveros", value: "Llaveros" }, 
   { label: "NBA", value: "NBA" },
   { label: "MLB", value: "MLB" },
   { label: "NFL", value: "NFL" },
-  { label: "Llaveros", value: "Llaveros" }, // 🔥 CATEGORÍA AÑADIDA
+  { label: "F1", value: "F1" }, // 🔥 CATEGORÍA AÑADIDA
 ];
 
 const tallasAdulto = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];

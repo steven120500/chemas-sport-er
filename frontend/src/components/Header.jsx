@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { 
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaBoxOpen, FaPercentage
+  FaPercentage
 } from "react-icons/fa";
 
 export default function Header({
@@ -22,6 +22,15 @@ export default function Header({
   const [isDark, setIsDark] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  
+  // 🔥 REFERENCIAS PARA LA VALLA DESLIZABLE IMPARABLE
+  const scrollRef = useRef(null);
+  const [isDraggingCSS, setIsDraggingCSS] = useState(false);
+  
+  const isMouseDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftPos = useRef(0);
+  const hasDragged = useRef(false); 
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -29,6 +38,65 @@ export default function Header({
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // 🔥 LÓGICA DE AUTO-SCROLL (VALLA)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let animationId;
+    const scrollSpeed = 0.6; // Un toque más de fluidez
+
+    const autoScroll = () => {
+      // SOLO se pausa si el usuario está agarrando la barra físicamente
+      if (!isMouseDown.current) {
+        el.scrollLeft += scrollSpeed;
+        if (el.scrollLeft >= el.scrollWidth / 2) {
+          el.scrollLeft = 0;
+        }
+      }
+      animationId = requestAnimationFrame(autoScroll);
+    };
+
+    animationId = requestAnimationFrame(autoScroll);
+    return () => cancelAnimationFrame(animationId);
+  }, []); 
+  // 👆 Al dejar las dependencias vacías, el loop nunca se rompe por renderizados de React
+
+  // 🔥 FUNCIONES DE ARRASTRE MANUAL UNIFICADAS (MOUSE + TÁCTIL)
+  const handleStart = (e) => {
+    isMouseDown.current = true;
+    hasDragged.current = false; 
+    
+    // Soporte para Mouse y Touch
+    const pageX = e.pageX || (e.touches && e.touches[0].pageX);
+    if (!pageX) return;
+
+    startX.current = pageX - scrollRef.current.offsetLeft;
+    scrollLeftPos.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleEnd = () => {
+    isMouseDown.current = false;
+    setIsDraggingCSS(false);
+  };
+
+  const handleMove = (e) => {
+    if (!isMouseDown.current) return;
+    
+    const pageX = e.pageX || (e.touches && e.touches[0].pageX);
+    if (!pageX) return;
+
+    const x = pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5;
+    
+    if (Math.abs(walk) > 3) {
+      hasDragged.current = true;
+      setIsDraggingCSS(true);
+    }
+    
+    scrollRef.current.scrollLeft = scrollLeftPos.current - walk;
+  };
 
   const getInitials = (name) => {
     if (!name) return "US";
@@ -53,11 +121,11 @@ export default function Header({
     { label: "NIÑO", value: "Niño" },
     { label: "BALÓN", value: "Balón" },
     { label: "ABRIGOS", value: "Abrigos" },
-    { label: "F1", value: "F1" },
+    { label: "LLAVEROS", value: "Llaveros" }, 
     { label: "NBA", value: "NBA" },
     { label: "MLB", value: "MLB" },
     { label: "NFL", value: "NFL" },
-    { label: "LLAVEROS", value: "Llaveros" }, // 🔥 NUEVA CATEGORÍA AÑADIDA AQUÍ
+    { label: "F1", value: "F1" }, 
   ];
 
   return (
@@ -66,16 +134,12 @@ export default function Header({
         isDark ? "bg-black" : "bg-white"
       }`}
     >
-      {/* ================= PARTE SUPERIOR (Logo, Título y Usuario) ================= */}
       <div className="relative px-2 sm:px-6 py-2 sm:py-4">
         <div
           className={`absolute inset-0 transition-opacity duration-1000 ${
             isDark ? "opacity-20" : "opacity-70"
           }`}
-          style={{
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+          style={{ backgroundSize: "cover", backgroundPosition: "center" }}
         ></div>
 
         <div className="relative z-10 flex items-center justify-between w-full">
@@ -91,7 +155,6 @@ export default function Header({
             ChemaSport ER
           </h1>
 
-          {/* 🔘 BOTÓN DE USUARIO: DESAPARECE SI EL SIDEBAR ESTÁ ABIERTO */}
           <div className="flex items-center min-w-[44px] justify-end">
             {!sidebarOpen && (
               <button
@@ -114,26 +177,40 @@ export default function Header({
         </div>
       </div>
 
-      {/* ================= PARTE INFERIOR (SubHeader Integrado) ================= */}
-      <div className={`hidden md:block w-full border-t transition-colors duration-1000 ${
+      <div className={`hidden md:block w-full border-t transition-colors duration-1000 overflow-hidden ${
         isDark ? "border-gray-800" : "border-gray-100/50"
       }`}>
-        <div className="max-w-full mx-full px-4">
-          <nav className="flex items-center gap-8 py-3.5 overflow-x-auto whitespace-nowrap justify-center px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {navItems.map((item, index) => {
+        <div className="w-full relative">
+          <nav 
+            ref={scrollRef}
+            onMouseDown={handleStart}
+            onMouseLeave={handleEnd}
+            onMouseUp={handleEnd}
+            onMouseMove={handleMove}
+            onTouchStart={handleStart}
+            onTouchEnd={handleEnd}
+            onTouchCancel={handleEnd}
+            onTouchMove={handleMove}
+            className={`flex items-center gap-8 py-3.5 px-4 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] select-none ${isDraggingCSS ? "cursor-grabbing" : "cursor-grab"}`}
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            {[...navItems, ...navItems].map((item, index) => {
               const isActive = filterType === item.value;
               
               return (
                 <button
                   key={index}
-                  onClick={() => {
-                     if (setFilterType) setFilterType(item.value);
+                  onClick={(e) => {
+                     // Solo filtra si fue un clic real y NO un arrastre
+                     if (!hasDragged.current) {
+                       if (setFilterType) setFilterType(item.value);
+                     }
                   }}
-                  className={`group relative flex items-center text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-all duration-300 cursor-pointer bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 ${
+                  className={`group relative flex items-center text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-all duration-300 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 ${
                     isActive 
                       ? (isDark ? "text-white" : "text-black") 
                       : (isDark ? "text-gray-400 hover:text-white" : "text-gray-400 hover:text-black")
-                  }`}
+                  } cursor-pointer`}
                 >
                   {item.label}
                   
@@ -151,9 +228,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* ========================================================
-          🔸 SIDEBAR: FONDO BLANCO Y BOTONES NEGROS
-          ======================================================== */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity"
@@ -165,7 +239,6 @@ export default function Header({
           >
             <div className="relative bg-white h-full flex flex-col justify-between p-6 sm:p-7 shadow-2xl text-black font-sans">
               
-              {/* ❌ Botón Cerrar: Sin background y en color negro puro */}
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="absolute top-5 right-5 p-1 text-black hover:opacity-60 transition-opacity cursor-pointer z-10 bg-transparent border-0"
@@ -175,10 +248,8 @@ export default function Header({
               </button>
 
               {user ? (
-                /* 🟢 Vista: Con Sesión Iniciada */
                 <div className="mt-8 flex-grow overflow-y-auto pr-1">
                   
-                  {/* Tarjeta de usuario */}
                   <div className="mb-6 p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 flex items-center gap-3.5 shadow-sm">
                     <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center font-black text-sm shrink-0 shadow-md">
                       {getInitials(user.firstName || user.username || user.name)}
@@ -194,12 +265,8 @@ export default function Header({
                     </div>
                   </div>
 
-                  {/* Opciones del menú (Botones negros con hover gris suave) */}
                   <nav className="space-y-2.5">
                     
-                    
-
-                    {/* 💰 2. Comisiones */}
                     <button
                       onClick={() => {
                         navigate('/comisiones');
@@ -214,7 +281,6 @@ export default function Header({
                       <FaChevronRight size={12} className="text-zinc-500" />
                     </button>
 
-                    {/* ➕ 3. Agregar usuario */}
                     {(isSuperUser || canSeeHistory || user?.roles?.includes("add")) && (
                       <button
                         onClick={() => {
@@ -231,7 +297,6 @@ export default function Header({
                       </button>
                     )}
 
-                    {/* 👥 4. Ver usuarios */}
                     {(isSuperUser || canSeeHistory || user?.roles?.includes("view_users")) && (
                       <button
                         onClick={() => {
@@ -248,7 +313,6 @@ export default function Header({
                       </button>
                     )}
 
-                    {/* 🕒 5. Historial */}
                     {(isSuperUser || canSeeHistory || user?.roles?.includes("history")) && (
                       <button
                         onClick={() => {
@@ -267,7 +331,6 @@ export default function Header({
 
                   </nav>
 
-                  {/* Cerrar Sesión */}
                   <button
                     onClick={() => {
                       onLogout();
@@ -280,7 +343,6 @@ export default function Header({
                   </button>
                 </div>
               ) : (
-                /* ⚪ Vista: Sin Sesión */
                 <div className="my-auto flex flex-col items-center text-center px-4 w-full">
                   <div className="w-16 h-16 rounded-full bg-zinc-100 flex items-center justify-center text-black mb-5 shadow-sm border border-zinc-200/60">
                     <FaUser size={24} />
@@ -303,7 +365,6 @@ export default function Header({
                 </div>
               )}
 
-              {/* 🏷️ Pie de página */}
               <div className="mt-auto pt-5 border-t border-zinc-100 text-center">
                 <p className="text-[10px] text-zinc-400 font-black tracking-widest uppercase">
                   CHEMA SPORT ER
