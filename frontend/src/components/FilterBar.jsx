@@ -21,6 +21,7 @@ const categories = [
   { label: "NBA", value: "NBA" },
   { label: "MLB", value: "MLB" },
   { label: "NFL", value: "NFL" },
+  { label: "Llaveros", value: "Llaveros" }, // 🔥 CATEGORÍA AÑADIDA
 ];
 
 const tallasAdulto = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
@@ -32,6 +33,9 @@ const tallasNino = [
   { size: "24", label: "24 (Talla 10)" },
   { size: "26", label: "26 (Talla 12)" },
   { size: "28", label: "28 (Talla 14/16)" },
+];
+const tallasAccesorios = [
+  { size: "U", label: "U (Talla Única)" } // 🔥 TALLA ÚNICA AÑADIDA
 ];
 
 export default function FilterBar({
@@ -101,7 +105,7 @@ export default function FilterBar({
           >
             <input
               type="text"
-              placeholder="Buscar camiseta..."
+              placeholder="Buscar artículo..."
               value={localSearch}
               onChange={handleInputChange}
               className="w-full pl-5 pr-4 py-3 bg-zinc-100/90 border border-transparent rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black transition-all shadow-inner text-black"
@@ -272,6 +276,37 @@ export default function FilterBar({
                             })}
                           </div>
                         </div>
+
+                        {/* 🔥 SECCIÓN DE ACCESORIOS / LLAVEROS AÑADIDA */}
+                        <div>
+                          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Accesorios</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tallasAccesorios.map(({ size, label }) => {
+                              const isActive = filterSizes?.includes(size);
+                              return (
+                                <button
+                                  key={size}
+                                  onClick={() => {
+                                    if (setFilterSizes) {
+                                      setFilterSizes(prev => 
+                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                                      );
+                                    }
+                                    setIsOpen(false);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
+                                    isActive 
+                                      ? "bg-black text-white border-black shadow-sm" 
+                                      : "bg-zinc-50 text-zinc-700 border-zinc-200"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                       </motion.div>
                     )}
                   </div>

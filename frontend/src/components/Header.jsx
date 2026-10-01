@@ -57,6 +57,7 @@ export default function Header({
     { label: "NBA", value: "NBA" },
     { label: "MLB", value: "MLB" },
     { label: "NFL", value: "NFL" },
+    { label: "LLAVEROS", value: "Llaveros" }, // 🔥 NUEVA CATEGORÍA AÑADIDA AQUÍ
   ];
 
   return (
