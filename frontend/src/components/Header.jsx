@@ -45,10 +45,9 @@ export default function Header({
     if (!el) return;
 
     let animationId;
-    const scrollSpeed = 0.6; // Un toque más de fluidez
+    const scrollSpeed = 0.6;
 
     const autoScroll = () => {
-      // SOLO se pausa si el usuario está agarrando la barra físicamente
       if (!isMouseDown.current) {
         el.scrollLeft += scrollSpeed;
         if (el.scrollLeft >= el.scrollWidth / 2) {
@@ -61,14 +60,12 @@ export default function Header({
     animationId = requestAnimationFrame(autoScroll);
     return () => cancelAnimationFrame(animationId);
   }, []); 
-  // 👆 Al dejar las dependencias vacías, el loop nunca se rompe por renderizados de React
 
-  // 🔥 FUNCIONES DE ARRASTRE MANUAL UNIFICADAS (MOUSE + TÁCTIL)
+  // 🔥 FUNCIONES DE ARRASTRE MANUAL UNIFICADAS
   const handleStart = (e) => {
     isMouseDown.current = true;
     hasDragged.current = false; 
     
-    // Soporte para Mouse y Touch
     const pageX = e.pageX || (e.touches && e.touches[0].pageX);
     if (!pageX) return;
 
@@ -129,8 +126,9 @@ export default function Header({
   ];
 
   return (
+    // 🔥 Ahora es "sticky top-0" siempre, tanto en celular como en compu 🔥
     <header
-      className={`md:sticky md:top-0 z-50 w-full transition-colors duration-1000 shadow-md ${
+      className={`sticky top-0 z-50 w-full transition-colors duration-1000 shadow-md ${
         isDark ? "bg-black" : "bg-white"
       }`}
     >
@@ -177,7 +175,7 @@ export default function Header({
         </div>
       </div>
 
-      <div className={`hidden md:block w-full border-t transition-colors duration-1000 overflow-hidden ${
+      <div className={`w-full border-t transition-colors duration-1000 overflow-hidden ${
         isDark ? "border-gray-800" : "border-gray-100/50"
       }`}>
         <div className="w-full relative">
@@ -191,7 +189,7 @@ export default function Header({
             onTouchEnd={handleEnd}
             onTouchCancel={handleEnd}
             onTouchMove={handleMove}
-            className={`flex items-center gap-8 py-3.5 px-4 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] select-none ${isDraggingCSS ? "cursor-grabbing" : "cursor-grab"}`}
+            className={`flex items-center gap-6 sm:gap-8 py-2.5 sm:py-3.5 px-4 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] select-none ${isDraggingCSS ? "cursor-grabbing" : "cursor-grab"}`}
             style={{ WebkitOverflowScrolling: "touch" }}
           >
             {[...navItems, ...navItems].map((item, index) => {
@@ -201,12 +199,11 @@ export default function Header({
                 <button
                   key={index}
                   onClick={(e) => {
-                     // Solo filtra si fue un clic real y NO un arrastre
                      if (!hasDragged.current) {
                        if (setFilterType) setFilterType(item.value);
                      }
                   }}
-                  className={`group relative flex items-center text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-all duration-300 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 ${
+                  className={`group relative flex items-center text-[11px] sm:text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-all duration-300 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 ${
                     isActive 
                       ? (isDark ? "text-white" : "text-black") 
                       : (isDark ? "text-gray-400 hover:text-white" : "text-gray-400 hover:text-black")
