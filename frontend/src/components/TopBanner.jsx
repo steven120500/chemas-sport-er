@@ -19,7 +19,7 @@ function TopBanner() {
   }, []);
 
   return (
-    <div className="bg-black text-white text-center py-2 text-sm font-semibold">
+    <div className="bg-black text-white text-center py-5 text-sm font-semibold">
       {messages[currentIndex]}
     </div>
   );
