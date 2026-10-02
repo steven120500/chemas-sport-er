@@ -40,7 +40,6 @@ export default function ProductScreen({
   const [loading, setLoading] = useState(false);
   const [idx, setIdx] = useState(0);
   
-  // 🔥 ESTADO PARA GUARDAR LA TALLA SELECCIONADA POR EL CLIENTE
   const [selectedSize, setSelectedSize] = useState("");
 
   const displayName = user?.username || user?.email || "ChemaSportER";
@@ -55,11 +54,10 @@ export default function ProductScreen({
   useEffect(() => {
     setViewProduct(product);
     setIdx(0);
-    setSelectedSize(""); // Limpia la talla si cambia de producto
+    setSelectedSize(""); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
-  /* ⭐ SOCKETS EN TIEMPO REAL BLINDADOS Y ACTUALIZADOS ⭐ */
   useEffect(() => {
     const currentId = product?._id || product?.id;
     if (!currentId || isEditing) return;
@@ -148,7 +146,6 @@ export default function ProductScreen({
     onClose();
   };
 
-  // 🔥 DETECCIÓN DE TALLAS VISIBLES (INCLUYENDO LLAVEROS)
   const isNino = viewProduct?.type === "Niño";
   const isBalon = viewProduct?.type === "Balón" || viewProduct?.type === "Balones";
   const isLlavero = viewProduct?.type === "Llaveros";
@@ -158,7 +155,6 @@ export default function ProductScreen({
   const hasDiscount = viewProduct?.discountPrice !== undefined && viewProduct?.discountPrice !== null && Number(viewProduct?.discountPrice) > 0;
   const hasMany = galleryFromProduct.length > 1;
 
-  // 🔥 LÓGICA DE SUMA PARA LOS 3 ESPACIOS
   const getTotalBySize = (size) => {
     const t = parseInt(viewProduct?.tienda?.[size] ?? 0, 10) || 0; 
     const a = parseInt(viewProduct?.stock?.[size] ?? 0, 10) || 0; 
@@ -167,7 +163,7 @@ export default function ProductScreen({
     if (storeView === 'tienda') return t;
     if (storeView === 'bodega1') return a;
     if (storeView === 'bodega2') return b;
-    return t + a + b; // Si está en "Todos", suma los 3
+    return t + a + b; 
   };
 
   const finalPrice = hasDiscount ? viewProduct?.discountPrice : viewProduct?.price;
@@ -213,9 +209,9 @@ export default function ProductScreen({
                 )}
                 {hasMany && (
                   <>
-                    <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-black text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer"><FaChevronLeft size={20} /></button>
-                    <button onClick={() => setIdx((i) => (i + 1) % galleryFromProduct.length)} className="absolute right-4 z-10 bg-black text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer"><FaChevronRight size={20} /></button>
-                    <div className="absolute bottom-6 bg-black text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">{idx + 1} / {galleryFromProduct.length}</div>
+                    <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-yellow-500 text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-md"><FaChevronLeft size={20} /></button>
+                    <button onClick={() => setIdx((i) => (i + 1) % galleryFromProduct.length)} className="absolute right-4 z-10 bg-yellow-500 text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-md"><FaChevronRight size={20} /></button>
+                    <div className="absolute bottom-6 bg-yellow-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">{idx + 1} / {galleryFromProduct.length}</div>
                   </>
                 )}
               </div>
@@ -224,18 +220,18 @@ export default function ProductScreen({
             {/* LADO DERECHO: INFO Y TALLAS / UNIDADES */}
             <div className="w-full flex flex-col">
               <div className="mb-8">
-                <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm">{viewProduct?.type}</span>
-                <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-gray-900 leading-tight tracking-tight mb-6">{viewProduct?.name}</h1>
+                <span className="inline-block bg-yellow-500 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm">{viewProduct?.type}</span>
+                <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-yellow-500 leading-tight tracking-tight mb-6">{viewProduct?.name}</h1>
                 {hasDiscount ? (
                   <div className="flex flex-col items-start mb-6">
                       <span className="bg-black text-white text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">Oferta</span>
                       <div className="flex items-end gap-4">
                         <p className="line-through text-gray-400 text-2xl font-medium pb-1">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
-                        <p className="text-5xl font-black text-gray-900 tracking-tight">₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}</p>
+                        <p className="text-5xl font-black text-yellow-500 tracking-tight">₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}</p>
                       </div>
                   </div>
                 ) : (
-                  <p className="text-5xl font-black text-gray-900 tracking-tight mb-6">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
+                  <p className="text-5xl font-black text-yellow-500 tracking-tight mb-6">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
                 )}
               </div>
 
@@ -260,7 +256,7 @@ export default function ProductScreen({
                               ${isAgotado 
                                   ? 'border-gray-100 bg-gray-50/50 opacity-60 cursor-not-allowed' 
                                   : isSelected
-                                      ? 'border-black bg-black shadow-lg scale-[1.02] cursor-pointer'
+                                      ? 'border-yellow-500 bg-yellow-500 shadow-lg scale-[1.02] cursor-pointer'
                                       : isBodega2 
                                           ? 'border-purple-200 bg-purple-50/30 shadow-sm cursor-pointer hover:border-purple-400' 
                                           : 'border-gray-200 bg-white shadow-sm cursor-pointer hover:border-gray-300'
@@ -270,7 +266,7 @@ export default function ProductScreen({
                                 {size}
                               </span>
                               {canEdit && (
-                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
+                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : 'text-gray-500'}`}>
                                   {isAgotado ? 'Agotado' : `${total} disp.`}
                                 </span>
                               )}
@@ -334,7 +330,6 @@ export default function ProductScreen({
 
                   )}
 
-                  {/* 🔥 BOTÓN DE WHATSAPP DIRECTO CON VALIDACIÓN */}
                   <a
                     href={selectedSize ? whatsappUrl : '#'}
                     onClick={(e) => {
@@ -347,9 +342,9 @@ export default function ProductScreen({
                     }}
                     target={selectedSize ? "_blank" : "_self"}
                     rel="noopener noreferrer"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
+                    className="w-full bg-green-500 hover:bg-green-600 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
                   >
-                    <FaWhatsapp size2={22} />
+                    <FaWhatsapp size={22} />
                     COMPRAR POR WHATSAPP
                   </a>
                   

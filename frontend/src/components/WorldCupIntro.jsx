@@ -5,36 +5,36 @@ const IntroLoader = ({ onFinished }) => {
   const [fadeIntro, setFadeIntro] = useState(false);
   const [progress, setProgress] = useState(0);
   
-  // 🔥 FASES CINEMATOGRÁFICAS: 0=Corriendo, 1=Pateando, 2=Impacto/Texto, 3=Subtítulo
+  // 🔥 FASES FANTASMA: 0=Levitando, 1=Invocación (Brazos arriba), 2=Impacto CHEMA, 3=Impacto ER
   const [cinePhase, setCinePhase] = useState(0);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
 
-    // 1. Barra de progreso fluida (de 0 a 100% en ~2.6 seg)
+    // 1. Barra de progreso (0 a 100% en ~3 segundos)
     const intervalProgress = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(intervalProgress);
           return 100;
         }
-        const increment = Math.random() > 0.6 ? 3 : 2;
+        const increment = Math.random() > 0.5 ? 2 : 1;
         return Math.min(prev + increment, 100);
       });
-    }, 35);
+    }, 28);
     
-    // 2. TIMELINE DE LA CINEMATOGRÁFICA
-    const t1 = setTimeout(() => setCinePhase(1), 1300); // 1.3s: Se frena y PATEA EL BALÓN
-    const t2 = setTimeout(() => setCinePhase(2), 1600); // 1.6s: El balón golpea el centro y SALE "CHEMA SPORT"
-    const t3 = setTimeout(() => setCinePhase(3), 1900); // 1.9s: Sale "PREMIUM ER COLLECTION" y celebra
+    // 2. TIMELINE PARANORMAL
+    const t1 = setTimeout(() => setCinePhase(1), 1800); // Se detiene y levanta los brazos
+    const t2 = setTimeout(() => setCinePhase(2), 2200); // Aparece CHEMA SPORT
+    const t3 = setTimeout(() => setCinePhase(3), 2500); // Aparece ER
     
-    // 3. Salida y cierre (Total: 3.3 segundos para apreciar toda la escena)
-    const fadeTimer = setTimeout(() => setFadeIntro(true), 2700); 
+    // 3. Salida y cierre (Total: ~3.8 segundos)
+    const fadeTimer = setTimeout(() => setFadeIntro(true), 3200); 
     const endTimer = setTimeout(() => {
       setVisible(false);
       document.body.style.overflow = 'auto';
       if (onFinished) onFinished();
-    }, 3400);
+    }, 3900);
 
     return () => {
       document.body.style.overflow = 'auto';
@@ -49,126 +49,156 @@ const IntroLoader = ({ onFinished }) => {
 
   if (!visible) return null;
 
-  // Calculamos la posición del monigote: Corre hasta el centro (50%) y ahí se queda para patear
-  const stickmanPosition = Math.min(progress, 50);
+  const startX = 15;
+  // Avanza hasta el 50% y ahí se queda flotando
+  const stickmanPosition = Math.min(startX + (progress * 0.45), 50);
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-white px-6 py-12 transition-opacity duration-[700ms] ease-out ${
+      // 🔥 Se cambió a bg-black puro para asegurar que el fondo NUNCA se vea blanco 🔥
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between px-6 py-12 transition-opacity duration-[700ms] ease-out ${
         fadeIntro ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      }`}
+      } bg-black overflow-hidden`} 
     >
       <style>
         {`
-          /* ⭐ ANIMACIONES DE IMPACTO PARA EL TEXTO (SLAMS DESDE EL CENTRO) ⭐ */
+          /* ⭐ IMPACTOS GLITCH Y SANGRE ⭐ */
           @keyframes textSlam {
-            0% { transform: scale(2.5); opacity: 0; filter: blur(4px); }
-            100% { transform: scale(1); opacity: 1; filter: blur(0px); }
+            0% { transform: scale(2.5) translateY(20px); opacity: 0; filter: blur(8px) drop-shadow(0 0 20px #dc2626); color: #dc2626; }
+            40% { transform: scale(0.9); opacity: 1; filter: blur(0px) drop-shadow(0 0 0px transparent); color: #fff; }
+            50% { transform: scale(1.05); color: #ea580c; } 
+            100% { transform: scale(1); opacity: 1; color: #fff; }
           }
-          .animate-slam {
-            animation: textSlam 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-
-          /* ⭐ ANIMACIONES DEL MONIGOTE CORRIENDO ⭐ */
-          @keyframes runArm1 { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(35deg); } }
-          @keyframes runArm2 { 0%, 100% { transform: rotate(35deg); } 50% { transform: rotate(-35deg); } }
-          @keyframes runLeg1 { 0%, 100% { transform: rotate(-40deg); } 50% { transform: rotate(40deg); } }
-          @keyframes runLeg2 { 0%, 100% { transform: rotate(40deg); } 50% { transform: rotate(-40deg); } }
-          @keyframes bobbing { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-3px); } }
-          @keyframes ballBounce { 0%, 100% { transform: translateY(0px) scaleX(1); } 50% { transform: translateY(-8px) scaleX(0.95); } }
-
-          /* ⭐ ANIMACIÓN DE LA PATADA Y CELEBRACIÓN ⭐ */
-          @keyframes kickLeg { 0% { transform: rotate(0deg); } 30% { transform: rotate(-50deg); } 100% { transform: rotate(70deg); } }
-          @keyframes celebrateArms { 0% { transform: rotate(0deg); } 100% { transform: rotate(-140deg); } }
+          .animate-slam { animation: textSlam 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
           
-          /* ⭐ EL DISPARO DEL BALÓN AL CENTRO DE LA PANTALLA ⭐ */
-          @keyframes shootBall {
-            0% { transform: translate(0px, 0px) scale(1); opacity: 1; }
-            80% { transform: translate(10px, -240px) scale(3.5); opacity: 1; }
-            100% { transform: translate(10px, -260px) scale(5); opacity: 0; } /* Explota y desaparece en el centro */
+          @keyframes glitchEffect {
+             0% { opacity: 1; transform: translate(0); filter: hue-rotate(0deg); }
+             20% { opacity: 0.8; transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+             40% { opacity: 1; transform: translate(2px, -2px); filter: hue-rotate(-90deg); }
+             60% { opacity: 0.9; transform: translate(-2px, -2px); filter: hue-rotate(180deg); color: #dc2626; }
+             80% { opacity: 1; transform: translate(2px, 2px); filter: hue-rotate(0deg); }
+             100% { opacity: 1; transform: translate(0); color: #fff; }
+          }
+          .animate-glitch { animation: glitchEffect 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+
+          /* ⭐ ANIMACIONES DEL ESCENARIO ⭐ */
+          @keyframes cobwebSway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg); } }
+          .animate-cobweb { animation: cobwebSway 6s infinite alternate ease-in-out; transform-origin: top right; }
+
+          @keyframes batsFly {
+            0% { transform: translate(-10px, 10px) scale(0.9); opacity: 0; }
+            30% { opacity: 0.6; }
+            100% { transform: translate(30px, -20px) scale(1.05); opacity: 0.6; }
+          }
+          .animate-bats { animation: batsFly 4s ease-out forwards; }
+
+          /* ⭐ LEVITACIÓN FANTASMAL (Flota arriba y abajo) ⭐ */
+          @keyframes ghostHover { 
+            0%, 100% { transform: translateY(-10px) rotate(5deg); } 
+            50% { transform: translateY(-25px) rotate(8deg); } 
+          }
+          
+          /* Brazos y piernas colgando sin vida */
+          @keyframes dangleArm1 { 0%, 100% { transform: rotate(15deg); } 50% { transform: rotate(20deg); } }
+          @keyframes dangleArm2 { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(-5deg); } }
+          @keyframes dangleLeg1 { 0%, 100% { transform: rotate(10deg); } 50% { transform: rotate(15deg); } }
+          @keyframes dangleLeg2 { 0%, 100% { transform: rotate(25deg); } 50% { transform: rotate(30deg); } }
+          
+          /* Animación de la Bola de Alma Fatuo */
+          @keyframes ghostFloat { 0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.8; } 50% { transform: translate(-2px, -8px) scale(1.1); opacity: 1; filter: drop-shadow(0 0 5px #ea580c); } }
+
+          /* ⭐ ANIMACIÓN DE INVOCACIÓN (Susto) ⭐ */
+          @keyframes scarePose { 0% { transform: translateY(-15px) rotate(5deg) scale(1); } 100% { transform: translateY(-30px) rotate(-5deg) scale(1.15); filter: drop-shadow(0 0 8px #dc2626); } }
+          @keyframes armsUp { 0% { transform: rotate(15deg); } 100% { transform: rotate(-150deg); } }
+          
+          @keyframes shootGhost {
+            0% { transform: translate(0px, 0px) scale(1); opacity: 1; background: #ea580c; }
+            80% { transform: translate(15px, -240px) scale(4); opacity: 1; background: #dc2626; filter: blur(2px); }
+            100% { transform: translate(15px, -260px) scale(8); opacity: 0; filter: blur(10px); }
           }
 
-          /* ESTRUCTURA CSS BLINDADA DEL MONIGOTE */
+          /* ⭐ ESTRUCTURA CSS DEL FANTASMA ⭐ */
           .stickman-wrapper { position: relative; width: 20px; height: 42px; }
-          .sm-head { position: absolute; top: 0; left: 3px; width: 14px; height: 14px; border: 2.5px solid #000; border-radius: 50%; background: #fff; z-index: 10; }
-          .sm-body { position: absolute; top: 13px; left: 9px; width: 2.5px; height: 16px; background: #000; z-index: 5; }
-          .sm-arm-1 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 13px; background: #000; transform-origin: top center; z-index: 6; }
-          .sm-arm-2 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 13px; background: #000; transform-origin: top center; z-index: 4; }
-          .sm-leg-1 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #000; transform-origin: top center; z-index: 6; }
-          .sm-leg-2 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #000; transform-origin: top center; z-index: 4; }
-          .sm-ball { position: absolute; bottom: -2px; right: -12px; width: 10px; height: 10px; background: #000; border-radius: 50%; z-index: 10; }
+          /* Ahora el fantasma brilla un poco en la oscuridad */
+          .sm-head { position: absolute; top: 2px; left: 6px; width: 14px; height: 14px; border: 2.5px solid #fff; border-radius: 50%; background: #000; z-index: 10; box-shadow: 0 0 6px rgba(255,255,255,0.4); }
+          .sm-body { position: absolute; top: 13px; left: 9px; width: 2.5px; height: 16px; background: #fff; z-index: 5; box-shadow: 0 0 4px rgba(255,255,255,0.4); }
+          .sm-arm-1 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 14px; background: #fff; transform-origin: top center; z-index: 6; }
+          .sm-arm-2 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 14px; background: #fff; transform-origin: top center; z-index: 4; }
+          .sm-leg-1 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #fff; transform-origin: top center; z-index: 6; }
+          .sm-leg-2 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #fff; transform-origin: top center; z-index: 4; }
+          .sm-ball { position: absolute; bottom: -10px; right: -10px; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; z-index: 10; box-shadow: 0 0 8px #ea580c; }
 
-          /* ESTADOS CONDICIONALES DINÁMICOS */
-          .state-running { animation: bobbing 0.2s infinite ease-in-out; }
-          .state-running .sm-arm-1 { animation: runArm1 0.35s infinite ease-in-out; }
-          .state-running .sm-arm-2 { animation: runArm2 0.35s infinite ease-in-out; }
-          .state-running .sm-leg-1 { animation: runLeg1 0.35s infinite ease-in-out; }
-          .state-running .sm-leg-2 { animation: runLeg2 0.35s infinite ease-in-out; }
-          .state-running .sm-ball  { animation: ballBounce 0.25s infinite alternate ease-in-out; }
+          /* ESTADOS DEL FANTASMA PRINCIPAL */
+          .state-levitating { animation: ghostHover 1.5s infinite ease-in-out; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
+          .state-levitating .sm-body { transform: rotate(10deg); } /* Inclinado hacia adelante */
+          .state-levitating .sm-arm-1 { animation: dangleArm1 1.5s infinite alternate ease-in-out; }
+          .state-levitating .sm-arm-2 { animation: dangleArm2 1.5s infinite alternate ease-in-out; }
+          .state-levitating .sm-leg-1 { animation: dangleLeg1 1.5s infinite alternate ease-in-out; }
+          .state-levitating .sm-leg-2 { animation: dangleLeg2 1.5s infinite alternate ease-in-out; }
+          .state-levitating .sm-ball  { animation: ghostFloat 1s infinite alternate ease-in-out; }
 
-          /* Estado pateando */
-          .state-kicking .sm-leg-1 { animation: kickLeg 0.3s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-          .state-kicking .sm-ball  { animation: shootBall 0.3s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+          .state-summoning { animation: scarePose 0.3s forwards; }
+          .state-summoning .sm-head { transform: rotate(-10deg); box-shadow: inset 0 0 6px #dc2626, 0 0 10px #dc2626; }
+          .state-summoning .sm-arm-1 { animation: armsUp 0.3s forwards; }
+          .state-summoning .sm-arm-2 { animation: armsUp 0.3s forwards; }
+          .state-summoning .sm-leg-1 { transform: rotate(15deg); }
+          .state-summoning .sm-leg-2 { transform: rotate(25deg); }
+          .state-summoning .sm-ball  { animation: shootGhost 0.4s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94); }
 
-          /* Estado celebrando (brazos arriba) */
-          .state-celebrating .sm-arm-1 { animation: celebrateArms 0.4s forwards ease-out; }
-          .state-celebrating .sm-arm-2 { animation: celebrateArms 0.4s forwards ease-out; }
-          .state-celebrating .sm-ball  { opacity: 0; } /* El balón ya explotó arriba */
+          .state-faded { opacity: 0.3; filter: blur(2px); transform: translateY(-30px) rotate(-5deg) scale(1.15); }
+          .state-faded .sm-head { transform: rotate(-10deg); }
+          .state-faded .sm-arm-1 { transform: rotate(-150deg); }
+          .state-faded .sm-arm-2 { transform: rotate(-150deg); }
+          .state-faded .sm-leg-1 { transform: rotate(15deg); }
+          .state-faded .sm-leg-2 { transform: rotate(25deg); }
+          .state-faded .sm-ball  { opacity: 0; }
         `}
       </style>
 
+     
+
       {/* --- SUPERIOR --- */}
-      <div className="w-full flex justify-between items-center opacity-40 text-xs tracking-widest uppercase font-mono">
+      <div className="w-full flex justify-between items-center opacity-30 text-xs tracking-widest uppercase font-mono text-neutral-400 z-10 relative">
         <span>ChemaSport ER</span>
-        <span>Est. 2026</span>
+        <span>Maldición 2026</span>
       </div>
 
-      {/* --- CENTRO: LOGO TIPOGRÁFICO (OCULTO HASTA EL IMPACTO DEL BALÓN) --- */}
+      {/* --- CENTRO: LOGO TIPOGRÁFICO --- */}
       <div className="flex flex-col items-center justify-center my-auto w-full text-center min-h-[220px]">
-        
-        {/* CHEMA SPORT aparece justo cuando el balón golpea (cinePhase >= 2) */}
         {cinePhase >= 2 && (
-          <div className="animate-slam flex flex-col items-center">
-            <h1 className="text-black text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none">
+          <div className="animate-slam flex flex-col items-center relative z-20">
+            <h1 className="text-white text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">
               CHEMA
             </h1>
-            <h1 className="text-black text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none -mt-2 sm:-mt-4 md:-mt-6">
+            <h1 className="text-white text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none -mt-2 sm:-mt-4 md:-mt-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">
               SPORT
             </h1>
           </div>
         )}
-
-        {/* ER aparece un instante después (cinePhase >= 3) */}
         {cinePhase >= 3 && (
-          <div className="animate-slam mt-4 md:mt-6">
+          <div className="animate-glitch mt-4 md:mt-6 z-20">
             <div className="flex items-center justify-center gap-4">
-              <div className="h-[2px] w-8 md:w-16 bg-black"></div>
-              {/* 👇 AQUÍ ESTÁ EL AJUSTE: Pasó a text-xl sm:text-2xl md:text-4xl font-black 👇 */}
-              <span className="text-black font-black text-xl sm:text-2xl md:text-4xl tracking-[0.3em] uppercase">
+              <div className="h-[2px] w-8 md:w-16 bg-red-600 shadow-[0_0_8px_#dc2626]"></div>
+              <span className="text-red-500 font-black text-xl sm:text-2xl md:text-4xl tracking-[0.3em] uppercase drop-shadow-[0_0_5px_#dc2626]">
                 ER 
               </span>
-              <div className="h-[2px] w-8 md:w-16 bg-black"></div>
+              <div className="h-[2px] w-8 md:w-16 bg-red-600 shadow-[0_0_8px_#dc2626]"></div>
             </div>
           </div>
         )}
-
       </div>
 
-      {/* --- INFERIOR: BARRA DE PROGRESO CON MONIGOTE --- */}
+      {/* --- INFERIOR: BARRA DE PROGRESO Y FANTASMA --- */}
       <div className="w-full max-w-xl flex flex-col gap-2 relative pb-6">
         
-        {/* ⭐ AQUÍ ESTÁ EL TRUCO: agregamos scale(1.6) en el transform para que crezca un 60% más ⭐ */}
+        {/* EL FANTASMA PRINCIPAL */}
         <div 
-          className="absolute bottom-20 transition-all duration-75 ease-linear origin-bottom"
-          style={{ 
-            left: `${stickmanPosition}%`, 
-            transform: 'translateX(-50%) scale(2.6)' // 👈 Cambia 1.6 por 1.8 o 2.0 si lo quieres enorme
-          }}
+          className="absolute bottom-20 transition-all duration-75 ease-linear origin-bottom z-10"
+          style={{ left: `${stickmanPosition}%`, transform: 'translateX(-50%) scale(2.6)' }}
         >
-          {/* Monigote intacto por dentro */}
           <div className={`stickman-wrapper ${
-            cinePhase === 0 ? 'state-running' : 
-            cinePhase === 1 ? 'state-kicking' : 'state-celebrating'
+            cinePhase === 0 ? 'state-levitating' : 
+            cinePhase === 1 ? 'state-summoning' : 'state-faded'
           }`}>
             <div className="sm-head"></div>
             <div className="sm-body"></div>
@@ -176,20 +206,18 @@ const IntroLoader = ({ onFinished }) => {
             <div className="sm-arm-2"></div>
             <div className="sm-leg-1"></div>
             <div className="sm-leg-2"></div>
-            <div className="sm-ball"></div>
+            <div className="sm-ball"></div> {/* El alma / fuego fatuo que lo sigue */}
           </div>
         </div>
 
-        {/* Textos del indicador */}
-        <div className="flex justify-between items-end text-xs md:text-sm font-medium uppercase tracking-widest text-neutral-400">
-          <span>{cinePhase < 2 ? 'Preparando disparo...' : '¡Catálogo listo!'}</span>
-          <span className="font-mono text-black font-bold text-base">{progress}%</span>
+        <div className="flex justify-between items-end text-xs md:text-sm font-medium uppercase tracking-widest text-neutral-500 mt-8 z-20">
+          <span>{cinePhase < 2 ? 'Invocando espíritus...' : 'Maldición completada.'}</span>
+          <span className="font-mono text-orange-500 font-bold text-base drop-shadow-[0_0_3px_#ea580c]">{progress}%</span>
         </div>
 
-        {/* Línea de progreso */}
-        <div className="w-full h-[3px] bg-neutral-100 overflow-hidden relative rounded-full">
+        <div className="w-full h-[3px] bg-neutral-900 overflow-hidden relative rounded-full z-20">
           <div 
-            className="absolute top-0 left-0 bottom-0 bg-black transition-all duration-75 ease-linear rounded-full"
+            className="absolute top-0 left-0 bottom-0 transition-all duration-75 ease-linear rounded-full bg-gradient-to-r from-orange-600 to-red-600 shadow-[0_0_8px_#dc2626]"
             style={{ width: `${progress}%` }}
           ></div>
         </div>

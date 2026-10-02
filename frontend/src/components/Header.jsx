@@ -31,7 +31,6 @@ export default function Header({
   const scrollLeftPos = useRef(0);
   const hasDragged = useRef(false); 
   
-  // 🔥 NUEVO: Acumulador para evitar el bug de Safari/iPhone con decimales
   const accumulator = useRef(0); 
 
   useEffect(() => {
@@ -41,23 +40,21 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 LÓGICA DE AUTO-SCROLL BLINDADA PARA MÓVILES
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     let animationId;
-    const scrollSpeed = 0.6; // Velocidad de la valla
+    const scrollSpeed = 0.6;
 
     const autoScroll = () => {
       if (!isMouseDown.current) {
-        // SOLUCIÓN SAFARI: Acumulamos la velocidad decimal hasta tener al menos 1 píxel entero
         accumulator.current += scrollSpeed;
         
         if (accumulator.current >= 1) {
           const pixelsToMove = Math.floor(accumulator.current);
-          el.scrollLeft += pixelsToMove; // Movemos el scroll con números enteros
-          accumulator.current -= pixelsToMove; // Guardamos el decimal sobrante
+          el.scrollLeft += pixelsToMove;
+          accumulator.current -= pixelsToMove;
         }
 
         if (el.scrollLeft >= el.scrollWidth / 2) {
@@ -71,7 +68,6 @@ export default function Header({
     return () => cancelAnimationFrame(animationId);
   }, []); 
 
-  // 🔥 FUNCIONES DE ARRASTRE MANUAL UNIFICADAS
   const handleStart = (e) => {
     isMouseDown.current = true;
     hasDragged.current = false; 
@@ -141,6 +137,8 @@ export default function Header({
         isDark ? "bg-black" : "bg-white"
       }`}
     >
+    
+
       <div className="relative px-2 sm:px-6 py-2 sm:py-4">
         <div
           className={`absolute inset-0 transition-opacity duration-1000 ${
@@ -156,7 +154,7 @@ export default function Header({
 
           <h1
             className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-700 ${
-              isDark ? "text-white" : "text-black"
+              isDark ? "text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.6)]" : "text-black"
             }`}
           >
             ChemaSport ER
@@ -168,7 +166,7 @@ export default function Header({
                 onClick={() => setSidebarOpen(true)}
                 title={user ? "Menú de usuario" : "Iniciar sesión"}
                 className={`rounded-full p-3 shadow-lg transition-all duration-300 cursor-pointer ${
-                  isDark ? "bg-white text-black hover:bg-gray-200" : "bg-black text-white hover:bg-gray-800"
+                  isDark ? "bg-yellow-600 text-white hover:bg-yellow-700" : "bg-black text-white hover:bg-gray-800"
                 }`}
               >
                 {user ? (
@@ -185,7 +183,7 @@ export default function Header({
       </div>
 
       <div className={`w-full border-t transition-colors duration-1000 overflow-hidden ${
-        isDark ? "border-gray-800" : "border-gray-100/50"
+        isDark ? "border-yellow-900" : "border-gray-100/50"
       }`}>
         <div className="w-full relative">
           <nav 
@@ -214,8 +212,8 @@ export default function Header({
                   }}
                   className={`group relative flex items-center text-[11px] sm:text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-all duration-300 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 ${
                     isActive 
-                      ? (isDark ? "text-white" : "text-black") 
-                      : (isDark ? "text-gray-400 hover:text-white" : "text-gray-400 hover:text-black")
+                      ? (isDark ? "text-yellow-500 drop-shadow-[0_0_5px_#ca8a04]" : "text-yellow-600") 
+                      : (isDark ? "text-gray-400 hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500")
                   } cursor-pointer`}
                 >
                   {item.label}
@@ -223,8 +221,8 @@ export default function Header({
                   <span 
                     className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-300 ${
                       isActive 
-                        ? `w-full ${isDark ? "bg-white" : "bg-black"}` 
-                        : `w-0 group-hover:w-full ${isDark ? "bg-gray-600" : "bg-gray-200"}`
+                        ? `w-full ${isDark ? "bg-yellow-500 shadow-[0_0_8px_#ca8a04]" : "bg-yellow-600"}` 
+                        : `w-0 group-hover:w-full ${isDark ? "bg-yellow-900" : "bg-yellow-200"}`
                     }`}
                   />
                 </button>
@@ -240,14 +238,14 @@ export default function Header({
           onClick={() => setSidebarOpen(false)}
         >
           <div
-            className="fixed top-0 right-0 h-full w-80 sm:w-88 shadow-2xl animate-in slide-in-from-right duration-300"
+            className="fixed top-0 right-0 h-full w-80 sm:w-88 shadow-[0_0_30px_rgba(202,138,4,0.3)] animate-in slide-in-from-right duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative bg-white h-full flex flex-col justify-between p-6 sm:p-7 shadow-2xl text-black font-sans">
+            <div className="relative bg-white h-full flex flex-col justify-between p-6 sm:p-7 text-black font-sans">
               
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="absolute top-5 right-5 p-1 text-black hover:opacity-60 transition-opacity cursor-pointer z-10 bg-transparent border-0"
+                className="absolute top-5 right-5 p-1 text-black hover:text-yellow-600 transition-colors cursor-pointer z-10 bg-transparent border-0"
                 title="Cerrar"
               >
                 <FaTimes size={20} />
@@ -256,8 +254,8 @@ export default function Header({
               {user ? (
                 <div className="mt-8 flex-grow overflow-y-auto pr-1">
                   
-                  <div className="mb-6 p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 flex items-center gap-3.5 shadow-sm">
-                    <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center font-black text-sm shrink-0 shadow-md">
+                  <div className="mb-6 p-4 rounded-2xl bg-yellow-50 border border-yellow-200 flex items-center gap-3.5 shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-yellow-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(202,138,4,0.4)]">
                       {getInitials(user.firstName || user.username || user.name)}
                     </div>
                     <div className="overflow-hidden min-w-0 flex-1">
@@ -278,13 +276,13 @@ export default function Header({
                         navigate('/comisiones');
                         setSidebarOpen(false);
                       }}
-                      className="w-full bg-black hover:bg-zinc-800 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm"
+                      className="w-full bg-black hover:bg-yellow-600 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                     >
                       <div className="flex items-center gap-3">
-                        <FaPercentage size={15} className="text-zinc-400" />
+                        <FaPercentage size={15} className="text-yellow-500 group-hover:text-white transition-colors" />
                         <span>Comisiones</span>
                       </div>
-                      <FaChevronRight size={12} className="text-zinc-500" />
+                      <FaChevronRight size={12} className="text-yellow-700 group-hover:text-white transition-colors" />
                     </button>
 
                     {(isSuperUser || canSeeHistory || user?.roles?.includes("add")) && (
@@ -293,13 +291,13 @@ export default function Header({
                           setShowRegisterUserModal(true);
                           setSidebarOpen(false);
                         }}
-                        className="w-full bg-black hover:bg-zinc-800 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm"
+                        className="w-full bg-black hover:bg-yellow-600 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaUserPlus size={16} className="text-zinc-400" />
+                          <FaUserPlus size={16} className="text-yellow-500 group-hover:text-white transition-colors" />
                           <span>Agregar usuario</span>
                         </div>
-                        <FaChevronRight size={12} className="text-zinc-500" />
+                        <FaChevronRight size={12} className="text-yellow-700 group-hover:text-white transition-colors" />
                       </button>
                     )}
 
@@ -309,13 +307,13 @@ export default function Header({
                           setShowUserListModal(true);
                           setSidebarOpen(false);
                         }}
-                        className="w-full bg-black hover:bg-zinc-800 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm"
+                        className="w-full bg-black hover:bg-yellow-600 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaUsers size={16} className="text-zinc-400" />
+                          <FaUsers size={16} className="text-yellow-500 group-hover:text-white transition-colors" />
                           <span>Ver usuarios</span>
                         </div>
-                        <FaChevronRight size={12} className="text-zinc-500" />
+                        <FaChevronRight size={12} className="text-yellow-700 group-hover:text-white transition-colors" />
                       </button>
                     )}
 
@@ -325,13 +323,13 @@ export default function Header({
                           setShowHistoryModal(true);
                           setSidebarOpen(false);
                         }}
-                        className="w-full bg-black hover:bg-zinc-800 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm"
+                        className="w-full bg-black hover:bg-yellow-600 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-colors flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaHistory size={15} className="text-zinc-400" />
+                          <FaHistory size={15} className="text-yellow-500 group-hover:text-white transition-colors" />
                           <span>Historial</span>
                         </div>
-                        <FaChevronRight size={12} className="text-zinc-500" />
+                        <FaChevronRight size={12} className="text-yellow-700 group-hover:text-white transition-colors" />
                       </button>
                     )}
 
@@ -342,7 +340,7 @@ export default function Header({
                       onLogout();
                       setSidebarOpen(false);
                     }}
-                    className="w-full text-center mt-6 py-3.5 px-4 rounded-2xl font-black text-red-600 bg-red-50 hover:bg-red-100/80 border border-red-200 transition-colors uppercase text-xs tracking-widest cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full text-center mt-6 py-3.5 px-4 rounded-2xl font-black text-red-600 bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 transition-colors uppercase text-xs tracking-widest cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                   >
                     <FaSignOutAlt size={14} />
                     <span>Cerrar sesión</span>
@@ -350,7 +348,7 @@ export default function Header({
                 </div>
               ) : (
                 <div className="my-auto flex flex-col items-center text-center px-4 w-full">
-                  <div className="w-16 h-16 rounded-full bg-zinc-100 flex items-center justify-center text-black mb-5 shadow-sm border border-zinc-200/60">
+                  <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 mb-5 shadow-sm border border-yellow-200">
                     <FaUser size={24} />
                   </div>
                   <h3 className="text-3xl font-black text-black tracking-tight mb-1.5">
@@ -364,7 +362,7 @@ export default function Header({
                       onLoginClick();
                       setSidebarOpen(false);
                     }}
-                    className="w-full bg-black hover:bg-zinc-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg active:scale-95 cursor-pointer"
+                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_5px_15px_rgba(202,138,4,0.4)] active:scale-95 cursor-pointer"
                   >
                     INICIAR SESIÓN
                   </button>

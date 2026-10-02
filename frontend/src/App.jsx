@@ -632,17 +632,21 @@ function MainApp() {
                   </div>
                 </div>
 
+                {/* === PAGINACIÓN MEJORADA === */}
                 {pages > 1 && !loading && (
-                  <div className="mt-12 mb-12 flex flex-col items-center gap-3">
-                    <nav className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="mt-16 mb-20 flex flex-col items-center gap-3">
+                    <nav className="flex items-center justify-center gap-2 sm:gap-3">
+                      
+                      {/* Botón Anterior */}
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                        className="p-3 text-xs text-white bg-yellow-500 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
-                        <FaChevronLeft size={12} />
+                        <FaChevronLeft size={14} />
                       </button>
 
+                      {/* Números de página */}
                       {(() => {
                         const nums = buildPages(page, pages);
                         return nums.map((n, i) => {
@@ -652,13 +656,13 @@ function MainApp() {
 
                           return (
                             <span key={n} className="flex items-center gap-1.5">
-                              {showDots && <span className="px-1.5 text-zinc-400 font-bold text-xs">...</span>}
+                              {showDots && <span className="px-2 text-yellow-400 font-bold text-sm tracking-widest">...</span>}
                               <button
                                 onClick={() => setPage(n)}
-                                className={`min-w-[36px] h-9 px-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                                className={`min-w-[40px] h-10 px-3 text-sm font-black rounded-xl transition-all cursor-pointer border-2 ${
                                   isCurrent
-                                    ? 'bg-black text-white shadow-md scale-105'
-                                    : 'bg-gray-400 text-zinc-700 hover:bg-zinc-200'
+                                    ? 'bg-black text-yellow-500 border-black shadow-lg scale-[1.05]'
+                                    : 'bg-white text-yellow-500 border-gray-200 hover:border-black hover:text-black hover:bg-gray-50'
                                 }`}
                               >
                                 {n}
@@ -668,16 +672,23 @@ function MainApp() {
                         });
                       })()}
 
+                      {/* Botón Siguiente */}
                       <button
                         onClick={() => setPage((p) => Math.min(pages, p + 1))}
                         disabled={page === pages}
-                        className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                        className="p-3 text-xs text-white bg-yellow-500 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
-                        <FaChevronRight size={12} />
+                        <FaChevronRight size={14} />
                       </button>
                     </nav>
+                    
+                    {/* Indicador de página actual */}
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">
+                      Página {page} de {pages}
+                    </span>
                   </div>
                 )}
+                {/* ======================= */}
               </>
             } />
           </Routes>
