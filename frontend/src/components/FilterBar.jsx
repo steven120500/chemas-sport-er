@@ -84,14 +84,19 @@ export default function FilterBar({
   return (
     <>
       <div 
-        className={`sticky top-0 z-40 w-full transition-all duration-300 md:static md:bg-transparent md:shadow-none md:border-none ${
-          isScrolled ? "shadow-lg border-b border-yellow-900" : "bg-transparent shadow-sm border-b border-gray-800"
-        }`}
-        // 🔥 Forzamos fondo negro al hacer scroll para que no quede transparente
-        style={isScrolled ? { backgroundColor: 'white' } : {}}
+        // 🔥 Agregamos pb-6 y -mb-6 para crear una solapa invisible donde ocurrirá el desvanecimiento 🔥
+        className="sticky top-0 z-40 w-full transition-all duration-300 md:static pb-6 -mb-6"
+        style={isScrolled ? { 
+          // 🔥 Degradado perfecto: Negro sólido arriba, se desvanece a transparente en los últimos píxeles 🔥
+          background: 'linear-gradient(to bottom, rgba(5,5,5,1) 65%, rgba(5,5,5,0.8) 85%, rgba(5,5,5,0) 100%)',
+          pointerEvents: 'none' // Para que no bloquee clics en los productos que quedan bajo la sombra
+        } : { 
+          background: 'transparent',
+          pointerEvents: 'none'
+        }}
       >
         <div 
-          className={`w-full max-w-4xl mx-auto px-4 flex flex-row gap-3 items-center md:flex-col md:gap-4 transition-all duration-300 ${
+          className={`w-full max-w-4xl mx-auto px-4 flex flex-row gap-3 items-center md:flex-col md:gap-4 transition-all duration-300 pointer-events-auto ${
             isScrolled ? "py-2 md:pt-6 md:pb-0" : "py-3 md:pt-6 md:pb-0"
           }`}
         >
@@ -108,7 +113,7 @@ export default function FilterBar({
               placeholder="Buscar artículo..."
               value={localSearch}
               onChange={handleInputChange}
-              className="w-full pl-5 pr-4 py-3 bg-black border border-gray-800 rounded-full text-sm font-medium focus:outline-none focus:bg-black focus:border-yellow-500 focus:shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-all shadow-inner text-white placeholder-gray-500"
+              className="w-full pl-5 pr-4 py-3 bg-black border border-yellow-500 rounded-full text-sm font-medium focus:outline-none focus:bg-black focus:border-yellow-500 focus:shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-all text-white placeholder-gray-500"
             />
           </motion.div>
 
@@ -129,8 +134,6 @@ export default function FilterBar({
             >
               Filtrar
             </button>
-
-            
           </motion.div>
 
         </div>
@@ -153,31 +156,23 @@ export default function FilterBar({
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: "100%", opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              // 🔥 SOLUCIÓN DEFINITIVA A LA TRANSPARENCIA: style={{ backgroundColor: '#0a0a0a' }} 🔥
-              className="relative w-full sm:max-w-4xl border border-gray-800 rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-[0_0_40px_rgba(234,179,8,0.2)] p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto"
+              className="relative w-full sm:max-w-4xl border border-[#222] rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-[0_0_40px_rgba(234,179,8,0.15)] p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto"
               style={{ backgroundColor: '#0a0a0a' }}
             >
               
-              {/* 🔥 SANGRE CAYENDO DESDE EL TECHO DEL MENÚ 🔥 */}
-              <img 
-                src="/Sangre.png" 
-                alt="Mancha de sangre" 
-                className="absolute top-0 right-10 w-28 opacity-60 pointer-events-none z-0" 
-              />
 
               <div className="relative z-10">
-                <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-6">
-                  {/* Textos forzados a blanco para que se lean sobre el negro */}
+                <div className="flex items-center justify-between border-b border-[#222] pb-4 mb-6">
                   <h3 className="text-lg font-black text-white uppercase tracking-tight">Filtrar y ordenar</h3>
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="p-2.5 rounded-full bg-gray-900 text-gray-400 hover:text-yellow-500 hover:bg-gray-800 transition-colors cursor-pointer border border-gray-800"
+                    className="p-2.5 rounded-full bg-[#111] text-gray-400 hover:text-yellow-500 hover:bg-[#222] transition-colors cursor-pointer border border-[#222]"
                   >
                     <FaTimes size={16} />
                   </button>
                 </div>
 
-                <div className="flex flex-col divide-y divide-gray-800">
+                <div className="flex flex-col divide-y divide-[#222]">
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
@@ -206,7 +201,7 @@ export default function FilterBar({
                                 flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-none cursor-pointer border
                                 ${isActive 
                                   ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.3)]' 
-                                  : 'bg-black text-gray-400 border-gray-800 hover:border-yellow-900 hover:text-gray-200'}
+                                  : 'bg-black text-gray-400 border-[#222] hover:border-yellow-900 hover:text-gray-200'}
                               `}
                             >
                               <span>{cat.label}</span>
@@ -252,7 +247,7 @@ export default function FilterBar({
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
                                       ? "bg-yellow-500 text-black border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.3)]" 
-                                      : "bg-black text-gray-400 border-gray-800 hover:border-yellow-900 hover:text-gray-200"
+                                      : "bg-black text-gray-400 border-[#222] hover:border-yellow-900 hover:text-gray-200"
                                   }`}
                                 >
                                   {size}
@@ -281,7 +276,7 @@ export default function FilterBar({
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
                                       ? "bg-yellow-500 text-black border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.3)]" 
-                                      : "bg-black text-gray-400 border-gray-800 hover:border-yellow-900 hover:text-gray-200"
+                                      : "bg-black text-gray-400 border-[#222] hover:border-yellow-900 hover:text-gray-200"
                                   }`}
                                 >
                                   {label}
@@ -310,7 +305,7 @@ export default function FilterBar({
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
                                       ? "bg-yellow-500 text-black border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.3)]" 
-                                      : "bg-black text-gray-400 border-gray-800 hover:border-yellow-900 hover:text-gray-200"
+                                      : "bg-black text-gray-400 border-[#222] hover:border-yellow-900 hover:text-gray-200"
                                   }`}
                                 >
                                   {label}
@@ -326,7 +321,7 @@ export default function FilterBar({
                 </div>
               </div>
               
-              <div className="pt-4 border-t border-gray-800 mt-4 relative z-10">
+              <div className="pt-4 border-t border-[#222] mt-4 relative z-10">
                 <button
                   onClick={() => setIsOpen(false)}
                   className="w-full py-4 bg-yellow-500 text-black rounded-2xl font-black text-sm tracking-wider uppercase shadow-[0_0_15px_rgba(234,179,8,0.2)] hover:bg-yellow-400 transition-colors cursor-pointer"

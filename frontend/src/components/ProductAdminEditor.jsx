@@ -68,7 +68,6 @@ export default function ProductAdminEditor({
     );
   }, [product]);
 
-  // 🔥 CONFIGURACIÓN PARA LLAVEROS 🔥
   const isNino = editedType === "Niño";
   const isBalon = editedType === "Balón" || editedType === "Balones";
   const isLlavero = editedType === "Llaveros";
@@ -127,7 +126,6 @@ export default function ProductAdminEditor({
   };
 
   const checkHasDeduction = () => {
-    // 🔥 Si es llavero, saltamos la comprobación de venta para que no pida nombre ni genere comisión.
     if (isLlavero) return false;
 
     let decreased = false;
@@ -155,7 +153,6 @@ export default function ProductAdminEditor({
       const cleanStock = clean(editedStock);
       const cleanBodega = clean(editedBodega);
 
-      // Si es llavero y hubo rebaja, lo pasamos como ajuste directo
       const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
       const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
 
@@ -250,17 +247,21 @@ export default function ProductAdminEditor({
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start w-full">
+        {/* LADO IZQUIERDO: IMÁGENES */}
         <div className="w-full">
-          <div className="flex gap-4 justify-center flex-wrap bg-gray-50/50 p-8 rounded-3xl border border-gray-200">
+          <div 
+            className="flex gap-4 justify-center flex-wrap p-8 rounded-3xl border border-gray-800"
+            style={{ backgroundColor: '#111' }}
+          >
             {localImages.map((img, i) => {
               const thumbUrl = img?.src ? transformCloudinary(img.src, THUMB_MAX_W) : "";
               return (
                 <div key={i} className="relative group">
-                  <img src={thumbUrl || img.src} alt={`img-${i}`} className="h-40 w-40 object-cover rounded-2xl shadow-sm border border-gray-200" />
-                  <button onClick={() => handleImageRemove(i)} className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2.5 shadow-lg hover:bg-red-600 cursor-pointer">
+                  <img src={thumbUrl || img.src} alt={`img-${i}`} className="h-40 w-40 object-cover rounded-2xl shadow-sm border border-gray-800" />
+                  <button onClick={() => handleImageRemove(i)} className="absolute -top-3 -right-3 bg-red-600 text-white rounded-full p-2.5 shadow-lg hover:bg-red-700 cursor-pointer">
                     <FaTimes size={12} />
                   </button>
-                  <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl">
+                  <div className="absolute inset-x-0 bottom-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl">
                     <label className="text-white text-xs cursor-pointer font-bold tracking-wide">
                       CAMBIAR
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, i)} />
@@ -270,68 +271,139 @@ export default function ProductAdminEditor({
               );
             })}
             {localImages.length < 2 && (
-              <label className="h-40 w-40 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 rounded-2xl cursor-pointer hover:bg-gray-100">
-                <span className="text-3xl mb-1">+</span>
-                <span className="text-xs font-bold uppercase tracking-wider">Añadir Foto</span>
+              <label 
+                className="h-40 w-40 flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-2xl cursor-pointer hover:border-yellow-500 transition-colors"
+                style={{ backgroundColor: '#1a1a1a' }}
+              >
+                <span className="text-3xl mb-1 text-yellow-500">+</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-yellow-500">Añadir Foto</span>
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, localImages.length)} />
               </label>
             )}
           </div>
         </div>
 
+        {/* LADO DERECHO: FORMULARIO */}
         <div className="w-full flex flex-col">
           <div className="mb-8">
-            <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Tipo</label>
-            {/* 🔥 OPCIÓN LLAVEROS AGREGADA AQUÍ 🔥 */}
-            <select value={editedType} onChange={(e) => setEditedType(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl mb-4 bg-gray-50 font-semibold outline-none cursor-pointer">
-              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón", "Llaveros"].map((t) => <option key={t} value={t}>{t}</option>)}
+            <label className="block text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-widest ml-1">Tipo</label>
+            <select 
+              value={editedType} 
+              onChange={(e) => setEditedType(e.target.value)} 
+              className="w-full px-4 py-3 border border-gray-800 rounded-xl mb-4 font-semibold outline-none cursor-pointer focus:border-yellow-500 transition-colors"
+              style={{ backgroundColor: '#111', color: '#fff' }}
+            >
+              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón", "Llaveros"].map((t) => <option key={t} value={t} style={{ backgroundColor: '#111', color: '#fff' }}>{t}</option>)}
             </select>
 
-            <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Nombre</label>
-            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-black text-gray-900 outline-none mb-4" value={editedName} onChange={(e) => setEditedName(e.target.value)} />
+            <label className="block text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-widest ml-1">Nombre</label>
+            <input 
+              type="text" 
+              className="w-full border border-gray-800 rounded-xl px-4 py-3 text-lg font-black outline-none mb-4 focus:border-yellow-500 transition-colors" 
+              style={{ backgroundColor: '#111', color: '#fff' }}
+              value={editedName} 
+              onChange={(e) => setEditedName(e.target.value)} 
+            />
 
             <div className="flex gap-4">
               <div className="w-1/2">
-                <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Precio</label>
-                <input type="number" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold outline-none" value={editedPrice} onChange={(e) => setEditedPrice(e.target.value)} />
+                <label className="block text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-widest ml-1">Precio</label>
+                <input 
+                  type="number" 
+                  className="w-full border border-gray-800 rounded-xl px-4 py-3 text-lg font-bold outline-none focus:border-yellow-500 transition-colors" 
+                  style={{ backgroundColor: '#111', color: '#fff' }}
+                  value={editedPrice} 
+                  onChange={(e) => setEditedPrice(e.target.value)} 
+                />
               </div>
               <div className="w-1/2">
-                <label className="block text-xs text-green-700 mb-1.5 font-bold uppercase tracking-widest ml-1">Descuento</label>
-                <input type="number" className="w-full bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-lg font-bold text-green-700 outline-none" value={editedDiscountPrice} onChange={(e) => setEditedDiscountPrice(e.target.value)} />
+                <label className="block text-xs text-yellow-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Descuento</label>
+                <input 
+                  type="number" 
+                  className="w-full border border-yellow-500/50 rounded-xl px-4 py-3 text-lg font-bold outline-none focus:border-yellow-400 transition-colors" 
+                  style={{ backgroundColor: '#111', color: '#eab308' }}
+                  value={editedDiscountPrice} 
+                  onChange={(e) => setEditedDiscountPrice(e.target.value)} 
+                />
               </div>
             </div>
           </div>
 
+          {/* INVENTARIO */}
           <div className="mb-8">
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
-              <p className="text-center font-bold text-gray-400 uppercase tracking-widest mb-5 text-xs">Modificando Inventario</p>
+            <div 
+              className="rounded-3xl p-6 border border-gray-800 shadow-lg"
+              style={{ backgroundColor: '#111' }}
+            >
+              <p className="text-center font-bold text-yellow-500 uppercase tracking-widest mb-5 text-xs">Modificando Inventario</p>
               
               <div className="flex gap-2 mb-6">
-                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("stock")}>
+                <button 
+                  className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "stock" ? "border-blue-500 shadow-lg shadow-blue-900/30" : "border-gray-800 hover:border-blue-500/50"}`} 
+                  style={{ 
+                    backgroundColor: invMode === "stock" ? 'rgba(30, 58, 138, 0.3)' : '#1a1a1a', 
+                    color: invMode === "stock" ? '#60a5fa' : '#9ca3af' 
+                  }}
+                  onClick={() => setInvMode("stock")}
+                >
                   <FaBoxOpen size={20} className="mb-1" />
                   <span className="font-black text-[10px] uppercase tracking-wider">Bodega 1</span>
                 </button>
-                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "bodega" ? "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("bodega")}>
+                <button 
+                  className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "bodega" ? "border-purple-500 shadow-lg shadow-purple-900/30" : "border-gray-800 hover:border-purple-500/50"}`} 
+                  style={{ 
+                    backgroundColor: invMode === "bodega" ? 'rgba(88, 28, 135, 0.3)' : '#1a1a1a', 
+                    color: invMode === "bodega" ? '#c084fc' : '#9ca3af' 
+                  }}
+                  onClick={() => setInvMode("bodega")}
+                >
                   <FaWarehouse size={20} className="mb-1" />
                   <span className="font-black text-[10px] uppercase tracking-wider">Bodega 2</span>
                 </button>
-                <button className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "tienda" ? "bg-black border-black text-white shadow-lg" : "bg-white border-gray-200 text-gray-400"}`} onClick={() => setInvMode("tienda")}>
+                <button 
+                  className={`flex-1 flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${invMode === "tienda" ? "border-yellow-400 shadow-lg shadow-yellow-500/30" : "border-gray-800 hover:border-yellow-500/50"}`} 
+                  style={{ 
+                    backgroundColor: invMode === "tienda" ? '#eab308' : '#1a1a1a', 
+                    color: invMode === "tienda" ? '#000000' : '#9ca3af' 
+                  }}
+                  onClick={() => setInvMode("tienda")}
+                >
                   <FaStore size={20} className="mb-1" />
                   <span className="font-black text-[10px] uppercase tracking-wider">Tienda</span>
                 </button>
               </div>
 
-              <div className={`p-5 rounded-2xl transition-colors duration-300 ${invMode === "tienda" ? "bg-gray-50" : invMode === "stock" ? "bg-blue-50/50" : "bg-purple-50/50"}`}>
+              <div 
+                className="p-5 rounded-2xl border transition-colors duration-300"
+                style={{ 
+                  backgroundColor: invMode === "tienda" ? 'rgba(234, 179, 8, 0.05)' : invMode === "stock" ? 'rgba(59, 130, 246, 0.05)' : 'rgba(168, 85, 247, 0.05)',
+                  borderColor: invMode === "tienda" ? 'rgba(234, 179, 8, 0.2)' : invMode === "stock" ? 'rgba(59, 130, 246, 0.2)' : 'rgba(168, 85, 247, 0.2)'
+                }}
+              >
                 <div className="grid grid-cols-4 gap-x-3 gap-y-5">
                   {tallasVisibles.map((size) => {
                     const currentVal = invMode === "tienda" ? editedTienda[size] : invMode === "stock" ? editedStock[size] : editedBodega[size];
-                    const inputColors = invMode === "tienda" ? "focus:border-black text-black border-gray-200" : invMode === "stock" ? "focus:border-blue-500 text-blue-900 border-blue-200" : "focus:border-purple-500 text-purple-900 border-purple-200";
-                    const labelColors = invMode === "tienda" ? "text-gray-500" : invMode === "stock" ? "text-blue-600" : "text-purple-600";
+                    const inputFocusColor = invMode === "tienda" ? "focus:border-yellow-500" : invMode === "stock" ? "focus:border-blue-500" : "focus:border-purple-500";
+                    const labelColor = invMode === "tienda" ? "#eab308" : invMode === "stock" ? "#60a5fa" : "#c084fc";
 
                     return (
                       <div key={size} className="relative mt-2">
-                        <div className={`absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-transparent px-2 text-[10px] font-black tracking-widest uppercase z-10 ${labelColors}`}>{size}</div>
-                        <input type="number" min="0" className={`w-full h-12 pt-1 border bg-white rounded-2xl text-center font-black text-lg focus:outline-none transition-all ${inputColors} ${!currentVal ? 'opacity-60 shadow-sm' : 'shadow-md'}`} value={currentVal || 0} placeholder="0" onWheel={(e) => e.target.blur()} onChange={(e) => handleStockChange(size, e.target.value)} />
+                        <div 
+                          className="absolute -top-2.5 left-1/2 transform -translate-x-1/2 px-2 text-[10px] font-black tracking-widest uppercase z-10"
+                          style={{ backgroundColor: '#1a1a1a', color: labelColor }}
+                        >
+                          {size}
+                        </div>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          className={`w-full h-12 pt-1 border border-gray-700 rounded-2xl text-center font-black text-lg focus:outline-none transition-all ${inputFocusColor} ${!currentVal ? 'opacity-60 shadow-sm' : 'shadow-md shadow-black/50'}`} 
+                          style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                          value={currentVal || ""} 
+                          placeholder="0" 
+                          onWheel={(e) => e.target.blur()} 
+                          onChange={(e) => handleStockChange(size, e.target.value)} 
+                        />
                       </div>
                     );
                   })}
@@ -340,42 +412,45 @@ export default function ProductAdminEditor({
             </div>
           </div>
 
-          <div className="mb-8 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
+          <div 
+            className="mb-8 p-5 rounded-2xl border border-gray-800"
+            style={{ backgroundColor: '#111' }}
+          >
+            <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
             <div className="flex flex-col gap-4">
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input type="checkbox" checked={editedHidden} onChange={(e) => setEditedHidden(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${editedHidden ? 'bg-black' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedHidden ? 'transform translate-x-5' : ''}`}></div>
+                  <div className={`w-11 h-6 rounded-full transition-colors ${editedHidden ? 'bg-yellow-500' : 'bg-gray-700'}`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedHidden ? 'transform translate-x-5 bg-black' : ''}`}></div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-black text-gray-800">Ocultar Producto</span>
-                  <span className="text-xs text-gray-400 font-medium">Nadie podrá verlo en la tienda.</span>
+                  <span className="text-sm font-black text-gray-200">Ocultar Producto</span>
+                  <span className="text-xs text-gray-500 font-medium">Nadie podrá verlo en la tienda.</span>
                 </div>
               </label>
 
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input type="checkbox" checked={editedIsMundial2026} onChange={(e) => setEditedIsMundial2026(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${editedIsMundial2026 ? 'bg-black' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsMundial2026 ? 'transform translate-x-5' : ''}`}></div>
+                  <div className={`w-11 h-6 rounded-full transition-colors ${editedIsMundial2026 ? 'bg-yellow-500' : 'bg-gray-700'}`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsMundial2026 ? 'transform translate-x-5 bg-black' : ''}`}></div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-black text-gray-800">Torneo: Mundial 2026</span>
-                  <span className="text-xs text-gray-400 font-medium">Aparecerá en el filtro especial.</span>
+                  <span className="text-sm font-black text-gray-200">Torneo: Mundial 2026</span>
+                  <span className="text-xs text-gray-500 font-medium">Aparecerá en el filtro especial.</span>
                 </div>
               </label>
 
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">
                   <input type="checkbox" checked={editedIsTemporada2627} onChange={(e) => setEditedIsTemporada2627(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${editedIsTemporada2627 ? 'bg-red-600' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
+                  <div className={`w-11 h-6 rounded-full transition-colors ${editedIsTemporada2627 ? 'bg-yellow-500' : 'bg-gray-700'}`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsTemporada2627 ? 'transform translate-x-5 bg-black' : ''}`}></div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-black text-gray-800">Temporada 26-27</span>
-                  <span className="text-xs text-gray-400 font-medium">Muestra el sello circular vintage en la chema.</span>
+                  <span className="text-sm font-black text-gray-200">Temporada 26-27</span>
+                  <span className="text-xs text-gray-500 font-medium">Muestra el sello circular vintage en la chema.</span>
                 </div>
               </label>
             </div>
@@ -383,15 +458,15 @@ export default function ProductAdminEditor({
 
           <div className="mt-auto flex flex-col gap-3">
             <button
-              className="w-full bg-black hover:bg-gray-900 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform cursor-pointer"
+              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-transform cursor-pointer"
               onClick={() => {
                 const changes = getInventoryChanges();
                 toastHOT(
                   (t) => (
-                    <div className="text-center p-2">
-                      <p className="font-black text-gray-800 mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
+                    <div className="text-center p-2 rounded-xl border border-gray-800" style={{ backgroundColor: '#111' }}>
+                      <p className="font-black text-white mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
                       {changes.length > 0 ? (
-                        <div className="text-left bg-gray-50 border border-gray-200 p-3 rounded-xl mb-4 text-xs font-mono text-gray-700 max-h-32 overflow-y-auto shadow-inner">
+                        <div className="text-left border border-gray-800 p-3 rounded-xl mb-4 text-xs font-mono text-gray-300 max-h-32 overflow-y-auto shadow-inner" style={{ backgroundColor: '#1a1a1a' }}>
                           {changes.map((change, i) => (<div key={i} className="py-1">{change}</div>))}
                         </div>
                       ) : (
@@ -408,23 +483,28 @@ export default function ProductAdminEditor({
                               handleSave("", false); 
                             }
                           }} 
-                          className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer"
+                          className="bg-yellow-500 text-black px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-yellow-400 cursor-pointer shadow-md"
                         >
                           SÍ, GUARDAR
                         </button>
-                        <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer">
+                        <button onClick={() => toastHOT.dismiss(t.id)} className="text-gray-300 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-800 cursor-pointer border border-gray-700" style={{ backgroundColor: '#222' }}>
                           CANCELAR
                         </button>
                       </div>
                     </div>
-                  ), { duration: 8000 }
+                  ), { duration: 8000, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
                 );
               }}
               disabled={loading}
             >
               {loading ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
             </button>
-            <button className="w-full bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer" onClick={onCancel} disabled={loading}>
+            <button 
+              className="w-full bg-transparent border-2 border-gray-800 text-gray-400 hover:text-white py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer transition-colors" 
+              style={{ hover: { backgroundColor: '#111' } }}
+              onClick={onCancel} 
+              disabled={loading}
+            >
               CANCELAR EDICIÓN
             </button>
           </div>
@@ -433,20 +513,24 @@ export default function ProductAdminEditor({
 
       {/* 🔥 MODAL MULTI-PASO DE VENTA */}
       {showBuyerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col items-center text-center relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div 
+            className="rounded-3xl p-6 md:p-8 max-w-md w-full shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-gray-800 flex flex-col items-center text-center relative"
+            style={{ backgroundColor: '#111' }}
+          >
             
             {!confirmCommission ? (
               <>
                 {/* PASO 1: OBTENER EL NOMBRE */}
-                <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-lg text-2xl">👤</div>
-                <h3 className="text-xl font-black text-gray-900 mb-1">¿Quién compró esta camiseta?</h3>
-                <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
+                <div className="w-14 h-14 rounded-2xl bg-yellow-500 text-black flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(234,179,8,0.4)] text-2xl">👤</div>
+                <h3 className="text-xl font-black text-white mb-1">¿Quién compró esta camiseta?</h3>
+                <p className="text-xs text-gray-400 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
                 <div className="w-full relative mb-6">
                   <input 
                     type="text" 
                     placeholder="Ej: Emanuel Espinoza" 
-                    className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-800 text-center text-sm focus:border-black focus:outline-none shadow-inner bg-gray-50/50" 
+                    className="w-full px-4 py-3.5 border border-gray-700 rounded-2xl font-bold text-white text-center text-sm focus:border-yellow-500 focus:outline-none shadow-inner transition-colors" 
+                    style={{ backgroundColor: '#0a0a0a' }}
                     value={buyerName} 
                     onChange={(e) => setBuyerName(e.target.value)} 
                     autoFocus 
@@ -458,13 +542,13 @@ export default function ProductAdminEditor({
                     type="button" 
                     onClick={() => { 
                       if (!buyerName.trim()) {
-                        toast.error("Debes ingresar el nombre del cliente para registrar la venta.");
+                        toast.error("Debes ingresar el nombre del cliente para registrar la venta.", { style: { background: '#111', color: '#fff' }});
                         return;
                       }
                       setConfirmCommission(true); 
                     }} 
                     disabled={loading} 
-                    className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                    className="flex-1 bg-yellow-500 text-black font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-[0_0_15px_rgba(234,179,8,0.2)] hover:bg-yellow-400 transition-colors cursor-pointer"
                   >
                     REGISTRAR VENTA
                   </button>
@@ -477,7 +561,8 @@ export default function ProductAdminEditor({
                       setBuyerName(""); 
                     }} 
                     disabled={loading} 
-                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
+                    className="flex-1 text-gray-300 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-800 transition-colors cursor-pointer border border-gray-700"
+                    style={{ backgroundColor: '#222' }}
                   >
                     SOLO ACTUALIZAR
                   </button>
@@ -487,8 +572,8 @@ export default function ProductAdminEditor({
               <>
                 {/* PASO 2: CONFIRMAR LA COMISIÓN */}
                
-                <h3 className="text-xl font-black text-gray-900 mb-2">Confirmar Comisión</h3>
-                <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">¿Seguro que hiciste una venta o un cambio? </p>
+                <h3 className="text-xl font-black text-white mb-2">Confirmar Comisión</h3>
+                <p className="text-sm text-gray-400 mb-6 font-medium leading-relaxed">¿Seguro que hiciste una venta o un cambio? </p>
                 
                 <div className="flex gap-3 w-full">
                   <button 
@@ -500,7 +585,7 @@ export default function ProductAdminEditor({
                       setBuyerName("");     
                     }} 
                     disabled={loading} 
-                    className="flex-1 bg-green-600 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-lg hover:bg-green-700 transition-colors cursor-pointer"
+                    className="flex-1 bg-green-500 text-black font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:bg-green-400 transition-colors cursor-pointer"
                   >
                     SÍ
                   </button>
@@ -509,7 +594,8 @@ export default function ProductAdminEditor({
                     type="button" 
                     onClick={() => setConfirmCommission(false)} 
                     disabled={loading} 
-                    className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
+                    className="flex-1 text-gray-300 font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-800 transition-colors cursor-pointer border border-gray-700"
+                    style={{ backgroundColor: '#222' }}
                   >
                     NO, VOLVER
                   </button>

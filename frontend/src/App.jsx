@@ -78,8 +78,8 @@ function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, us
   }, [id, products]);
 
   if (loadingProducts || isFetchingId) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+      <div className="w-10 h-10 border-4 border-[#333] border-t-yellow-500 rounded-full animate-spin"></div>
     </div>
   );
 
@@ -397,7 +397,11 @@ function MainApp() {
         {showIntro && <WorldCupIntro onFinished={() => setShowIntro(false)} />}
       </AnimatePresence>
 
-      <div className={showIntro ? "hidden" : "flex flex-col min-h-screen bg-white"}>
+      {/* 🔥 FONDO CASI NEGRO MINIMALISTA PREMIUM (Tonos oscuros directos en HEX) 🔥 */}
+      <div 
+        className={showIntro ? "hidden" : "flex flex-col min-h-screen text-white"}
+        style={{ background: 'linear-gradient(to bottom, #050505, #121212)' }}
+      >
 
         {/* ================= MODALES GLOBALES ================= */}
         {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
@@ -489,7 +493,7 @@ function MainApp() {
 
                 {canAdd && !anyModalOpen && (
                 <button
-                    className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-lg hover:bg-gray-800 transition z-50"
+                    className="fixed bottom-6 right-6 bg-yellow-500 text-black p-4 rounded-full shadow-lg hover:bg-yellow-400 transition z-50"
                     onClick={() => setShowAddModal(true)}
                     title="Añadir producto"
                 >
@@ -511,11 +515,11 @@ function MainApp() {
                   }
                 }} />
 
-                {/* 🔥 VISTA DE INVENTARIO CON LOS 4 BOTONES NUEVOS 🔥 */}
+                {/* 🔥 VISTA DE INVENTARIO (Ajustada para fondo oscuro) 🔥 */}
                 {isSuperUser && (
                 <div className="w-full max-w-7xl mx-auto px-4 mt-6">
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-gray-50 border border-gray-200 p-4 rounded-2xl shadow-sm">
-                    <span className="text-sm font-black text-black uppercase tracking-tight mr-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-black/40 border border-white/10 p-4 rounded-2xl shadow-sm">
+                    <span className="text-sm font-black text-gray-200 uppercase tracking-tight mr-2">
                         Vista de Inventario:
                     </span>
                     <div className="flex gap-2 flex-wrap justify-center">
@@ -523,8 +527,8 @@ function MainApp() {
                         onClick={() => { setStoreView('todos'); setLoading(true); setPage(1); }}
                         className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'todos' 
-                            ? 'bg-black text-white border-black shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                            ? 'bg-yellow-500 text-black border-yellow-500 shadow-md' 
+                            : 'bg-transparent text-gray-400 border-gray-700 hover:border-gray-300 hover:text-gray-200'
                         }`}
                         >
                         Todas
@@ -533,8 +537,8 @@ function MainApp() {
                         onClick={() => { setStoreView('tienda'); setLoading(true); setPage(1); }}
                         className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'tienda' 
-                            ? 'bg-black text-white border-black shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black'
+                            ? 'bg-yellow-500 text-black border-yellow-500 shadow-md' 
+                            : 'bg-transparent text-gray-400 border-gray-700 hover:border-gray-300 hover:text-gray-200'
                         }`}
                         >
                         Tienda
@@ -544,7 +548,7 @@ function MainApp() {
                         className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'bodega1' 
                             ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-600 hover:text-blue-600'
+                            : 'bg-transparent text-gray-400 border-gray-700 hover:border-blue-500 hover:text-blue-500'
                         }`}
                         >
                         Bodega 1
@@ -554,7 +558,7 @@ function MainApp() {
                         className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border-2 ${
                             storeView === 'bodega2' 
                             ? 'bg-purple-600 text-white border-purple-600 shadow-md' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-600 hover:text-purple-600'
+                            : 'bg-transparent text-gray-400 border-gray-700 hover:border-purple-500 hover:text-purple-500'
                         }`}
                         >
                         Bodega 2
@@ -591,8 +595,8 @@ function MainApp() {
 
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
                   <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
-                      <span className="text-sm sm:text-base text-gray-600 font-medium">¿Querés saber tu talla?</span>
-                      <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
+                      <span className="text-sm sm:text-base text-gray-300 font-medium">¿Querés saber tu talla?</span>
+                      <button onClick={() => setShowMedidas(true)} className="bg-yellow-500 text-black px-5 py-2 rounded-full hover:bg-yellow-400 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
                       VER MEDIDAS
                       </button>
                   </div>
@@ -604,10 +608,10 @@ function MainApp() {
                   <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {loading ? (
                     Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-4 rounded-3xl border border-gray-100">
-                        <div className="w-full h-[350px] bg-gray-200 rounded-2xl"></div>
-                        <div className="w-3/4 h-5 bg-gray-200 rounded-full mt-2"></div>
-                        <div className="w-1/2 h-5 bg-gray-200 rounded-full"></div>
+                      <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-[#111] p-4 rounded-3xl border border-[#222]">
+                        <div className="w-full h-[350px] bg-[#222] rounded-2xl"></div>
+                        <div className="w-3/4 h-5 bg-[#222] rounded-full mt-2"></div>
+                        <div className="w-1/2 h-5 bg-[#222] rounded-full"></div>
                       </div>
                     ))
                   ) : filteredProducts.length > 0 ? (
@@ -621,7 +625,7 @@ function MainApp() {
                       />
                       ))
                   ) : (
-                      <div className="col-span-full text-center text-gray-600 font-semibold py-10 bg-gray-100 rounded-md">
+                      <div className="col-span-full text-center text-gray-400 font-semibold py-10 bg-[#111] rounded-2xl border border-[#222]">
                       {filterSizes.length > 0
                           ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
                           : storeView !== 'todos'
@@ -632,7 +636,7 @@ function MainApp() {
                   </div>
                 </div>
 
-                {/* === PAGINACIÓN MEJORADA === */}
+                {/* === PAGINACIÓN MEJORADA (Ajustada para fondo oscuro) === */}
                 {pages > 1 && !loading && (
                   <div className="mt-16 mb-20 flex flex-col items-center gap-3">
                     <nav className="flex items-center justify-center gap-2 sm:gap-3">
@@ -641,7 +645,7 @@ function MainApp() {
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="p-3 text-xs text-white bg-yellow-500 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="p-3 text-xs text-black bg-yellow-500 rounded-xl hover:bg-yellow-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
                         <FaChevronLeft size={14} />
                       </button>
@@ -656,13 +660,13 @@ function MainApp() {
 
                           return (
                             <span key={n} className="flex items-center gap-1.5">
-                              {showDots && <span className="px-2 text-yellow-400 font-bold text-sm tracking-widest">...</span>}
+                              {showDots && <span className="px-2 text-yellow-500 font-bold text-sm tracking-widest">...</span>}
                               <button
                                 onClick={() => setPage(n)}
                                 className={`min-w-[40px] h-10 px-3 text-sm font-black rounded-xl transition-all cursor-pointer border-2 ${
                                   isCurrent
-                                    ? 'bg-black text-yellow-500 border-black shadow-lg scale-[1.05]'
-                                    : 'bg-white text-yellow-500 border-gray-200 hover:border-black hover:text-black hover:bg-gray-50'
+                                    ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg scale-[1.05]'
+                                    : 'bg-[#111] text-yellow-500 border-[#333] hover:border-yellow-500 hover:bg-[#222]'
                                 }`}
                               >
                                 {n}
@@ -676,14 +680,14 @@ function MainApp() {
                       <button
                         onClick={() => setPage((p) => Math.min(pages, p + 1))}
                         disabled={page === pages}
-                        className="p-3 text-xs text-white bg-yellow-500 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="p-3 text-xs text-black bg-yellow-500 rounded-xl hover:bg-yellow-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
                         <FaChevronRight size={14} />
                       </button>
                     </nav>
                     
                     {/* Indicador de página actual */}
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">
                       Página {page} de {pages}
                     </span>
                   </div>

@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 const IntroLoader = ({ onFinished }) => {
   const [visible, setVisible] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
-  const [progress, setProgress] = useState(0);
+  // Usaremos decimales para que el cálculo visual sea sub-píxel perfecto
+  const [progress, setProgress] = useState(0); 
   
   // 🔥 FASES FANTASMA: 0=Levitando, 1=Invocación (Brazos arriba), 2=Impacto CHEMA, 3=Impacto ER
   const [cinePhase, setCinePhase] = useState(0);
@@ -11,17 +12,23 @@ const IntroLoader = ({ onFinished }) => {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
 
-    // 1. Barra de progreso (0 a 100% en ~3 segundos)
-    const intervalProgress = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(intervalProgress);
-          return 100;
-        }
-        const increment = Math.random() > 0.5 ? 2 : 1;
-        return Math.min(prev + increment, 100);
-      });
-    }, 28);
+    // 1. Barra de progreso sincronizada a los fotogramas del dispositivo (60/120fps)
+    let animationFrameId;
+    const startTime = performance.now();
+    const duration = 2000; // 2 segundos exactos para llegar a 100%
+
+    const updateProgress = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const currentProgress = Math.min((elapsed / duration) * 100, 100);
+      
+      setProgress(currentProgress);
+
+      if (currentProgress < 100) {
+        animationFrameId = requestAnimationFrame(updateProgress);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(updateProgress);
     
     // 2. TIMELINE PARANORMAL
     const t1 = setTimeout(() => setCinePhase(1), 1800); // Se detiene y levanta los brazos
@@ -38,7 +45,7 @@ const IntroLoader = ({ onFinished }) => {
 
     return () => {
       document.body.style.overflow = 'auto';
-      clearInterval(intervalProgress);
+      cancelAnimationFrame(animationFrameId);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
@@ -55,7 +62,6 @@ const IntroLoader = ({ onFinished }) => {
 
   return (
     <div 
-      // 🔥 Se cambió a bg-black puro para asegurar que el fondo NUNCA se vea blanco 🔥
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between px-6 py-12 transition-opacity duration-[700ms] ease-out ${
         fadeIntro ? 'opacity-0 pointer-events-none' : 'opacity-100'
       } bg-black overflow-hidden`} 
@@ -155,8 +161,6 @@ const IntroLoader = ({ onFinished }) => {
         `}
       </style>
 
-     
-
       {/* --- SUPERIOR --- */}
       <div className="w-full flex justify-between items-center opacity-30 text-xs tracking-widest uppercase font-mono text-neutral-400 z-10 relative">
         <span>ChemaSport ER</span>
@@ -193,7 +197,7 @@ const IntroLoader = ({ onFinished }) => {
         
         {/* EL FANTASMA PRINCIPAL */}
         <div 
-          className="absolute bottom-20 transition-all duration-75 ease-linear origin-bottom z-10"
+          className="absolute bottom-20 origin-bottom z-10 will-change-[left,transform]"
           style={{ left: `${stickmanPosition}%`, transform: 'translateX(-50%) scale(2.6)' }}
         >
           <div className={`stickman-wrapper ${
@@ -212,12 +216,12 @@ const IntroLoader = ({ onFinished }) => {
 
         <div className="flex justify-between items-end text-xs md:text-sm font-medium uppercase tracking-widest text-neutral-500 mt-8 z-20">
           <span>{cinePhase < 2 ? 'Invocando espíritus...' : 'Maldición completada.'}</span>
-          <span className="font-mono text-orange-500 font-bold text-base drop-shadow-[0_0_3px_#ea580c]">{progress}%</span>
+          <span className="font-mono text-orange-500 font-bold text-base drop-shadow-[0_0_3px_#ea580c]">{Math.floor(progress)}%</span>
         </div>
 
         <div className="w-full h-[3px] bg-neutral-900 overflow-hidden relative rounded-full z-20">
           <div 
-            className="absolute top-0 left-0 bottom-0 transition-all duration-75 ease-linear rounded-full bg-gradient-to-r from-orange-600 to-red-600 shadow-[0_0_8px_#dc2626]"
+            className="absolute top-0 left-0 bottom-0 rounded-full bg-gradient-to-r from-orange-600 to-red-600 shadow-[0_0_8px_#dc2626] will-change-[width]"
             style={{ width: `${progress}%` }}
           ></div>
         </div>

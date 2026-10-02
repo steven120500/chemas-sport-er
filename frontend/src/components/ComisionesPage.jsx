@@ -487,7 +487,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+    <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
           
         <button

@@ -83,7 +83,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           <div className="flex flex-col gap-3 mt-8">
           <button
             type="submit"
-            className="w-full bg-black hover:bg-gray-900 text-white py-4 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
+            className="w-full bg-black hover:bg-gray-900 text-black py-4 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5"
           >
             {isRegister ? 'Registrarse' : 'Iniciar Sesión'}
           </button>

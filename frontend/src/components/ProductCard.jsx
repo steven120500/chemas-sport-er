@@ -91,20 +91,20 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onClick(product)}
-      // 🔥 TRUCO: style={{ backgroundColor: '#0a0a0a' }} fuerza el color sin depender de Tailwind 🔥
-      style={{ backgroundColor: '#0a0a0a' }}
+      // 🔥 TRUCO: Degradado lineal oscuro para dar relieve y destacar del fondo principal 🔥
+      style={{ background: 'linear-gradient(135deg, #1e1e1e 0%, #0a0a0a 100%)' }}
       className={`group/card relative w-full rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-gray-800 hover:border-yellow-500 p-0 transition-all duration-300 cursor-pointer flex flex-col justify-between font-sans shadow-lg hover:shadow-2xl hover:shadow-yellow-500/30 overflow-hidden
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
       `}
     >
-   {/* 🔥 TELARAÑA EN LA ESQUINA DE LA TARJETA MÁS GRANDE 🔥 */}
-<img 
-  src="/Araña.png" 
-  alt="Telaraña decorativa" 
-  className="absolute top-0 left-0 w-40 sm:w-60 opacity-[0.15] invert pointer-events-none z-0 transition-transform duration-700 group-hover/card:scale-105 origin-top-left" 
-/>
+      {/* 🔥 TELARAÑA EN LA ESQUINA DE LA TARJETA MÁS GRANDE 🔥 */}
+      <img 
+        src="/Araña.png" 
+        alt="Telaraña decorativa" 
+        className="absolute top-0 left-0 w-40 sm:w-60 opacity-[0.15] invert pointer-events-none z-0 transition-transform duration-700 group-hover/card:scale-105 origin-top-left" 
+      />
 
-     {isNuevo && !isTotalAgotado && (
+      {isNuevo && !isTotalAgotado && (
         <div className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 z-40 w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
           <svg className="w-full h-full text-yellow-500" viewBox="0 0 100 100" fill="currentColor">
             <polygon points="50,0 58,15 74,8 77,24 94,22 91,38 100,48 91,59 95,76 78,77 74,93 58,85 50,100 42,85 26,93 22,77 5,76 9,59 0,48 9,38 6,22 23,24 26,8 42,15" />
@@ -242,7 +242,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
         {/* --- COLUMNA DERECHA: IMÁGENES --- */}
         <div className="col-span-6 relative w-full h-full z-10">
-          <div className="relative w-full h-full overflow-hidden" style={{ backgroundColor: '#111111' }}>
+          {/* 🔥 Fondo de la imagen oscurecido para integrar mejor con el degradado de la tarjeta 🔥 */}
+          <div className="relative w-full h-full overflow-hidden" style={{ backgroundColor: '#0f0f0f' }}>
             {(() => {
               const screenWidth = window.innerWidth;
               let H = 1000;

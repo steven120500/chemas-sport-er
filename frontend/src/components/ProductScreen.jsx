@@ -177,11 +177,15 @@ export default function ProductScreen({
   const whatsappUrl = `https://wa.me/50660369857?text=${encodeURIComponent(whatsappMsg)}`;
 
   return (
-    <div className="full bg-white pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up">
+    <div 
+      className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-white"
+      // 🔥 Fondo transparente para que el degradado del App.jsx fluya directo al Footer sin rayas 🔥
+      style={{ backgroundColor: 'transparent' }}
+    >
       <div className="max-w-6xl mx-auto">
         <button
           onClick={() => { if (isEditing) unlockProduct(); onClose(); }}
-          className="flex items-center gap-2 text-gray-500 bg-white hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs cursor-pointer"
+          className="flex items-center gap-2 text-gray-400 bg-transparent hover:text-yellow-500 transition-colors mb-8 font-bold uppercase tracking-widest text-xs cursor-pointer"
         >
           <FaChevronLeft size={14} /> Volver al catálogo
         </button>
@@ -201,17 +205,17 @@ export default function ProductScreen({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
             {/* LADO IZQUIERDO: GALERÍA DE VISUALIZACIÓN */}
             <div className="w-full">
-              <div className="relative flex items-center justify-center bg-gray-50/50 rounded-3xl p-6 border border-gray-100">
+              <div className="relative flex items-center justify-center bg-[#0a0a0a] rounded-3xl p-6 border border-[#222] shadow-[0_0_30px_rgba(234,179,8,0.05)]">
                 {displayUrl ? (
                   <img src={displayUrl} alt={viewProduct?.name || "Producto"} className="w-full max-h-[600px] object-contain drop-shadow-2xl rounded-2xl" loading="lazy" />
                 ) : (
-                  <div className="h-[400px] w-full grid place-items-center text-gray-400 bg-gray-100 rounded-3xl"><span className="font-semibold">Sin imagen</span></div>
+                  <div className="h-[400px] w-full grid place-items-center text-gray-500 bg-[#111] rounded-3xl"><span className="font-semibold">Sin imagen</span></div>
                 )}
                 {hasMany && (
                   <>
-                    <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-yellow-500 text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-md"><FaChevronLeft size={20} /></button>
-                    <button onClick={() => setIdx((i) => (i + 1) % galleryFromProduct.length)} className="absolute right-4 z-10 bg-yellow-500 text-white p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-md"><FaChevronRight size={20} /></button>
-                    <div className="absolute bottom-6 bg-yellow-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">{idx + 1} / {galleryFromProduct.length}</div>
+                    <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-yellow-500 text-black p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.4)] border border-yellow-400"><FaChevronLeft size={20} /></button>
+                    <button onClick={() => setIdx((i) => (i + 1) % galleryFromProduct.length)} className="absolute right-4 z-10 bg-yellow-500 text-black p-4 rounded-full transition-all hover:scale-105 cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.4)] border border-yellow-400"><FaChevronRight size={20} /></button>
+                    <div className="absolute bottom-6 bg-[#111] border border-[#333] text-yellow-500 text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">{idx + 1} / {galleryFromProduct.length}</div>
                   </>
                 )}
               </div>
@@ -220,18 +224,18 @@ export default function ProductScreen({
             {/* LADO DERECHO: INFO Y TALLAS / UNIDADES */}
             <div className="w-full flex flex-col">
               <div className="mb-8">
-                <span className="inline-block bg-yellow-500 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm">{viewProduct?.type}</span>
+                <span className="inline-block bg-yellow-500 text-black px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm border border-yellow-400">{viewProduct?.type}</span>
                 <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-yellow-500 leading-tight tracking-tight mb-6">{viewProduct?.name}</h1>
                 {hasDiscount ? (
                   <div className="flex flex-col items-start mb-6">
-                      <span className="bg-black text-white text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest">Oferta</span>
+                      <span className="bg-[#111] border border-[#333] text-yellow-500 text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest shadow-sm">Oferta</span>
                       <div className="flex items-end gap-4">
-                        <p className="line-through text-gray-400 text-2xl font-medium pb-1">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
-                        <p className="text-5xl font-black text-yellow-500 tracking-tight">₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}</p>
+                        <p className="line-through text-gray-500 text-2xl font-medium pb-1">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
+                        <p className="text-5xl font-black text-yellow-500 tracking-tight drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]">₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}</p>
                       </div>
                   </div>
                 ) : (
-                  <p className="text-5xl font-black text-yellow-500 tracking-tight mb-6">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
+                  <p className="text-5xl font-black text-yellow-500 tracking-tight mb-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
                 )}
               </div>
 
@@ -254,23 +258,23 @@ export default function ProductScreen({
                             }}
                             className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 transition-all select-none overflow-hidden 
                               ${isAgotado 
-                                  ? 'border-gray-100 bg-gray-50/50 opacity-60 cursor-not-allowed' 
+                                  ? 'border-[#222] bg-[#111] opacity-60 cursor-not-allowed' 
                                   : isSelected
-                                      ? 'border-yellow-500 bg-yellow-500 shadow-lg scale-[1.02] cursor-pointer'
+                                      ? 'border-yellow-500 bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)] scale-[1.02] cursor-pointer'
                                       : isBodega2 
-                                          ? 'border-purple-200 bg-purple-50/30 shadow-sm cursor-pointer hover:border-purple-400' 
-                                          : 'border-gray-200 bg-white shadow-sm cursor-pointer hover:border-gray-300'
+                                          ? 'border-purple-900/50 bg-purple-900/20 shadow-sm cursor-pointer hover:border-purple-500' 
+                                          : 'border-[#333] bg-[#0a0a0a] shadow-sm cursor-pointer hover:border-yellow-500'
                               }`}
                           >
-                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : isBodega2 ? 'text-purple-900' : 'text-gray-900'}`}>
+                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-600' : isSelected ? 'text-black' : isBodega2 ? 'text-purple-400' : 'text-gray-300'}`}>
                                 {size}
                               </span>
                               {canEdit && (
-                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-300' : isSelected ? 'text-white' : 'text-gray-500'}`}>
+                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-600' : isSelected ? 'text-black/70' : 'text-gray-500'}`}>
                                   {isAgotado ? 'Agotado' : `${total} disp.`}
                                 </span>
                               )}
-                              {isAgotado && <svg className="absolute inset-0 w-full h-full text-gray-300/80" preserveAspectRatio="none" viewBox="0 0 100 100"><line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>}
+                              {isAgotado && <svg className="absolute inset-0 w-full h-full text-[#333]" preserveAspectRatio="none" viewBox="0 0 100 100"><line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>}
                           </div>
                       );
                   })}
@@ -280,19 +284,19 @@ export default function ProductScreen({
               <div className="mt-auto">
                 <div className="flex flex-col gap-3">
                   {canEdit && (
-                    <button onClick={handleEditClick} disabled={loading} className="w-full bg-black hover:bg-gray-900 text-white flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg cursor-pointer disabled:opacity-50">
+                    <button onClick={handleEditClick} disabled={loading} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-[0_5px_15px_rgba(234,179,8,0.3)] cursor-pointer disabled:opacity-50">
                       {loading ? "PROCESANDO..." : "MODIFICAR PRODUCTO"}
                     </button>
                   )}
                   {canDelete && (
                     <button
-                      className="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer"
+                      className="w-full bg-transparent border border-[#333] text-red-500 hover:bg-red-950/20 hover:border-red-900/50 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer transition-colors"
                       disabled={loading}
                       onClick={() => {
                         toastHOT(
                           (t) => (
-                            <div className="text-center p-2">
-                              <p className="font-black text-gray-800 mb-4 text-base">¿Eliminar este producto?</p>
+                            <div className="text-center p-2 bg-[#111] rounded-xl border border-[#333]">
+                              <p className="font-black text-gray-200 mb-4 text-base">¿Eliminar este producto?</p>
                               <div className="flex gap-3 justify-center">
                                 <button
                                   onClick={async () => {
@@ -305,7 +309,9 @@ export default function ProductScreen({
                                       });
                                       if (!res.ok) throw new Error("Error en servidor al eliminar");
                                       
-                                      toastHOT.success("Producto eliminado correctamente.");
+                                      toastHOT.success("Producto eliminado correctamente.", {
+                                        style: { borderRadius: '12px', background: '#000', color: '#fff', border: '1px solid #333' }
+                                      });
                                       onUpdate?.(null, product._id || product.id);
                                       onClose?.();
                                     } catch (err) {
@@ -314,14 +320,14 @@ export default function ProductScreen({
                                       setLoading(false);
                                     }
                                   }}
-                                  className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer"
+                                  className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer border border-red-500"
                                 >
                                   ELIMINAR
                                 </button>
-                                <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-gray-800 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer">CANCELAR</button>
+                                <button onClick={() => toastHOT.dismiss(t.id)} className="bg-[#222] text-gray-300 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-[#333] cursor-pointer border border-[#444]">CANCELAR</button>
                               </div>
                             </div>
-                          ), { duration: 6000 }
+                          ), { duration: 6000, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
                         );
                       }}
                     >
@@ -336,13 +342,13 @@ export default function ProductScreen({
                       if (!selectedSize) {
                         e.preventDefault();
                         toastHOT.error(isLlavero ? "Debes seleccionar la unidad antes de comprar." : "Debes seleccionar una talla antes de comprar.", { 
-                          style: { borderRadius: '12px', background: '#000', color: '#fff' }
+                          style: { borderRadius: '12px', background: '#111', color: '#fff', border: '1px solid #333' }
                         });
                       }
                     }}
                     target={selectedSize ? "_blank" : "_self"}
                     rel="noopener noreferrer"
-                    className="w-full bg-green-500 hover:bg-green-600 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
+                    className="w-full bg-green-500 hover:bg-green-600 text-white hover:text-white outline-none focus:outline-none border-none decoration-transparent hover:decoration-transparent py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-[0_5px_15px_rgba(34,197,94,0.3)] transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3"
                   >
                     <FaWhatsapp size={22} />
                     COMPRAR POR WHATSAPP
