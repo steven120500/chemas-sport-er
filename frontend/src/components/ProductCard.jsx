@@ -91,13 +91,12 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onClick(product)}
-      // 🔥 TRUCO: Degradado lineal oscuro para dar relieve y destacar del fondo principal 🔥
       style={{ background: 'linear-gradient(135deg, #1e1e1e 0%, #0a0a0a 100%)' }}
-      className={`group/card relative w-full rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-gray-800 hover:border-yellow-500 p-0 transition-all duration-300 cursor-pointer flex flex-col justify-between font-sans shadow-lg hover:shadow-2xl hover:shadow-yellow-500/30 overflow-hidden
+      // Se eliminó la clase overflow-hidden de este div principal
+      className={`group/card relative w-full rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-gray-800 hover:border-yellow-500 p-0 transition-all duration-300 cursor-pointer flex flex-col justify-between font-sans shadow-lg hover:shadow-2xl hover:shadow-yellow-500/30
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
       `}
     >
-      {/* 🔥 TELARAÑA EN LA ESQUINA DE LA TARJETA MÁS GRANDE 🔥 */}
       <img 
         src="/Araña.png" 
         alt="Telaraña decorativa" 
@@ -156,7 +155,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         `}
       </style>
 
-      <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px]">
+      {/* Se agregó overflow-hidden y redondeado a este contenedor interno que envuelve el contenido */}
+      <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px] overflow-hidden rounded-[14px] sm:rounded-[22px]">
         
         {/* --- COLUMNA IZQUIERDA: INFORMACIÓN --- */}
         <div className="col-span-6 flex flex-col justify-between p-3.5 sm:p-6 pr-2 sm:pr-5 z-10">
@@ -242,7 +242,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
         {/* --- COLUMNA DERECHA: IMÁGENES --- */}
         <div className="col-span-6 relative w-full h-full z-10">
-          {/* 🔥 Fondo de la imagen oscurecido para integrar mejor con el degradado de la tarjeta 🔥 */}
           <div className="relative w-full h-full overflow-hidden" style={{ backgroundColor: '#0f0f0f' }}>
             {(() => {
               const screenWidth = window.innerWidth;
