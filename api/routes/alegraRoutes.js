@@ -1,5 +1,4 @@
 import express from 'express';
-import fetch from 'node-fetch'; // O usa el fetch nativo de Node si estás en versiones recientes
 
 const router = express.Router();
 
@@ -25,12 +24,11 @@ router.post('/emitir-tiquete', async (req, res) => {
     const itemsAlegra = [];
     
     ventas.forEach((venta) => {
-      // Si la venta tiene múltiples tallas o ítems detallados
       if (venta.items && Array.isArray(venta.items)) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
-            price: Number(venta.price) || 10000, // Ajusta según el precio real de tu producto si lo tienes guardado
+            price: Number(venta.price) || 10000,
             quantity: 1
           });
         });
@@ -51,10 +49,9 @@ router.post('/emitir-tiquete', async (req, res) => {
       dueDate: fechaActual,
       client: {
         name: ventas[0]?.cliente || "Cliente General",
-        identification: "000000000" // Identificación genérica por defecto para tiquetes
+        identification: "000000000" // Identificación genérica por defecto
       },
-      // En Costa Rica, el documento 04 corresponde a Tiquete Electrónico
-      documentType: "04", 
+      documentType: "04", // Tiquete Electrónico
       items: itemsAlegra,
       payments: [
         {
@@ -65,7 +62,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       ]
     };
 
-    // 4. Enviar la petición a la API oficial de Alegra
+    // 4. Enviar la petición usando el fetch nativo de Node.js
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
       headers: {
