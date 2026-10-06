@@ -2,25 +2,22 @@ import express from 'express';
 
 const router = express.Router();
 
-// Credenciales proporcionadas
 const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 /* ========================================================
-   🧾 EMITIR TIQUETE ELECTRÓNICO EN ALEGRA
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    const { ventas } = req.body; // Recibe el arreglo de ventas seleccionadas desde el frontend
+    // Recibe las ventas y el tipo de emisión ("hacienda" o "interno")
+    const { ventas, tipo } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
       return res.status(400).json({ error: "No se seleccionaron ventas para facturar." });
     }
 
-    // 1. Preparar la autenticación Basic Auth para Alegra
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-
-    // 2. Construir los ítems para la API de Alegra basados en las ventas del usuario
     const itemsAlegra = [];
     
     ventas.forEach((venta) => {
@@ -41,17 +38,16 @@ router.post('/emitir-tiquete', async (req, res) => {
       }
     });
 
-    // 3. Estructura de la factura/tiquete para la API de Alegra (Costa Rica)
     const fechaActual = new Date().toISOString().split('T')[0];
     
+    // Estructura base del comprobante
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
         name: ventas[0]?.cliente || "Cliente General",
-        identification: "000000000" // Identificación genérica por defecto
+        identification: "000000000"
       },
-      documentType: "04", // Tiquete Electrónico
       items: itemsAlegra,
       payments: [
         {
@@ -62,7 +58,12 @@ router.post('/emitir-tiquete', async (req, res) => {
       ]
     };
 
-    // 4. Enviar la petición usando el fetch nativo de Node.js
+    // 🔥 LA MAGIA ESTÁ AQUÍ: Si es hacienda, forzamos el Tiquete Electrónico (04)
+    if (tipo === "hacienda") {
+      payloadAlegra.documentType = "04"; 
+    } 
+    // Si es "interno", Alegra creará una factura básica/ticket interno según tu configuración
+
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
       headers: {
@@ -78,14 +79,15 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!alegraResponse.ok) {
       console.error("Error de Alegra:", alegraData);
       return res.status(400).json({ 
-        error: alegraData.message || "Error al generar el tiquete electrónico en Alegra." 
+        error: alegraData.message || "Error al generar el documento en Alegra." 
       });
     }
 
-    // 5. Devolver el enlace del PDF o éxito al frontend
     return res.status(200).json({
       success: true,
-      message: "¡Tiquete electrónico generado con éxito ante Hacienda!",
+      message: tipo === "hacienda" 
+        ? "¡Tiquete electrónico oficial generado ante Hacienda!"
+        : "Ticket interno generado con éxito.",
       pdfUrl: alegraData.printUrl || alegraData.pdf || null,
       alegraId: alegraData.id
     });

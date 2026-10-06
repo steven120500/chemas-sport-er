@@ -118,7 +118,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
   const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
-  const [generandoTiquete, setGenerandoTiquete] = useState(false); // Estado para evitar doble clic al facturar
+  
+  const [generandoTiquete, setGenerandoTiquete] = useState(false);
+  const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
 
   const storedUser = useMemo(() => {
     try {
@@ -131,6 +133,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
   const fetchVentas = async () => {
     setLoading(true);
+    setVentasSeleccionadas([]); 
     try {
       const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
       const params = new URLSearchParams({
@@ -237,6 +240,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       if (!res.ok) throw new Error("Error en el servidor al reiniciar");
 
       setLogs([]);
+      setVentasSeleccionadas([]);
       toastHOT.success("Historial reiniciado. Comisiones puestas en cero.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
       });
@@ -278,7 +282,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
-  // 🗑️ LÓGICA DE ANULACIÓN
   const ejecutarAnulacion = async (venta) => {
     try {
       const payload = {
@@ -315,6 +318,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       }
 
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
+      setVentasSeleccionadas((prev) => prev.filter((v) => v._id !== venta._id));
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
         style: { background: "#000", color: "#fff", fontWeight: "bold" }
       });
@@ -352,12 +356,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-  // 🧾 LÓGICA DE EMISIÓN DE TIQUETE CON ALEGRA
-  const ejecutarEmisionTiquete = async (venta) => {
+  // 🧾 1. COMUNICACIÓN CON BACKEND (TIPO INCLUIDO)
+  const ejecutarEmisionTiquete = async (ventasArray, tipoEmision) => {
     if (generandoTiquete) return;
     setGenerandoTiquete(true);
     
-    const toastId = toastHOT.loading("Comunicando con Hacienda (Alegra)...");
+    const toastId = toastHOT.loading(`Generando ticket ${tipoEmision === "hacienda" ? "oficial" : "interno"}...`);
 
     try {
       const response = await fetch(`${API_BASE}/api/alegra/emitir-tiquete`, {
@@ -367,20 +371,22 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           "x-super": storedUser?.isSuperUser ? "true" : "false"
         },
         body: JSON.stringify({
-          ventas: [venta] // Enviamos el objeto parseado directamente al backend
+          ventas: ventasArray,
+          tipo: tipoEmision 
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "No se pudo emitir el tiquete");
+        throw new Error(data.error || "No se pudo emitir el comprobante");
       }
 
-      toastHOT.success("¡Tiquete electrónico generado con éxito!", { id: toastId });
+      toastHOT.success(data.message || "¡Documento generado con éxito!", { id: toastId });
+      setVentasSeleccionadas([]); 
       
       if (data.pdfUrl) {
-        window.open(data.pdfUrl, "_blank"); // Abre el PDF en una nueva pestaña
+        window.open(data.pdfUrl, "_blank"); 
       }
 
     } catch (error) {
@@ -389,6 +395,90 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     } finally {
       setGenerandoTiquete(false);
     }
+  };
+
+  // 🧾 2. ADVERTENCIA FINAL HACIENDA
+  const confirmarEmisionHacienda = (ventasArray) => {
+    toastHOT((t) => (
+      <div className="text-center p-2 text-black font-sans">
+        <div className="flex justify-center text-amber-500 mb-2">
+          <FaExclamationTriangle size={24} />
+        </div>
+        <p className="font-black text-sm mb-1 text-amber-600 uppercase tracking-widest">¿Emitir a Hacienda?</p>
+        <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
+          Esto enviará el tiquete electrónico directamente a los servidores de Hacienda. Es un documento oficial y fiscal.
+        </p>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => {
+              toastHOT.dismiss(t.id);
+              ejecutarEmisionTiquete(ventasArray, "hacienda");
+            }}
+            className="bg-amber-500 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-amber-600 cursor-pointer shadow-md"
+          >
+            SÍ, CONFIRMAR
+          </button>
+          <button
+            onClick={() => toastHOT.dismiss(t.id)}
+            className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
+          >
+            CANCELAR
+          </button>
+        </div>
+      </div>
+    ), { duration: 8000 });
+  };
+
+  // 🧾 3. ENRUTADOR VISUAL DE EMISIÓN
+  const abrirMenuEmision = (ventasArray) => {
+    if (!storedUser?.isSuperUser) {
+      ejecutarEmisionTiquete(ventasArray, "interno");
+      return;
+    }
+
+    toastHOT((t) => (
+      <div className="text-center p-2 text-black font-sans">
+        <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Tipo de Comprobante</p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => {
+              toastHOT.dismiss(t.id);
+              ejecutarEmisionTiquete(ventasArray, "interno");
+            }}
+            className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors"
+          >
+            Ticket Normal (Uso Interno)
+          </button>
+          <button
+            onClick={() => {
+              toastHOT.dismiss(t.id);
+              confirmarEmisionHacienda(ventasArray);
+            }}
+            className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors"
+          >
+            Tiquete Electrónico (Hacienda)
+          </button>
+        </div>
+        <button
+          onClick={() => toastHOT.dismiss(t.id)}
+          className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer"
+        >
+          Cancelar
+        </button>
+      </div>
+    ), { duration: 6000 });
+  };
+
+  // Lógica para marcar/desmarcar ventas de la tabla
+  const toggleSeleccionVenta = (venta) => {
+    setVentasSeleccionadas((prev) => {
+      const existe = prev.find((v) => v._id === venta._id);
+      if (existe) {
+        return prev.filter((v) => v._id !== venta._id);
+      } else {
+        return [...prev, venta];
+      }
+    });
   };
 
   const generarPDFBlancoYNegro = () => {
@@ -708,15 +798,30 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               </p>
             </div>
 
-            <div className="relative w-full sm:w-72">
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Buscar por cliente o vendedor..."
-                className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
-              />
-              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              
+              {/* 🔥 BOTÓN GLOBAL PARA EMISIÓN MÚLTIPLE MODIFICADO */}
+              {ventasSeleccionadas.length > 0 && (
+                <button
+                  onClick={() => abrirMenuEmision(ventasSeleccionadas)}
+                  disabled={generandoTiquete}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
+                >
+                  <FaReceipt size={14} />
+                  <span>Emitir {ventasSeleccionadas.length} en 1 Tiquete</span>
+                </button>
+              )}
+
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Buscar por cliente..."
+                  className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
+                />
+                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+              </div>
             </div>
           </div>
 
@@ -735,6 +840,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
+                    <th className="py-3 px-3 text-center">Sel.</th>
                     <th className="py-3 px-3">Fecha</th>
                     <th className="py-3 px-3">Vendedor</th>
                     <th className="py-3 px-3">Cliente</th>
@@ -758,9 +864,21 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       storedUser?.isSuperUser ||
                       String(storedUser?.username || "").toLowerCase() === String(venta.vendedor || "").toLowerCase()
                     );
+                    
+                    const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
 
                     return (
-                      <tr key={venta._id} className="hover:bg-zinc-50 transition-colors">
+                      <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                        
+                        <td className="py-3.5 px-3 text-center">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSeleccionVenta(venta)}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-black"
+                          />
+                        </td>
+
                         <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">
                           {dateStr} <span className="text-[10px] text-zinc-400">{timeStr}</span>
                         </td>
@@ -780,7 +898,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           )}
                         </td>
 
-                        {/* 🔥 SE MUESTRAN MÚLTIPLES UBICACIONES SI APLICA 🔥 */}
                         <td className="py-3.5 px-3">
                           <div className="flex flex-wrap gap-1">
                             {venta.items.length > 0 ? (
@@ -803,11 +920,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
                         <td className="py-3.5 px-3 text-center">
                           <div className="flex justify-center items-center gap-3">
+                            
+                            {/* 🔥 BOTÓN INDIVIDUAL MODIFICADO */}
                             <button
-                              onClick={() => ejecutarEmisionTiquete(venta)}
+                              onClick={() => abrirMenuEmision([venta])}
                               disabled={generandoTiquete}
                               className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50"
-                              title="Emitir tiquete electrónico en Hacienda"
+                              title="Emitir comprobante"
                             >
                               <FaReceipt size={14} />
                             </button>
