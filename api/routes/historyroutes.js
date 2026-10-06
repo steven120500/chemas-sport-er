@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const q         = (req.query.q || '').trim();
     const userParam = (req.query.user || '').trim();
     const store     = (req.query.store || '').trim();
-    const type      = (req.query.type || '').trim(); // ⭐ AQUÍ EXTRAEMOS EL TIPO
+    const type      = (req.query.type || '').trim(); 
     const startDate = (req.query.startDate || '').trim();
     const endDate   = (req.query.endDate || '').trim();
     const month     = (req.query.month || '').trim();
@@ -21,17 +21,16 @@ router.get('/', async (req, res) => {
     const defaultLimit = isFiltering ? 1000 : 30;
     const limit = Math.min(Math.max(parseInt(req.query.limit || String(defaultLimit), 10), 1), 3000);
 
-    // 🔥 USAMOS UN ARREGLO $and PARA QUE NINGÚN FILTRO CHOQUE CON OTRO 🔥
     const andConditions = [];
 
     /* ⭐ 1. BUSCADOR INTEGRAL (Camiseta, Cliente, Acción o Vendedor) ⭐ */
     if (q) {
       andConditions.push({
         $or: [
-          { item: { $regex: q, $options: 'i' } },
-          { details: { $regex: q, $options: 'i' } }, // 👈 ENCUENTRA AL CLIENTE AQUÍ
-          { action: { $regex: q, $options: 'i' } },
-          { user: { $regex: q, $options: 'i' } }
+          { item: { $regex: q,$options: 'i' } },
+          { details: { $regex: q,$options: 'i' } },
+          { action: { $regex: q,$options: 'i' } },
+          { user: { $regex: q,$options: 'i' } }
         ]
       });
     }
@@ -43,45 +42,49 @@ router.get('/', async (req, res) => {
 
     /* ⭐ 3. FILTRO POR TIENDA ⭐ */
     if (store) {
-      andConditions.push({ details: { $regex: store, $options: 'i' } });
+      andConditions.push({ details: { $regex: store,$options: 'i' } });
     }
 
     /* ⭐ 4. FILTRO POR TIPO DE ARTÍCULO ⭐ */
     if (type) {
-      // Busca exactamente "(Tipo)" dentro del nombre del ítem (ej: "(Player)", "(Niño)")
       andConditions.push({ item: { $regex: `\\(${type}\\)`, $options: 'i' } });
     }
 
-    /* ⭐ 5. FILTRO POR FECHAS O MES ⭐ */
+    /* ⭐ 5. FILTRO POR FECHAS O MES (CORREGIDO PARA COSTA RICA UTC-6) ⭐ */
     if (startDate || endDate) {
       const dateQuery = {};
+      
       if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        dateQuery.$gte = start;
+        const [y, m, d] = startDate.split('-').map(Number);
+        // 00:00:00 en Costa Rica = 06:00:00 UTC
+        dateQuery.$gte = new Date(Date.UTC(y, m - 1, d, 6, 0, 0, 0));
       }
+      
       if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateQuery.$lte = end;
+        const [y, m, d] = endDate.split('-').map(Number);
+        // 23:59:59 en Costa Rica = 05:59:59 UTC del DÍA SIGUIENTE (+1 al día)
+        dateQuery.$lte = new Date(Date.UTC(y, m - 1, d + 1, 5, 59, 59, 999));
       }
       andConditions.push({ date: dateQuery });
+      
     } else if (month) {
-      // Formato esperado: YYYY-MM (ej: 2026-07)
       const [y, m] = month.split('-').map(Number);
       if (y && m) {
-        const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
-        const end = new Date(y, m, 0, 23, 59, 59, 999);
-        andConditions.push({ date: { $gte: start, $lte: end } });
+        // Inicio de mes en CR (Día 1 a las 00:00) -> Día 1 a las 06:00 UTC
+        const start = new Date(Date.UTC(y, m - 1, 1, 6, 0, 0, 0));
+        
+        // Fin de mes en CR (Último día a las 23:59) -> Día 1 del siguiente mes a las 05:59 UTC
+        const end = new Date(Date.UTC(y, m, 1, 5, 59, 59, 999));
+        
+        andConditions.push({ date: { $gte: start,$lte: end } });
       }
     }
 
-    // Construimos la consulta final limpiamente
     const find = andConditions.length > 0 ? { $and: andConditions } : {};
 
     const [items, total] = await Promise.all([
       History.find(find)
-        .sort({ date: -1 }) // Los más recientes primero
+        .sort({ date: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),

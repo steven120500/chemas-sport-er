@@ -513,7 +513,7 @@ export default function ProductAdminEditor({
 
       {/* 🔥 MODAL MULTI-PASO DE VENTA */}
       {showBuyerModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
           <div 
             className="rounded-3xl p-6 md:p-8 max-w-md w-full shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-gray-800 flex flex-col items-center text-center relative"
             style={{ backgroundColor: '#111' }}

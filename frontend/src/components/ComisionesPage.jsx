@@ -50,35 +50,39 @@ function parseSaleDetails(log) {
   let totalUnidades = 0;
 
   try {
-    const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/gi;
-    let m;
-    while ((m = regex.exec(cleanDetails)) !== null) {
-      const [matchCompleto, rawTalla, oldStr, newStr] = m;
-      const talla = String(rawTalla || "").trim().toUpperCase();
-      const oldV = Number(oldStr) || 0;
-      const newV = Number(newStr) || 0;
+    // 🔥 CORRECCIÓN: Separamos el texto por "|" para analizar cada ubicación por separado
+    const segmentos = cleanDetails.split("|");
 
-      const subStr = cleanDetails.substring(0, m.index);
-      
-      // 🔥 IDENTIFICACIÓN DE 3 UBICACIONES PARA LA TABLA DE COMISIONES
-      let tienda = "Tienda";
-      if (subStr.includes("Bodega 2") || subStr.includes("Tienda #2")) {
-        tienda = "Bodega 2";
-      } else if (subStr.includes("Bodega 1") || subStr.includes("Tienda #1")) {
-        tienda = "Bodega 1";
-      }
+    segmentos.forEach((segmento) => {
+      const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/i;
+      const match = regex.exec(segmento);
 
-      const cantidad = Math.abs(oldV - newV);
+      if (match) {
+        const [, rawTalla, oldStr, newStr] = match;
+        const talla = String(rawTalla || "").trim().toUpperCase();
+        const oldV = Number(oldStr) || 0;
+        const newV = Number(newStr) || 0;
 
-      if (cantidad > 0 && talla && talla !== "U" && !talla.includes("ID")) {
-        totalUnidades += cantidad;
-        tallasAgrupadas[talla] = (tallasAgrupadas[talla] || 0) + cantidad;
-        
-        for (let i = 0; i < cantidad; i++) {
-          items.push({ tienda, talla, nombre: itemGeneral });
+        // 🔥 IDENTIFICACIÓN DE UBICACIÓN AISLADA PARA CADA SEGMENTO
+        let tienda = "Tienda";
+        if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) {
+          tienda = "Bodega 2";
+        } else if (segmento.includes("Bodega 1") || segmento.includes("Tienda #1")) {
+          tienda = "Bodega 1";
+        }
+
+        const cantidad = Math.abs(oldV - newV);
+
+        if (cantidad > 0 && talla && talla !== "U" && !talla.includes("ID")) {
+          totalUnidades += cantidad;
+          tallasAgrupadas[talla] = (tallasAgrupadas[talla] || 0) + cantidad;
+          
+          for (let i = 0; i < cantidad; i++) {
+            items.push({ tienda, talla, nombre: itemGeneral });
+          }
         }
       }
-    }
+    });
   } catch (e) {
     console.error("Error al procesar tallas:", e);
   }
@@ -739,10 +743,21 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           )}
                         </td>
 
+                        {/* 🔥 SE MUESTRAN MÚLTIPLES UBICACIONES SI APLICA 🔥 */}
                         <td className="py-3.5 px-3">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
-                            {venta.items[0]?.tienda || "Tienda"}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {venta.items.length > 0 ? (
+                              [...new Set(venta.items.map(i => i.tienda))].map((ubicacion, idx) => (
+                                <span key={idx} className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
+                                  {ubicacion}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
+                                Tienda
+                              </span>
+                            )}
+                          </div>
                         </td>
                         
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">

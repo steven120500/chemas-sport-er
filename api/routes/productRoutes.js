@@ -58,7 +58,7 @@ function diffProduct(prev, next) {
     changes.push(`Temporada 26-27: ${prevTemp ? 'Sí' : 'No'} → ${nextTemp ? 'Sí' : 'No'}`);
   }
 
-  // 🔥 ACTUALIZADO: Los 3 espacios con sus nuevos nombres para el historial
+  // Los 3 espacios con sus nuevos nombres para el historial
   changes.push(...diffInv('Tienda', prev.tienda, next.tienda));
   changes.push(...diffInv('Bodega 1', prev.stock, next.stock));
   changes.push(...diffInv('Bodega 2', prev.bodega, next.bodega));
@@ -102,7 +102,6 @@ router.post('/', upload.any(), async (req, res) => {
     const imageSrc = images[0]?.url || '';
     const imageSrc2 = images[1]?.url || ''; 
 
-    // 🔥 NUEVO: Recibe y limpia "tienda"
     let tienda = {};
     try {
       if (typeof req.body.tienda === 'string') tienda = JSON.parse(req.body.tienda);
@@ -130,7 +129,7 @@ router.post('/', upload.any(), async (req, res) => {
       price: Number(req.body.price),
       discountPrice: Number(req.body.discountPrice) || 0,
       type: String(req.body.type || '').trim(),
-      tienda: cleanTienda, // 🔥 Se guarda la nueva ubicación
+      tienda: cleanTienda, 
       stock: cleanStock,
       bodega: cleanBodega,
       images,
@@ -220,7 +219,6 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // 🔥 NUEVO: Recibe y actualiza "tienda"
     let incomingTienda = req.body.tienda;
     if (typeof incomingTienda === 'string') {
       try { incomingTienda = JSON.parse(incomingTienda); } catch {}
@@ -241,7 +239,7 @@ router.put('/:id', async (req, res) => {
 
     let restadas = 0;
     
-    // 🔥 NUEVO: Calcula ventas si se rebajó algo de "tienda"
+    // Calcular cantidad de prendas restadas para comisiones y etiquetas
     for (const size of new Set([...Object.keys(prev.tienda || {}), ...Object.keys(nextTienda || {})])) {
       const before = Number(prev.tienda?.[size] ?? 0);
       const after  = Number(nextTienda?.[size] ?? 0);
@@ -267,7 +265,7 @@ router.put('/:id', async (req, res) => {
       discountPrice: Number.isFinite(Number(req.body.discountPrice))
         ? Math.trunc(Number(req.body.discountPrice))
         : prev.discountPrice,
-      tienda: nextTienda, // 🔥 Se actualiza la nueva ubicación
+      tienda: nextTienda, 
       stock: nextStock,
       bodega: nextBodega,
       lockedBy: null,
@@ -313,78 +311,69 @@ router.put('/:id', async (req, res) => {
     );
     const updatedObj = updated.toObject();
 
-    res.status(200).json(updatedObj);
+    // 🚨 REGISTRO SÍNCRONO (SIN SETTIMEOUT) PARA EVITAR PÉRDIDA DE HISTORIAL 🚨
+    const nombreCliente = (req.body.customerName || "").trim();
+    const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
 
-    setTimeout(async () => {
-      try {
-        const nombreCliente = (req.body.customerName || "").trim();
-        const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
+    if (esVenta) {
+      updated.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
+      const now = new Date();
+      const totalMonth = (updated.popularCountHistory || [])
+        .filter(entry => {
+          const d = new Date(entry.date);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).reduce((sum, e) => sum + e.quantity, 0);
+      updated.isPopular = totalMonth >= 10;
+      await updated.save();
+    }
 
-        if (esVenta) {
-          updated.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
-          const now = new Date();
-          const totalMonth = (updated.popularCountHistory || [])
-            .filter(entry => {
-              const d = new Date(entry.date);
-              return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-            }).reduce((sum, e) => sum + e.quantity, 0);
-          updated.isPopular = totalMonth >= 10;
-          await updated.save();
-        }
+    const changes = diffProduct(prev, updatedObj);
+    
+    const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
+      ? nombreCliente
+      : (esVenta ? "Cliente General / Tienda" : "");
 
-        // 🔥 ACTUALIZADO: Etiquetas correctas para el historial
-        let tiendasModificadas = [];
-        if (JSON.stringify(prev.tienda) !== JSON.stringify(nextTienda)) tiendasModificadas.push("Tienda");
-        if (JSON.stringify(prev.stock) !== JSON.stringify(nextStock)) tiendasModificadas.push("Bodega 1");
-        if (JSON.stringify(prev.bodega) !== JSON.stringify(nextBodega)) tiendasModificadas.push("Bodega 2");
-        const etiquetaTienda = tiendasModificadas.length > 0 ? tiendasModificadas.join(" y ") : "Datos generales";
+    let detalleText = '';
+    
+    // Construcción pura sin etiquetas globales (solo extraemos las tiendas individuales)
+    if (esVenta && req.body.details) {
+      detalleText = req.body.details.replace(/👤 Cliente:\s*[^|]+\|\s*/gi, "").trim();
+    } else if (changes.length) {
+      detalleText = changes.join(' | ');
+    }
 
-        const changes = diffProduct(prev, updatedObj);
-        
-        const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
-          ? nombreCliente
-          : (esVenta ? "Cliente General / Tienda" : "");
-
-        let detalleText = '';
-        if (esVenta && req.body.details) {
-          detalleText = req.body.details.replace(/👤 Cliente:\s*[^|]+\|\s*/gi, "").trim();
-        } else if (changes.length) {
-          detalleText = changes.join(' | ');
-        }
-
-        if (detalleText) {
-          let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
-          
-          if (clienteFinal) {
-            detalleText = `👤 Cliente: ${clienteFinal} | 🏬 ${etiquetaTienda} | ${detalleText}`;
-          } else {
-            detalleText = `🏬 ${etiquetaTienda} | ${detalleText}`;
-          }
-
-          await History.create({
-            productId: prev._id,
-            user: user,
-            action: accionTexto,
-            item: `${updated.name} (${updated.type})`,
-            date: new Date(),
-            details: detalleText
-          });
-        }
-
-        updatedObj._lastEditMeta = {
-          user: user,
-          store: etiquetaTienda,
-          customer: clienteFinal || nombreCliente,
-          action: esVenta ? "rebajó stock" : "editó"
-        };
-
-        const io = req.app.get('io');
-        if (io) io.emit('productoActualizado', updatedObj);
-
-      } catch (bgError) {
-        console.error('Error analítico en segundo plano en PUT /api/products/:id:', bgError);
+    // Siempre crear historial si hubo cambios
+    if (detalleText || esVenta) {
+      let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
+      
+      // Agregamos cliente e ID sin ensuciar la cadena para el parseo del frontend
+      if (clienteFinal) {
+        detalleText = `👤 Cliente: ${clienteFinal} | [ID:${prev._id}] | ${detalleText}`;
+      } else {
+        detalleText = `[ID:${prev._id}] | ${detalleText}`;
       }
-    }, 0);
+
+      await History.create({
+        productId: prev._id,
+        user: user,
+        action: accionTexto,
+        item: `${updated.name} (${updated.type})`,
+        date: new Date(),
+        details: detalleText
+      });
+    }
+
+    updatedObj._lastEditMeta = {
+      user: user,
+      customer: clienteFinal || nombreCliente,
+      action: esVenta ? "rebajó stock" : "editó"
+    };
+
+    const io = req.app.get('io');
+    if (io) io.emit('productoActualizado', updatedObj);
+
+    // Mandar respuesta al cliente SOLO DESPUÉS de asegurar la base de datos
+    res.status(200).json(updatedObj);
 
   } catch (err) {
     console.error('PUT /api/products/:id error:', err);
@@ -392,7 +381,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-/* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
 router.post('/anular/:id', async (req, res) => {
   try {
@@ -432,11 +420,10 @@ router.post('/anular/:id', async (req, res) => {
     const updatedStock = { ...(product.stock || {}) };
     const updatedBodega = { ...(product.bodega || {}) };
 
-    // 🔥 MODIFICADO: Acepta tanto tallas normales como la talla "U" (Llaveros) y cualquier otra manual
     items.forEach(({ tienda, talla }) => {
       if (talla) {
         const ubicacionLower = (tienda || "").toLowerCase();
-        if (ubicacionLower === "tienda") {
+        if (ubicacionLower === "tienda" || ubicacionLower.includes("tienda #1")) {
           updatedTienda[talla] = (Number(updatedTienda[talla]) || 0) + 1;
         } else if (ubicacionLower.includes("bodega 2") || ubicacionLower.includes("tienda #2")) {
           updatedBodega[talla] = (Number(updatedBodega[talla]) || 0) + 1;
@@ -531,7 +518,6 @@ router.get('/', async (req, res) => {
     const allSizesArray = Array.from(ALL_SIZES);
     const sizesArr = sizes ? sizes.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-    // 🔥 FILTRO ACTUALIZADO PARA LAS 3 UBICACIONES
     if (storeView === 'tienda') {
       const checkSizes = sizesArr.length > 0 ? sizesArr : allSizesArray;
       find.$or = checkSizes.map(size => ({ [`tienda.${size}`]: { $gt: 0 } }));
@@ -549,7 +535,6 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    // 🔥 AÑADIMOS 'tienda' A LA PROYECCIÓN
     const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 

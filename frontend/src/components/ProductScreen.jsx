@@ -295,8 +295,8 @@ export default function ProductScreen({
                       onClick={() => {
                         toastHOT(
                           (t) => (
-                            <div className="text-center p-2 bg-[#111] rounded-xl border border-[#333]">
-                              <p className="font-black text-gray-200 mb-4 text-base">¿Eliminar este producto?</p>
+                            <div className="text-center p-2 bg-white rounded-xl border border-[#333]">
+                              <p className="font-black text-black mb-4 text-base">¿Eliminar este producto?</p>
                               <div className="flex gap-3 justify-center">
                                 <button
                                   onClick={async () => {
