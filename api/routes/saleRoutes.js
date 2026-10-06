@@ -49,7 +49,7 @@ router.post('/anular/:id', async (req, res) => {
           .trim();
 
       const targetWords = normalize(cleanItemName).split(/\s+/).filter(w => w.length > 1);
-      const allProducts = await Product.find({}, '_id name stock bodega');
+      const allProducts = await Product.find({}, '_id name tienda stock bodega'); // 🔥 Se agregó 'tienda'
 
       let maxMatches = 0;
       for (const p of allProducts) {
@@ -83,8 +83,12 @@ router.post('/anular/:id', async (req, res) => {
         const talla = String(tallaCapturada || "").trim().toUpperCase();
         const oldV = Number(valorViejo) || 0;
         const newV = Number(valorNuevo) || 0;
+        
+        // 🔥 Corrección: Identificar correctamente Tienda, Bodega 1 y Bodega 2
         const subStr = cleanDetails.substring(0, m.index);
-        const tienda = subStr.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+        let tienda = "Tienda";
+        if (subStr.includes("Bodega 2") || subStr.includes("Tienda #2")) tienda = "Bodega 2";
+        else if (subStr.includes("Bodega 1") || subStr.includes("Tienda #1")) tienda = "Bodega 1";
 
         if (talla.includes("ID") || talla.length > 5) continue;
 
@@ -101,7 +105,10 @@ router.post('/anular/:id', async (req, res) => {
         const [, fallbackTalla] = cleanDetails.match(/\[([A-Z0-9]+)\]/i) || [];
         if (fallbackTalla) {
           const t = String(fallbackTalla).toUpperCase();
-          const tienda = cleanDetails.includes("Tienda #2") ? "Tienda #2" : "Tienda #1";
+          let tienda = "Tienda";
+          if (cleanDetails.includes("Bodega 2") || cleanDetails.includes("Tienda #2")) tienda = "Bodega 2";
+          else if (cleanDetails.includes("Bodega 1") || cleanDetails.includes("Tienda #1")) tienda = "Bodega 1";
+          
           prendas.push({ tienda, talla: t });
         }
       }
@@ -109,25 +116,32 @@ router.post('/anular/:id', async (req, res) => {
 
     // 4. Si encontramos el producto y tiene tallas válidas, devolvemos el stock
     if (product && prendas.length > 0) {
+      // 🔥 Corrección: Ahora clonamos las TRES ubicaciones
+      const updatedTienda = { ...(product.tienda || {}) };
       const updatedStock = { ...(product.stock || {}) };
       const updatedBodega = { ...(product.bodega || {}) };
 
       prendas.forEach(({ tienda, talla }) => {
         const tUpper = String(talla || "").trim().toUpperCase();
         if (tUpper && tUpper !== "U") {
-          const t = String(tienda || "");
-          if (t.includes("Tienda #2") || t.toLowerCase().includes("bodega")) {
+          const t = String(tienda || "").trim();
+          
+          // 🔥 Lógica exacta para repartir a la ubicación correcta
+          if (t === "Bodega 2" || t === "Tienda #2") {
             updatedBodega[tUpper] = (Number(updatedBodega[tUpper]) || 0) + 1;
-          } else {
+          } else if (t === "Bodega 1" || t === "Tienda #1") {
             updatedStock[tUpper] = (Number(updatedStock[tUpper]) || 0) + 1;
+          } else {
+            // Por defecto, si dice "Tienda", cae aquí
+            updatedTienda[tUpper] = (Number(updatedTienda[tUpper]) || 0) + 1;
           }
         }
       });
 
-      // Guardado forzado y directo en MongoDB
+      // 🔥 Guardado forzado y directo en MongoDB para las TRES ubicaciones
       const updatedProduct = await Product.findByIdAndUpdate(
         product._id,
-        { $set: { stock: updatedStock, bodega: updatedBodega } },
+        { $set: { tienda: updatedTienda, stock: updatedStock, bodega: updatedBodega } },
         { new: true }
       );
 
@@ -149,7 +163,7 @@ router.post('/anular/:id', async (req, res) => {
     return res.status(200).json({ 
       success: true, 
       message: (product && prendas.length > 0)
-        ? `Venta anulada. Se devolvieron las tallas al stock de ${product.name}.`
+        ? `Venta anulada. Se devolvieron las tallas a la ubicación correcta de ${product.name}.`
         : "Venta eliminada del historial correctamente."
     });
 
