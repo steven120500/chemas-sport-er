@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
-  FaFilePdf, FaTrash, FaLock, FaExclamationTriangle
+  FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -50,7 +50,6 @@ function parseSaleDetails(log) {
   let totalUnidades = 0;
 
   try {
-    // 🔥 CORRECCIÓN: Separamos el texto por "|" para analizar cada ubicación por separado
     const segmentos = cleanDetails.split("|");
 
     segmentos.forEach((segmento) => {
@@ -63,7 +62,6 @@ function parseSaleDetails(log) {
         const oldV = Number(oldStr) || 0;
         const newV = Number(newStr) || 0;
 
-        // 🔥 IDENTIFICACIÓN DE UBICACIÓN AISLADA PARA CADA SEGMENTO
         let tienda = "Tienda";
         if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) {
           tienda = "Bodega 2";
@@ -87,7 +85,6 @@ function parseSaleDetails(log) {
     console.error("Error al procesar tallas:", e);
   }
 
-  // Respaldo si no hubo flechas de cambio
   if (items.length === 0) {
     const [, fallbackTalla] = cleanDetails.match(/\[([A-Z0-9]+)\]/i) || [];
     if (fallbackTalla) {
@@ -121,6 +118,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
   const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
+  const [generandoTiquete, setGenerandoTiquete] = useState(false); // Estado para evitar doble clic al facturar
 
   const storedUser = useMemo(() => {
     try {
@@ -352,6 +350,45 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </div>
       </div>
     ), { duration: 6000 });
+  };
+
+  // 🧾 LÓGICA DE EMISIÓN DE TIQUETE CON ALEGRA
+  const ejecutarEmisionTiquete = async (venta) => {
+    if (generandoTiquete) return;
+    setGenerandoTiquete(true);
+    
+    const toastId = toastHOT.loading("Comunicando con Hacienda (Alegra)...");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/alegra/emitir-tiquete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-super": storedUser?.isSuperUser ? "true" : "false"
+        },
+        body: JSON.stringify({
+          ventas: [venta] // Enviamos el objeto parseado directamente al backend
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo emitir el tiquete");
+      }
+
+      toastHOT.success("¡Tiquete electrónico generado con éxito!", { id: toastId });
+      
+      if (data.pdfUrl) {
+        window.open(data.pdfUrl, "_blank"); // Abre el PDF en una nueva pestaña
+      }
+
+    } catch (error) {
+      console.error("Error emitiendo tiquete:", error);
+      toastHOT.error(`Error: ${error.message}`, { id: toastId, duration: 5000 });
+    } finally {
+      setGenerandoTiquete(false);
+    }
   };
 
   const generarPDFBlancoYNegro = () => {
@@ -679,7 +716,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 placeholder="Buscar por cliente o vendedor..."
                 className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
               />
-              
+              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
             </div>
           </div>
 
@@ -704,7 +741,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Artículo / Tallas</th>
                     <th className="py-3 px-3">Ubicación</th>
                     <th className="py-3 px-3 text-right">Cant.</th>
-                    <th className="py-3 px-3 text-center">Anular</th>
+                    <th className="py-3 px-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 font-medium">
@@ -765,19 +802,30 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         </td>
 
                         <td className="py-3.5 px-3 text-center">
-                          {canDelete ? (
+                          <div className="flex justify-center items-center gap-3">
                             <button
-                              onClick={() => confirmarAnulacion(venta)}
-                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                              title="Anular venta y restablecer inventario"
+                              onClick={() => ejecutarEmisionTiquete(venta)}
+                              disabled={generandoTiquete}
+                              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                              title="Emitir tiquete electrónico en Hacienda"
                             >
-                              <FaTrash size={13} />
+                              <FaReceipt size={14} />
                             </button>
-                          ) : (
-                            <div className="p-2 text-zinc-300" title="Solo el creador o SuperAdmin pueden anular">
-                              <FaLock size={11} />
-                            </div>
-                          )}
+
+                            {canDelete ? (
+                              <button
+                                onClick={() => confirmarAnulacion(venta)}
+                                className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                title="Anular venta y restablecer inventario"
+                              >
+                                <FaTrash size={13} />
+                              </button>
+                            ) : (
+                              <div className="p-2 text-zinc-300" title="Solo el creador o SuperAdmin pueden anular">
+                                <FaLock size={11} />
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

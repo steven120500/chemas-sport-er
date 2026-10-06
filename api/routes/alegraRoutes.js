@@ -4,7 +4,7 @@ const router = express.Router();
 
 // Credenciales proporcionadas
 const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
-const ALEGRA_TOKEN = "Chemas@123";
+const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 /* ========================================================
    🧾 EMITIR TIQUETE ELECTRÓNICO EN ALEGRA
