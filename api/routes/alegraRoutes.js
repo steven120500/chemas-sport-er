@@ -22,10 +22,8 @@ router.post('/emitir-tiquete', async (req, res) => {
     let totalFactura = 0;
     
     ventas.forEach((venta) => {
-      // 🔥 Como el frontend manda las ventas seleccionadas, calculamos el total basado en las unidades 
-      // (Asumiendo un precio promedio por prenda o usando el totalUnidades si no trae precio explícito)
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
-      const precioPorPrenda = Number(venta.price) || Number(venta.precio) || 10000; // Puedes ajustar este precio base por prenda si lo deseas
+      const precioPorPrenda = Number(venta.price) || Number(venta.precio) || 10000;
       
       const subtotalVenta = precioPorPrenda * cantidadUnidades;
       totalFactura += subtotalVenta;
@@ -51,19 +49,20 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
+    // Estructura corregida con los códigos oficiales en el bloque de pagos
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 // Cliente de contado
+        id: 2 
       },
       items: itemsAlegra,
       paymentCondition: "01", // Contado
       paymentForm: "01",       // Efectivo
-      status: "open",          // Abierta / Emitida (evita borradores)
+      status: "open",          // Emitida directamente
       payments: [
         {
-          paymentMethod: "cash",
+          paymentMethod: "01", // 🔥 Corregido: Usamos "01" en lugar de "cash" para la API de CR
           amount: totalFactura,
           date: fechaActual
         }
@@ -93,12 +92,14 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
+    const pdfGenerado = `https://app.alegra.com/print/invoice?id=${alegraData.id}`;
+
     return res.status(200).json({
       success: true,
       message: tipo === "hacienda" 
         ? "¡Tiquete electrónico oficial generado ante Hacienda!"
         : "Ticket interno generado con éxito.",
-      pdfUrl: alegraData.printUrl || alegraData.pdf || null,
+      pdfUrl: pdfGenerado,
       alegraId: alegraData.id
     });
 
