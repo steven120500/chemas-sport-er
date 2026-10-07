@@ -104,6 +104,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
   const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
 
+  // 🔥 Estado para nuestro nuevo Modal de Precio
+  const [modalPrecio, setModalPrecio] = useState({ isOpen: false, ventas: [] });
+  const [precioInput, setPrecioInput] = useState("10000");
+
   const storedUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
   }, []);
@@ -272,7 +276,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <div class="text-center">
             <h1>CHEMASPORT ER</h1>
             <p>Ropa y Artículos Deportivos</p>
-            <p>Tel: 60369857</p>
+            <p>Tel: +50660369857</p>
           </div>
           
           <div class="divider"></div>
@@ -334,7 +338,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       toastHOT.success("¡Registrado en Alegra con éxito!", { id: toastId });
       setVentasSeleccionadas([]); 
       
-      // 🔥 MANDAMOS A IMPRIMIR NATIVAMENTE EN LA PÁGINA
       imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado);
 
     } catch (error) {
@@ -344,31 +347,32 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   };
 
-  // 🧾 PREGUNTAR PRECIO Y TIPO
-  const abrirMenuEmision = (ventasArray) => {
-    // 1. Pedimos el precio real al usuario
-    const precioIngresado = window.prompt(
-      `Emitiendo ${ventasArray.length} registro(s).\n\nIngrese el PRECIO TOTAL (Monto en colones) que cobró por esta venta:`, 
-      "10000"
-    );
-    
-    if (!precioIngresado) return; 
-    const precioNumerico = Number(precioIngresado);
+  // 🧾 1. ABRIR EL MODAL DE PRECIO EN LUGAR DEL WINDOW.PROMPT
+  const abrirModalPrecio = (ventasArray) => {
+    setModalPrecio({ isOpen: true, ventas: ventasArray });
+    setPrecioInput("10000"); // Precio por defecto
+  };
 
+  // 🧾 2. PROCESAR EL PRECIO Y MOSTRAR OPCIONES (ADMIN) O EMITIR (NORMAL)
+  const confirmarPrecioYContinuar = () => {
+    const precioNumerico = Number(precioInput);
     if (isNaN(precioNumerico) || precioNumerico <= 0) {
-      return alert("El precio debe ser un número válido mayor a 0.");
+      toastHOT.error("El precio debe ser un número mayor a 0.");
+      return;
     }
 
-    // 🔥 CORRECCIÓN: Validamos el admin por la propiedad de React o por el Storage
+    const ventasArray = modalPrecio.ventas;
+    setModalPrecio({ isOpen: false, ventas: [] }); // Cerramos el modal
+
     const esAdmin = isSuperUser || storedUser?.isSuperUser === true || storedUser?.role === "admin" || storedUser?.rol === "admin";
 
-    // 2. Si no es admin, emite interno directo con el precio indicado
+    // Si no es admin, emitimos directo internamente
     if (!esAdmin) {
       ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico);
       return;
     }
 
-    // 3. Menú de Admin
+    // Si es Admin, mostramos el menú de Hacienda vs Interno
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
         <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Monto: ₡{precioNumerico.toLocaleString("es-CR")}</p>
@@ -624,7 +628,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
             <div className="flex items-center gap-4 w-full sm:w-auto">
               {ventasSeleccionadas.length > 0 && (
-                <button onClick={() => abrirMenuEmision(ventasSeleccionadas)} disabled={generandoTiquete} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50">
+                <button onClick={() => abrirModalPrecio(ventasSeleccionadas)} disabled={generandoTiquete} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50">
                   <FaReceipt size={14} />
                   <span>Emitir {ventasSeleccionadas.length} en 1 Tiquete</span>
                 </button>
@@ -691,7 +695,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
                         <td className="py-3.5 px-3 text-center">
                           <div className="flex justify-center items-center gap-3">
-                            <button onClick={() => abrirMenuEmision([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50" title="Emitir comprobante">
+                            <button onClick={() => abrirModalPrecio([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50" title="Emitir comprobante">
                               <FaReceipt size={14} />
                             </button>
                             {canDelete ? (
@@ -712,6 +716,49 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           )}
         </div>
       </div>
+
+      {/* 🔥 NUEVO MODAL ELEGANTE PARA INGRESAR EL PRECIO */}
+      {modalPrecio.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl animate-fade-in-up">
+            <div className="flex justify-center text-emerald-500 mb-4">
+              <FaReceipt size={32} />
+            </div>
+            <h3 className="text-xl font-black text-center text-black mb-1">Monto de la Venta</h3>
+            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">
+              Ingrese el total cobrado por los {modalPrecio.ventas.length} registro(s) seleccionados.
+            </p>
+            
+            <div className="relative mb-6">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-lg">₡</span>
+              <input 
+                type="number" 
+                value={precioInput} 
+                onChange={(e) => setPrecioInput(e.target.value)} 
+                onKeyDown={(e) => { if (e.key === "Enter") confirmarPrecioYContinuar(); }}
+                autoFocus 
+                className="w-full pl-9 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-xl font-black text-black outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center" 
+              />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={confirmarPrecioYContinuar} 
+                className="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                Confirmar y Continuar
+              </button>
+              <button 
+                onClick={() => setModalPrecio({ isOpen: false, ventas: [] })} 
+                className="w-full bg-zinc-100 text-zinc-600 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 transition-all active:scale-95 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
