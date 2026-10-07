@@ -730,7 +730,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </p>
             
             <div className="relative mb-6">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-lg">₡</span>
+              <span className="absolute left-4 top-2 -translate-y-1/2 text-zinc-400 font-black text-lg">₡</span>
               <input 
                 type="number" 
                 value={precioInput} 

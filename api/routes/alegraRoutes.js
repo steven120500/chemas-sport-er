@@ -23,13 +23,22 @@ router.post('/emitir-tiquete', async (req, res) => {
     
     const itemsAlegra = [];
     let totalFactura = 0;
+
+    // 1. Calculamos cuántas prendas hay en TOTAL en todas las ventas seleccionadas
+    let totalUnidadesGlobal = 0;
+    ventas.forEach(v => {
+      totalUnidadesGlobal += (Number(v.totalUnidades) || 1);
+    });
+
+    // 2. Sacamos el precio real de CADA prenda dividiendo el monto global digitado entre el total de unidades
+    const precioManualNum = Number(precioManual);
+    const precioUnitario = (precioManualNum && totalUnidadesGlobal > 0) 
+      ? (precioManualNum / totalUnidadesGlobal) 
+      : 10000;
     
+    // 3. Armamos las líneas del tiquete
     ventas.forEach((venta) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
-      
-      // Si mandaron un precio global para esta emisión, lo dividimos entre las unidades
-      const precioUnitario = Number(precioManual) / cantidadUnidades || Number(venta.price) || 10000;
-      
       const subtotalVenta = precioUnitario * cantidadUnidades;
       totalFactura += subtotalVenta;
 
@@ -64,21 +73,20 @@ router.post('/emitir-tiquete', async (req, res) => {
       paymentCondition: "01", // Contado
       paymentForm: "01",      // Efectivo
       status: "open",         // Emitida de una vez
-      // 🔥 Registramos el pago a la Caja General (ID 1) para que quede "Cobrada"
       payments: [
         {
-          account: { id: 1 }, 
+          account: { id: 1 }, // ID de la Caja General para que quede Pagada
           amount: totalFactura,
           date: fechaActual
         }
       ]
     };
 
-    // 🔥 ENRUTAMIENTO CRÍTICO: HACIENDA VS INTERNO
+    // 🔥 ENRUTAMIENTO: HACIENDA VS INTERNO
     if (tipo === "hacienda") {
       payloadAlegra.documentType = "04"; // 04 = Tiquete Electrónico oficial
     } else {
-      // Si es interno, forzamos a usar la plantilla NO electrónica
+      // Interno = Plantilla NO electrónica
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
 
@@ -101,7 +109,6 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
-    // Extraer el número consecutivo oficial para imprimirlo en tu página
     const consecutivo = alegraData.numberTemplate ? alegraData.numberTemplate.fullNumber : alegraData.id;
 
     return res.status(200).json({
