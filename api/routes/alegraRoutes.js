@@ -6,11 +6,12 @@ const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 /* ========================================================
-   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (VERSION DEFINITIVA)
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    const { ventas, tipo } = req.body; 
+    // 🔥 Ahora recibimos el precio manual que digita el usuario en el frontend
+    const { ventas, tipo, precioManual } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
       return res.status(400).json({ error: "No se seleccionaron ventas para facturar." });
@@ -19,27 +20,31 @@ router.post('/emitir-tiquete', async (req, res) => {
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
     const itemsAlegra = [];
+    let totalFactura = 0;
     
     ventas.forEach((venta) => {
-      // 1. Calculamos el precio y las cantidades reales
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
-      const precioPorPrenda = Number(venta.price) || Number(venta.precio) || 10000;
+      
+      // Si mandaron un precio global para esta emisión, lo dividimos entre las unidades (o lo aplicamos directo)
+      const precioUnitario = Number(precioManual) / cantidadUnidades || Number(venta.price) || 10000;
+      
+      const subtotalVenta = precioUnitario * cantidadUnidades;
+      totalFactura += subtotalVenta;
 
-      // 2. Construimos los ítems para Alegra
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
-            id: 1, // ID del ítem "Venta simple" en Alegra
+            id: 1, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
-            price: precioPorPrenda,
+            price: precioUnitario,
             quantity: 1
           });
         });
       } else {
         itemsAlegra.push({
-          id: 1, // ID del ítem "Venta simple" en Alegra
+          id: 1, 
           name: venta.item || "Camiseta Deportiva",
-          price: precioPorPrenda,
+          price: precioUnitario,
           quantity: cantidadUnidades
         });
       }
@@ -47,26 +52,30 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // 3. Estructura maestra a prueba de errores para Costa Rica
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 // ID exacto del cliente de contado
+        id: 2 // Cliente de contado
       },
       items: itemsAlegra,
-      paymentCondition: "01", // Código Hacienda: 01 = Contado
-      paymentForm: "01",      // Código Hacienda: 01 = Efectivo
-      status: "open"          // Evita que se guarde como borrador
+      paymentCondition: "01", // Contado
+      paymentForm: "01",      // Efectivo
+      status: "open",         // Emitida de una vez
+      // 🔥 Registramos el pago a la Caja General (ID 1) para que quede "Cobrada"
+      payments: [
+        {
+          account: { id: 1 }, 
+          amount: totalFactura,
+          date: fechaActual
+        }
+      ]
     };
 
-    // 4. Enrutamiento del documento (Hacienda vs Interno)
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; // 04 = Tiquete Electrónico Oficial
+      payloadAlegra.documentType = "04"; 
     } 
-    // Si es "interno", Alegra usa su consecutivo estándar de factura
 
-    // 5. Envío a la API
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
       headers: {
@@ -86,15 +95,14 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
-    // 6. Enlace de impresión limpia y directa
-    const pdfGenerado = `https://app.alegra.com/print/invoice?id=${alegraData.id}`;
+    // Extraer el número consecutivo oficial para imprimirlo en tu página
+    const consecutivo = alegraData.numberTemplate ? alegraData.numberTemplate.fullNumber : alegraData.id;
 
     return res.status(200).json({
       success: true,
-      message: tipo === "hacienda" 
-        ? "¡Tiquete electrónico oficial generado ante Hacienda!"
-        : "Ticket interno generado con éxito.",
-      pdfUrl: pdfGenerado,
+      message: "¡Generado con éxito!",
+      consecutivoOficial: consecutivo,
+      totalCobrado: totalFactura,
       alegraId: alegraData.id
     });
 
