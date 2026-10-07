@@ -10,7 +10,6 @@ const ALEGRA_TOKEN = "134a1c740dd8a0185278";
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    // Recibe las ventas y el tipo de emisión ("hacienda" o "interno")
     const { ventas, tipo } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
@@ -19,14 +18,13 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
-    // Construir los ítems para la API de Alegra
     const itemsAlegra = [];
     
     ventas.forEach((venta) => {
       if (venta.items && Array.isArray(venta.items)) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
-            id: 1, // ID del ítem "Venta simple" en Alegra
+            id: 1, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
             price: Number(venta.price) || 10000,
             quantity: 1
@@ -34,7 +32,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         });
       } else {
         itemsAlegra.push({
-          id: 1, // ID del ítem "Venta simple" en Alegra
+          id: 1, 
           name: venta.item || "Camiseta Deportiva",
           price: Number(venta.price) || 10000,
           quantity: venta.totalUnidades || 1
@@ -44,21 +42,19 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // Estructura base del comprobante con las llaves exactas para CR
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 // ID exacto del cliente de contado
+        id: 2 
       },
       items: itemsAlegra,
-      paymentCondition: "01", // Llave correcta para CR -> 01 = Contado
-      paymentForm: "01"       // Llave correcta para CR -> 01 = Efectivo
+      paymentCondition: "01", 
+      paymentForm: "01"       
     };
 
-    // 🔥 Si es hacienda, forzamos el Tiquete Electrónico (04)
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; 
+      payloadAlegr.documentType = "04"; 
     } 
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
@@ -72,6 +68,9 @@ router.post('/emitir-tiquete', async (req, res) => {
     });
 
     const alegraData = await alegraResponse.json();
+
+    // 🔥 IMPRIMIR LA RESPUESTA DE ALEGRA EN LA TERMINAL DE RENDER
+    console.log("Respuesta completa de Alegra:", JSON.stringify(alegraData, null, 2));
 
     if (!alegraResponse.ok) {
       console.error("Error de Alegra:", alegraData);
