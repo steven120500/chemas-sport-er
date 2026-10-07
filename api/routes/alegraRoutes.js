@@ -24,17 +24,20 @@ router.post('/emitir-tiquete', async (req, res) => {
     const itemsAlegra = [];
     let totalFactura = 0;
 
-    // 1. Calculamos cuántas prendas hay en TOTAL en todas las ventas seleccionadas
+    // 1. Calculamos cuántas prendas hay en TOTAL
     let totalUnidadesGlobal = 0;
     ventas.forEach(v => {
       totalUnidadesGlobal += (Number(v.totalUnidades) || 1);
     });
 
-    // 2. Sacamos el precio real de CADA prenda dividiendo el monto global digitado entre el total de unidades
+    // 2. Sacamos el precio real de CADA prenda
     const precioManualNum = Number(precioManual);
-    const precioUnitario = (precioManualNum && totalUnidadesGlobal > 0) 
+    let precioUnitario = (precioManualNum && totalUnidadesGlobal > 0) 
       ? (precioManualNum / totalUnidadesGlobal) 
       : 10000;
+      
+    // 🔥 SOLUCIÓN: Cortamos los decimales a 5 máximo para que Alegra no lo rechace
+    precioUnitario = Number(precioUnitario.toFixed(5));
     
     // 3. Armamos las líneas del tiquete
     ventas.forEach((venta) => {
@@ -60,6 +63,9 @@ router.post('/emitir-tiquete', async (req, res) => {
         });
       }
     });
+
+    // 🔥 Redondeamos el pago total a 2 decimales exactos
+    totalFactura = Number(totalFactura.toFixed(2));
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
