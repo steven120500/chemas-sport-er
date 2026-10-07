@@ -45,8 +45,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        name: ventas[0]?.cliente || "Cliente General",
-        identification: "000000000"
+        id: 2 // ID exacto del cliente de contado en tu cuenta de Alegra
       },
       items: itemsAlegra,
       payments: [
@@ -58,7 +57,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       ]
     };
 
-    // 🔥 LA MAGIA ESTÁ AQUÍ: Si es hacienda, forzamos el Tiquete Electrónico (04)
+    // 🔥 Si es hacienda, forzamos el Tiquete Electrónico (04)
     if (tipo === "hacienda") {
       payloadAlegra.documentType = "04"; 
     } 
