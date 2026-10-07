@@ -385,6 +385,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       toastHOT.success(data.message || "¡Documento generado con éxito!", { id: toastId });
       setVentasSeleccionadas([]); 
       
+      // 🔥 AQUÍ SE ABRE LA PESTAÑA LIMPIA DE IMPRESIÓN 
       if (data.pdfUrl) {
         window.open(data.pdfUrl, "_blank"); 
       }
@@ -431,11 +432,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
   // 🧾 3. ENRUTADOR VISUAL DE EMISIÓN
   const abrirMenuEmision = (ventasArray) => {
+    // Si no es Super Admin, siempre hace un ticket interno automáticamente
     if (!storedUser?.isSuperUser) {
       ejecutarEmisionTiquete(ventasArray, "interno");
       return;
     }
 
+    // Menú exclusivo para el Super Admin
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
         <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Tipo de Comprobante</p>

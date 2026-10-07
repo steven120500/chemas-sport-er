@@ -6,7 +6,7 @@ const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 /* ========================================================
-   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (VERSION DEFINITIVA)
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
@@ -19,19 +19,17 @@ router.post('/emitir-tiquete', async (req, res) => {
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
     const itemsAlegra = [];
-    let totalFactura = 0;
     
     ventas.forEach((venta) => {
+      // 1. Calculamos el precio y las cantidades reales
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
       const precioPorPrenda = Number(venta.price) || Number(venta.precio) || 10000;
-      
-      const subtotalVenta = precioPorPrenda * cantidadUnidades;
-      totalFactura += subtotalVenta;
 
+      // 2. Construimos los ítems para Alegra
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
-            id: 1, 
+            id: 1, // ID del ítem "Venta simple" en Alegra
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
             price: precioPorPrenda,
             quantity: 1
@@ -39,7 +37,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         });
       } else {
         itemsAlegra.push({
-          id: 1, 
+          id: 1, // ID del ítem "Venta simple" en Alegra
           name: venta.item || "Camiseta Deportiva",
           price: precioPorPrenda,
           quantity: cantidadUnidades
@@ -49,30 +47,26 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // Estructura corregida con los códigos oficiales en el bloque de pagos
+    // 3. Estructura maestra a prueba de errores para Costa Rica
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 
+        id: 2 // ID exacto del cliente de contado
       },
       items: itemsAlegra,
-      paymentCondition: "01", // Contado
-      paymentForm: "01",       // Efectivo
-      status: "open",          // Emitida directamente
-      payments: [
-        {
-          paymentMethod: "01", // 🔥 Corregido: Usamos "01" en lugar de "cash" para la API de CR
-          amount: totalFactura,
-          date: fechaActual
-        }
-      ]
+      paymentCondition: "01", // Código Hacienda: 01 = Contado
+      paymentForm: "01",      // Código Hacienda: 01 = Efectivo
+      status: "open"          // Evita que se guarde como borrador
     };
 
+    // 4. Enrutamiento del documento (Hacienda vs Interno)
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; 
+      payloadAlegra.documentType = "04"; // 04 = Tiquete Electrónico Oficial
     } 
+    // Si es "interno", Alegra usa su consecutivo estándar de factura
 
+    // 5. Envío a la API
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
       headers: {
@@ -92,6 +86,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
+    // 6. Enlace de impresión limpia y directa
     const pdfGenerado = `https://app.alegra.com/print/invoice?id=${alegraData.id}`;
 
     return res.status(200).json({
