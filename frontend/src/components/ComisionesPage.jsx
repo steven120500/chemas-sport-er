@@ -270,13 +270,22 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
             h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
             p { margin: 2px 0; }
+            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
+            .logo-img { max-width: 140px; height: auto; object-fit: contain; }
           </style>
         </head>
         <body>
           <div class="text-center">
+            <!-- LOGO SUPERIOR CORREGIDO -->
+            <div class="logo-container">
+              <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+            </div>
+            
             <h1>CHEMASPORT ER</h1>
             <p>Ropa y Artículos Deportivos</p>
             <p>Tel: +50660369857</p>
+            <!-- NUEVA DIRECCIÓN -->
+            <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
           </div>
           
           <div class="divider"></div>
@@ -307,7 +316,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           
           <script>
             window.onload = function() {
-              window.print();
+              // Pequeño retraso para asegurar que la imagen del logo cargue antes de imprimir
+              setTimeout(() => {
+                window.print();
+              }, 300);
             };
           </script>
         </body>
