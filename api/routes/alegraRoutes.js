@@ -18,12 +18,15 @@ router.post('/emitir-tiquete', async (req, res) => {
     }
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
+    
+    // Construir los ítems para la API de Alegra
     const itemsAlegra = [];
     
     ventas.forEach((venta) => {
       if (venta.items && Array.isArray(venta.items)) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
+            id: 1, // ID del ítem "Venta simple" en Alegra
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
             price: Number(venta.price) || 10000,
             quantity: 1
@@ -31,6 +34,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         });
       } else {
         itemsAlegra.push({
+          id: 1, // ID del ítem "Venta simple" en Alegra
           name: venta.item || "Camiseta Deportiva",
           price: Number(venta.price) || 10000,
           quantity: venta.totalUnidades || 1
