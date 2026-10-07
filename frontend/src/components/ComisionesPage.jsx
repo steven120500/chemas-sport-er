@@ -21,20 +21,14 @@ function extractClienteSeguro(detailsStr) {
   if (typeof detailsStr !== "string") return "Cliente General";
   const idx = detailsStr.indexOf("Cliente:");
   if (idx === -1) return "Cliente General";
-  
   const after = detailsStr.substring(idx + 8);
   const endIdx = after.indexOf("|");
   const raw = endIdx !== -1 ? after.substring(0, endIdx) : after;
-  const clean = String(raw || "").trim();
-  return clean || "Cliente General";
+  return String(raw || "").trim() || "Cliente General";
 }
 
-// 🛡️ PARSEO DE TALLAS 100% SEGURO PARA 3 UBICACIONES
 function parseSaleDetails(log) {
-  const detailsStr = typeof log?.details === "string" 
-    ? log.details 
-    : JSON.stringify(log?.details || "");
-
+  const detailsStr = typeof log?.details === "string" ? log.details : JSON.stringify(log?.details || "");
   const cliente = extractClienteSeguro(detailsStr);
   const vendedor = String(log?.user || "Sistema").trim();
   const itemGeneral = String(log?.item || "Camiseta").trim();
@@ -51,45 +45,34 @@ function parseSaleDetails(log) {
 
   try {
     const segmentos = cleanDetails.split("|");
-
     segmentos.forEach((segmento) => {
       const regex = /\[(.*?)\]\s*:\s*(\d+)\s*(?:->|→|-|to)\s*(\d+)/i;
       const match = regex.exec(segmento);
-
       if (match) {
         const [, rawTalla, oldStr, newStr] = match;
         const talla = String(rawTalla || "").trim().toUpperCase();
         const oldV = Number(oldStr) || 0;
         const newV = Number(newStr) || 0;
-
         let tienda = "Tienda";
-        if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) {
-          tienda = "Bodega 2";
-        } else if (segmento.includes("Bodega 1") || segmento.includes("Tienda #1")) {
-          tienda = "Bodega 1";
-        }
+        if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) tienda = "Bodega 2";
+        else if (segmento.includes("Bodega 1") || segmento.includes("Tienda #1")) tienda = "Bodega 1";
 
         const cantidad = Math.abs(oldV - newV);
-
         if (cantidad > 0 && talla && talla !== "U" && !talla.includes("ID")) {
           totalUnidades += cantidad;
           tallasAgrupadas[talla] = (tallasAgrupadas[talla] || 0) + cantidad;
-          
-          for (let i = 0; i < cantidad; i++) {
-            items.push({ tienda, talla, nombre: itemGeneral });
-          }
+          for (let i = 0; i < cantidad; i++) items.push({ tienda, talla, nombre: itemGeneral });
         }
       }
     });
   } catch (e) {
-    console.error("Error al procesar tallas:", e);
+    console.error(e);
   }
 
   if (items.length === 0) {
     const [, fallbackTalla] = cleanDetails.match(/\[([A-Z0-9]+)\]/i) || [];
     if (fallbackTalla) {
       const cleanFallback = String(fallbackTalla).toUpperCase();
-      
       let tiendaFallback = "Tienda";
       if (cleanDetails.includes("Bodega 2") || cleanDetails.includes("Tienda #2")) tiendaFallback = "Bodega 2";
       else if (cleanDetails.includes("Bodega 1") || cleanDetails.includes("Tienda #1")) tiendaFallback = "Bodega 1";
@@ -118,17 +101,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
   const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
-  
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
   const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
 
   const storedUser = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
   }, []);
 
   const fetchVentas = async () => {
@@ -136,27 +113,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     setVentasSeleccionadas([]); 
     try {
       const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
-      const params = new URLSearchParams({
-        page: "1",
-        limit: "3000",
-        month: selectedMonth,
-        _: String(Date.now()),
-      });
-
+      const params = new URLSearchParams({ page: "1", limit: "3000", month: selectedMonth, _: String(Date.now()) });
       const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
-        headers: {
-          "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false",
-          "x-roles": roles,
-        },
+        headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false", "x-roles": roles },
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-      setLogs(items);
+      setLogs(Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []));
     } catch (err) {
-      console.error("Error cargando ventas:", err);
       setLogs([]);
     } finally {
       setLoading(false);
@@ -170,41 +134,26 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
   const ventasFiltradas = useMemo(() => {
     if (!Array.isArray(logs)) return [];
-    return logs
-      .map((log) => {
-        const parsed = parseSaleDetails(log);
-        const actionStr = String(log?.action || "").toLowerCase();
-        const detailsStr = String(log?.details || "").toLowerCase();
-
-        const esVenta = 
-          actionStr.includes("vend") || 
-          (parsed.totalUnidades > 0 && !actionStr.includes("ajust") && !actionStr.includes("actualiz") && !detailsStr.includes("ajuste"));
-
-        return { ...log, ...parsed, esVenta };
-      })
-      .filter((v) => v.esVenta && v.totalUnidades > 0);
+    return logs.map((log) => {
+      const parsed = parseSaleDetails(log);
+      const actionStr = String(log?.action || "").toLowerCase();
+      const detailsStr = String(log?.details || "").toLowerCase();
+      const esVenta = actionStr.includes("vend") || (parsed.totalUnidades > 0 && !actionStr.includes("ajust") && !actionStr.includes("actualiz") && !detailsStr.includes("ajuste"));
+      return { ...log, ...parsed, esVenta };
+    }).filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
 
   const ranking = useMemo(() => {
     const conteo = {};
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
-
     ventasFiltradas.forEach((v) => {
       const vend = v.vendedor || "Otros";
-      if (!conteo[vend]) {
-        conteo[vend] = { ventas: 0, unidades: 0 };
-      }
+      if (!conteo[vend]) conteo[vend] = { ventas: 0, unidades: 0 };
       conteo[vend].ventas += 1;
       conteo[vend].unidades += v.totalUnidades;
     });
-
     return Object.entries(conteo)
-      .map(([vendedor, stats]) => ({
-        vendedor,
-        ventas: stats.ventas,
-        unidades: stats.unidades,
-        totalComision: stats.unidades * comisionPorPrenda,
-      }))
+      .map(([vendedor, stats]) => ({ vendedor, ventas: stats.ventas, unidades: stats.unidades, totalComision: stats.unidades * comisionPorPrenda }))
       .filter((item) => storedUser?.isSuperUser || item.unidades > 0)
       .sort((a, b) => b.unidades - a.unidades);
   }, [ventasFiltradas, comisionPorPrenda, storedUser?.isSuperUser]);
@@ -212,18 +161,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const tablaVentas = useMemo(() => {
     if (!searchFilter.trim()) return ventasFiltradas;
     const q = searchFilter.toLowerCase();
-    return ventasFiltradas.filter((v) =>
-      v.vendedor.toLowerCase().includes(q) ||
-      v.cliente.toLowerCase().includes(q) ||
-      String(v.item || "").toLowerCase().includes(q)
-    );
+    return ventasFiltradas.filter((v) => v.vendedor.toLowerCase().includes(q) || v.cliente.toLowerCase().includes(q) || String(v.item || "").toLowerCase().includes(q));
   }, [ventasFiltradas, searchFilter]);
 
   const top1 = ranking.at(0) || null;
   const top2 = ranking.at(1) || null;
   const top3 = ranking.at(2) || null;
   const restoRanking = ranking.slice(3);
-
   const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
 
@@ -231,21 +175,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     try {
       const res = await fetch(`${API_BASE}/api/history`, {
         method: "DELETE",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false"
-        }
+        headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" }
       });
-
       if (!res.ok) throw new Error("Error en el servidor al reiniciar");
-
       setLogs([]);
       setVentasSeleccionadas([]);
-      toastHOT.success("Historial reiniciado. Comisiones puestas en cero.", {
-        style: { background: "#000", color: "#fff", fontWeight: "bold" }
-      });
+      toastHOT.success("Historial reiniciado. Comisiones puestas en cero.", { style: { background: "#000", color: "#fff", fontWeight: "bold" } });
     } catch (err) {
-      console.error(err);
       toastHOT.error("No se pudo reiniciar el historial.");
     }
   };
@@ -253,30 +189,15 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const confirmarResetGlobal = () => {
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
-        <div className="flex justify-center text-red-600 mb-2">
-          <FaExclamationTriangle size={24} />
-        </div>
+        <div className="flex justify-center text-red-600 mb-2"><FaExclamationTriangle size={24} /></div>
         <p className="font-black text-sm mb-1 text-red-600 uppercase tracking-widest">¿Reiniciar todo el mes?</p>
         <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
-          Esto eliminará <strong>absolutamente todas</strong> las ventas y pondrá a todos los vendedores en cero. <br/><br/>
+          Esto eliminará <strong>absolutamente todas</strong> las ventas y pondrá a todos los vendedores en cero.<br/><br/>
           <span className="font-bold text-black">Ojo:</span> Esta acción no afecta el stock, solo limpia la tabla de comisiones. No se puede deshacer.
         </p>
         <div className="flex gap-2 justify-center">
-          <button
-            onClick={() => {
-              toastHOT.dismiss(t.id);
-              ejecutarResetGlobal();
-            }}
-            className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer shadow-md"
-          >
-            SÍ, BORRAR TODO
-          </button>
-          <button
-            onClick={() => toastHOT.dismiss(t.id)}
-            className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
-          >
-            CANCELAR
-          </button>
+          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarResetGlobal(); }} className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer shadow-md">SÍ, BORRAR TODO</button>
+          <button onClick={() => toastHOT.dismiss(t.id)} className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer">CANCELAR</button>
         </div>
       </div>
     ), { duration: 8000 });
@@ -284,46 +205,21 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
   const ejecutarAnulacion = async (venta) => {
     try {
-      const payload = {
-        productId: venta.productId || null,
-        item: venta.item,
-        items: venta.items || [],
-        totalUnidades: venta.totalUnidades || 1
-      };
-
+      const payload = { productId: venta.productId || null, item: venta.item, items: venta.items || [], totalUnidades: venta.totalUnidades || 1 };
       let res = await fetch(`${API_BASE}/api/sales/anular/${venta._id}`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false"
-        },
-        body: JSON.stringify(payload)
+        method: "POST", headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" }, body: JSON.stringify(payload)
       });
-
       if (!res.ok && res.status === 404) {
         res = await fetch(`${API_BASE}/api/products/anular/${venta._id}`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "x-super": storedUser?.isSuperUser ? "true" : "false"
-          },
-          body: JSON.stringify(payload)
+          method: "POST", headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" }, body: JSON.stringify(payload)
         });
       }
-
       const resData = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(resData.error || `Error ${res.status} del servidor al anular`);
-      }
-
+      if (!res.ok) throw new Error(resData.error || `Error ${res.status} del servidor al anular`);
       setLogs((prev) => prev.filter((l) => l._id !== venta._id));
       setVentasSeleccionadas((prev) => prev.filter((v) => v._id !== venta._id));
-      toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", {
-        style: { background: "#000", color: "#fff", fontWeight: "bold" }
-      });
+      toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", { style: { background: "#000", color: "#fff", fontWeight: "bold" } });
     } catch (err) {
-      console.error("Error al anular:", err);
       toastHOT.error(err.message || "No se pudo anular la venta.");
     }
   };
@@ -336,151 +232,164 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           Se sumarán <strong>{venta.totalUnidades} camiseta(s)</strong> ({venta.tallasTexto || "talla vendida"}) al stock y se descontará del vendedor <strong>{venta.vendedor}</strong>.
         </p>
         <div className="flex gap-2 justify-center">
-          <button
-            onClick={() => {
-              toastHOT.dismiss(t.id);
-              ejecutarAnulacion(venta);
-            }}
-            className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
-          >
-            Sí, Anular
-          </button>
-          <button
-            onClick={() => toastHOT.dismiss(t.id)}
-            className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
-          >
-            Cancelar
-          </button>
+          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarAnulacion(venta); }} className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer">Sí, Anular</button>
+          <button onClick={() => toastHOT.dismiss(t.id)} className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer">Cancelar</button>
         </div>
       </div>
     ), { duration: 6000 });
   };
 
-  // 🧾 1. COMUNICACIÓN CON BACKEND (TIPO INCLUIDO)
-  const ejecutarEmisionTiquete = async (ventasArray, tipoEmision) => {
+  // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO (SIN ABRIR ALEGRA)
+  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado) => {
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
+
+    const fechaHoy = new Date().toLocaleString("es-CR");
+    const clienteNombre = ventasArray[0]?.cliente || "Cliente de Contado";
+    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+
+    const itemsHTML = ventasArray.map(v => `
+      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+        <span style="flex: 1; padding-right: 10px;">${v.totalUnidades}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}</span>
+      </div>
+    `).join("");
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Tiquete ${consecutivoOficial}</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+            h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
+            p { margin: 2px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="text-center">
+            <h1>CHEMASPORT ER</h1>
+            <p>Ropa y Artículos Deportivos</p>
+            <p>Tel: 60369857</p>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+          
+          <div class="divider"></div>
+          
+          <p class="font-bold" style="margin-bottom: 8px;">CANT. DESCRIPCIÓN</p>
+          ${itemsHTML}
+          
+          <div class="divider"></div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+            <span>TOTAL:</span>
+            <span>₡${totalCobrado.toLocaleString("es-CR")}</span>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="text-center" style="margin-top: 20px;">
+            <p>¡Gracias por su compra!</p>
+            <p>Conserve este tiquete para reclamos.</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // 🧾 COMUNICACIÓN CON BACKEND
+  const ejecutarEmisionTiquete = async (ventasArray, tipoEmision, precioManual) => {
     if (generandoTiquete) return;
     setGenerandoTiquete(true);
-    
-    const toastId = toastHOT.loading(`Generando ticket ${tipoEmision === "hacienda" ? "oficial" : "interno"}...`);
+    const toastId = toastHOT.loading(`Procesando en Alegra...`);
 
     try {
       const response = await fetch(`${API_BASE}/api/alegra/emitir-tiquete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false"
-        },
-        body: JSON.stringify({
-          ventas: ventasArray,
-          tipo: tipoEmision 
-        })
+        headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" },
+        body: JSON.stringify({ ventas: ventasArray, tipo: tipoEmision, precioManual })
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
 
-      if (!response.ok) {
-        throw new Error(data.error || "No se pudo emitir el comprobante");
-      }
-
-      toastHOT.success(data.message || "¡Documento generado con éxito!", { id: toastId });
+      toastHOT.success("¡Registrado en Alegra con éxito!", { id: toastId });
       setVentasSeleccionadas([]); 
       
-      // 🔥 AQUÍ SE ABRE LA PESTAÑA LIMPIA DE IMPRESIÓN 
-      if (data.pdfUrl) {
-        window.open(data.pdfUrl, "_blank"); 
-      }
+      // 🔥 MANDAMOS A IMPRIMIR NATIVAMENTE EN LA PÁGINA
+      imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado);
 
     } catch (error) {
-      console.error("Error emitiendo tiquete:", error);
       toastHOT.error(`Error: ${error.message}`, { id: toastId, duration: 5000 });
     } finally {
       setGenerandoTiquete(false);
     }
   };
 
-  // 🧾 2. ADVERTENCIA FINAL HACIENDA
-  const confirmarEmisionHacienda = (ventasArray) => {
-    toastHOT((t) => (
-      <div className="text-center p-2 text-black font-sans">
-        <div className="flex justify-center text-amber-500 mb-2">
-          <FaExclamationTriangle size={24} />
-        </div>
-        <p className="font-black text-sm mb-1 text-amber-600 uppercase tracking-widest">¿Emitir a Hacienda?</p>
-        <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
-          Esto enviará el tiquete electrónico directamente a los servidores de Hacienda. Es un documento oficial y fiscal.
-        </p>
-        <div className="flex gap-2 justify-center">
-          <button
-            onClick={() => {
-              toastHOT.dismiss(t.id);
-              ejecutarEmisionTiquete(ventasArray, "hacienda");
-            }}
-            className="bg-amber-500 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-amber-600 cursor-pointer shadow-md"
-          >
-            SÍ, CONFIRMAR
-          </button>
-          <button
-            onClick={() => toastHOT.dismiss(t.id)}
-            className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer"
-          >
-            CANCELAR
-          </button>
-        </div>
-      </div>
-    ), { duration: 8000 });
-  };
-
-  // 🧾 3. ENRUTADOR VISUAL DE EMISIÓN
+  // 🧾 PREGUNTAR PRECIO Y TIPO
   const abrirMenuEmision = (ventasArray) => {
-    // Si no es Super Admin, siempre hace un ticket interno automáticamente
-    if (!storedUser?.isSuperUser) {
-      ejecutarEmisionTiquete(ventasArray, "interno");
+    // 1. Pedimos el precio real al usuario
+    const precioIngresado = window.prompt(
+      `Emitiendo ${ventasArray.length} registro(s).\n\nIngrese el PRECIO TOTAL (Monto en colones) que cobró por esta venta:`, 
+      "10000"
+    );
+    
+    if (!precioIngresado) return; 
+    const precioNumerico = Number(precioIngresado);
+
+    if (isNaN(precioNumerico) || precioNumerico <= 0) {
+      return alert("El precio debe ser un número válido mayor a 0.");
+    }
+
+    // 🔥 CORRECCIÓN: Validamos el admin por la propiedad de React o por el Storage
+    const esAdmin = isSuperUser || storedUser?.isSuperUser === true || storedUser?.role === "admin" || storedUser?.rol === "admin";
+
+    // 2. Si no es admin, emite interno directo con el precio indicado
+    if (!esAdmin) {
+      ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico);
       return;
     }
 
-    // Menú exclusivo para el Super Admin
+    // 3. Menú de Admin
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
-        <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Tipo de Comprobante</p>
+        <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Monto: ₡{precioNumerico.toLocaleString("es-CR")}</p>
         <div className="flex flex-col gap-2">
-          <button
-            onClick={() => {
-              toastHOT.dismiss(t.id);
-              ejecutarEmisionTiquete(ventasArray, "interno");
-            }}
-            className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors"
-          >
+          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico); }} className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors">
             Ticket Normal (Uso Interno)
           </button>
-          <button
-            onClick={() => {
-              toastHOT.dismiss(t.id);
-              confirmarEmisionHacienda(ventasArray);
-            }}
-            className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors"
-          >
+          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiquete(ventasArray, "hacienda", precioNumerico); }} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
             Tiquete Electrónico (Hacienda)
           </button>
         </div>
-        <button
-          onClick={() => toastHOT.dismiss(t.id)}
-          className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer"
-        >
-          Cancelar
-        </button>
+        <button onClick={() => toastHOT.dismiss(t.id)} className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer">Cancelar</button>
       </div>
     ), { duration: 6000 });
   };
 
-  // Lógica para marcar/desmarcar ventas de la tabla
   const toggleSeleccionVenta = (venta) => {
     setVentasSeleccionadas((prev) => {
       const existe = prev.find((v) => v._id === venta._id);
-      if (existe) {
-        return prev.filter((v) => v._id !== venta._id);
-      } else {
-        return [...prev, venta];
-      }
+      if (existe) return prev.filter((v) => v._id !== venta._id);
+      return [...prev, venta];
     });
   };
 
@@ -502,22 +411,18 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             .title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase; margin: 0; }
             .subtitle { font-size: 11px; color: #444; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }
             .meta { text-align: right; font-size: 10px; color: #333; }
-            
             .summary-box { display: flex; border: 1px solid #000; margin-bottom: 25px; }
             .summary-item { flex: 1; padding: 10px 15px; border-right: 1px solid #000; }
             .summary-item:last-child { border-right: none; }
             .summary-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
             .summary-value { font-size: 18px; font-weight: 900; margin-top: 4px; }
-
             .section-title { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 25px; margin-bottom: 10px; }
-
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
             th { text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1.5px solid #000; padding: 6px 4px; }
             td { padding: 6px 4px; border-bottom: 1px solid #e0e0e0; font-size: 10px; }
             tr:last-child td { border-bottom: 1px solid #000; }
             .text-right { text-align: right; }
             .font-bold { font-weight: 800; }
-
             .footer { margin-top: 35px; border-top: 1px solid #000; padding-top: 8px; font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; color: #555; }
           </style>
         </head>
@@ -602,19 +507,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </tbody>
           </table>
 
-          <div class="footer">
-            Chema Sport ER — Documento Oficial de Rendición de Cuentas
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+          <div class="footer">Chema Sport ER — Documento Oficial de Rendición de Cuentas</div>
+          <script>window.onload = function() { window.print(); };</script>
         </body>
       </html>
     `;
-
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
@@ -623,11 +520,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
-          
-        <button
-          onClick={() => navigate("/")}
-          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
-        >
+        <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8">
           <FaChevronLeft size={12} /> Volver al catálogo
         </button>
 
@@ -637,141 +530,76 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <FaTrophy size={11} className="text-amber-400" />
               <span>TABLERO DE COMISIONES</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
-              Ranking de Vendedores
-            </h1>
-            <p className="text-zinc-500 text-sm font-medium mt-1">
-              Registro de ventas y comisiones acumuladas del mes.
-            </p>
+            <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">Ranking de Vendedores</h1>
+            <p className="text-zinc-500 text-sm font-medium mt-1">Registro de ventas y comisiones acumuladas del mes.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {storedUser?.isSuperUser && (
-              <button
-                onClick={confirmarResetGlobal}
-                className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer border border-red-200"
-                title="Borrar todo el historial de ventas del mes"
-              >
+              <button onClick={confirmarResetGlobal} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer border border-red-200" title="Borrar todo el historial de ventas del mes">
                 <FaTrash size={14} />
                 <span className="hidden sm:inline">Reiniciar</span>
               </button>
             )}
-
-            <button
-              onClick={generarPDFBlancoYNegro}
-              className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
-            >
+            <button onClick={generarPDFBlancoYNegro} className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-md transition-all cursor-pointer">
               <FaFilePdf size={14} />
               <span>Exportar PDF</span>
             </button>
-
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <FaCalendarAlt className="text-zinc-400" />
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent text-sm font-black text-black outline-none cursor-pointer"
-              />
+              <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent text-sm font-black text-black outline-none cursor-pointer" />
             </div>
-
             <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${storedUser?.isSuperUser ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
-              {!storedUser?.isSuperUser ? (
-                <FaLock className="text-zinc-400" size={10} title="Solo administradores" />
-              ) : (
-                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>
-              )}
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={comisionPorPrenda}
-                onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)}
-                disabled={!storedUser?.isSuperUser}
-                className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!storedUser?.isSuperUser ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`}
-              />
+              {!storedUser?.isSuperUser ? <FaLock className="text-zinc-400" size={10} title="Solo administradores" /> : <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>}
+              <input type="number" min="0" step="100" value={comisionPorPrenda} onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)} disabled={!storedUser?.isSuperUser} className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!storedUser?.isSuperUser ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`} />
             </div>
           </div>
         </div>
 
         {/* Podio Top 3 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
-          
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
-            <div className="w-12 h-12 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
-              🥈
-            </div>
+            <div className="w-12 h-12 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xl font-black mb-3 shadow-inner">🥈</div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">2º LUGAR</span>
-            <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">
-              {top2?.vendedor || "Sin ventas"}
-            </h3>
+            <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">{top2?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
-              <p className="text-3xl font-black text-black leading-none">
-                {top2?.unidades || 0}
-              </p>
+              <p className="text-3xl font-black text-black leading-none">{top2?.unidades || 0}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Prendas vendidas</p>
-              <p className="text-sm font-black text-emerald-600 mt-2">
-                ₡{(top2?.totalComision || 0).toLocaleString("es-CR")}
-              </p>
+              <p className="text-sm font-black text-emerald-600 mt-2">₡{(top2?.totalComision || 0).toLocaleString("es-CR")}</p>
             </div>
           </div>
-
           <div className="bg-gradient-to-b from-amber-500/10 via-white to-white rounded-3xl p-7 border-2 border-amber-400 shadow-xl flex flex-col items-center text-center relative order-1 md:order-2 -mt-4 md:-mt-6">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-black flex items-center justify-center text-3xl font-black mb-3 shadow-md">
-              🥇
-            </div>
-            <span className="text-xs font-black tracking-widest text-amber-600 uppercase flex items-center gap-1">
-              ★ LÍDER EN VENTAS ★
-            </span>
-            <h3 className="text-2xl sm:text-3xl font-black text-black mt-1 truncate max-w-full">
-              {top1?.vendedor || "Sin ventas"}
-            </h3>
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-black flex items-center justify-center text-3xl font-black mb-3 shadow-md">🥇</div>
+            <span className="text-xs font-black tracking-widest text-amber-600 uppercase flex items-center gap-1">★ LÍDER EN VENTAS ★</span>
+            <h3 className="text-2xl sm:text-3xl font-black text-black mt-1 truncate max-w-full">{top1?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-amber-50/60 rounded-2xl p-4 border border-amber-200">
-              <p className="text-4xl font-black text-black leading-none">
-                {top1?.unidades || 0}
-              </p>
+              <p className="text-4xl font-black text-black leading-none">{top1?.unidades || 0}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mt-1">Prendas vendidas</p>
-              <p className="text-lg font-black text-emerald-600 mt-2">
-                ₡{(top1?.totalComision || 0).toLocaleString("es-CR")}
-              </p>
+              <p className="text-lg font-black text-emerald-600 mt-2">₡{(top1?.totalComision || 0).toLocaleString("es-CR")}</p>
               <span className="text-[10px] font-bold text-zinc-400">Total comisiones</span>
             </div>
           </div>
-
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-3">
-            <div className="w-12 h-12 rounded-full bg-amber-700/20 text-amber-800 flex items-center justify-center text-xl font-black mb-3 shadow-inner">
-              🥉
-            </div>
+            <div className="w-12 h-12 rounded-full bg-amber-700/20 text-amber-800 flex items-center justify-center text-xl font-black mb-3 shadow-inner">🥉</div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">3º LUGAR</span>
-            <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">
-              {top3?.vendedor || "Sin ventas"}
-            </h3>
+            <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">{top3?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
-              <p className="text-3xl font-black text-black leading-none">
-                {top3?.unidades || 0}
-              </p>
+              <p className="text-3xl font-black text-black leading-none">{top3?.unidades || 0}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Prendas vendidas</p>
-              <p className="text-sm font-black text-emerald-600 mt-2">
-                ₡{(top3?.totalComision || 0).toLocaleString("es-CR")}
-              </p>
+              <p className="text-sm font-black text-emerald-600 mt-2">₡{(top3?.totalComision || 0).toLocaleString("es-CR")}</p>
             </div>
           </div>
-
         </div>
 
         {/* Resto del ranking */}
         {restoRanking.length > 0 && (
           <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">
-              Posiciones Generales
-            </h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">Posiciones Generales</h3>
             <div className="divide-y divide-zinc-100">
               {restoRanking.map((item, idx) => (
                 <div key={item.vendedor} className="py-3.5 flex items-center justify-between hover:bg-zinc-50 px-3 rounded-xl transition-colors">
                   <div className="flex items-center gap-3.5">
-                    <span className="w-7 h-7 rounded-full bg-zinc-100 font-black text-xs text-zinc-700 flex items-center justify-center">
-                      {idx + 4}
-                    </span>
+                    <span className="w-7 h-7 rounded-full bg-zinc-100 font-black text-xs text-zinc-700 flex items-center justify-center">{idx + 4}</span>
                     <span className="font-black text-sm text-black">{item.vendedor}</span>
                   </div>
                   <div className="flex items-center gap-6 text-right">
@@ -779,9 +607,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       <span className="font-black text-base text-black">{item.unidades}</span>
                       <span className="text-[10px] text-zinc-400 font-bold uppercase ml-1">prendas</span>
                     </div>
-                    <span className="font-black text-sm text-emerald-600 min-w-[90px]">
-                      ₡{item.totalComision.toLocaleString("es-CR")}
-                    </span>
+                    <span className="font-black text-sm text-emerald-600 min-w-[90px]">₡{item.totalComision.toLocaleString("es-CR")}</span>
                   </div>
                 </div>
               ))}
@@ -793,50 +619,28 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                Detalle de Ventas del Periodo
-              </h2>
-              <p className="text-zinc-400 text-xs font-medium mt-0.5">
-                {tablaVentas.length} ventas registradas este mes ({totalPrendasMes} prendas en total).
-              </p>
+              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">Detalle de Ventas del Periodo</h2>
+              <p className="text-zinc-400 text-xs font-medium mt-0.5">{tablaVentas.length} ventas registradas este mes ({totalPrendasMes} prendas en total).</p>
             </div>
-
             <div className="flex items-center gap-4 w-full sm:w-auto">
-              
-              {/* 🔥 BOTÓN GLOBAL PARA EMISIÓN MÚLTIPLE MODIFICADO */}
               {ventasSeleccionadas.length > 0 && (
-                <button
-                  onClick={() => abrirMenuEmision(ventasSeleccionadas)}
-                  disabled={generandoTiquete}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
-                >
+                <button onClick={() => abrirMenuEmision(ventasSeleccionadas)} disabled={generandoTiquete} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap disabled:opacity-50">
                   <FaReceipt size={14} />
                   <span>Emitir {ventasSeleccionadas.length} en 1 Tiquete</span>
                 </button>
               )}
-
               <div className="relative w-full sm:w-64">
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Buscar por cliente..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors"
-                />
+                <input type="text" value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder="Buscar por cliente..." className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black transition-colors" />
                 <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
               </div>
             </div>
           </div>
 
           {loading ? (
-            <p className="text-center py-12 text-zinc-400 font-bold text-xs uppercase tracking-widest">
-              Cargando ventas del mes...
-            </p>
+            <p className="text-center py-12 text-zinc-400 font-bold text-xs uppercase tracking-widest">Cargando ventas del mes...</p>
           ) : tablaVentas.length === 0 ? (
             <div className="text-center py-12 bg-zinc-50 rounded-2xl border border-zinc-100">
-              <p className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
-                No hay ventas registradas en el mes de {selectedMonth}.
-              </p>
+              <p className="text-zinc-500 font-bold text-xs uppercase tracking-wider">No hay ventas registradas en el mes de {selectedMonth}.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -856,96 +660,46 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <tbody className="divide-y divide-zinc-100 font-medium">
                   {tablaVentas.map((venta) => {
                     const dateObj = venta.date ? new Date(venta.date) : null;
-                    const dateStr = dateObj
-                      ? `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}`
-                      : "";
-                    const timeStr = dateObj
-                      ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : "";
-
-                    const canDelete = Boolean(
-                      storedUser?.isSuperUser ||
-                      String(storedUser?.username || "").toLowerCase() === String(venta.vendedor || "").toLowerCase()
-                    );
-                    
+                    const dateStr = dateObj ? `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}` : "";
+                    const timeStr = dateObj ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+                    const canDelete = Boolean(storedUser?.isSuperUser || String(storedUser?.username || "").toLowerCase() === String(venta.vendedor || "").toLowerCase());
                     const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
 
                     return (
                       <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
-                        
                         <td className="py-3.5 px-3 text-center">
-                          <input 
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSeleccionVenta(venta)}
-                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-black"
-                          />
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSeleccionVenta(venta)} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-black" />
                         </td>
-
-                        <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">
-                          {dateStr} <span className="text-[10px] text-zinc-400">{timeStr}</span>
-                        </td>
-                        <td className="py-3.5 px-3 font-black text-black">
-                          {venta.vendedor}
-                        </td>
-                        <td className="py-3.5 px-3 font-bold text-zinc-800">
-                          {venta.cliente}
-                        </td>
-                        
+                        <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">{dateStr} <span className="text-[10px] text-zinc-400">{timeStr}</span></td>
+                        <td className="py-3.5 px-3 font-black text-black">{venta.vendedor}</td>
+                        <td className="py-3.5 px-3 font-bold text-zinc-800">{venta.cliente}</td>
                         <td className="py-3.5 px-3 text-zinc-700">
                           <span className="font-bold text-black block">{venta.item}</span>
-                          {venta.tallasTexto && (
-                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">
-                              Tallas: {venta.tallasTexto}
-                            </span>
-                          )}
+                          {venta.tallasTexto && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">Tallas: {venta.tallasTexto}</span>}
                         </td>
-
                         <td className="py-3.5 px-3">
                           <div className="flex flex-wrap gap-1">
                             {venta.items.length > 0 ? (
                               [...new Set(venta.items.map(i => i.tienda))].map((ubicacion, idx) => (
-                                <span key={idx} className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
-                                  {ubicacion}
-                                </span>
+                                <span key={idx} className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">{ubicacion}</span>
                               ))
                             ) : (
-                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">
-                                Tienda
-                              </span>
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold">Tienda</span>
                             )}
                           </div>
                         </td>
-                        
-                        <td className="py-3.5 px-3 font-black text-right text-sm text-black">
-                          {venta.totalUnidades}
-                        </td>
-
+                        <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
                         <td className="py-3.5 px-3 text-center">
                           <div className="flex justify-center items-center gap-3">
-                            
-                            {/* 🔥 BOTÓN INDIVIDUAL MODIFICADO */}
-                            <button
-                              onClick={() => abrirMenuEmision([venta])}
-                              disabled={generandoTiquete}
-                              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50"
-                              title="Emitir comprobante"
-                            >
+                            <button onClick={() => abrirMenuEmision([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer disabled:opacity-50" title="Emitir comprobante">
                               <FaReceipt size={14} />
                             </button>
-
                             {canDelete ? (
-                              <button
-                                onClick={() => confirmarAnulacion(venta)}
-                                className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                                title="Anular venta y restablecer inventario"
-                              >
+                              <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular venta y restablecer inventario">
                                 <FaTrash size={13} />
                               </button>
                             ) : (
-                              <div className="p-2 text-zinc-300" title="Solo el creador o SuperAdmin pueden anular">
-                                <FaLock size={11} />
-                              </div>
+                              <div className="p-2 text-zinc-300" title="Solo el creador o SuperAdmin pueden anular"><FaLock size={11} /></div>
                             )}
                           </div>
                         </td>
@@ -956,9 +710,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               </table>
             </div>
           )}
-
         </div>
-
       </div>
     </div>
   );

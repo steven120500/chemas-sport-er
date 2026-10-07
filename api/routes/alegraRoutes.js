@@ -5,12 +5,14 @@ const router = express.Router();
 const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
+// 🔥 ID DE TU NUMERACIÓN INTERNA (NO ELECTRÓNICA)
+const ID_NUMERACION_INTERNA = 1; 
+
 /* ========================================================
    🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    // 🔥 Ahora recibimos el precio manual que digita el usuario en el frontend
     const { ventas, tipo, precioManual } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
@@ -25,7 +27,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     ventas.forEach((venta) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
       
-      // Si mandaron un precio global para esta emisión, lo dividimos entre las unidades (o lo aplicamos directo)
+      // Si mandaron un precio global para esta emisión, lo dividimos entre las unidades
       const precioUnitario = Number(precioManual) / cantidadUnidades || Number(venta.price) || 10000;
       
       const subtotalVenta = precioUnitario * cantidadUnidades;
@@ -72,9 +74,13 @@ router.post('/emitir-tiquete', async (req, res) => {
       ]
     };
 
+    // 🔥 ENRUTAMIENTO CRÍTICO: HACIENDA VS INTERNO
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; 
-    } 
+      payloadAlegra.documentType = "04"; // 04 = Tiquete Electrónico oficial
+    } else {
+      // Si es interno, forzamos a usar la plantilla NO electrónica
+      payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
+    }
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
