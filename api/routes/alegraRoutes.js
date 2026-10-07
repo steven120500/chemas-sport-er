@@ -19,14 +19,23 @@ router.post('/emitir-tiquete', async (req, res) => {
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
     const itemsAlegra = [];
+    let totalFactura = 0;
     
     ventas.forEach((venta) => {
-      if (venta.items && Array.isArray(venta.items)) {
+      // 🔥 Como el frontend manda las ventas seleccionadas, calculamos el total basado en las unidades 
+      // (Asumiendo un precio promedio por prenda o usando el totalUnidades si no trae precio explícito)
+      const cantidadUnidades = Number(venta.totalUnidades) || 1;
+      const precioPorPrenda = Number(venta.price) || Number(venta.precio) || 10000; // Puedes ajustar este precio base por prenda si lo deseas
+      
+      const subtotalVenta = precioPorPrenda * cantidadUnidades;
+      totalFactura += subtotalVenta;
+
+      if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
             id: 1, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
-            price: Number(venta.price) || 10000,
+            price: precioPorPrenda,
             quantity: 1
           });
         });
@@ -34,8 +43,8 @@ router.post('/emitir-tiquete', async (req, res) => {
         itemsAlegra.push({
           id: 1, 
           name: venta.item || "Camiseta Deportiva",
-          price: Number(venta.price) || 10000,
-          quantity: venta.totalUnidades || 1
+          price: precioPorPrenda,
+          quantity: cantidadUnidades
         });
       }
     });
@@ -46,12 +55,19 @@ router.post('/emitir-tiquete', async (req, res) => {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 
+        id: 2 // Cliente de contado
       },
       items: itemsAlegra,
-      paymentCondition: "01", 
-      paymentForm: "01",
-      status: "open" // 🔥 Esto evita que se quede en borrador y la emite de una vez
+      paymentCondition: "01", // Contado
+      paymentForm: "01",       // Efectivo
+      status: "open",          // Abierta / Emitida (evita borradores)
+      payments: [
+        {
+          paymentMethod: "cash",
+          amount: totalFactura,
+          date: fechaActual
+        }
+      ]
     };
 
     if (tipo === "hacienda") {
@@ -77,15 +93,12 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
-    // Obtenemos el link del PDF que provee Alegra
-    const pdfGenerado = alegraData.printUrl || alegraData.pdf || `https://app.alegra.com/print/invoice?id=${alegraData.id}`;
-
     return res.status(200).json({
       success: true,
       message: tipo === "hacienda" 
         ? "¡Tiquete electrónico oficial generado ante Hacienda!"
         : "Ticket interno generado con éxito.",
-      pdfUrl: pdfGenerado,
+      pdfUrl: alegraData.printUrl || alegraData.pdf || null,
       alegraId: alegraData.id
     });
 
