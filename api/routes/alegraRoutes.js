@@ -50,11 +50,12 @@ router.post('/emitir-tiquete', async (req, res) => {
       },
       items: itemsAlegra,
       paymentCondition: "01", 
-      paymentForm: "01"       
+      paymentForm: "01",
+      status: "open" // 🔥 Esto evita que se quede en borrador y la emite de una vez
     };
 
     if (tipo === "hacienda") {
-      payloadAlegr.documentType = "04"; 
+      payloadAlegra.documentType = "04"; 
     } 
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
@@ -69,9 +70,6 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const alegraData = await alegraResponse.json();
 
-    // 🔥 IMPRIMIR LA RESPUESTA DE ALEGRA EN LA TERMINAL DE RENDER
-    console.log("Respuesta completa de Alegra:", JSON.stringify(alegraData, null, 2));
-
     if (!alegraResponse.ok) {
       console.error("Error de Alegra:", alegraData);
       return res.status(400).json({ 
@@ -79,12 +77,15 @@ router.post('/emitir-tiquete', async (req, res) => {
       });
     }
 
+    // Obtenemos el link del PDF que provee Alegra
+    const pdfGenerado = alegraData.printUrl || alegraData.pdf || `https://app.alegra.com/print/invoice?id=${alegraData.id}`;
+
     return res.status(200).json({
       success: true,
       message: tipo === "hacienda" 
         ? "¡Tiquete electrónico oficial generado ante Hacienda!"
         : "Ticket interno generado con éxito.",
-      pdfUrl: alegraData.printUrl || alegraData.pdf || null,
+      pdfUrl: pdfGenerado,
       alegraId: alegraData.id
     });
 
