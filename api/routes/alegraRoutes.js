@@ -44,7 +44,7 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // Estructura base del comprobante usando las opciones exactas del menú de Alegra CR
+    // Estructura base del comprobante usando los códigos oficiales numéricos de CR
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
@@ -52,8 +52,8 @@ router.post('/emitir-tiquete', async (req, res) => {
         id: 2 // ID exacto del cliente de contado
       },
       items: itemsAlegra,
-      paymentMethod: "Contado", // Sacado de la lista "Condición"
-      paymentForm: "Efectivo"   // Sacado de la lista "Medio de pago"
+      paymentMethod: "01", // 01 = Contado (Código Oficial Hacienda)
+      paymentForm: "01"    // 01 = Efectivo (Código Oficial Hacienda)
     };
 
     // 🔥 Si es hacienda, forzamos el Tiquete Electrónico (04)
