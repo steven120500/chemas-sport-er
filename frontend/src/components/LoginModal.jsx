@@ -80,7 +80,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 placeholder="Ingresa tu usuario"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-white font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner"
+                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-black font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner"
               />
             </div>
 
@@ -93,7 +93,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-white font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner pr-20"
+                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-black font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner pr-20"
               />
               <button
                 type="button"
