@@ -52,12 +52,13 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-      let tipoAlegra = "Cédula física"; 
-      if (tipoIdentificacion === "02") tipoAlegra = "Cédula jurídica";
+      // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA (SIN TILDE EN CEDULA)
+      let tipoAlegra = "Cedula Fisica"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "Cedula Juridica";
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
-      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero no domiciliado";
-      else if (tipoIdentificacion === "06") tipoAlegra = "No contribuyente";
+      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero No Domiciliado";
+      else if (tipoIdentificacion === "06") tipoAlegra = "No Contribuyente";
 
       console.log("🔍 Buscando contacto existente en Alegra para cédula:", cedulaLimpiada);
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
