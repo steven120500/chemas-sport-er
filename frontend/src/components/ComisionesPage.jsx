@@ -624,10 +624,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                   onChange={(e) => setModalHacienda({...modalHacienda, tipoIdentificacion: e.target.value})}
                   className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-blue-600"
                 >
-                  <option value="01">Cédula Física</option>
+               <option value="01">Cédula Física</option>
                   <option value="02">Cédula Jurídica</option>
                   <option value="03">DIMEX</option>
                   <option value="04">NITE</option>
+                  <option value="05">Extranjero No Domiciliado</option>
+                  <option value="06">No Contribuyente</option>
                 </select>
               </div>
 
