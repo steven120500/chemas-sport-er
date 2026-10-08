@@ -39,7 +39,8 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    const { ventas, tipo, precioManual, cedula, nombreCliente, email } = req.body; 
+    // 🔥 AQUÍ SE RECIBE EL NUEVO TIPO DE IDENTIFICACIÓN DESDE EL FRONTEND
+    const { ventas, tipo, precioManual, cedula, nombreCliente, email, tipoIdentificacion } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
       return res.status(400).json({ error: "No se seleccionaron ventas para facturar." });
@@ -47,7 +48,7 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
-    // 🔥 CLIENTE DINÁMICO: Si el usuario digitó una cédula, la usamos obligatoriamente
+    // CLIENTE DINÁMICO: Si el usuario digitó una cédula, la usamos obligatoriamente
     let clientId = 2; // Por defecto solo si no hay cédula
 
     if (cedula && cedula.trim() !== "") {
@@ -76,14 +77,17 @@ router.post('/emitir-tiquete', async (req, res) => {
           },
           body: JSON.stringify({
             name: nombreCliente || "Cliente Electrónico",
-            identification: cedulaLimpiada,
+            // 🔥 AQUÍ SE ARREGLA EL ERROR 2035 ENVIANDO EL TIPO EXACTO
+            identificationObject: {
+              type: tipoIdentificacion || "01",
+              number: cedulaLimpiada
+            },
             email: email ? email.trim() : "",
             type: "client"
           })
         });
         const newContactData = await newContactRes.json();
         
-        // AQUÍ ESTÁN LOS LOGS PARA SABER POR QUÉ FALLA ALEGRA
         if (newContactRes.ok && newContactData.id) {
           clientId = newContactData.id;
           console.log("✅ CONTACTO CREADO EXITOSAMENTE EN ALEGRA. ID:", clientId);
@@ -117,7 +121,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         venta.items.forEach((item) => {
           itemsAlegra.push({
             id: ID_ITEM_CABYS, 
-            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, // Línea corregida
+            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, // 🔥 SINTAXIS ARREGLADA
             price: precioUnitario,
             quantity: 1
           });
@@ -173,7 +177,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     const alegraData = await alegraResponse.json();
 
     if (!alegraResponse.ok) {
-      console.error("Error de Alegra:", alegraData);
+      console.error("Error de Alegra al emitir factura:", alegraData);
       return res.status(400).json({ 
         error: alegraData.message || "Error al generar el documento en Alegra." 
       });
