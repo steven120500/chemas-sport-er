@@ -39,7 +39,6 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    // 🔥 AQUÍ SE RECIBE EL NUEVO TIPO DE IDENTIFICACIÓN DESDE EL FRONTEND
     const { ventas, tipo, precioManual, cedula, nombreCliente, email, tipoIdentificacion } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
@@ -48,19 +47,18 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
-    // CLIENTE DINÁMICO: Si el usuario digitó una cédula, la usamos obligatoriamente
     let clientId = 2; // Por defecto solo si no hay cédula
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-      // 🔥 TRADUCTOR DE TIPO DE IDENTIFICACIÓN PARA ALEGRA (MAYÚSCULAS EXACTAS)
-      let tipoAlegra = "Cédula Física"; 
-      if (tipoIdentificacion === "02") tipoAlegra = "Cédula Jurídica";
+      // 🔥 TRADUCTOR A MINÚSCULAS (COMO LO EXIGE LA API DE ALEGRA)
+      let tipoAlegra = "Cédula física"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "Cédula jurídica";
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
-      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero No Domiciliado";
-      else if (tipoIdentificacion === "06") tipoAlegra = "No Contribuyente";
+      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero no domiciliado";
+      else if (tipoIdentificacion === "06") tipoAlegra = "No contribuyente";
 
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
         headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
@@ -77,6 +75,21 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
+        
+        // PREPARAMOS EL PAQUETE DE DATOS EXACTO QUE SE ENVIARÁ
+        const payloadNuevoContacto = {
+          name: nombreCliente || "Cliente Electrónico",
+          identificationObject: {
+            type: tipoAlegra,
+            number: cedulaLimpiada
+          },
+          email: email ? email.trim() : "",
+          type: "client"
+        };
+
+        // 🕵️ LOG PARA ESPIAR QUÉ SE LE ENVÍA EXACTAMENTE A ALEGRA
+        console.log("📦 ENVIANDO A ALEGRA:", JSON.stringify(payloadNuevoContacto));
+
         const newContactRes = await fetch(`https://api.alegra.com/api/v1/contacts`, {
           method: "POST",
           headers: { 
@@ -84,16 +97,7 @@ router.post('/emitir-tiquete', async (req, res) => {
             "Content-Type": "application/json",
             "Accept": "application/json"
           },
-          body: JSON.stringify({
-            name: nombreCliente || "Cliente Electrónico",
-            // 🔥 AQUÍ SE ENVÍA LA TRADUCCIÓN EXACTA QUE ALEGRA NECESITA
-            identificationObject: {
-              type: tipoAlegra,
-              number: cedulaLimpiada
-            },
-            email: email ? email.trim() : "",
-            type: "client"
-          })
+          body: JSON.stringify(payloadNuevoContacto)
         });
         const newContactData = await newContactRes.json();
         
@@ -130,7 +134,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         venta.items.forEach((item) => {
           itemsAlegra.push({
             id: ID_ITEM_CABYS, 
-            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, // 🔥 SINTAXIS ARREGLADA
+            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
             price: precioUnitario,
             quantity: 1
           });
