@@ -171,8 +171,8 @@ router.post('/emitir-tiquete', async (req, res) => {
         id: clientId 
       },
       items: itemsAlegra,
-      paymentCondition: "01",
-      paymentForm: "01",
+      paymentCondition: "01", // Contado
+      paymentForm: "01",      // Efectivo
       status: "open",
       payments: [
         {
