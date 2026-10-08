@@ -59,6 +59,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero no domiciliado";
       else if (tipoIdentificacion === "06") tipoAlegra = "No contribuyente";
 
+      console.log("🔍 Buscando contacto existente en Alegra para cédula:", cedulaLimpiada);
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
         headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
       });
@@ -66,6 +67,7 @@ router.post('/emitir-tiquete', async (req, res) => {
 
       if (Array.isArray(contactsData) && contactsData.length > 0) {
         clientId = contactsData[0].id;
+        console.log("✅ Contacto ya existe en Alegra con ID:", clientId);
         if (email) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
             method: "PUT",
@@ -74,7 +76,6 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        
         // PREPARAMOS EL PAQUETE DE DATOS EXACTO QUE SE ENVIARÁ
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
@@ -86,8 +87,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           type: "client"
         };
 
-        // 🕵️ LOG PARA ESPIAR QUÉ SE LE ENVÍA EXACTAMENTE A ALEGRA
-        console.log("📦 ENVIANDO A ALEGRA:", JSON.stringify(payloadNuevoContacto));
+        console.log("📦 ENVIANDO NUEVO CONTACTO A ALEGRA:", JSON.stringify(payloadNuevoContacto, null, 2));
 
         const newContactRes = await fetch(`https://api.alegra.com/api/v1/contacts`, {
           method: "POST",
@@ -98,7 +98,13 @@ router.post('/emitir-tiquete', async (req, res) => {
           },
           body: JSON.stringify(payloadNuevoContacto)
         });
+        
         const newContactData = await newContactRes.json();
+        console.log("📥 RESPUESTA CRUDA DE ALEGRA (CREAR CONTACTO):", {
+          status: newContactRes.status,
+          ok: newContactRes.ok,
+          data: newContactData
+        });
         
         if (newContactRes.ok && newContactData.id) {
           clientId = newContactData.id;
@@ -176,6 +182,8 @@ router.post('/emitir-tiquete', async (req, res) => {
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
 
+    console.log("📄 ENVIANDO FACTURA A ALEGRA:", JSON.stringify(payloadAlegra, null, 2));
+
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
       headers: {
@@ -187,6 +195,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     });
 
     const alegraData = await alegraResponse.json();
+    console.log("📥 RESPUESTA DE FACTURA EN ALEGRA:", { status: alegraResponse.status, data: alegraData });
 
     if (!alegraResponse.ok) {
       console.error("Error de Alegra al emitir factura:", alegraData);
