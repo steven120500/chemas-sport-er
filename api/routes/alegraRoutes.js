@@ -52,15 +52,8 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-    
-      // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA
-    
-    let tipoAlegra = "Cédula física"; 
-    if (tipoIdentificacion === "02") tipoAlegra = "Cédula jurídica";
-    else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
-    else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
-    else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero No Domiciliado";
-    else if (tipoIdentificacion === "06") tipoAlegra = "No Contribuyente";
+      // 🔥 PLAN B: ENVIAR EL CÓDIGO DIRECTO DE HACIENDA ("01", "02", etc.)
+      let tipoAlegra = tipoIdentificacion || "01"; 
 
       console.log("==================================================");
       console.log("🔍 1. BUSCANDO CONTACTO EXISTENTE:", cedulaLimpiada);
@@ -72,7 +65,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       if (Array.isArray(contactsData) && contactsData.length > 0) {
         clientId = contactsData[0].id;
         console.log("✅ 2. CONTACTO ENCONTRADO EN ALEGRA. ID:", clientId);
-        if (email) {
+        if (email && email.includes("@")) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
             method: "PUT",
             headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json", "Accept": "application/json" },
@@ -87,7 +80,7 @@ router.post('/emitir-tiquete', async (req, res) => {
             type: tipoAlegra,
             number: cedulaLimpiada
           },
-          email: email ? email.trim() : "",
+          email: (email && email.includes("@")) ? email.trim() : "",
           type: "client",
           address: {
             address: "Grecia centro",
