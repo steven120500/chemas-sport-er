@@ -368,6 +368,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
 
+  // 🧾 2. PROCESAR EL PRECIO Y MOSTRAR OPCIONES (ADMIN) O EMITIR (NORMAL)
   const confirmarPrecioYContinuar = () => {
     const precioNumerico = Number(precioInput);
     if (isNaN(precioNumerico) || precioNumerico <= 0) {
@@ -376,55 +377,91 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
 
     const ventasArray = modalPrecio.ventas;
-    setModalPrecio({ isOpen: false, ventas: [] }); 
+    setModalPrecio({ isOpen: false, ventas: [] }); // Cerramos el modal de precio
 
     const esAdmin = isSuperUser || storedUser?.isSuperUser === true || storedUser?.role === "admin" || storedUser?.rol === "admin";
 
+    // Si no es admin, emite directo el ticket normal interno
     if (!esAdmin) {
-      ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico);
+      ejecutarEmisionTiqueteConDatos(ventasArray, "interno", precioNumerico, "", "", "");
       return;
     }
 
+    // Si es admin, mostramos el menú de selección
     toastHOT((t) => (
       <div className="text-center p-3 text-black font-sans">
         <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Monto: ₡{precioNumerico.toLocaleString("es-CR")}</p>
         <div className="flex flex-col gap-2">
-          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico); }} className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors">
+          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiqueteConDatos(ventasArray, "interno", precioNumerico, "", "", ""); }} className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors">
             Ticket Normal (Uso Interno)
           </button>
-          <button onClick={async () => { 
-            toastHOT.dismiss(t.id); 
-            const cedulaInput = prompt("Digite la cédula del cliente para el Tiquete Electrónico:", "");
-            if (!cedulaInput || !cedulaInput.trim()) {
-              toastHOT.error("Debe ingresar una cédula válida para Hacienda.");
-              return;
-            }
+          
+          <button onClick={() => {
+            toastHOT.dismiss(t.id);
+            
+            // 🔥 MODAL UNIFICADO PARA PEDIR CÉDULA Y CORREO EN UNA SOLA VENTANA
+            toastHOT((tDatos) => (
+              <div className="p-4 text-black font-sans bg-white rounded-2xl shadow-xl w-80">
+                <p className="font-black text-xs uppercase tracking-wider mb-3 text-zinc-800 text-center">Datos para Tiquete Electrónico</p>
+                
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Cédula del cliente *</label>
+                    <input id="input-cedula-hacienda" type="text" placeholder="Ej. 101110222" className="w-full mt-1 px-3 py-2 border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600" />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo electrónico (Opcional)</label>
+                    <input id="input-correo-hacienda" type="email" placeholder="cliente@correo.com" className="w-full mt-1 px-3 py-2 border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600" />
+                  </div>
+                </div>
 
-            const emailInput = prompt("Digite el correo electrónico del cliente (opcional):", "");
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => toastHOT.dismiss(tDatos.id)} className="flex-1 bg-zinc-200 text-zinc-700 py-2 rounded-xl text-xs font-bold uppercase hover:bg-zinc-300 cursor-pointer">
+                    Cancelar
+                  </button>
+                  <button onClick={async () => {
+                    const cedulaVal = document.getElementById("input-cedula-hacienda").value.trim();
+                    const correoVal = document.getElementById("input-correo-hacienda").value.trim();
 
-            const loadingToast = toastHOT.loading("Consultando cédula en Hacienda...");
-            try {
-              const resCedula = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${cedulaInput.trim()}`);
-              const dataCedula = await resCedula.json();
-              toastHOT.dismiss(loadingToast);
+                    if (!cedulaVal) {
+                      toastHOT.error("La cédula es obligatoria para Hacienda.");
+                      return;
+                    }
 
-              if (!resCedula.ok) throw new Error(dataCedula.error || "No se pudo obtener el nombre");
+                    toastHOT.dismiss(tDatos.id);
+                    const loadingToast = toastHOT.loading("Consultando cédula en Hacienda...");
 
-              toastHOT.success(`Cliente: ${dataCedula.nombre}`);
-              ejecutarEmisionTiqueteConDatos(ventasArray, "hacienda", precioNumerico, cedulaInput.trim(), dataCedula.nombre, emailInput ? emailInput.trim() : "");
-            } catch (err) {
-              toastHOT.dismiss(loadingToast);
-              toastHOT.error(err.message);
-            }
+                    try {
+                      const resCedula = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${cedulaVal}`);
+                      const dataCedula = await resCedula.json();
+                      toastHOT.dismiss(loadingToast);
+
+                      if (!resCedula.ok) throw new Error(dataCedula.error || "No se pudo obtener el nombre");
+
+                      toastHOT.success(`Cliente: ${dataCedula.nombre}`);
+                      ejecutarEmisionTiqueteConDatos(ventasArray, "hacienda", precioNumerico, cedulaVal, dataCedula.nombre, correoVal);
+                    } catch (err) {
+                      toastHOT.dismiss(loadingToast);
+                      toastHOT.error(err.message);
+                    }
+                  }} className="flex-1 bg-blue-600 text-white py-2 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm">
+                    Emitir
+                  </button>
+                </div>
+              </div>
+            ), { duration: Infinity });
+
           }} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
             Tiquete Electrónico (Hacienda)
           </button>
         </div>
         <button onClick={() => toastHOT.dismiss(t.id)} className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer">Cancelar</button>
       </div>
-    ), { duration: 10000 });
+    ), { duration: 15000 });
   };
 
+  // 🚀 FUNCIÓN UNIFICADA DE EMISIÓN
   const ejecutarEmisionTiqueteConDatos = async (ventasArray, tipoEmision, precioManual, cedula, nombreCliente, email) => {
     if (generandoTiquete) return;
     setGenerandoTiquete(true);
@@ -440,7 +477,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
 
-      toastHOT.success("¡Tiquete Electrónico emitido con éxito!", { id: toastId });
+      toastHOT.success("¡Comprobante emitido con éxito!", { id: toastId });
       setVentasSeleccionadas([]); 
       imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado);
 
@@ -450,6 +487,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       setGenerandoTiquete(false);
     }
   };
+
+  
 
   const toggleSeleccionVenta = (venta) => {
     setVentasSeleccionadas((prev) => {

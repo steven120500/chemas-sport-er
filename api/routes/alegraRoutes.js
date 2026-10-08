@@ -47,23 +47,23 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
-    // 1. GESTIÓN DEL CLIENTE EN ALEGRA (CON CÉDULA Y CORREO)
-    let clientId = 2; // Cliente genérico por defecto para tiquetes internos
+    // 🔥 CLIENTE DINÁMICO: Si el usuario digitó una cédula, la usamos obligatoriamente
+    let clientId = 2; // Por defecto solo si no hay cédula
 
-    if (tipo === "hacienda" && cedula) {
-      const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedula}`, {
+    if (cedula && cedula.trim() !== "") {
+      const cedulaLimpiada = cedula.trim();
+      const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
         headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
       });
       const contactsData = await contactRes.json();
 
       if (Array.isArray(contactsData) && contactsData.length > 0) {
         clientId = contactsData[0].id;
-        // Si ya existe pero traemos correo nuevo, lo actualizamos opcionalmente
         if (email) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
             method: "PUT",
             headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json", "Accept": "application/json" },
-            body: JSON.stringify({ email: email })
+            body: JSON.stringify({ email: email.trim() })
           });
         }
       } else {
@@ -76,8 +76,8 @@ router.post('/emitir-tiquete', async (req, res) => {
           },
           body: JSON.stringify({
             name: nombreCliente || "Cliente Electrónico",
-            identification: cedula,
-            email: email || "",
+            identification: cedulaLimpiada,
+            email: email ? email.trim() : "",
             type: "client"
           })
         });
@@ -150,7 +150,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     };
 
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; 
+      payloadAlegra.documentType = "04"; // Tiquete electrónico oficial
     } else {
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
