@@ -52,7 +52,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-      // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA (SIN TILDE EN CEDULA)
+      // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA
       let tipoAlegra = "Cedula Fisica"; 
       if (tipoIdentificacion === "02") tipoAlegra = "Cedula Juridica";
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
@@ -77,7 +77,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // PREPARAMOS EL PAQUETE DE DATOS EXACTO QUE SE ENVIARÁ
+        // 📦 PREPARAMOS EL PAQUETE CON DATOS Y UBICACIÓN POR DEFECTO PARA CREAR EL CLIENTE AUTOMÁTICAMENTE
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
           identificationObject: {
@@ -85,7 +85,13 @@ router.post('/emitir-tiquete', async (req, res) => {
             number: cedulaLimpiada
           },
           email: email ? email.trim() : "",
-          type: "client"
+          type: "client",
+          address: {
+            address: "Grecia centro",
+            city: "Grecia",
+            state: "Alajuela",
+            country: "Costa Rica"
+          }
         };
 
         console.log("📦 ENVIANDO NUEVO CONTACTO A ALEGRA:", JSON.stringify(payloadNuevoContacto, null, 2));
