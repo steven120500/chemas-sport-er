@@ -53,12 +53,12 @@ router.post('/emitir-tiquete', async (req, res) => {
       const cedulaLimpiada = cedula.trim();
 
       // 🔥 TRADUCTOR DEFINITIVO: ALEGRA EXIGE MINÚSCULAS CON TILDES
-      let tipoAlegra = "Cédula física"; 
-      if (tipoIdentificacion === "02") tipoAlegra = "Cédula jurídica";
-      else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
-      else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
-      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero no domiciliado";
-      else if (tipoIdentificacion === "06") tipoAlegra = "No contribuyente";
+      let tipoAlegra = "cedulaFisica"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "cedulaJuridica";
+      else if (tipoIdentificacion === "03") tipoAlegra = "dimex";
+      else if (tipoIdentificacion === "04") tipoAlegra = "nite";
+      else if (tipoIdentificacion === "05") tipoAlegra = "extranjeroNoDomiciliado";
+      else if (tipoIdentificacion === "06") tipoAlegra = "noContribuyente";
 
       console.log("==================================================");
       console.log("🔍 1. BUSCANDO CONTACTO EXISTENTE:", cedulaLimpiada);
