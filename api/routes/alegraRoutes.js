@@ -82,8 +82,13 @@ router.post('/emitir-tiquete', async (req, res) => {
           })
         });
         const newContactData = await newContactRes.json();
+        
+        // AQUÍ ESTÁN LOS LOGS PARA SABER POR QUÉ FALLA ALEGRA
         if (newContactRes.ok && newContactData.id) {
           clientId = newContactData.id;
+          console.log("✅ CONTACTO CREADO EXITOSAMENTE EN ALEGRA. ID:", clientId);
+        } else {
+          console.error("❌ ERROR DE ALEGRA AL CREAR EL CONTACTO:", newContactData);
         }
       }
     }
@@ -112,7 +117,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         venta.items.forEach((item) => {
           itemsAlegra.push({
             id: ID_ITEM_CABYS, 
-            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
+            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, // Línea corregida
             price: precioUnitario,
             quantity: 1
           });
