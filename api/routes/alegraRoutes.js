@@ -52,8 +52,13 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-      // 🔥 PLAN B: ENVIAR EL CÓDIGO DIRECTO DE HACIENDA ("01", "02", etc.)
-      let tipoAlegra = tipoIdentificacion || "01"; 
+      // 🔥 TRADUCTOR DEFINITIVO: ALEGRA EXIGE MINÚSCULAS CON TILDES
+      let tipoAlegra = "Cédula física"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "Cédula jurídica";
+      else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
+      else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
+      else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero no domiciliado";
+      else if (tipoIdentificacion === "06") tipoAlegra = "No contribuyente";
 
       console.log("==================================================");
       console.log("🔍 1. BUSCANDO CONTACTO EXISTENTE:", cedulaLimpiada);
@@ -112,7 +117,6 @@ router.post('/emitir-tiquete', async (req, res) => {
           console.error("❌ 3. ERROR FATAL AL CREAR CONTACTO EN ALEGRA:");
           console.error(JSON.stringify(newContactData, null, 2));
           console.log("==================================================");
-          // Si falla la creación, usará el clientId = 2 por defecto para que la app no se caiga
         }
       }
     }
@@ -159,7 +163,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     totalFactura = Number(totalFactura.toFixed(2));
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // 📄 PREPARAMOS LA FACTURA (AQUÍ ESTÁ LA CONDICIÓN DE PAGO)
+    // 📄 PREPARAMOS LA FACTURA
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
@@ -167,8 +171,8 @@ router.post('/emitir-tiquete', async (req, res) => {
         id: clientId 
       },
       items: itemsAlegra,
-      paymentCondition: "01", // "01" es Contado en catálogos de Hacienda
-      paymentForm: "01",      // "01" es Efectivo en catálogos de Hacienda
+      paymentCondition: "01",
+      paymentForm: "01", 
       status: "open",
       payments: [
         {
