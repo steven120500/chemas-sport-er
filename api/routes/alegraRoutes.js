@@ -53,8 +53,9 @@ router.post('/emitir-tiquete', async (req, res) => {
       const cedulaLimpiada = cedula.trim();
 
       // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA
-      let tipoAlegra = "Cedula Fisica"; 
-      if (tipoIdentificacion === "02") tipoAlegra = "Cedula Juridica";
+      // 🔥 TRADUCTOR COMPATIBLE CON LA API DE ALEGRA
+      let tipoAlegra = "Cédula Física"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "Cédula Jurídica";
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
       else if (tipoIdentificacion === "05") tipoAlegra = "Extranjero No Domiciliado";
