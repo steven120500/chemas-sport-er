@@ -5,18 +5,41 @@ const router = express.Router();
 const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
-// 🔥 ID DE TU NUMERACIÓN INTERNA (NO ELECTRÓNICA)
+// ID DE LA NUMERACIÓN INTERNA (NO ELECTRÓNICA)
 const ID_NUMERACION_INTERNA = 1; 
 
-// 🔥 ID DEL NUEVO ÍTEM VÁLIDO CON CÓDIGO CABYS EN ALEGRA (Camiseta deportiva)
+// ID DEL NUEVO ÍTEM VÁLIDO CON CÓDIGO CABYS EN ALEGRA (Camiseta deportiva)
 const ID_ITEM_CABYS = 8;
+
+/* ========================================================
+   🔍 CONSULTAR CÉDULA EN HACIENDA
+   ======================================================== */
+router.get('/consultar-cedula/:identificacion', async (req, res) => {
+  try {
+    const { identificacion } = req.params;
+    const response = await fetch(`https://api.hacienda.go.cr/fe/ae?identificacion=${identificacion}`);
+    
+    if (!response.ok) {
+      return res.status(404).json({ error: "No se encontró información para esta cédula en el registro." });
+    }
+    
+    const data = await response.json();
+    return res.status(200).json({
+      success: true,
+      nombre: data.nombre || "Cliente Electrónico"
+    });
+  } catch (error) {
+    console.error("Error al consultar cédula:", error);
+    res.status(500).json({ error: "Error al conectar con el servicio de consulta." });
+  }
+});
 
 /* ========================================================
    🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    const { ventas, tipo, precioManual } = req.body; 
+    const { ventas, tipo, precioManual, cedula, nombreCliente, email } = req.body; 
 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
       return res.status(400).json({ error: "No se seleccionaron ventas para facturar." });
@@ -24,25 +47,62 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     
+    // 1. GESTIÓN DEL CLIENTE EN ALEGRA (CON CÉDULA Y CORREO)
+    let clientId = 2; // Cliente genérico por defecto para tiquetes internos
+
+    if (tipo === "hacienda" && cedula) {
+      const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedula}`, {
+        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+      });
+      const contactsData = await contactRes.json();
+
+      if (Array.isArray(contactsData) && contactsData.length > 0) {
+        clientId = contactsData[0].id;
+        // Si ya existe pero traemos correo nuevo, lo actualizamos opcionalmente
+        if (email) {
+          await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
+            method: "PUT",
+            headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ email: email })
+          });
+        }
+      } else {
+        const newContactRes = await fetch(`https://api.alegra.com/api/v1/contacts`, {
+          method: "POST",
+          headers: { 
+            "Authorization": `Basic ${credentials}`, 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            name: nombreCliente || "Cliente Electrónico",
+            identification: cedula,
+            email: email || "",
+            type: "client"
+          })
+        });
+        const newContactData = await newContactRes.json();
+        if (newContactRes.ok && newContactData.id) {
+          clientId = newContactData.id;
+        }
+      }
+    }
+
     const itemsAlegra = [];
     let totalFactura = 0;
 
-    // 1. Calculamos cuántas prendas hay en TOTAL
     let totalUnidadesGlobal = 0;
     ventas.forEach(v => {
       totalUnidadesGlobal += (Number(v.totalUnidades) || 1);
     });
 
-    // 2. Sacamos el precio real de CADA prenda
     const precioManualNum = Number(precioManual);
     let precioUnitario = (precioManualNum && totalUnidadesGlobal > 0) 
       ? (precioManualNum / totalUnidadesGlobal) 
       : 10000;
       
-    // 🔥 SOLUCIÓN: Cortamos los decimales a 5 máximo para que Alegra no lo rechace
     precioUnitario = Number(precioUnitario.toFixed(5));
     
-    // 3. Armamos las líneas del tiquete usando el ID con CABYS (8)
     ventas.forEach((venta) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
       const subtotalVenta = precioUnitario * cantidadUnidades;
@@ -67,35 +127,31 @@ router.post('/emitir-tiquete', async (req, res) => {
       }
     });
 
-    // 🔥 Redondeamos el pago total a 2 decimales exactos
     totalFactura = Number(totalFactura.toFixed(2));
-
     const fechaActual = new Date().toISOString().split('T')[0];
     
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: {
-        id: 2 // Cliente de contado
+        id: clientId 
       },
       items: itemsAlegra,
-      paymentCondition: "01", // Contado
-      paymentForm: "01",      // Efectivo
-      status: "open",         // Emitida de una vez
+      paymentCondition: "01",
+      paymentForm: "01",
+      status: "open",
       payments: [
         {
-          account: { id: 1 }, // ID de la Caja General para que quede Pagada
+          account: { id: 1 },
           amount: totalFactura,
           date: fechaActual
         }
       ]
     };
 
-    // 🔥 ENRUTAMIENTO: HACIENDA VS INTERNO
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; // 04 = Tiquete Electrónico oficial
+      payloadAlegra.documentType = "04"; 
     } else {
-      // Interno = Plantilla NO electrónica
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
 

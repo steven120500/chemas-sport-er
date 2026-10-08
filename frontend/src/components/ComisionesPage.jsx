@@ -286,6 +286,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <p>Tel: +50660369857</p>
             <!-- NUEVA DIRECCIÓN -->
             <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+            <p style="font-size: 10px;">CJ: 3102916554</p>
+<p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
           </div>
           
           <div class="divider"></div>
@@ -365,7 +367,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     setPrecioInput("10000"); // Precio por defecto
   };
 
-  // 🧾 2. PROCESAR EL PRECIO Y MOSTRAR OPCIONES (ADMIN) O EMITIR (NORMAL)
+
   const confirmarPrecioYContinuar = () => {
     const precioNumerico = Number(precioInput);
     if (isNaN(precioNumerico) || precioNumerico <= 0) {
@@ -374,31 +376,79 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
 
     const ventasArray = modalPrecio.ventas;
-    setModalPrecio({ isOpen: false, ventas: [] }); // Cerramos el modal
+    setModalPrecio({ isOpen: false, ventas: [] }); 
 
     const esAdmin = isSuperUser || storedUser?.isSuperUser === true || storedUser?.role === "admin" || storedUser?.rol === "admin";
 
-    // Si no es admin, emitimos directo internamente
     if (!esAdmin) {
       ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico);
       return;
     }
 
-    // Si es Admin, mostramos el menú de Hacienda vs Interno
     toastHOT((t) => (
-      <div className="text-center p-2 text-black font-sans">
+      <div className="text-center p-3 text-black font-sans">
         <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Monto: ₡{precioNumerico.toLocaleString("es-CR")}</p>
         <div className="flex flex-col gap-2">
           <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiquete(ventasArray, "interno", precioNumerico); }} className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors">
             Ticket Normal (Uso Interno)
           </button>
-          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiquete(ventasArray, "hacienda", precioNumerico); }} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
+          <button onClick={async () => { 
+            toastHOT.dismiss(t.id); 
+            const cedulaInput = prompt("Digite la cédula del cliente para el Tiquete Electrónico:", "");
+            if (!cedulaInput || !cedulaInput.trim()) {
+              toastHOT.error("Debe ingresar una cédula válida para Hacienda.");
+              return;
+            }
+
+            const emailInput = prompt("Digite el correo electrónico del cliente (opcional):", "");
+
+            const loadingToast = toastHOT.loading("Consultando cédula en Hacienda...");
+            try {
+              const resCedula = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${cedulaInput.trim()}`);
+              const dataCedula = await resCedula.json();
+              toastHOT.dismiss(loadingToast);
+
+              if (!resCedula.ok) throw new Error(dataCedula.error || "No se pudo obtener el nombre");
+
+              toastHOT.success(`Cliente: ${dataCedula.nombre}`);
+              ejecutarEmisionTiqueteConDatos(ventasArray, "hacienda", precioNumerico, cedulaInput.trim(), dataCedula.nombre, emailInput ? emailInput.trim() : "");
+            } catch (err) {
+              toastHOT.dismiss(loadingToast);
+              toastHOT.error(err.message);
+            }
+          }} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
             Tiquete Electrónico (Hacienda)
           </button>
         </div>
         <button onClick={() => toastHOT.dismiss(t.id)} className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer">Cancelar</button>
       </div>
-    ), { duration: 6000 });
+    ), { duration: 10000 });
+  };
+
+  const ejecutarEmisionTiqueteConDatos = async (ventasArray, tipoEmision, precioManual, cedula, nombreCliente, email) => {
+    if (generandoTiquete) return;
+    setGenerandoTiquete(true);
+    const toastId = toastHOT.loading(`Emitiendo en Alegra...`);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/alegra/emitir-tiquete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" },
+        body: JSON.stringify({ ventas: ventasArray, tipo: tipoEmision, precioManual, cedula, nombreCliente, email })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
+
+      toastHOT.success("¡Tiquete Electrónico emitido con éxito!", { id: toastId });
+      setVentasSeleccionadas([]); 
+      imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado);
+
+    } catch (error) {
+      toastHOT.error(`Error: ${error.message}`, { id: toastId, duration: 6000 });
+    } finally {
+      setGenerandoTiquete(false);
+    }
   };
 
   const toggleSeleccionVenta = (venta) => {
