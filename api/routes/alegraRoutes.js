@@ -8,6 +8,9 @@ const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 // 🔥 ID DE TU NUMERACIÓN INTERNA (NO ELECTRÓNICA)
 const ID_NUMERACION_INTERNA = 1; 
 
+// 🔥 ID DEL NUEVO ÍTEM VÁLIDO CON CÓDIGO CABYS EN ALEGRA (Camiseta deportiva)
+const ID_ITEM_CABYS = 8;
+
 /* ========================================================
    🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
@@ -39,7 +42,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     // 🔥 SOLUCIÓN: Cortamos los decimales a 5 máximo para que Alegra no lo rechace
     precioUnitario = Number(precioUnitario.toFixed(5));
     
-    // 3. Armamos las líneas del tiquete
+    // 3. Armamos las líneas del tiquete usando el ID con CABYS (8)
     ventas.forEach((venta) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
       const subtotalVenta = precioUnitario * cantidadUnidades;
@@ -48,7 +51,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
           itemsAlegra.push({
-            id: 1, 
+            id: ID_ITEM_CABYS, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`,
             price: precioUnitario,
             quantity: 1
@@ -56,7 +59,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         });
       } else {
         itemsAlegra.push({
-          id: 1, 
+          id: ID_ITEM_CABYS, 
           name: venta.item || "Camiseta Deportiva",
           price: precioUnitario,
           quantity: cantidadUnidades
