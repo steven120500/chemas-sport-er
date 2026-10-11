@@ -421,7 +421,142 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   };
 
-  const generarPDFBlancoYNegro = () => { /* PDF Logic ... */ };
+  const generarPDFBlancoYNegro = () => {
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return alert("Por favor permite las ventanas emergentes para generar el PDF.");
+
+    const fechaHoy = new Date().toLocaleDateString("es-CR");
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Reporte Comisiones - ${selectedMonth}Chema Sport ER</title>
+          <style>
+            @page { size: letter; margin: 15mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #000; background: #fff; margin: 0; padding: 0; font-size: 11px; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase; margin: 0; }
+            .subtitle { font-size: 11px; color: #444; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }
+            .meta { text-align: right; font-size: 10px; color: #333; }
+            
+            .summary-box { display: flex; border: 1px solid #000; margin-bottom: 25px; }
+            .summary-item { flex: 1; padding: 10px 15px; border-right: 1px solid #000; }
+            .summary-item:last-child { border-right: none; }
+            .summary-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+            .summary-value { font-size: 18px; font-weight: 900; margin-top: 4px; }
+
+            .section-title { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-top: 25px; margin-bottom: 10px; }
+
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th { text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1.5px solid #000; padding: 6px 4px; }
+            td { padding: 6px 4px; border-bottom: 1px solid #e0e0e0; font-size: 10px; }
+            tr:last-child td { border-bottom: 1px solid #000; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 800; }
+
+            .footer { margin-top: 35px; border-top: 1px solid #000; padding-top: 8px; font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">CHEMA SPORT ER</h1>
+              <p class="subtitle">Liquidación de Ventas y Comisiones</p>
+            </div>
+            <div class="meta">
+              <p><strong>Mes:</strong> ${selectedMonth}</p>
+              <p><strong>Fecha de Emisión:</strong> ${fechaHoy}</p>
+            </div>
+          </div>
+
+          <div class="summary-box">
+            <div class="summary-item">
+              <div class="summary-label">Prendas Vendidas</div>
+              <div class="summary-value">${totalPrendasMes} uds.</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Comisiones</div>
+              <div class="summary-value">₡${totalComisionesMes.toLocaleString("es-CR")}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Tarifa por Prenda</div>
+              <div class="summary-value">₡${comisionPorPrenda.toLocaleString("es-CR")}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Líder del Mes</div>
+              <div class="summary-value">${top1?.vendedor || "N/A"} (${top1?.unidades || 0})</div>
+            </div>
+          </div>
+
+          <div class="section-title">1. Resumen por Vendedor</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 10%;">Pos.</th>
+                <th style="width: 45%;">Vendedor</th>
+                <th class="text-right" style="width: 20%;">Prendas</th>
+                <th class="text-right" style="width: 25%;">Total Comisión</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ranking.map((r, i) => `
+                <tr>
+                  <td class="font-bold">${i + 1}º</td>
+                  <td class="font-bold">${r.vendedor}</td>
+                  <td class="text-right">${r.unidades}</td>
+                  <td class="text-right font-bold">₡${r.totalComision.toLocaleString("es-CR")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <div class="section-title">2. Registro Detallado de Ventas</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 15%;">Fecha</th>
+                <th style="width: 20%;">Vendedor</th>
+                <th style="width: 25%;">Cliente</th>
+                <th style="width: 30%;">Artículo / Tallas</th>
+                <th class="text-right" style="width: 10%;">Cant.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ventasFiltradas.map((v) => {
+                const d = v.date ? new Date(v.date) : null;
+                const fStr = d ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}` : "-";
+                return `
+                  <tr>
+                    <td>${fStr}</td>
+                    <td class="font-bold">${v.vendedor}</td>
+                    <td>${v.cliente}</td>
+                    <td>${v.item}${v.tallasTexto ? ` (${v.tallasTexto})` : ""}</td>
+                    <td class="text-right font-bold">${v.totalUnidades}</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Chema Sport ER — Documento Oficial de Rendición de Cuentas
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
@@ -441,6 +576,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* 🔥 BOTÓN DE REPORTE AGREGADO AQUÍ */}
+            {storedUser?.isSuperUser && (
+              <button onClick={generarPDFBlancoYNegro} className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer">
+                <FaFilePdf size={14} />
+                <span className="hidden sm:inline">Reporte</span>
+              </button>
+            )}
+            
             {storedUser?.isSuperUser && (
               <button onClick={confirmarResetGlobal} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer border border-red-200">
                 <FaTrash size={14} />
@@ -492,7 +635,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
         </div>
 
-        {/* 🔥 FIX: TABLA DE POSICIONES GENERALES CON MÁRGENES ARREGLADOS */}
         {restoRanking.length > 0 && (
           <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">Posiciones Generales</h3>
