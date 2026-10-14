@@ -33,7 +33,24 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto si falla algo
+    let clientId = 2; // Cliente por defecto
+
+    // 🔥 SÚPER ESPÍA: DESCARGAR LA ÚLTIMA FACTURA MANUAL PERFECTA PARA VER SU ESTRUCTURA
+    console.log("==================================================");
+    console.log("🕵️‍♂️ ESTRUCTURA REAL DE UNA FACTURA PERFECTA (Buscando campos de pago)...");
+    try {
+      const resSpy = await fetch("https://api.alegra.com/api/v1/invoices?limit=2", {
+        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+      });
+      const dataSpy = await resSpy.json();
+      if (Array.isArray(dataSpy) && dataSpy.length > 0) {
+         // Imprimimos todo el objeto de la última factura para ver dónde esconden la condición
+         console.log(JSON.stringify(dataSpy[0], null, 2));
+      }
+    } catch (e) {
+      console.log("Error al espiar facturas:", e.message);
+    }
+    console.log("==================================================");
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -44,7 +61,6 @@ router.post('/emitir-tiquete', async (req, res) => {
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
 
-      console.log("==================================================");
       console.log(`🔍 1. BUSCANDO CONTACTO EXISTENTE: ${cedulaLimpiada}`);
       
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
@@ -133,17 +149,15 @@ router.post('/emitir-tiquete', async (req, res) => {
     totalFactura = Number(totalFactura.toFixed(2));
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // 📄 PREPARAMOS LA FACTURA
+    // 📄 PREPARAMOS LA FACTURA (Con la configuración que Alegra dejó pasar antes)
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 LA COMBINACIÓN DEFINITIVA EN INGLÉS PARA ALEGRA
-      paymentCondition: "cash",     // Alegra lo asume como "Contado" y envía 01 a Hacienda
-      paymentForm: "transfer",      // Transferencia/SINPE
-      paymentMethod: "transfer",    // Transferencia/SINPE
+      paymentForm: "cash",          
+      paymentMethod: "transfer",    
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
@@ -154,10 +168,6 @@ router.post('/emitir-tiquete', async (req, res) => {
     } else {
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
-
-    console.log("==================================================");
-    console.log("📄 4. PAYLOAD DE FACTURA ENVIADO A ALEGRA:");
-    console.log(JSON.stringify(payloadAlegra, null, 2));
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
@@ -174,7 +184,6 @@ router.post('/emitir-tiquete', async (req, res) => {
     }
 
     console.log("✅ 5. FACTURA CREADA CON ÉXITO EN ALEGRA.");
-    console.log("==================================================");
     
     return res.status(200).json({ 
       success: true, 
