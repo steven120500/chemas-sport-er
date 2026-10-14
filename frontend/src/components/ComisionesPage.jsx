@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
-  FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt
+  FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt,
+  FaEdit, FaCheck, FaTimes, FaTruck
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -13,6 +14,62 @@ function ymLocal(d = new Date()) {
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
   return `${y}-${m}`;
+}
+
+// Normaliza texto quitando tildes, espacios y símbolos para comparar nombres exactos
+function normText(str = "") {
+  return String(str)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+// Limpia el nombre quitando el "(Player)", "(Fan)", etc. del final
+function normBaseName(str = "") {
+  const sinParentesis = String(str).replace(/\s*\([^)]*\)\s*$/g, "");
+  return normText(sinParentesis);
+}
+
+// Extrae la categoría entre paréntesis del log, ej: "Real Madrid (Player)" -> "player"
+function extractCatFromItem(str = "") {
+  const match = String(str).match(/\(([^)]+)\)\s*$/);
+  return match ? normText(match[1]) : "";
+}
+
+// Convierte cualquier formato de precio ("₡22.000", "22,000", 22000) al número real 22000
+function parsePrecioCR(val) {
+  if (typeof val === "number" && !isNaN(val)) return val;
+  if (!val) return 0;
+  let str = String(val).trim();
+  // Si viene con decimales tipo 22000.00
+  if (/^\d+\.\d{2}$/.test(str)) {
+    return Math.round(Number(str));
+  }
+  const digits = str.replace(/[^\d]/g, "");
+  return Number(digits) || 0;
+}
+
+// Extrae el precio real de un objeto producto sin importar cómo se llame el campo en MongoDB
+function getProductPrice(p) {
+  if (!p || typeof p !== "object") return 0;
+  const candidatos = [
+    p.price,
+    p.precio,
+    p.valor,
+    p.costo,
+    p.salePrice,
+    p.precioVenta,
+    p.amount,
+    p.discountPrice,
+    p.precioOferta
+  ];
+  for (const c of candidatos) {
+    const num = parsePrecioCR(c);
+    if (num > 0) return num;
+  }
+  return 0;
 }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Melissa", "Ashly"];
@@ -33,7 +90,7 @@ function parseSaleDetails(log) {
   const vendedor = String(log?.user || "Sistema").trim();
   const itemGeneral = String(log?.item || "Camiseta").trim();
 
-  const rawIdSearch = `${log?.productId || ''} ${detailsStr}`;
+  const rawIdSearch = `${log?.productId || ''} ${log?.itemId || ''} ${detailsStr}`;
   const [, idHex] = rawIdSearch.match(/([a-f0-9]{24})/i) || [];
   const productId = idHex || null;
 
@@ -91,12 +148,33 @@ function parseSaleDetails(log) {
     .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
     .join(", ");
 
-  return { cliente, vendedor, items, totalUnidades, tallasTexto, productId, rawDetails: detailsStr };
+  // Si el log ya traía precio directo guardado
+  let precioEnLog = parsePrecioCR(log?.price || log?.precio || log?.total || 0);
+  if (!precioEnLog) {
+    const matchPrecio = detailsStr.match(/(?:Precio|Total|Monto)\s*:\s*₡?\s*([\d.,]+)/i);
+    if (matchPrecio && matchPrecio[1]) {
+      precioEnLog = parsePrecioCR(matchPrecio[1]);
+    }
+  }
+
+  const unidadesFinales = totalUnidades || 1;
+
+  return { 
+    cliente, 
+    vendedor, 
+    items, 
+    totalUnidades: unidadesFinales, 
+    tallasTexto, 
+    productId, 
+    rawDetails: detailsStr,
+    precioEnLog
+  };
 }
 
 export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
+  const [catalogoMap, setCatalogoMap] = useState({ byId: {}, byFullKey: {}, byBaseName: {} });
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
@@ -104,18 +182,91 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
   const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
 
-  // Estados de Modales
-  const [modalPrecio, setModalPrecio] = useState({ isOpen: false, ventas: [] });
-  const [precioInput, setPrecioInput] = useState("10000");
+  // ✏️ Estados para Precios Personalizados en la Tabla (con persistencia en localStorage)
+  const [preciosPersonalizados, setPreciosPersonalizados] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("chemasport_precios_custom") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [editandoPrecioId, setEditandoPrecioId] = useState(null);
+  const [tempPrecioFila, setTempPrecioFila] = useState("");
 
-  // 🔥 NUEVO ESTADO PARA EL MODAL DE HACIENDA
-  const [modalHacienda, setModalHacienda] = useState({
-    isOpen: false, ventas: [], precio: 0,
-    tipoIdentificacion: "01", cedula: "", nombre: "", correo: ""
+  // 🔥 MODAL UNIFICADO DE FACTURACIÓN (INCLUYE ENVÍO PERSONALIZABLE)
+  const [modalFacturar, setModalFacturar] = useState({
+    isOpen: false,
+    ventas: [],
+    precio: "",
+    incluyeEnvio: false,
+    precioEnvio: "2500",
+    tipoEmision: "hacienda", // "hacienda" | "interno"
+    tipoIdentificacion: "01",
+    cedula: "",
+    nombre: "",
+    telefono: "",
+    correo: ""
   });
 
   const storedUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
+  }, []);
+
+  const esSuperAdmin = useMemo(() => {
+    return Boolean(
+      isSuperUser || 
+      user?.isSuperUser || 
+      storedUser?.isSuperUser === true || 
+      storedUser?.role === "admin" || 
+      storedUser?.rol === "admin"
+    );
+  }, [isSuperUser, user, storedUser]);
+
+  // 🛍️ 1. CARGAR CATÁLOGO COMPLETO DE PRODUCTOS
+  useEffect(() => {
+    const fetchCatalogo = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/products?limit=10000&all=true`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const lista = Array.isArray(data?.items) 
+          ? data.items 
+          : (Array.isArray(data?.products) ? data.products : (Array.isArray(data) ? data : []));
+
+        const byId = {};
+        const byFullKey = {};
+        const byBaseName = {};
+
+        lista.forEach((p) => {
+          const precioUnitario = getProductPrice(p);
+          if (precioUnitario > 0) {
+            const pid = p._id || p.id;
+            if (pid) byId[String(pid)] = precioUnitario;
+
+            const rawName = p.name || p.nombre || p.title || p.item || "";
+            const rawCat = p.category || p.categoria || p.type || p.tipo || "";
+
+            if (rawName) {
+              const base = normBaseName(rawName);
+              const full = normText(rawName);
+              const cat = normText(rawCat);
+
+              byBaseName[base] = precioUnitario;
+              byFullKey[full] = precioUnitario;
+              if (cat) {
+                byFullKey[`${base}_${cat}`] = precioUnitario;
+              }
+            }
+          }
+        });
+
+        setCatalogoMap({ byId, byFullKey, byBaseName });
+      } catch (err) {
+        console.error("Error cargando precios del catálogo:", err);
+      }
+    };
+
+    fetchCatalogo();
   }, []);
 
   const fetchVentas = async () => {
@@ -152,6 +303,129 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       return { ...log, ...parsed, esVenta };
     }).filter((v) => v.esVenta && v.totalUnidades > 0);
   }, [logs]);
+
+  // 🔍 2. SI ALGUNA VENTA TIENE PRODUCT_ID PERO NO VINO EN EL CATÁLOGO GENERAL (EJ. AGOTADO O PAGINADO), LO BUSCA INDIVIDUALMENTE
+  useEffect(() => {
+    const missingIds = [
+      ...new Set(
+        ventasFiltradas
+          .map((v) => v.productId)
+          .filter((id) => id && !catalogoMap.byId[id])
+      )
+    ];
+
+    if (missingIds.length === 0) return;
+
+    let cancelado = false;
+    const buscarFaltantes = async () => {
+      const encontrados = {};
+      await Promise.all(
+        missingIds.map(async (id) => {
+          try {
+            const r = await fetch(`${API_BASE}/api/products/${id}`);
+            if (!r.ok) return;
+            const prod = await r.json();
+            const itemObj = prod?.product || prod?.item || prod;
+            const pUnit = getProductPrice(itemObj);
+            if (pUnit > 0) {
+              encontrados[id] = pUnit;
+            }
+          } catch {
+            // Ignorar si no existe el endpoint individual
+          }
+        })
+      );
+
+      if (!cancelado && Object.keys(encontrados).length > 0) {
+        setCatalogoMap((prev) => ({
+          ...prev,
+          byId: { ...prev.byId, ...encontrados }
+        }));
+      }
+    };
+
+    buscarFaltantes();
+    return () => { cancelado = true; };
+  }, [ventasFiltradas, catalogoMap.byId]);
+
+  // 💰 FUNCIÓN QUE CALCULA EL PRECIO EXACTO DE LA CAMISETA
+  const obtenerPrecioVenta = (venta) => {
+    // 1. Si el usuario lo personalizó con el lápiz, usar ese precio
+    if (preciosPersonalizados[venta._id] !== undefined) {
+      return Number(preciosPersonalizados[venta._id]);
+    }
+
+    const cantidad = Number(venta.totalUnidades) || 1;
+
+    // 2. Búsqueda exacta por ID de MongoDB del producto
+    if (venta.productId && catalogoMap.byId[venta.productId]) {
+      return catalogoMap.byId[venta.productId] * cantidad;
+    }
+
+    // 3. Búsqueda exacta por Nombre + Categoría (ej: "AC Milan Local 06-07 Kaká" + "Niño")
+    const baseName = normBaseName(venta.item);
+    const catFromLog = extractCatFromItem(venta.item);
+    const fullText = normText(venta.item);
+
+    if (catFromLog && catalogoMap.byFullKey[`${baseName}_${catFromLog}`]) {
+      return catalogoMap.byFullKey[`${baseName}_${catFromLog}`] * cantidad;
+    }
+
+    if (catalogoMap.byFullKey[fullText]) {
+      return catalogoMap.byFullKey[fullText] * cantidad;
+    }
+
+    // 4. Búsqueda exacta por el nombre limpio de la camiseta
+    if (baseName && catalogoMap.byBaseName[baseName]) {
+      return catalogoMap.byBaseName[baseName] * cantidad;
+    }
+
+    // 5. Si el log de venta ya traía el precio guardado
+    if (venta.precioEnLog > 0) {
+      return venta.precioEnLog;
+    }
+
+    // 6. Respaldo oficial según la tabla de productos de Alegra
+    const itemLower = String(venta.item || "").toLowerCase();
+    let unitarioFallback = 20000; // Fan y resto por defecto
+    if (itemLower.includes("llavero") || itemLower.includes("envio") || itemLower.includes("envío")) {
+      unitarioFallback = 2500;
+    } else if (
+      itemLower.includes("nacional") || 
+      itemLower.includes("player") || 
+      itemLower.includes("jugador") || 
+      itemLower.includes("retro")
+    ) {
+      unitarioFallback = 22000;
+    } else if (
+      itemLower.includes("fan") || 
+      itemLower.includes("mujer") || 
+      itemLower.includes("niño") || 
+      itemLower.includes("nino")
+    ) {
+      unitarioFallback = 20000;
+    }
+
+    return unitarioFallback * cantidad;
+  };
+
+  // Guardar precio editado con el lápiz en la fila
+  const guardarPrecioFila = (ventaId) => {
+    const valorNum = Number(tempPrecioFila);
+    if (isNaN(valorNum) || valorNum <= 0) {
+      toastHOT.error("Ingrese un precio válido mayor a 0.");
+      return;
+    }
+    const nuevosPrecios = { ...preciosPersonalizados, [ventaId]: valorNum };
+    setPreciosPersonalizados(nuevosPrecios);
+    try {
+      localStorage.setItem("chemasport_precios_custom", JSON.stringify(nuevosPrecios));
+    } catch (e) {
+      console.error(e);
+    }
+    setEditandoPrecioId(null);
+    toastHOT.success("Precio actualizado en la tabla.");
+  };
 
   const ranking = useMemo(() => {
     const conteo = {};
@@ -250,12 +524,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
-  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado) => {
+  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
     const printWindow = window.open("", "_blank", "width=400,height=600");
     if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
     const fechaHoy = new Date().toLocaleString("es-CR");
-    const clienteNombre = ventasArray[0]?.cliente || "Cliente de Contado";
+    const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
     const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
     const itemsHTML = ventasArray.map(v => `
@@ -296,6 +570,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
           <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
           <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
           <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
           <div class="divider"></div>
           <p class="font-bold" style="margin-bottom: 8px;">CANT. DESCRIPCIÓN</p>
@@ -303,7 +579,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <div class="divider"></div>
           <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
             <span>TOTAL:</span>
-            <span>₡${totalCobrado.toLocaleString("es-CR")}</span>
+            <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
           </div>
           <div class="divider"></div>
           <div class="text-center" style="margin-top: 20px;">
@@ -321,82 +597,154 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     printWindow.document.close();
   };
 
-  // 🧾 1. ABRIR EL MODAL DE PRECIO INICIAL
-  const abrirModalPrecio = (ventasArray) => {
-    setModalPrecio({ isOpen: true, ventas: ventasArray });
-    setPrecioInput("10000"); 
+  // 🧾 1. ABRIR EL MODAL UNIFICADO DE FACTURACIÓN CON EL PRECIO DE LA TABLA
+  const abrirModalFacturacion = (ventasArray) => {
+    const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
+    const clienteInicial = ventasArray[0]?.cliente && ventasArray[0]?.cliente !== "Cliente General" 
+      ? ventasArray[0].cliente 
+      : "";
+
+    setModalFacturar({
+      isOpen: true,
+      ventas: ventasArray,
+      precio: String(sumaPreciosTabla),
+      incluyeEnvio: false,
+      precioEnvio: "2500",
+      tipoEmision: esSuperAdmin ? "hacienda" : "interno",
+      tipoIdentificacion: "01",
+      cedula: "",
+      nombre: clienteInicial,
+      telefono: "",
+      correo: ""
+    });
   };
 
-  // 🧾 2. PROCESAR EL PRECIO Y PREGUNTAR TIPO DE TIQUETE
-  const confirmarPrecioYContinuar = () => {
-    const precioNumerico = Number(precioInput);
-    if (isNaN(precioNumerico) || precioNumerico <= 0) {
-      toastHOT.error("El precio debe ser un número mayor a 0.");
-      return;
-    }
-    const ventasArray = modalPrecio.ventas;
-    setModalPrecio({ isOpen: false, ventas: [] });
-
-    const esAdmin = isSuperUser || storedUser?.isSuperUser === true || storedUser?.role === "admin" || storedUser?.rol === "admin";
-
-    if (!esAdmin) {
-      ejecutarEmisionTiqueteConDatos(ventasArray, "interno", precioNumerico, "", "", "", "01");
-      return;
-    }
-
-    toastHOT((t) => (
-      <div className="text-center p-3 text-black font-sans">
-        <p className="font-black text-sm mb-3 uppercase tracking-widest text-zinc-800">Monto: ₡{precioNumerico.toLocaleString("es-CR")}</p>
-        <div className="flex flex-col gap-2">
-          <button onClick={() => { toastHOT.dismiss(t.id); ejecutarEmisionTiqueteConDatos(ventasArray, "interno", precioNumerico, "", "", "", "01"); }} className="bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-black cursor-pointer shadow-sm transition-colors">
-            Ticket Normal (Uso Interno)
-          </button>
-          
-          <button onClick={() => {
-            toastHOT.dismiss(t.id);
-            // Abrimos el nuevo modal React de Hacienda
-            setModalHacienda({
-              isOpen: true, ventas: ventasArray, precio: precioNumerico,
-              tipoIdentificacion: "01", cedula: "", nombre: "", correo: ""
-            });
-          }} className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
-            Tiquete Electrónico (Hacienda)
-          </button>
-        </div>
-        <button onClick={() => toastHOT.dismiss(t.id)} className="mt-3 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase tracking-widest cursor-pointer">Cancelar</button>
-      </div>
-    ), { duration: 15000 });
-  };
-
-  // 🔍 BUSCAR CÉDULA EN HACIENDA (AUTOMÁTICO EN EL MODAL)
+  // 🔍 BUSCAR CÉDULA EN HACIENDA (DENTRO DEL MODAL UNIFICADO)
   const buscarCedulaHacienda = async () => {
-    if (!modalHacienda.cedula.trim()) {
+    if (!modalFacturar.cedula.trim()) {
       toastHOT.error("Ingrese una cédula para buscar.");
       return;
     }
     const toastId = toastHOT.loading("Consultando en Hacienda...");
     try {
-      const res = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${modalHacienda.cedula.trim()}`);
+      const res = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${modalFacturar.cedula.trim()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se encontró el cliente");
-      setModalHacienda(prev => ({ ...prev, nombre: data.nombre }));
+      setModalFacturar((prev) => ({ ...prev, nombre: data.nombre }));
       toastHOT.success("¡Cliente encontrado!", { id: toastId });
     } catch (error) {
       toastHOT.error(error.message, { id: toastId });
     }
   };
 
-  // 🚀 FUNCIÓN UNIFICADA DE EMISIÓN CON EL NUEVO DATO (tipoIdentificacion)
-  const ejecutarEmisionTiqueteConDatos = async (ventasArray, tipoEmision, precioManual, cedula, nombreCliente, email, tipoIdentificacion) => {
+  // 🚀 VALIDAR Y EMITIR DESDE EL MODAL UNIFICADO (CON SOPORTE PARA ENVÍO PERSONALIZABLE)
+  const confirmarYEmitirFactura = () => {
+    const precioPrendas = Number(modalFacturar.precio);
+    if (isNaN(precioPrendas) || precioPrendas <= 0) {
+      toastHOT.error("El monto de los productos debe ser un número mayor a 0.");
+      return;
+    }
+
+    const llevaEnvio = Boolean(modalFacturar.incluyeEnvio);
+    const montoEnvio = llevaEnvio ? Number(modalFacturar.precioEnvio) : 0;
+
+    if (llevaEnvio && (isNaN(montoEnvio) || montoEnvio <= 0)) {
+      toastHOT.error("El monto del envío debe ser un número mayor a 0.");
+      return;
+    }
+
+    const esHacienda = modalFacturar.tipoEmision === "hacienda";
+
+    // En Hacienda, Cédula y Nombre son obligatorios. En Ticket Normal, NO son obligatorios.
+    if (esHacienda && (!modalFacturar.cedula.trim() || !modalFacturar.nombre.trim())) {
+      toastHOT.error("Para Factura Electrónica (Hacienda), la Cédula y el Nombre son obligatorios.");
+      return;
+    }
+
+    // Si el usuario editó el precio de una sola venta en el modal, sincronizar el precio de la prenda con la tabla
+    if (modalFacturar.ventas.length === 1) {
+      const unicaVentaId = modalFacturar.ventas[0]._id;
+      const nuevosPrecios = { ...preciosPersonalizados, [unicaVentaId]: precioPrendas };
+      setPreciosPersonalizados(nuevosPrecios);
+      try {
+        localStorage.setItem("chemasport_precios_custom", JSON.stringify(nuevosPrecios));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Calculamos el factor de ajuste sobre las prendas por si el usuario modificó el monto en el modal
+    const sumaOriginalPrendas = modalFacturar.ventas.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
+    const factorPrendas = sumaOriginalPrendas > 0 ? (precioPrendas / sumaOriginalPrendas) : 1;
+
+    // Preparamos cada venta con su precio unitario exacto para que el backend no mezcle el precio del envío con las camisas
+    const ventasParaEmitir = modalFacturar.ventas.map((v) => {
+      const cant = Number(v.totalUnidades) || 1;
+      const totalFilaAjustado = obtenerPrecioVenta(v) * factorPrendas;
+      return {
+        ...v,
+        precioUnitarioCustom: Number((totalFilaAjustado / cant).toFixed(5))
+      };
+    });
+
+    // 🚚 Si marcó el checkbox de Envío, agregamos la línea de "Envio GAM" con su precio personalizado
+    if (llevaEnvio && montoEnvio > 0) {
+      ventasParaEmitir.push({
+        _id: `envio_${Date.now()}`,
+        item: "Envio GAM",
+        totalUnidades: 1,
+        tallasTexto: "",
+        cliente: modalFacturar.ventas[0]?.cliente || "Cliente General",
+        vendedor: modalFacturar.ventas[0]?.vendedor || "Caja",
+        precioUnitarioCustom: montoEnvio,
+        items: []
+      });
+    }
+
+    const totalCobrarFinal = precioPrendas + montoEnvio;
+    const nombreFinal = modalFacturar.nombre.trim() || modalFacturar.ventas[0]?.cliente || "Cliente de Contado";
+    const cedulaFinal = modalFacturar.cedula.trim();
+    const correoFinal = modalFacturar.correo.trim();
+    const telefonoFinal = modalFacturar.telefono.trim();
+    const tipoIdFinal = modalFacturar.tipoIdentificacion;
+    const tipoEmisionFinal = modalFacturar.tipoEmision;
+
+    setModalFacturar((prev) => ({ ...prev, isOpen: false }));
+
+    ejecutarEmisionTiqueteConDatos(
+      ventasParaEmitir,
+      tipoEmisionFinal,
+      totalCobrarFinal,
+      cedulaFinal,
+      nombreFinal,
+      correoFinal,
+      tipoIdFinal,
+      telefonoFinal
+    );
+  };
+
+  // 🚀 FUNCIÓN UNIFICADA DE EMISIÓN CON BACKEND
+  const ejecutarEmisionTiqueteConDatos = async (
+    ventasArray, tipoEmision, precioManual, cedula, nombreCliente, email, tipoIdentificacion, telefono = ""
+  ) => {
     if (generandoTiquete) return;
     setGenerandoTiquete(true);
-    const toastId = toastHOT.loading(`Emitiendo en Alegra...`);
+    const toastId = toastHOT.loading(`Emitiendo comprobante en Alegra...`);
 
     try {
       const response = await fetch(`${API_BASE}/api/alegra/emitir-tiquete`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false" },
-        body: JSON.stringify({ ventas: ventasArray, tipo: tipoEmision, precioManual, cedula, nombreCliente, email, tipoIdentificacion })
+        body: JSON.stringify({ 
+          ventas: ventasArray, 
+          tipo: tipoEmision, 
+          precioManual, 
+          cedula, 
+          nombreCliente, 
+          email, 
+          telefono,
+          tipoIdentificacion 
+        })
       });
 
       const data = await response.json();
@@ -404,7 +752,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
       toastHOT.success("¡Comprobante emitido con éxito!", { id: toastId });
       setVentasSeleccionadas([]); 
-      imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado);
+      imprimirTicketNativo(ventasArray, data.consecutivoOficial, data.totalCobrado, {
+        nombre: nombreCliente,
+        cedula,
+        telefono
+      });
 
     } catch (error) {
       toastHOT.error(`Error: ${error.message}`, { id: toastId, duration: 6000 });
@@ -422,7 +774,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   const generarPDFBlancoYNegro = () => {
-
     const printWindow = window.open("", "_blank");
     if (!printWindow) return alert("Por favor permite las ventanas emergentes para generar el PDF.");
 
@@ -432,7 +783,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Reporte Comisiones - ${selectedMonth}Chema Sport ER</title>
+          <title>Reporte Comisiones - ${selectedMonth} Chema Sport ER</title>
           <style>
             @page { size: letter; margin: 15mm; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #000; background: #fff; margin: 0; padding: 0; font-size: 11px; }
@@ -516,10 +867,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           <table>
             <thead>
               <tr>
-                <th style="width: 15%;">Fecha</th>
-                <th style="width: 20%;">Vendedor</th>
-                <th style="width: 25%;">Cliente</th>
-                <th style="width: 30%;">Artículo / Tallas</th>
+                <th style="width: 12%;">Fecha</th>
+                <th style="width: 16%;">Vendedor</th>
+                <th style="width: 22%;">Cliente</th>
+                <th style="width: 15%;">Precio</th>
+                <th style="width: 25%;">Artículo / Tallas</th>
                 <th class="text-right" style="width: 10%;">Cant.</th>
               </tr>
             </thead>
@@ -527,11 +879,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               ${ventasFiltradas.map((v) => {
                 const d = v.date ? new Date(v.date) : null;
                 const fStr = d ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}` : "-";
+                const precioFila = obtenerPrecioVenta(v);
                 return `
                   <tr>
                     <td>${fStr}</td>
                     <td class="font-bold">${v.vendedor}</td>
                     <td>${v.cliente}</td>
+                    <td class="font-bold">₡${precioFila.toLocaleString("es-CR")}</td>
                     <td>${v.item}${v.tallasTexto ? ` (${v.tallasTexto})` : ""}</td>
                     <td class="text-right font-bold">${v.totalUnidades}</td>
                   </tr>
@@ -576,15 +930,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* 🔥 BOTÓN DE REPORTE AGREGADO AQUÍ */}
-            {storedUser?.isSuperUser && (
+            {esSuperAdmin && (
               <button onClick={generarPDFBlancoYNegro} className="flex items-center gap-2 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer">
                 <FaFilePdf size={14} />
                 <span className="hidden sm:inline">Reporte</span>
               </button>
             )}
             
-            {storedUser?.isSuperUser && (
+            {esSuperAdmin && (
               <button onClick={confirmarResetGlobal} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black uppercase tracking-wider px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer border border-red-200">
                 <FaTrash size={14} />
                 <span className="hidden sm:inline">Reiniciar</span>
@@ -594,9 +947,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <FaCalendarAlt className="text-zinc-400" />
               <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent text-sm font-black text-black outline-none cursor-pointer" />
             </div>
-            <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${storedUser?.isSuperUser ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
-              {!storedUser?.isSuperUser ? <FaLock className="text-zinc-400" size={10} title="Solo administradores" /> : <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>}
-              <input type="number" min="0" step="100" value={comisionPorPrenda} onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)} disabled={!storedUser?.isSuperUser} className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!storedUser?.isSuperUser ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`} />
+            <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${esSuperAdmin ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
+              {!esSuperAdmin ? <FaLock className="text-zinc-400" size={10} title="Solo administradores" /> : <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>}
+              <input type="number" min="0" step="100" value={comisionPorPrenda} onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)} disabled={!esSuperAdmin} className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!esSuperAdmin ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`} />
             </div>
           </div>
         </div>
@@ -666,7 +1019,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             </div>
             <div className="flex items-center gap-4 w-full sm:w-auto">
               {ventasSeleccionadas.length > 0 && (
-                <button onClick={() => abrirModalPrecio(ventasSeleccionadas)} disabled={generandoTiquete} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap">
+                <button onClick={() => abrirModalFacturacion(ventasSeleccionadas)} disabled={generandoTiquete} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer whitespace-nowrap">
                   <FaReceipt size={14} /> Emitir {ventasSeleccionadas.length} en 1 Tiquete
                 </button>
               )}
@@ -692,6 +1045,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Fecha</th>
                     <th className="py-3 px-3">Vendedor</th>
                     <th className="py-3 px-3">Cliente</th>
+                    <th className="py-3 px-3">Precio</th>
                     <th className="py-3 px-3">Artículo / Tallas</th>
                     <th className="py-3 px-3 text-right">Cant.</th>
                     <th className="py-3 px-3 text-center">Acciones</th>
@@ -701,6 +1055,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                   {tablaVentas.map((venta) => {
                     const dateObj = venta.date ? new Date(venta.date) : null;
                     const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
+                    const precioActual = obtenerPrecioVenta(venta);
+                    const estaEditando = editandoPrecioId === venta._id;
+
                     return (
                       <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
                         <td className="py-3.5 px-3 text-center">
@@ -709,21 +1066,74 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">{dateObj ? `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}` : ""}</td>
                         <td className="py-3.5 px-3 font-black text-black">{venta.vendedor}</td>
                         <td className="py-3.5 px-3 font-bold text-zinc-800">{venta.cliente}</td>
+                        
+                        {/* 🔥 COLUMNA DE PRECIO CONECTADA AL CATÁLOGO + LÁPIZ */}
+                        <td className="py-3.5 px-3 whitespace-nowrap">
+                          {estaEditando ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-[10px]">₡</span>
+                                <input
+                                  type="number"
+                                  value={tempPrecioFila}
+                                  onChange={(e) => setTempPrecioFila(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") guardarPrecioFila(venta._id);
+                                    if (e.key === "Escape") setEditandoPrecioId(null);
+                                  }}
+                                  autoFocus
+                                  className="w-24 pl-5 pr-2 py-1 bg-white border border-black rounded-lg text-xs font-black text-black outline-none"
+                                />
+                              </div>
+                              <button
+                                onClick={() => guardarPrecioFila(venta._id)}
+                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
+                                title="Guardar precio"
+                              >
+                                <FaCheck size={10} />
+                              </button>
+                              <button
+                                onClick={() => setEditandoPrecioId(null)}
+                                className="p-1.5 bg-zinc-200 text-zinc-600 rounded-lg hover:bg-zinc-300 transition-colors cursor-pointer"
+                                title="Cancelar"
+                              >
+                                <FaTimes size={10} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-emerald-700 text-xs">
+                                ₡{precioActual.toLocaleString("es-CR")}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setEditandoPrecioId(venta._id);
+                                  setTempPrecioFila(String(precioActual));
+                                }}
+                                className="p-1.5 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
+                                title="Personalizar precio"
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
                         <td className="py-3.5 px-3 text-zinc-700">
                           <span className="font-bold text-black block">{venta.item}</span>
                           {venta.tallasTexto && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">Tallas: {venta.tallasTexto}</span>}
                         </td>
                         <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
                         <td className="py-3.5 px-3 text-center">
-  <div className="flex justify-center items-center gap-3">
-    <button onClick={() => abrirModalPrecio([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer">
-      <FaReceipt size={14} />
-    </button>
-    <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer">
-      <FaTrash size={13} />
-    </button>
-  </div>
-</td>
+                          <div className="flex justify-center items-center gap-3">
+                            <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura">
+                              <FaReceipt size={14} />
+                            </button>
+                            <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
+                              <FaTrash size={13} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -734,110 +1144,196 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
         </div>
       </div>
 
-      {/* MODAL 1: PRECIO */}
-      {modalPrecio.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl animate-fade-in-up">
-            <h3 className="text-xl font-black text-center text-black mb-1">Monto de la Venta</h3>
-            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">Ingrese el total cobrado.</p>
-            <div className="relative mb-6">
-              <span className="absolute left-4 top-2 -translate-y-1/2 text-zinc-400 font-black text-lg">₡</span>
-              <input type="number" value={precioInput} onChange={(e) => setPrecioInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") confirmarPrecioYContinuar(); }} autoFocus className="w-full pl-9 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-xl font-black text-black outline-none focus:border-emerald-500 text-center" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <button onClick={confirmarPrecioYContinuar} className="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md cursor-pointer">Continuar</button>
-              <button onClick={() => setModalPrecio({ isOpen: false, ventas: [] })} className="w-full bg-zinc-100 text-zinc-600 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer">Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🔥 MODAL 2: HACIENDA (NUEVO DISEÑO CON BÚSQUEDA Y TIPO) */}
-      {modalHacienda.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl animate-fade-in-up">
-            <h3 className="text-lg font-black text-center text-zinc-800 uppercase tracking-widest mb-6">Facturación Electrónica</h3>
+      {/* 🔥 MODAL UNIFICADO DE FACTURACIÓN */}
+      {modalFacturar.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl animate-fade-in-up my-8">
+            <h3 className="text-lg font-black text-center text-zinc-900 uppercase tracking-widest mb-1">
+              Emitir Comprobante
+            </h3>
+            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">
+              {modalFacturar.ventas.length === 1 
+                ? `${modalFacturar.ventas[0].totalUnidades}x ${modalFacturar.ventas[0].item}`
+                : `${modalFacturar.ventas.length} ventas seleccionadas`}
+            </p>
             
             <div className="flex flex-col gap-4 mb-6">
+              {/* 1. MONTO DE LAS PRENDAS EDITABLE (Trae por defecto el de la tabla) */}
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">Tipo de Identificación *</label>
-                <select 
-                  value={modalHacienda.tipoIdentificacion} 
-                  onChange={(e) => setModalHacienda({...modalHacienda, tipoIdentificacion: e.target.value})}
-                  className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-blue-600"
-                >
-               <option value="01">Cédula Física</option>
-                  <option value="02">Cédula Jurídica</option>
-                  <option value="03">DIMEX</option>
-                  <option value="04">NITE</option>
-                  <option value="05">Extranjero No Domiciliado</option>
-                  <option value="06">No Contribuyente</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">Número de Cédula *</label>
-                <div className="flex gap-2 mt-1">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Monto de Productos *</label>
+                <div className="relative mt-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-base">₡</span>
                   <input 
-                    type="text" 
-                    value={modalHacienda.cedula} 
-                    onChange={(e) => setModalHacienda({...modalHacienda, cedula: e.target.value})}
-                    onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }}
-                    placeholder="Ej. 101110222" 
-                    className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600" 
+                    type="number" 
+                    value={modalFacturar.precio} 
+                    onChange={(e) => setModalFacturar({ ...modalFacturar, precio: e.target.value })}
+                    className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-base font-black text-emerald-700 outline-none focus:border-black" 
                   />
-                  <button 
-                    onClick={buscarCedulaHacienda} 
-                    className="bg-zinc-800 text-white px-4 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" 
-                    title="Buscar nombre en Hacienda"
-                  >
-                    <FaSearch size={14} />
-                  </button>
                 </div>
               </div>
 
+              {/* 🚚 CHECKBOX DE ENVÍO + MONTO DE ENVÍO PERSONALIZABLE */}
+              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 transition-all">
+                <label className="flex items-center justify-between cursor-pointer select-none">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={modalFacturar.incluyeEnvio}
+                      onChange={(e) => setModalFacturar({ ...modalFacturar, incluyeEnvio: e.target.checked })}
+                      className="w-4 h-4 rounded accent-black cursor-pointer"
+                    />
+                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                      <FaTruck className="text-zinc-500" size={13} /> Agregar Envío
+                    </span>
+                  </div>
+                  {modalFacturar.incluyeEnvio && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                      + ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}
+                    </span>
+                  )}
+                </label>
+
+                {modalFacturar.incluyeEnvio && (
+                  <div className="mt-3 pt-3 border-t border-zinc-200/80">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Costo del Envío (Personalizable) *</label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-sm">₡</span>
+                      <input
+                        type="number"
+                        value={modalFacturar.precioEnvio}
+                        onChange={(e) => setModalFacturar({ ...modalFacturar, precioEnvio: e.target.value })}
+                        placeholder="2500"
+                        className="w-full pl-8 pr-4 py-2 bg-white border border-zinc-300 rounded-xl text-sm font-black text-black outline-none focus:border-black"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Resumen del Total Final si lleva envío */}
+                {modalFacturar.incluyeEnvio && (
+                  <div className="mt-2.5 flex items-center justify-between text-xs font-black text-zinc-900 pt-1">
+                    <span>TOTAL A FACTURAR:</span>
+                    <span className="text-sm text-emerald-700">
+                      ₡{((Number(modalFacturar.precio) || 0) + (Number(modalFacturar.precioEnvio) || 0)).toLocaleString("es-CR")}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. SELECTOR DE TIPO DE COMPROBANTE (Normal solo habilitado para Super Admin) */}
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">Nombre del Cliente *</label>
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Tipo de Comprobante *</label>
+                <select 
+                  value={modalFacturar.tipoEmision} 
+                  onChange={(e) => setModalFacturar({ ...modalFacturar, tipoEmision: e.target.value })}
+                  disabled={!esSuperAdmin}
+                  className={`w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-black outline-none focus:border-black ${!esSuperAdmin ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
+                  {esSuperAdmin && (
+                    <option value="interno">Ticket Normal (Uso Interno)</option>
+                  )}
+                </select>
+              </div>
+
+              {/* 3. TIPO DE IDENTIFICACIÓN Y CÉDULA */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">
+                    Tipo ID {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                  </label>
+                  <select 
+                    value={modalFacturar.tipoIdentificacion} 
+                    onChange={(e) => setModalFacturar({ ...modalFacturar, tipoIdentificacion: e.target.value })}
+                    className="w-full mt-1 px-2.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-black"
+                  >
+                    <option value="01">Física</option>
+                    <option value="02">Jurídica</option>
+                    <option value="03">DIMEX</option>
+                    <option value="04">NITE</option>
+                    <option value="05">Extranjero</option>
+                    <option value="06">No Contrib.</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">
+                    Número de Cédula {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                  </label>
+                  <div className="flex gap-1.5 mt-1">
+                    <input 
+                      type="text" 
+                      value={modalFacturar.cedula} 
+                      onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }}
+                      placeholder={modalFacturar.tipoEmision === "hacienda" ? "Ej. 101110222" : "Opcional..."}
+                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={buscarCedulaHacienda} 
+                      className="bg-zinc-800 text-white px-3.5 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" 
+                      title="Buscar nombre en Hacienda"
+                    >
+                      <FaSearch size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. NOMBRE DEL CLIENTE */}
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase">
+                  Nombre del Cliente {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                </label>
                 <input 
                   type="text" 
-                  value={modalHacienda.nombre} 
-                  onChange={(e) => setModalHacienda({...modalHacienda, nombre: e.target.value})}
-                  placeholder="Automático al buscar..." 
-                  className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600 bg-white font-bold text-zinc-800" 
+                  value={modalFacturar.nombre} 
+                  onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })}
+                  placeholder={modalFacturar.tipoEmision === "hacienda" ? "Automático al buscar o escriba..." : "Cliente de Contado (Opcional)"} 
+                  className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" 
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo Electrónico (Opcional)</label>
-                <input 
-                  type="email" 
-                  value={modalHacienda.correo} 
-                  onChange={(e) => setModalHacienda({...modalHacienda, correo: e.target.value})}
-                  placeholder="cliente@correo.com" 
-                  className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600" 
-                />
+              {/* 5. TELÉFONO Y CORREO ELECTRÓNICO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono (Opcional)</label>
+                  <input 
+                    type="tel" 
+                    value={modalFacturar.telefono} 
+                    onChange={(e) => setModalFacturar({ ...modalFacturar, telefono: e.target.value })}
+                    placeholder="Ej. 8888-8888" 
+                    className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo (Opcional)</label>
+                  <input 
+                    type="email" 
+                    value={modalFacturar.correo} 
+                    onChange={(e) => setModalFacturar({ ...modalFacturar, correo: e.target.value })}
+                    placeholder="cliente@correo.com" 
+                    className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
+                  />
+                </div>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => setModalHacienda({ ...modalHacienda, isOpen: false })} className="flex-1 bg-zinc-100 text-zinc-600 py-3 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer">
+              <button 
+                onClick={() => setModalFacturar({ ...modalFacturar, isOpen: false })} 
+                className="flex-1 bg-zinc-100 text-zinc-600 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer"
+              >
                 Cancelar
               </button>
               <button 
-                onClick={() => {
-                  if (!modalHacienda.cedula.trim() || !modalHacienda.nombre.trim()) {
-                    toastHOT.error("Cédula y Nombre son obligatorios.");
-                    return;
-                  }
-                  setModalHacienda({ ...modalHacienda, isOpen: false });
-                  ejecutarEmisionTiqueteConDatos(
-                    modalHacienda.ventas, "hacienda", modalHacienda.precio, 
-                    modalHacienda.cedula.trim(), modalHacienda.nombre.trim(), modalHacienda.correo.trim(), modalHacienda.tipoIdentificacion
-                  );
-                }} 
-                className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-blue-700 shadow-sm cursor-pointer"
+                onClick={confirmarYEmitirFactura} 
+                disabled={generandoTiquete}
+                className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md cursor-pointer transition-colors"
               >
-                Emitir
+                Emitir Comprobante
               </button>
             </div>
           </div>

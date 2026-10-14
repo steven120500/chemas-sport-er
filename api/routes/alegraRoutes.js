@@ -7,7 +7,98 @@ const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 // ID DE LA NUMERACIÓN INTERNA (NO ELECTRÓNICA)
 const ID_NUMERACION_INTERNA = 1; 
-const ID_ITEM_CABYS = 8;
+const ID_ITEM_FALLBACK = 8; // Respaldo por defecto
+
+// Caché en memoria para no consultar los ítems e impuestos en cada factura
+let cacheItemsAlegra = null;
+let cacheImpuestoExentoId = null;
+
+// Normalizar texto (sin tildes, en minúsculas) para comparar nombres sin fallos
+function limpiarTexto(str = "") {
+  return String(str)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// 🔥 FUNCIÓN QUE OBTIENE LOS IDs REALES DE TUS PRODUCTOS EN ALEGRA
+async function obtenerMapaProductosAlegra(credentials) {
+  if (cacheItemsAlegra) return cacheItemsAlegra;
+  try {
+    const res = await fetch("https://api.alegra.com/api/v1/items?limit=30", {
+      headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const mapa = {};
+      data.forEach((item) => {
+        if (item && item.name && item.id) {
+          mapa[limpiarTexto(item.name)] = Number(item.id);
+        }
+      });
+      cacheItemsAlegra = mapa;
+      console.log("✅ MAPA DE PRODUCTOS ALEGRA CARGADO:", mapa);
+      return mapa;
+    }
+  } catch (err) {
+    console.error("⚠️ Error consultando ítems de Alegra:", err);
+  }
+  return {};
+}
+
+// 🔥 CLASIFICADOR OFICIAL: CONECTA CADA CATEGORÍA CON SU PRODUCTO DE ALEGRA Y SU PRECIO
+function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
+  const txt = limpiarTexto(nombreVenta);
+
+  // Extraer lo que viene entre paréntesis al final, ej: "(Player)", "(Nacional)", "(Niño)"
+  const matchParentesis = txt.match(/\(([^)]+)\)\s*$/);
+  const categoria = matchParentesis ? matchParentesis[1].trim() : "";
+
+  let nombreProductoAlegra = "Camisa Version Fan"; // Predeterminado para Fan y el resto
+  let precioBase = 20000;
+
+  if (categoria.includes("nacional") || txt.includes("(nacional)")) {
+    nombreProductoAlegra = "Camisa Nacional";
+    precioBase = 22000;
+  } else if (categoria.includes("player") || categoria.includes("jugador") || txt.includes("(player)")) {
+    nombreProductoAlegra = "Camiseta Versión Jugador";
+    precioBase = 22000;
+  } else if (categoria.includes("retro") || txt.includes("(retro)")) {
+    nombreProductoAlegra = "Camiseta Deportiva Versión Retro";
+    precioBase = 22000;
+  } else if (categoria.includes("mujer") || txt.includes("(mujer)")) {
+    nombreProductoAlegra = "Camisa Version Fan Mujer";
+    precioBase = 20000;
+  } else if (categoria.includes("nino") || txt.includes("(nino)") || txt.includes("uniforme de nino")) {
+    nombreProductoAlegra = "Uniforme de Niño";
+    precioBase = 20000;
+  } else if (categoria.includes("llavero") || txt.includes("llavero")) {
+    nombreProductoAlegra = "Llavero Deportivo";
+    precioBase = 2500;
+  } else if (categoria.includes("envio") || txt.includes("envio gam") || txt.startsWith("envio")) {
+    nombreProductoAlegra = "Envio GAM";
+    precioBase = 2500;
+  } else {
+    // Fan ((Fan)) y todo el resto (NBA, MLB, NFL, F1, Balón, Abrigos, etc.)
+    nombreProductoAlegra = "Camisa Version Fan";
+    precioBase = 20000;
+  }
+
+  // Buscar el ID exacto en Alegra
+  const claveBusqueda = limpiarTexto(nombreProductoAlegra);
+  const idEnAlegra =
+    mapaAlegra[claveBusqueda] ||
+    mapaAlegra["camisa version fan"] ||
+    mapaAlegra["camiseta deportiva version fan"] ||
+    ID_ITEM_FALLBACK;
+
+  return {
+    idAlegra: idEnAlegra,
+    nombreProductoAlegra,
+    precioBase
+  };
+}
 
 /* ========================================================
    🔍 CONSULTAR CÉDULA EN HACIENDA
@@ -29,11 +120,13 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
-    const { ventas, tipo, precioManual, cedula, nombreCliente, email, tipoIdentificacion } = req.body; 
-    if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
+    const { ventas, tipo, precioManual, cedula, nombreCliente, email, telefono, tipoIdentificacion } = req.body; 
+    if (!ventas || !Array.isArray(ventas) || ventas.length === 0) {
+      return res.status(400).json({ error: "Sin ventas." });
+    }
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto
+    let clientId = 2; // Cliente de Contado / General por defecto en Alegra
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -56,11 +149,16 @@ router.post('/emitir-tiquete', async (req, res) => {
         clientId = contactsData[0].id;
         console.log(`✅ 2. CONTACTO ENCONTRADO. ID: ${clientId}`);
 
-        if (email && email.includes("@")) {
+        // Actualizar correo y/o teléfono si se enviaron en el modal
+        const datosActualizar = {};
+        if (email && email.includes("@")) datosActualizar.email = email.trim();
+        if (telefono && telefono.trim() !== "") datosActualizar.phonePrimary = telefono.trim();
+
+        if (Object.keys(datosActualizar).length > 0) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
             method: "PUT",
             headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ email: email.trim() })
+            body: JSON.stringify(datosActualizar)
           });
         }
       } else {
@@ -74,6 +172,10 @@ router.post('/emitir-tiquete', async (req, res) => {
           email: (email && email.includes("@")) ? email.trim() : "",
           type: "client"
         };
+
+        if (telefono && telefono.trim() !== "") {
+          payloadNuevoContacto.phonePrimary = telefono.trim();
+        }
 
         console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
         
@@ -99,56 +201,81 @@ router.post('/emitir-tiquete', async (req, res) => {
       }
     }
 
-    // 🔥 BUSCAR DINÁMICAMENTE EL IMPUESTO "IVA EXENTO 0%"
-    let idImpuestoExento = 2; // ID 2 suele ser el exento por defecto en Alegra CR
-    try {
-      const taxesRes = await fetch("https://api.alegra.com/api/v1/taxes", {
-        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
-      });
-      const taxesData = await taxesRes.json();
-      if (Array.isArray(taxesData)) {
-        // Buscamos el impuesto que tenga 0% o que diga "exento"
-        const impuesto = taxesData.find(t => t.name.toLowerCase().includes("exento") || Number(t.percentage) === 0);
-        if (impuesto) {
-          idImpuestoExento = impuesto.id;
-          console.log(`✅ IMPUESTO EXENTO ENCONTRADO. ID: ${idImpuestoExento}`);
+    // 🔥 BUSCAR DINÁMICAMENTE EL IMPUESTO "IVA EXENTO 0%" (Con caché)
+    let idImpuestoExento = cacheImpuestoExentoId || 2;
+    if (!cacheImpuestoExentoId) {
+      try {
+        const taxesRes = await fetch("https://api.alegra.com/api/v1/taxes", {
+          headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+        });
+        const taxesData = await taxesRes.json();
+        if (Array.isArray(taxesData)) {
+          const impuesto = taxesData.find(t => t.name.toLowerCase().includes("exento") || Number(t.percentage) === 0);
+          if (impuesto) {
+            idImpuestoExento = impuesto.id;
+            cacheImpuestoExentoId = impuesto.id;
+            console.log(`✅ IMPUESTO EXENTO ENCONTRADO. ID: ${idImpuestoExento}`);
+          }
         }
+      } catch (e) {
+        console.log("⚠️ No se pudo buscar el impuesto, usando el ID 2 por defecto.");
       }
-    } catch (e) {
-      console.log("⚠️ No se pudo buscar el impuesto, usando el ID 2 por defecto.");
     }
 
-    const itemsAlegra = [];
-    let totalFactura = 0;
-    let totalUnidadesGlobal = 0;
-    ventas.forEach(v => totalUnidadesGlobal += (Number(v.totalUnidades) || 1));
+    // 🔥 OBTENER MAPA DE PRODUCTOS DE ALEGRA (Camisa Nacional, Player, Retro, Fan, Mujer, Niño, Llavero, Envío)
+    const mapaProductos = await obtenerMapaProductosAlegra(credentials);
 
-    let precioUnitario = (Number(precioManual) && totalUnidadesGlobal > 0) ? (Number(precioManual) / totalUnidadesGlobal) : 10000;
-    precioUnitario = Number(precioUnitario.toFixed(5));
-    
+    // 1. Armamos las líneas base con su respectivo Producto de Alegra y su Precio Oficial
+    const lineasPreliminares = [];
+    let sumaPreciosTabla = 0;
+
     ventas.forEach((venta) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
-      totalFactura += (precioUnitario * cantidadUnidades);
+      const infoCat = resolverProductoYPrecioBase(venta.item, mapaProductos);
+
+      // Si desde el frontend venía un precio personalizado por fila, lo usamos; si no, usamos el de la categoría
+      const precioUnitarioDeEstaVenta = Number(venta.precioUnitarioCustom) > 0
+        ? Number(venta.precioUnitarioCustom)
+        : infoCat.precioBase;
 
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
-          itemsAlegra.push({ 
-            id: ID_ITEM_CABYS, 
-            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, 
-            price: precioUnitario, 
-            quantity: 1,
-            tax: [{ id: idImpuestoExento }] // 🔥 AQUÍ SE INYECTA EL IVA EXENTO
+          lineasPreliminares.push({
+            id: infoCat.idAlegra,
+            // Se envía el nombre del producto en Alegra o el detalle con talla
+            name: `${infoCat.nombreProductoAlegra} - ${venta.item} (Talla: ${item.talla})`,
+            precioBaseUnitario: precioUnitarioDeEstaVenta,
+            quantity: 1
           });
+          sumaPreciosTabla += precioUnitarioDeEstaVenta;
         });
       } else {
-        itemsAlegra.push({ 
-          id: ID_ITEM_CABYS, 
-          name: venta.item || "Camiseta Deportiva", 
-          price: precioUnitario, 
-          quantity: cantidadUnidades,
-          tax: [{ id: idImpuestoExento }] // 🔥 AQUÍ SE INYECTA EL IVA EXENTO
+        lineasPreliminares.push({
+          id: infoCat.idAlegra,
+          name: `${infoCat.nombreProductoAlegra} - ${venta.item || "Camiseta Deportiva"}`,
+          precioBaseUnitario: precioUnitarioDeEstaVenta,
+          quantity: cantidadUnidades
         });
+        sumaPreciosTabla += (precioUnitarioDeEstaVenta * cantidadUnidades);
       }
+    });
+
+    // 2. Ajustamos al precioManual que se envió desde el modal (sin importar el precio fijo que tenga en Alegra)
+    const montoTotalDeseado = Number(precioManual) > 0 ? Number(precioManual) : sumaPreciosTabla;
+    const factorAjuste = sumaPreciosTabla > 0 ? (montoTotalDeseado / sumaPreciosTabla) : 1;
+
+    let totalFactura = 0;
+    const itemsAlegra = lineasPreliminares.map((linea) => {
+      const precioFinalUnitario = Number((linea.precioBaseUnitario * factorAjuste).toFixed(5));
+      totalFactura += (precioFinalUnitario * linea.quantity);
+
+      return {
+        id: linea.id,
+        name: linea.name,
+        price: precioFinalUnitario,
+        quantity: linea.quantity,
+        tax: [{ id: idImpuestoExento }]
+      };
     });
 
     totalFactura = Number(totalFactura.toFixed(2));
@@ -161,7 +288,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // LA COMBINACIÓN MÁGICA QUE YA NOS FUNCIONÓ
+      // LA COMBINACIÓN MÁGICA PARA CONTADO + SINPE/TRANSFERENCIA
       saleCondition: "CASH",        
       paymentMethod: "TRANSFER",    
       
