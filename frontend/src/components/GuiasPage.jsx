@@ -265,98 +265,109 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
-  // 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL
-  const handleDescargarYCompartirPDF = async (guia) => {
-    const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
-    try {
-      const jsPDF = await cargarJsPDF();
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [101.6, 152.4]
-      });
+// 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL (AJUSTADO A 1 SOLA PÁGINA)
+const handleDescargarYCompartirPDF = async (guia) => {
+  const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
+  try {
+    const jsPDF = await cargarJsPDF();
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [101.6, 152.4]
+    });
 
-      const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
-      const esMayorista = guia.esMayorista === "Sí";
+    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+    const esMayorista = guia.esMayorista === "Sí";
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
+
+    doc.setLineWidth(0.6);
+    doc.line(6, 16.5, 95.6, 16.5);
+
+    let y = 25;
+    const margenIzq = 6;
+    const anchoMax = 89.6;
+
+    const agregarCampo = (etiqueta, valor) => {
+      const textoValor = String(valor || "").trim();
+      if (!textoValor) return;
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
-
-      doc.setLineWidth(0.6);
-      doc.line(6, 16.5, 95.6, 16.5);
-
-      let y = 25;
-      const margenIzq = 6;
-      const anchoMax = 89.6;
-
-      const agregarCampo = (etiqueta, valor) => {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        const textoEtiqueta = `${etiqueta}: `;
-        doc.text(textoEtiqueta, margenIzq, y);
-        const anchoEtiqueta = doc.getTextWidth(textoEtiqueta);
-
+      doc.setFontSize(12);
+      
+      // Si es "Comentarios", ponemos la etiqueta arriba con sus dos puntos y el texto detallado abajo limpio
+      if (etiqueta === "Comentarios") {
+        doc.text(`${etiqueta}:`, margenIzq, y);
+        y += 6;
         doc.setFont("helvetica", "normal");
-        const textoValor = String(valor || "");
-        const lineasValor = doc.splitTextToSize(textoValor, anchoMax - anchoEtiqueta);
-
-        if (lineasValor.length === 1) {
-          doc.text(lineasValor[0], margenIzq + anchoEtiqueta, y);
-          y += 8.5;
-        } else {
-          const todasLineas = doc.splitTextToSize(`${textoEtiqueta}${textoValor}`, anchoMax);
-          doc.text(todasLineas, margenIzq, y);
-          y += todasLineas.length * 6.5 + 2;
-        }
-      };
-
-      agregarCampo("Nombre", guia.nombre);
-      agregarCampo("Provincia", guia.provincia);
-      agregarCampo("Cantón", guia.canton);
-      agregarCampo("Distrito", guia.distrito);
-      agregarCampo("Teléfono", guia.telefono);
-      agregarCampo("Debe", cobroPendiente ? `¢${Number(guia.monto || 0).toLocaleString("es-CR")}` : "No");
-      agregarCampo("Meter raspa", guia.meterRaspa);
-      agregarCampo("Comentarios", guia.comentarios || "");
-
-      if (esMayorista && guia.nombreMayorista) {
-        const yLinea = Math.max(y + 2, 118);
-        doc.setLineWidth(0.7);
-        doc.setLineDashPattern([2, 2], 0);
-        doc.line(6, yLinea, 95.6, yLinea);
-        doc.setLineDashPattern([], 0);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(26);
-        const LineasMayorista = doc.splitTextToSize(guia.nombreMayorista.toUpperCase(), 88);
-        doc.text(LineasMayorista, 50.8, yLinea + 12, { align: "center" });
-      }
-
-      const nombreLimpio = String(guia.nombre || "Guia").replace(/[^a-zA-Z0-9_-]/g, "_");
-      const fileName = `Guia_${nombreLimpio}.pdf`;
-
-      doc.save(fileName);
-
-      const pdfBlob = doc.output("blob");
-      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-
-      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
-        await navigator.share({
-          title: `Guía - ${guia.nombre}`,
-          text: `Guía de envío para ${guia.nombre}`,
-          files: [pdfFile]
-        }).catch(() => {});
+        const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
+        doc.text(lineasValor, margenIzq, y);
+        y += (lineasValor.length * 6) + 4;
       } else {
-        toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
+        doc.text(`${etiqueta}:`, margenIzq, y);
+        doc.setFont("helvetica", "normal");
+        const lineasValor = doc.splitTextToSize(textoValor, anchoMax - 26);
+        doc.text(lineasValor, margenIzq + 26, y);
+        y += (lineasValor.length * 6) + 3;
       }
-    } catch (err) {
-      console.error("Error generando PDF:", err);
-      toastHOT.error("Error al descargar el PDF, abriendo vista de impresión...", { id: toastId });
-      handleVistaImpresion(guia);
+    };
+
+    agregarCampo("Nombre", guia.nombre);
+    agregarCampo("Provincia", guia.provincia);
+    agregarCampo("Cantón", guia.canton);
+    agregarCampo("Distrito", guia.distrito);
+    agregarCampo("Teléfono", guia.telefono);
+    agregarCampo("Debe", cobroPendiente ? `¢${Number(guia.monto || 0).toLocaleString("es-CR")}` : "No");
+    agregarCampo("Raspa", guia.meterRaspa);
+    agregarCampo("Comentarios", guia.comentarios);
+
+    // 🔥 NOMBRE DE MAYORISTA ADAPTABLE PARA QUE NUNCA SALTE DE PÁGINA
+    if (esMayorista && guia.nombreMayorista) {
+      const yLinea = Math.max(y + 2, 115);
+      doc.setLineWidth(0.7);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.line(6, yLinea, 95.6, yLinea);
+      doc.setLineDashPattern([], 0);
+
+      const textoMay = guia.nombreMayorista.toUpperCase();
+      
+      let tamFuente = 24;
+      if (textoMay.length > 12) tamFuente = 18;
+      if (textoMay.length > 20) tamFuente = 14;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(tamFuente);
+      
+      const lineasMayorista = doc.splitTextToSize(textoMay, 88);
+      doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
     }
-  };
+
+    const nombreLimpio = String(guia.nombre || "Guia").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = `Guia_${nombreLimpio}.pdf`;
+
+    doc.save(fileName);
+
+    const pdfBlob = doc.output("blob");
+    const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
+      await navigator.share({
+        title: `Guía - ${guia.nombre}`,
+        text: `Guía de envío para ${guia.nombre}`,
+        files: [pdfFile]
+      }).catch(() => {});
+    } else {
+      toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
+    }
+  } catch (err) {
+    console.error("Error generando PDF:", err);
+    toastHOT.error("Error al descargar el PDF, abriendo vista de impresión...", { id: toastId });
+    handleVistaImpresion(guia);
+  }
+};
 
   // 🖨️ VISTA DE IMPRESIÓN DIRECTA
   const handleVistaImpresion = (guia) => {
