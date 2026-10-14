@@ -33,7 +33,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto
+    let clientId = 2; // Cliente por defecto si falla algo
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -140,9 +140,9 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 EL DESCUBRIMIENTO MAESTRO DE LA RADIOGRAFÍA
-      term: "De contado",            // Alegra lo usa internamente y lo traduce a "01" para Hacienda
-      paymentMethod: "TRANSFER",     // Alegra lo usa internamente y lo traduce a "04" para Hacienda
+      // 🔥 LA LLAVE MAESTRA DESCUBIERTA EN EL PAYLOAD
+      saleCondition: "CASH",        // Alegra usa esto internamente para "Condición: Contado"
+      paymentMethod: "TRANSFER",    // Alegra usa esto internamente para "Método: SINPE"
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
