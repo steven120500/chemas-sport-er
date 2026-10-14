@@ -25,7 +25,7 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
 });
 
 /* ========================================================
-   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (CON ESPÍAS)
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (CON SÚPER ESPÍAS)
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
@@ -38,7 +38,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
-      // 🔥 TRADUCTOR PERFECTO DE CÉDULAS (CON LOS ACRÓNIMOS DE ALEGRA)
+      // 🔥 TRADUCTOR PERFECTO DE CÉDULAS
       let tipoAlegra = "CF"; // 01 -> Cédula Física por defecto
       if (tipoIdentificacion === "02") tipoAlegra = "CJ"; // Cédula Jurídica
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
@@ -55,7 +55,6 @@ router.post('/emitir-tiquete', async (req, res) => {
       if (Array.isArray(contactsData) && contactsData.length > 0) {
         clientId = contactsData[0].id;
         console.log(`✅ 2. CONTACTO ENCONTRADO. ID: ${clientId}`);
-        console.log(`🕵️ FORMATO DEL CONTACTO EN BASE DE DATOS:`, JSON.stringify(contactsData[0].identificationObject, null, 2));
 
         if (email && email.includes("@")) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
@@ -65,7 +64,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // 📦 CREAR CLIENTE NUEVO (SIN DIRECCIÓN PARA EVITAR ERROR 2027)
+        // 📦 CREAR CLIENTE NUEVO
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
           identificationObject: {
@@ -77,8 +76,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         };
 
         console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
-        console.log("📦 PAYLOAD DE CONTACTO:", JSON.stringify(payloadNuevoContacto, null, 2));
-
+        
         const newContactRes = await fetch(`https://api.alegra.com/api/v1/contacts`, {
           method: "POST",
           headers: { 
@@ -97,7 +95,6 @@ router.post('/emitir-tiquete', async (req, res) => {
         } else {
           console.error("❌ 3. ERROR AL CREAR CONTACTO:");
           console.error(JSON.stringify(newContactData, null, 2));
-          console.log("⚠️ Usando cliente por defecto (ID: 2) para no frenar la venta.");
         }
       }
     }
@@ -143,10 +140,10 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 LA COMBINACIÓN GANADORA PARA ALEGRA + HACIENDA CR
-      paymentCondition: "01",       // Para Hacienda: 01 = Contado
-      paymentForm: "cash",          // Para Alegra: cash = Contado
-      paymentMethod: "transfer",    // Para Alegra: transfer = SINPE/Transferencia
+      // 🔥 LA SOLUCIÓN FINAL: PALABRA EXACTA DEL DESPLEGABLE
+      paymentCondition: "Contado",  // Exige la palabra literal, no el código "01"
+      paymentForm: "cash",          
+      paymentMethod: "transfer",    
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
@@ -159,7 +156,11 @@ router.post('/emitir-tiquete', async (req, res) => {
     }
 
     console.log("==================================================");
-    console.log("📄 4. PAYLOAD DE FACTURA ENVIADO A ALEGRA:");
+    console.log("🕵️‍♂️ REVISIÓN ESPÍA - CAMPOS DE PAGO ANTES DE ENVIAR:");
+    console.log(`- paymentCondition: "${payloadAlegra.paymentCondition}"`);
+    console.log(`- paymentForm: "${payloadAlegra.paymentForm}"`);
+    console.log(`- paymentMethod: "${payloadAlegra.paymentMethod}"`);
+    console.log("📄 4. PAYLOAD COMPLETO DE FACTURA ENVIADO A ALEGRA:");
     console.log(JSON.stringify(payloadAlegra, null, 2));
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
@@ -172,12 +173,14 @@ router.post('/emitir-tiquete', async (req, res) => {
     
     if (!alegraResponse.ok) {
       console.error("❌ 5. ERROR DE ALEGRA AL EMITIR FACTURA:");
-      console.error("🕵️ MOTIVO EXACTO DEL RECHAZO:", JSON.stringify(alegraData, null, 2));
+      console.error("🕵️‍♂️ MOTIVO EXACTO DEL RECHAZO (LEER ESTO CON LUPA):");
+      console.error(JSON.stringify(alegraData, null, 2));
       return res.status(400).json({ error: alegraData.message || "Error al generar factura en Alegra." });
     }
 
     console.log("✅ 5. FACTURA CREADA CON ÉXITO EN ALEGRA.");
-    console.log("🕵️ RESPUESTA COMPLETA DE LA FACTURA:", JSON.stringify(alegraData, null, 2));
+    console.log("🕵️‍♂️ RESPUESTA EXITOSA DE ALEGRA:");
+    console.log(JSON.stringify(alegraData, null, 2));
     console.log("==================================================");
     
     return res.status(200).json({ 
