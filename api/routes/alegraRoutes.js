@@ -33,7 +33,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto si falla algo
+    let clientId = 2; // Cliente por defecto
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -64,7 +64,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // 📦 CREAR CLIENTE NUEVO (SIN DIRECCIÓN)
+        // 📦 CREAR CLIENTE NUEVO
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
           identificationObject: {
@@ -99,6 +99,25 @@ router.post('/emitir-tiquete', async (req, res) => {
       }
     }
 
+    // 🔥 BUSCAR DINÁMICAMENTE EL IMPUESTO "IVA EXENTO 0%"
+    let idImpuestoExento = 2; // ID 2 suele ser el exento por defecto en Alegra CR
+    try {
+      const taxesRes = await fetch("https://api.alegra.com/api/v1/taxes", {
+        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+      });
+      const taxesData = await taxesRes.json();
+      if (Array.isArray(taxesData)) {
+        // Buscamos el impuesto que tenga 0% o que diga "exento"
+        const impuesto = taxesData.find(t => t.name.toLowerCase().includes("exento") || Number(t.percentage) === 0);
+        if (impuesto) {
+          idImpuestoExento = impuesto.id;
+          console.log(`✅ IMPUESTO EXENTO ENCONTRADO. ID: ${idImpuestoExento}`);
+        }
+      }
+    } catch (e) {
+      console.log("⚠️ No se pudo buscar el impuesto, usando el ID 2 por defecto.");
+    }
+
     const itemsAlegra = [];
     let totalFactura = 0;
     let totalUnidadesGlobal = 0;
@@ -117,7 +136,8 @@ router.post('/emitir-tiquete', async (req, res) => {
             id: ID_ITEM_CABYS, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, 
             price: precioUnitario, 
-            quantity: 1 
+            quantity: 1,
+            tax: [{ id: idImpuestoExento }] // 🔥 AQUÍ SE INYECTA EL IVA EXENTO
           });
         });
       } else {
@@ -125,7 +145,8 @@ router.post('/emitir-tiquete', async (req, res) => {
           id: ID_ITEM_CABYS, 
           name: venta.item || "Camiseta Deportiva", 
           price: precioUnitario, 
-          quantity: cantidadUnidades 
+          quantity: cantidadUnidades,
+          tax: [{ id: idImpuestoExento }] // 🔥 AQUÍ SE INYECTA EL IVA EXENTO
         });
       }
     });
@@ -140,9 +161,9 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 LA LLAVE MAESTRA DESCUBIERTA EN EL PAYLOAD
-      saleCondition: "CASH",        // Alegra usa esto internamente para "Condición: Contado"
-      paymentMethod: "TRANSFER",    // Alegra usa esto internamente para "Método: SINPE"
+      // LA COMBINACIÓN MÁGICA QUE YA NOS FUNCIONÓ
+      saleCondition: "CASH",        
+      paymentMethod: "TRANSFER",    
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
