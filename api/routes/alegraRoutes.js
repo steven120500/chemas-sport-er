@@ -33,31 +33,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; 
-
-    // 🔥 EL SÚPER ESPÍA: LEER LAS FACTURAS ANTERIORES PARA VER EL SECRETO
-    console.log("==================================================");
-    console.log("🕵️‍♂️ RADIOGRAFÍA DE FACTURA (Buscando el formato correcto)...");
-    try {
-      const resSpy = await fetch("https://api.alegra.com/api/v1/invoices?limit=5", {
-        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
-      });
-      const dataSpy = await resSpy.json();
-      if (Array.isArray(dataSpy) && dataSpy.length > 0) {
-        const facturaGuia = dataSpy.find(f => f.paymentForm || f.paymentCondition);
-        if (facturaGuia) {
-           console.log("✅ ESTRUCTURA DE PAGO ENCONTRADA EN ALEGRA:");
-           console.log(`- paymentForm:`, facturaGuia.paymentForm);
-           console.log(`- paymentMethod:`, facturaGuia.paymentMethod);
-           console.log(`- paymentCondition:`, facturaGuia.paymentCondition);
-        } else {
-           console.log("⚠️ No se encontraron campos de pago en las últimas facturas.");
-        }
-      }
-    } catch (e) {
-       console.log("Error al espiar facturas.");
-    }
-    console.log("==================================================");
+    let clientId = 2; // Cliente por defecto si falla algo
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -68,6 +44,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
 
+      console.log("==================================================");
       console.log(`🔍 1. BUSCANDO CONTACTO EXISTENTE: ${cedulaLimpiada}`);
       
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
@@ -163,9 +140,10 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 INTENTAMOS CON LOS CÓDIGOS OFICIALES NUMÉRICOS 
-      paymentForm: "01",          // 01 = Contado en Hacienda
-      paymentMethod: "04",        // 04 = Transferencia en Hacienda
+      // 🔥 LA COMBINACIÓN DEFINITIVA EN INGLÉS PARA ALEGRA
+      paymentCondition: "cash",     // Alegra lo asume como "Contado" y envía 01 a Hacienda
+      paymentForm: "transfer",      // Transferencia/SINPE
+      paymentMethod: "transfer",    // Transferencia/SINPE
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
