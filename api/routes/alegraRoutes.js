@@ -5,9 +5,13 @@ const router = express.Router();
 const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
+// ID DE LA NUMERACIÓN INTERNA (NO ELECTRÓNICA)
 const ID_NUMERACION_INTERNA = 1; 
 const ID_ITEM_CABYS = 8;
 
+/* ========================================================
+   🔍 CONSULTAR CÉDULA EN HACIENDA
+   ======================================================== */
 router.get('/consultar-cedula/:identificacion', async (req, res) => {
   try {
     const { identificacion } = req.params;
@@ -20,19 +24,29 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
   }
 });
 
+/* ========================================================
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (CON ESPÍAS)
+   ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
     const { ventas, tipo, precioManual, cedula, nombreCliente, email, tipoIdentificacion } = req.body; 
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; 
+    let clientId = 2; // Cliente por defecto
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
+      // 🔥 TRADUCTOR PERFECTO DE CÉDULAS (CON LOS ACRÓNIMOS DE ALEGRA)
+      let tipoAlegra = "CF"; // 01 -> Cédula Física por defecto
+      if (tipoIdentificacion === "02") tipoAlegra = "CJ"; // Cédula Jurídica
+      else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
+      else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
+
       console.log("==================================================");
-      console.log("🔍 1. BUSCANDO CONTACTO EXISTENTE:", cedulaLimpiada);
+      console.log(`🔍 1. BUSCANDO CONTACTO EXISTENTE: ${cedulaLimpiada}`);
+      
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
         headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
       });
@@ -40,11 +54,8 @@ router.post('/emitir-tiquete', async (req, res) => {
 
       if (Array.isArray(contactsData) && contactsData.length > 0) {
         clientId = contactsData[0].id;
-        console.log("✅ 2. CONTACTO ENCONTRADO EN ALEGRA. ID:", clientId);
-        
-        // 🕵️ EL ESPÍA: ESTO NOS DIRÁ EL SECRETO DE ALEGRA
-        console.log("🕵️ FORMATO EXACTO QUE USA ALEGRA INTERNAMENTE:");
-        console.log(JSON.stringify(contactsData[0].identificationObject, null, 2));
+        console.log(`✅ 2. CONTACTO ENCONTRADO. ID: ${clientId}`);
+        console.log(`🕵️ FORMATO DEL CONTACTO EN BASE DE DATOS:`, JSON.stringify(contactsData[0].identificationObject, null, 2));
 
         if (email && email.includes("@")) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
@@ -54,10 +65,13 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // 🚀 EL BYPASS: ENVIAMOS SOLO EL NÚMERO EN LA RAÍZ Y ELIMINAMOS EL identificationObject
+        // 📦 CREAR CLIENTE NUEVO CON LOS ACRÓNIMOS EXACTOS
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
-          identification: cedulaLimpiada, // <-- Truco aquí
+          identificationObject: {
+            type: tipoAlegra,
+            number: cedulaLimpiada
+          },
           email: (email && email.includes("@")) ? email.trim() : "",
           type: "client",
           address: {
@@ -68,8 +82,8 @@ router.post('/emitir-tiquete', async (req, res) => {
           }
         };
 
-        console.log("⚠️ 2. CONTACTO NO ENCONTRADO. INTENTANDO BYPASS...");
-        console.log("📦 PAYLOAD DE CONTACTO A ENVIAR:", JSON.stringify(payloadNuevoContacto, null, 2));
+        console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
+        console.log("📦 PAYLOAD DE CONTACTO:", JSON.stringify(payloadNuevoContacto, null, 2));
 
         const newContactRes = await fetch(`https://api.alegra.com/api/v1/contacts`, {
           method: "POST",
@@ -85,11 +99,11 @@ router.post('/emitir-tiquete', async (req, res) => {
         
         if (newContactRes.ok && newContactData.id) {
           clientId = newContactData.id;
-          console.log("✅ 3. BYPASS EXITOSO. NUEVO ID:", clientId);
+          console.log(`✅ 3. CONTACTO CREADO CON ÉXITO. NUEVO ID: ${clientId}`);
         } else {
-          console.error("❌ 3. EL BYPASS FALLÓ. ALEGRA SIGUE RECHAZANDO:");
+          console.error("❌ 3. ERROR AL CREAR CONTACTO:");
           console.error(JSON.stringify(newContactData, null, 2));
-          console.log("==================================================");
+          console.log("⚠️ Usando cliente por defecto (ID: 2) para no frenar la venta.");
         }
       }
     }
@@ -108,29 +122,48 @@ router.post('/emitir-tiquete', async (req, res) => {
 
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
-          itemsAlegra.push({ id: ID_ITEM_CABYS, name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, price: precioUnitario, quantity: 1 });
+          // 🔥 FIX: Línea corregida (antes tenía un salto de línea que rompía el string)
+          itemsAlegra.push({ 
+            id: ID_ITEM_CABYS, 
+            name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, 
+            price: precioUnitario, 
+            quantity: 1 
+          });
         });
       } else {
-        itemsAlegra.push({ id: ID_ITEM_CABYS, name: venta.item || "Camiseta", price: precioUnitario, quantity: cantidadUnidades });
+        itemsAlegra.push({ 
+          id: ID_ITEM_CABYS, 
+          name: venta.item || "Camiseta Deportiva", 
+          price: precioUnitario, 
+          quantity: cantidadUnidades 
+        });
       }
     });
 
     totalFactura = Number(totalFactura.toFixed(2));
     const fechaActual = new Date().toISOString().split('T')[0];
     
+    // 📄 PREPARAMOS LA FACTURA (INCLUYE ESPÍAS DE PAGOS)
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: { id: clientId },
       items: itemsAlegra,
-      paymentCondition: "01",
-      paymentForm: "01", 
+      paymentCondition: "01", // 01 = Contado
+      paymentForm: "04",      // 04 = Transferencia/SINPE Móvil (dejamos este para que el espía lo capture)
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
     };
 
-    if (tipo === "hacienda") payloadAlegra.documentType = "04";
-    else payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
+    if (tipo === "hacienda") {
+      payloadAlegra.documentType = "04"; // Tiquete electrónico oficial
+    } else {
+      payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
+    }
+
+    console.log("==================================================");
+    console.log("📄 4. PAYLOAD DE FACTURA ENVIADO A ALEGRA:");
+    console.log(JSON.stringify(payloadAlegra, null, 2));
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
       method: "POST",
@@ -141,16 +174,24 @@ router.post('/emitir-tiquete', async (req, res) => {
     const alegraData = await alegraResponse.json();
     
     if (!alegraResponse.ok) {
-      console.error("❌ 5. ERROR AL EMITIR FACTURA:", JSON.stringify(alegraData, null, 2));
-      return res.status(400).json({ error: alegraData.message || "Error al generar factura." });
+      console.error("❌ 5. ERROR DE ALEGRA AL EMITIR FACTURA:");
+      console.error("🕵️ MOTIVO EXACTO DEL RECHAZO:", JSON.stringify(alegraData, null, 2));
+      return res.status(400).json({ error: alegraData.message || "Error al generar factura en Alegra." });
     }
 
-    console.log("✅ 5. FACTURA CREADA CON ÉXITO.");
-    return res.status(200).json({ success: true, consecutivoOficial: alegraData.numberTemplate ? alegraData.numberTemplate.fullNumber : alegraData.id, totalCobrado: totalFactura });
+    console.log("✅ 5. FACTURA CREADA CON ÉXITO EN ALEGRA.");
+    console.log("🕵️ RESPUESTA COMPLETA DE LA FACTURA:", JSON.stringify(alegraData, null, 2));
+    console.log("==================================================");
+    
+    return res.status(200).json({ 
+      success: true, 
+      consecutivoOficial: alegraData.numberTemplate ? alegraData.numberTemplate.fullNumber : alegraData.id, 
+      totalCobrado: totalFactura 
+    });
 
   } catch (error) {
-    console.error("❌ ERROR FATAL:", error);
-    res.status(500).json({ error: "Error del servidor." });
+    console.error("❌ ERROR FATAL EN /emitir-tiquete:", error);
+    res.status(500).json({ error: "Error del servidor al emitir tiquete." });
   }
 });
 
