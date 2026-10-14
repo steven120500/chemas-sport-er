@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTruck, FaFilePdf, FaPlus, 
   FaMapMarkerAlt, FaUser, FaTrash, FaSearch, FaBoxOpen,
-  FaStickyNote, FaStore, FaCalendarAlt, FaCopy
+  FaStickyNote, FaStore, FaCalendarAlt, FaPrint
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -17,6 +17,26 @@ function getFechaHoyYMD() {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+// Carga dinámica de jsPDF desde CDN para no requerir npm install adicional
+function cargarJsPDF() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf && window.jspdf.jsPDF) {
+      return resolve(window.jspdf.jsPDF);
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.onload = () => {
+      if (window.jspdf && window.jspdf.jsPDF) {
+        resolve(window.jspdf.jsPDF);
+      } else {
+        reject(new Error("No se pudo inicializar jsPDF"));
+      }
+    };
+    script.onerror = () => reject(new Error("Error cargando librería PDF"));
+    document.body.appendChild(script);
+  });
 }
 
 export default function GuiasPage() {
@@ -213,11 +233,6 @@ export default function GuiasPage() {
     toastHOT.success("Guía eliminada de la tabla.");
   };
 
-  const handleCopiarPDFGuia = (guia) => {
-    handleImprimirPDF(guia);
-    toastHOT.success("PDF de guía generado para descarga.");
-  };
-
   const guiasFiltradas = useMemo(() => {
     return guias.filter((g) => {
       const coincideFecha = g.fechaYMD ? g.fechaYMD === fechaFiltro : true;
@@ -237,102 +252,202 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
- // 🖨️ GENERADOR DE PDF (TÍTULO CENTRADO Y 4x6 SIN SALTO DE PÁGINA)
- const handleImprimirPDF = (guia) => {
-  const printWindow = window.open("", "_blank", "width=700,height=900");
-  if (!printWindow) {
-    toastHOT.error("Por favor permite las ventanas emergentes para descargar el PDF.");
-    return;
-  }
+  // 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL (FORMATO 4x6 PULGADAS SIN SALTO DE PÁGINA)
+  const handleDescargarYCompartirPDF = async (guia) => {
+    const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
+    try {
+      const jsPDF = await cargarJsPDF();
+      // 4x6 pulgadas en milímetros: 101.6mm x 152.4mm
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [101.6, 152.4]
+      });
 
-  const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
-  const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
-  const esMayorista = guia.esMayorista === "Sí";
+      const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+      const montoFormateado = `CRC ${Number(guia.monto || 0).toLocaleString("es-CR")}`;
+      const esMayorista = guia.esMayorista === "Sí";
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="es">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Mensajería Privada - ${guia.nombre}</title>
-        <style>
-          @page { size: 4in 6in; margin: 4mm; }
-          body {
-            font-family: Arial, Helvetica, sans-serif;
-            color: #000;
-            background: #fff;
-            margin: 0;
-            padding: 2px;
-            font-size: 20px;
-            line-height: 1.3;
-          }
-          .ticket {
-            width: 100%;
-            max-width: 100%;
-          }
-          .title {
-            text-align: center;
-            font-size: 26px;
-            font-weight: 900;
-            margin-bottom: 12px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 8px;
-          }
-          .line {
-            margin-bottom: 10px;
-            word-break: break-word;
-          }
-          .bold {
-            font-weight: 900;
-          }
-          .mayorista-bottom {
-            text-align: center;
-            font-size: 44px;
-            font-weight: 900;
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 3px dashed #000;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="ticket">
-          <div class="title">Mensajería Privada</div>
-          
-          <div class="line"><span class="bold">Nombre:</span> ${guia.nombre}</div>
-          <div class="line"><span class="bold">Provincia:</span> ${guia.provincia}</div>
-          <div class="line"><span class="bold">Cantón:</span> ${guia.canton}</div>
-          <div class="line"><span class="bold">Distrito:</span> ${guia.distrito}</div>
-          <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
-          <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
-          <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
-          <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
+      // Título centrado
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
 
-          ${esMayorista && guia.nombreMayorista ? `
-            <div class="mayorista-bottom">
-              ${guia.nombreMayorista.toUpperCase()}
-            </div>
-          ` : ""}
-        </div>
+      // Línea divisoria superior
+      doc.setLineWidth(0.6);
+      doc.line(6, 16.5, 95.6, 16.5);
 
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
-      </body>
-    </html>
-  `;
+      let y = 25;
+      const margenIzq = 6;
+      const anchoMax = 89.6;
 
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-};
+      const agregarCampo = (etiqueta, valor) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        const textoEtiqueta = `${etiqueta}: `;
+        doc.text(textoEtiqueta, margenIzq, y);
+        const anchoEtiqueta = doc.getTextWidth(textoEtiqueta);
 
+        doc.setFont("helvetica", "normal");
+        const textoValor = String(valor || "");
+        const lineasValor = doc.splitTextToSize(textoValor, anchoMax - anchoEtiqueta);
+
+        if (lineasValor.length === 1) {
+          doc.text(lineasValor[0], margenIzq + anchoEtiqueta, y);
+          y += 8.5;
+        } else {
+          // Si el texto es muy largo (como en comentarios), envuelve limpio
+          const todasLineas = doc.splitTextToSize(`${textoEtiqueta}${textoValor}`, anchoMax);
+          doc.text(todasLineas, margenIzq, y);
+          y += todasLineas.length * 6.5 + 2;
+        }
+      };
+
+      agregarCampo("Nombre", guia.nombre);
+      agregarCampo("Provincia", guia.provincia);
+      agregarCampo("Cantón", guia.canton);
+      agregarCampo("Distrito", guia.distrito);
+      agregarCampo("Teléfono", guia.telefono);
+      agregarCampo("Debe", cobroPendiente ? `¢${Number(guia.monto || 0).toLocaleString("es-CR")}` : "No");
+      agregarCampo("Meter raspa", guia.meterRaspa);
+      agregarCampo("Comentarios", guia.comentarios || "");
+
+      // Si es mayorista, lo colocamos grande y centrado abajo sin salirse de la página
+      if (esMayorista && guia.nombreMayorista) {
+        const yLinea = Math.max(y + 2, 118);
+        doc.setLineWidth(0.7);
+        doc.setLineDashPattern([2, 2], 0);
+        doc.line(6, yLinea, 95.6, yLinea);
+        doc.setLineDashPattern([], 0);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(26);
+        const LineasMayorista = doc.splitTextToSize(guia.nombreMayorista.toUpperCase(), 88);
+        doc.text(LineasMayorista, 50.8, yLinea + 12, { align: "center" });
+      }
+
+      const nombreLimpio = String(guia.nombre || "Guia").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const fileName = `Guia_${nombreLimpio}.pdf`;
+
+      // 1. Descargar el PDF automáticamente en el dispositivo
+      doc.save(fileName);
+
+      // 2. Si el dispositivo soporta Web Share API con archivos (Celulares / Mac / Tablets), abrir el menú de compartir de una vez
+      const pdfBlob = doc.output("blob");
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
+        await navigator.share({
+          title: `Guía - ${guia.nombre}`,
+          text: `Guía de envío para ${guia.nombre}`,
+          files: [pdfFile]
+        }).catch(() => {});
+      } else {
+        toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
+      }
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      toastHOT.error("Error al descargar el PDF, abriendo vista de impresión...", { id: toastId });
+      handleVistaImpresion(guia);
+    }
+  };
+
+  // 🖨️ VISTA DE IMPRESIÓN DIRECTA PARA LA IMPRESORA TÉRMICA 4x6
+  const handleVistaImpresion = (guia) => {
+    const printWindow = window.open("", "_blank", "width=700,height=900");
+    if (!printWindow) {
+      toastHOT.error("Por favor permite las ventanas emergentes para imprimir.");
+      return;
+    }
+
+    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+    const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
+    const esMayorista = guia.esMayorista === "Sí";
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Mensajería Privada - ${guia.nombre}</title>
+          <style>
+            @page { size: 4in 6in; margin: 4mm; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #000;
+              background: #fff;
+              margin: 0;
+              padding: 2px;
+              font-size: 20px;
+              line-height: 1.3;
+            }
+            .ticket {
+              width: 100%;
+              max-width: 100%;
+            }
+            .title {
+              text-align: center;
+              font-size: 26px;
+              font-weight: 900;
+              margin-bottom: 12px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 8px;
+            }
+            .line {
+              margin-bottom: 10px;
+              word-break: break-word;
+            }
+            .bold {
+              font-weight: 900;
+            }
+            .mayorista-bottom {
+              text-align: center;
+              font-size: 44px;
+              font-weight: 900;
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 3px dashed #000;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <div class="title">Mensajería Privada</div>
+            
+            <div class="line"><span class="bold">Nombre:</span> ${guia.nombre}</div>
+            <div class="line"><span class="bold">Provincia:</span> ${guia.provincia}</div>
+            <div class="line"><span class="bold">Cantón:</span> ${guia.canton}</div>
+            <div class="line"><span class="bold">Distrito:</span> ${guia.distrito}</div>
+            <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
+            <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
+            <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
+            <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
+
+            ${esMayorista && guia.nombreMayorista ? `
+              <div class="mayorista-bottom">
+                ${guia.nombreMayorista.toUpperCase()}
+              </div>
+            ` : ""}
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
@@ -747,7 +862,6 @@ export default function GuiasPage() {
                           </div>
                           {g.comentarios && (
                             <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-zinc-500 uppercase mt-0.5">
-                              {/* Icono minimalista de ubicación limpio y proporcionado */}
                               <FaMapMarkerAlt size={11} className="text-zinc-400 shrink-0" />
                               <span>{g.comentarios}</span>
                             </span>
@@ -756,16 +870,23 @@ export default function GuiasPage() {
 
                         <td className="py-4 px-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-1.5">
-                          
-
-                            {/* Botón Imprimir PDF */}
+                            {/* Botón Descargar y Compartir PDF */}
                             <button
-                              onClick={() => handleImprimirPDF(g)}
+                              onClick={() => handleDescargarYCompartirPDF(g)}
                               className="inline-flex items-center gap-1 bg-black hover:bg-zinc-800 text-white px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-                              title="Imprimir PDF de la Guía"
+                              title="Descargar y Compartir PDF"
                             >
                               <FaFilePdf size={12} className="text-amber-400" />
                               <span>PDF</span>
+                            </button>
+
+                            {/* Botón Impresión Directa Térmica */}
+                            <button
+                              onClick={() => handleVistaImpresion(g)}
+                              className="p-2.5 bg-zinc-100 hover:bg-zinc-200 text-white rounded-xl transition-all cursor-pointer shadow-sm"
+                              title="Imprimir en térmica"
+                            >
+                              <FaPrint size={12} />
                             </button>
 
                             {/* Botón Eliminar */}
