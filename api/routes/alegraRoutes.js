@@ -25,7 +25,7 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
 });
 
 /* ========================================================
-   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA (CON SÚPER ESPÍAS)
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
@@ -33,18 +33,41 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto si falla algo
+    let clientId = 2; 
+
+    // 🔥 EL SÚPER ESPÍA: LEER LAS FACTURAS ANTERIORES PARA VER EL SECRETO
+    console.log("==================================================");
+    console.log("🕵️‍♂️ RADIOGRAFÍA DE FACTURA (Buscando el formato correcto)...");
+    try {
+      const resSpy = await fetch("https://api.alegra.com/api/v1/invoices?limit=5", {
+        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+      });
+      const dataSpy = await resSpy.json();
+      if (Array.isArray(dataSpy) && dataSpy.length > 0) {
+        const facturaGuia = dataSpy.find(f => f.paymentForm || f.paymentCondition);
+        if (facturaGuia) {
+           console.log("✅ ESTRUCTURA DE PAGO ENCONTRADA EN ALEGRA:");
+           console.log(`- paymentForm:`, facturaGuia.paymentForm);
+           console.log(`- paymentMethod:`, facturaGuia.paymentMethod);
+           console.log(`- paymentCondition:`, facturaGuia.paymentCondition);
+        } else {
+           console.log("⚠️ No se encontraron campos de pago en las últimas facturas.");
+        }
+      }
+    } catch (e) {
+       console.log("Error al espiar facturas.");
+    }
+    console.log("==================================================");
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
 
       // 🔥 TRADUCTOR PERFECTO DE CÉDULAS
-      let tipoAlegra = "CF"; // 01 -> Cédula Física por defecto
-      if (tipoIdentificacion === "02") tipoAlegra = "CJ"; // Cédula Jurídica
+      let tipoAlegra = "CF"; 
+      if (tipoIdentificacion === "02") tipoAlegra = "CJ"; 
       else if (tipoIdentificacion === "03") tipoAlegra = "DIMEX";
       else if (tipoIdentificacion === "04") tipoAlegra = "NITE";
 
-      console.log("==================================================");
       console.log(`🔍 1. BUSCANDO CONTACTO EXISTENTE: ${cedulaLimpiada}`);
       
       const contactRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpiada}`, {
@@ -64,7 +87,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // 📦 CREAR CLIENTE NUEVO
+        // 📦 CREAR CLIENTE NUEVO (SIN DIRECCIÓN)
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
           identificationObject: {
@@ -140,10 +163,9 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 LA SOLUCIÓN FINAL: PALABRA EXACTA DEL DESPLEGABLE
-      paymentCondition: "Contado",  // Exige la palabra literal, no el código "01"
-      paymentForm: "cash",          
-      paymentMethod: "transfer",    
+      // 🔥 INTENTAMOS CON LOS CÓDIGOS OFICIALES NUMÉRICOS 
+      paymentForm: "01",          // 01 = Contado en Hacienda
+      paymentMethod: "04",        // 04 = Transferencia en Hacienda
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
@@ -156,11 +178,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     }
 
     console.log("==================================================");
-    console.log("🕵️‍♂️ REVISIÓN ESPÍA - CAMPOS DE PAGO ANTES DE ENVIAR:");
-    console.log(`- paymentCondition: "${payloadAlegra.paymentCondition}"`);
-    console.log(`- paymentForm: "${payloadAlegra.paymentForm}"`);
-    console.log(`- paymentMethod: "${payloadAlegra.paymentMethod}"`);
-    console.log("📄 4. PAYLOAD COMPLETO DE FACTURA ENVIADO A ALEGRA:");
+    console.log("📄 4. PAYLOAD DE FACTURA ENVIADO A ALEGRA:");
     console.log(JSON.stringify(payloadAlegra, null, 2));
 
     const alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
@@ -173,14 +191,11 @@ router.post('/emitir-tiquete', async (req, res) => {
     
     if (!alegraResponse.ok) {
       console.error("❌ 5. ERROR DE ALEGRA AL EMITIR FACTURA:");
-      console.error("🕵️‍♂️ MOTIVO EXACTO DEL RECHAZO (LEER ESTO CON LUPA):");
       console.error(JSON.stringify(alegraData, null, 2));
       return res.status(400).json({ error: alegraData.message || "Error al generar factura en Alegra." });
     }
 
     console.log("✅ 5. FACTURA CREADA CON ÉXITO EN ALEGRA.");
-    console.log("🕵️‍♂️ RESPUESTA EXITOSA DE ALEGRA:");
-    console.log(JSON.stringify(alegraData, null, 2));
     console.log("==================================================");
     
     return res.status(200).json({ 
