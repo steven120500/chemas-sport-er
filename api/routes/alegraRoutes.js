@@ -143,9 +143,10 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       
-      // 🔥 TRADUCCIÓN PERFECTA PARA LA API DE ALEGRA
-      paymentForm: "cash",          // Esto es "Condición: Contado"
-      paymentMethod: "transfer",    // Esto es "Medio de Pago: SINPE / Transferencia" (Alegra exige que diga "transfer")
+      // 🔥 LA COMBINACIÓN GANADORA PARA ALEGRA + HACIENDA CR
+      paymentCondition: "01",       // Para Hacienda: 01 = Contado
+      paymentForm: "cash",          // Para Alegra: cash = Contado
+      paymentMethod: "transfer",    // Para Alegra: transfer = SINPE/Transferencia
       
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
