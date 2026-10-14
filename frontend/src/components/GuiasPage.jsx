@@ -237,98 +237,100 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
-  const handleImprimirPDF = (guia) => {
-    const printWindow = window.open("", "_blank", "width=600,height=750");
-    if (!printWindow) {
-      toastHOT.error("Por favor permite las ventanas emergentes para descargar el PDF.");
-      return;
-    }
+ // 🖨️ GENERADOR DE PDF (AJUSTADO PARA 4x6 SIN SALTO DE PÁGINA)
+ const handleImprimirPDF = (guia) => {
+  const printWindow = window.open("", "_blank", "width=700,height=900");
+  if (!printWindow) {
+    toastHOT.error("Por favor permite las ventanas emergentes para descargar el PDF.");
+    return;
+  }
 
-    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
-    const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
-    const esMayorista = guia.esMayorista === "Sí";
+  const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+  const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
+  const esMayorista = guia.esMayorista === "Sí";
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Mensajería Privada - ${guia.nombre}</title>
-          <style>
-            @page { size: auto; margin: 12mm; }
-            body {
-              font-family: Arial, Helvetica, sans-serif;
-              color: #000;
-              background: #fff;
-              margin: 0;
-              padding: 10px;
-              font-size: 16px;
-              line-height: 1.4;
-            }
-            .ticket {
-              max-width: 420px;
-              margin: 0 auto;
-              padding: 15px;
-            }
-            .title {
-              font-size: 20px;
-              font-weight: bold;
-              margin-bottom: 15px;
-            }
-            .line {
-              margin-bottom: 12px;
-              word-break: break-word;
-            }
-            .bold {
-              font-weight: bold;
-            }
-            .mayorista-bottom {
-              text-align: center;
-              font-size: 46px;
-              font-weight: 900;
-              margin-top: 30px;
-              padding-top: 15px;
-              border-top: 3px dashed #000;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <div class="title">Mensajería Privada</div>
-            
-            <div class="line"><span class="bold">Nombre:</span> ${guia.nombre}</div>
-            <div class="line"><span class="bold">Provincia:</span> ${guia.provincia}</div>
-            <div class="line"><span class="bold">Cantón:</span> ${guia.canton}</div>
-            <div class="line"><span class="bold">Distrito:</span> ${guia.distrito}</div>
-            <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
-            <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
-            <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
-            <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Mensajería Privada - ${guia.nombre}</title>
+        <style>
+          @page { size: 4in 6in; margin: 4mm; }
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 2px;
+            font-size: 20px;
+            line-height: 1.3;
+          }
+          .ticket {
+            width: 100%;
+            max-width: 100%;
+          }
+          .title {
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+          }
+          .line {
+            margin-bottom: 10px;
+            word-break: break-word;
+          }
+          .bold {
+            font-weight: 900;
+          }
+          .mayorista-bottom {
+            text-align: center;
+            font-size: 44px;
+            font-weight: 900;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 3px dashed #000;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="title">Mensajería Privada</div>
+          
+          <div class="line"><span class="bold">Nombre:</span> ${guia.nombre}</div>
+          <div class="line"><span class="bold">Provincia:</span> ${guia.provincia}</div>
+          <div class="line"><span class="bold">Cantón:</span> ${guia.canton}</div>
+          <div class="line"><span class="bold">Distrito:</span> ${guia.distrito}</div>
+          <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
+          <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
+          <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
+          <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
 
-            ${esMayorista && guia.nombreMayorista ? `
-              <div class="mayorista-bottom">
-                ${guia.nombreMayorista.toUpperCase()}
-              </div>
-            ` : ""}
-          </div>
+          ${esMayorista && guia.nombreMayorista ? `
+            <div class="mayorista-bottom">
+              ${guia.nombreMayorista.toUpperCase()}
+            </div>
+          ` : ""}
+        </div>
 
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 250);
-            };
-          </script>
-        </body>
-      </html>
-    `;
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+    </html>
+  `;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+};
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
@@ -662,7 +664,7 @@ export default function GuiasPage() {
                   placeholder="Buscar..."
                   className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black"
                 />
-                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={12} />
+                <FaSearch className="absolute left-3.5 top-3 -translate-y-1/2 text-zinc-400" size={12} />
               </div>
             </div>
           </div>
