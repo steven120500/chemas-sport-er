@@ -188,11 +188,16 @@ export default function GuiasPage() {
     };
 
     try {
-      await fetch(`${API_BASE}/api/guias`, {
+      const res = await fetch(`${API_BASE}/api/guias`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nuevaGuia)
       });
+      const data = await res.json();
+      // Si el backend devuelve un _id oficial, lo integramos al objeto
+      if (data && data._id) {
+        nuevaGuia._id = data._id;
+      }
 
       setGuias((prev) => [nuevaGuia, ...prev]);
       setFechaFiltro(fechaYMD);
@@ -221,15 +226,23 @@ export default function GuiasPage() {
     }
   };
 
-  const eliminarGuia = async (id, backendId) => {
+  // 🔥 ELIMINAR UNA SOLA LÍNEA DE FORMA SEGURA
+  const eliminarGuia = async (gTarget) => {
     try {
-      if (backendId) {
-        await fetch(`${API_BASE}/api/guias/${backendId}`, { method: "DELETE" });
+      if (gTarget._id) {
+        await fetch(`${API_BASE}/api/guias/${gTarget._id}`, { method: "DELETE" });
       }
     } catch (e) {
       console.error(e);
     }
-    setGuias((prev) => prev.filter((g) => g.id !== id && g._id !== backendId));
+
+    setGuias((prev) => prev.filter((g) => {
+      if (gTarget._id && g._id) {
+        return g._id !== gTarget._id;
+      }
+      return g.id !== gTarget.id;
+    }));
+
     toastHOT.success("Guía eliminada de la tabla.");
   };
 
@@ -252,12 +265,11 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
-  // 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL (FORMATO 4x6 PULGADAS SIN SALTO DE PÁGINA)
+  // 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL
   const handleDescargarYCompartirPDF = async (guia) => {
     const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
     try {
       const jsPDF = await cargarJsPDF();
-      // 4x6 pulgadas en milímetros: 101.6mm x 152.4mm
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -265,15 +277,12 @@ export default function GuiasPage() {
       });
 
       const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
-      const montoFormateado = `CRC ${Number(guia.monto || 0).toLocaleString("es-CR")}`;
       const esMayorista = guia.esMayorista === "Sí";
 
-      // Título centrado
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
 
-      // Línea divisoria superior
       doc.setLineWidth(0.6);
       doc.line(6, 16.5, 95.6, 16.5);
 
@@ -296,7 +305,6 @@ export default function GuiasPage() {
           doc.text(lineasValor[0], margenIzq + anchoEtiqueta, y);
           y += 8.5;
         } else {
-          // Si el texto es muy largo (como en comentarios), envuelve limpio
           const todasLineas = doc.splitTextToSize(`${textoEtiqueta}${textoValor}`, anchoMax);
           doc.text(todasLineas, margenIzq, y);
           y += todasLineas.length * 6.5 + 2;
@@ -312,7 +320,6 @@ export default function GuiasPage() {
       agregarCampo("Meter raspa", guia.meterRaspa);
       agregarCampo("Comentarios", guia.comentarios || "");
 
-      // Si es mayorista, lo colocamos grande y centrado abajo sin salirse de la página
       if (esMayorista && guia.nombreMayorista) {
         const yLinea = Math.max(y + 2, 118);
         doc.setLineWidth(0.7);
@@ -329,10 +336,8 @@ export default function GuiasPage() {
       const nombreLimpio = String(guia.nombre || "Guia").replace(/[^a-zA-Z0-9_-]/g, "_");
       const fileName = `Guia_${nombreLimpio}.pdf`;
 
-      // 1. Descargar el PDF automáticamente en el dispositivo
       doc.save(fileName);
 
-      // 2. Si el dispositivo soporta Web Share API con archivos (Celulares / Mac / Tablets), abrir el menú de compartir de una vez
       const pdfBlob = doc.output("blob");
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
@@ -353,7 +358,7 @@ export default function GuiasPage() {
     }
   };
 
-  // 🖨️ VISTA DE IMPRESIÓN DIRECTA PARA LA IMPRESORA TÉRMICA 4x6
+  // 🖨️ VISTA DE IMPRESIÓN DIRECTA
   const handleVistaImpresion = (guia) => {
     const printWindow = window.open("", "_blank", "width=700,height=900");
     if (!printWindow) {
@@ -889,9 +894,9 @@ export default function GuiasPage() {
                               <FaPrint size={12} />
                             </button>
 
-                            {/* Botón Eliminar */}
+                            {/* Botón Eliminar Individual */}
                             <button
-                              onClick={() => eliminarGuia(g.id, g._id)}
+                              onClick={() => eliminarGuia(g)}
                               className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                               title="Eliminar registro"
                             >
