@@ -303,7 +303,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                       }
                     }}
                     placeholder="Buscar por producto o cliente..." 
-                    className="w-full bg-white border border-gray-200 rounded-xl pl-4 pr-11 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                    className="w-full bg-white border border-gray-200 text-black rounded-xl pl-4 pr-11 py-3 text-sm font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
                   />
                   {q.trim() !== "" && (
                     <button
