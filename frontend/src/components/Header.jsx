@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { 
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaPercentage
+  FaPercentage, FaTruck
 } from "react-icons/fa";
 
 export default function Header({
@@ -264,6 +264,21 @@ export default function Header({
                       <div className="flex items-center gap-3">
                         <FaPercentage size={15} className="text-yellow-500 transition-colors" />
                         <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
+                      </div>
+                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                    </button>
+
+                    {/* 🔥 NUEVO BOTÓN: GUÍAS 🔥 */}
+                    <button
+                      onClick={() => {
+                        navigate('/guias');
+                        setSidebarOpen(false);
+                      }}
+                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FaTruck size={15} className="text-yellow-500 transition-colors" />
+                        <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
                       </div>
                       <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
                     </button>
