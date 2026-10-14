@@ -13,6 +13,7 @@ import pdfRoutes from './routes/pdfRoutes.js';
 import historyRoutes from './routes/historyroutes.js';
 import saleRoutes from './routes/saleRoutes.js';
 import alegraRoutes from './routes/alegraRoutes.js'; // 👈 1. IMPORTAR RUTA DE ALEGRA
+import guiasRoutes from './routes/guiasRoutes.js';   // 👈 IMPORTAR RUTA DE GUÍAS
 
 dotenv.config();
 
@@ -90,6 +91,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/alegra', alegraRoutes); // 👈 2. MONTAR LA RUTA DE ALEGRA
+app.use('/api/guias', guiasRoutes);   // 👈 MONTAR LA RUTA DE GUÍAS
 
 app.get('/', (_req, res) => res.send('Chema Sport ER API con WebSockets'));
 
