@@ -19,20 +19,24 @@ function limpiarTexto(str = "") {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 // 🔥 FUNCIÓN QUE OBTIENE LOS IDs REALES DE TUS PRODUCTOS EN ALEGRA
 async function obtenerMapaProductosAlegra(credentials) {
-  if (cacheItemsAlegra) return cacheItemsAlegra;
+  if (cacheItemsAlegra && Object.keys(cacheItemsAlegra).length > 0) {
+    return cacheItemsAlegra;
+  }
   try {
-    const res = await fetch("https://api.alegra.com/api/v1/items?limit=30", {
+    const res = await fetch("https://api.alegra.com/api/v1/items?start=0&limit=30", {
       headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
     });
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
+    const lista = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+    if (lista.length > 0) {
       const mapa = {};
-      data.forEach((item) => {
+      lista.forEach((item) => {
         if (item && item.name && item.id) {
           mapa[limpiarTexto(item.name)] = Number(item.id);
         }
@@ -44,21 +48,33 @@ async function obtenerMapaProductosAlegra(credentials) {
   } catch (err) {
     console.error("⚠️ Error consultando ítems de Alegra:", err);
   }
-  return {};
+  return cacheItemsAlegra || {};
 }
 
 // 🔥 CLASIFICADOR OFICIAL: CONECTA CADA CATEGORÍA CON SU PRODUCTO DE ALEGRA Y SU PRECIO
 function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   const txt = limpiarTexto(nombreVenta);
 
-  // Extraer lo que viene entre paréntesis al final, ej: "(Player)", "(Nacional)", "(Niño)"
-  const matchParentesis = txt.match(/\(([^)]+)\)\s*$/);
-  const categoria = matchParentesis ? matchParentesis[1].trim() : "";
+  // Extraer lo que viene entre paréntesis, ej: "(Player)", "(Nacional)", "(Niño)", "(Mujer)"
+  const parentesisMatches = [...txt.matchAll(/\(([^)]+)\)/g)].map(m => m[1].trim());
+  const categoria = parentesisMatches.join(" ");
 
   let nombreProductoAlegra = "Camisa Version Fan"; // Predeterminado para Fan y el resto
   let precioBase = 20000;
 
-  if (categoria.includes("nacional") || txt.includes("(nacional)")) {
+  if (categoria.includes("envio") || txt.includes("envio gam") || txt === "envio" || txt.startsWith("envio ")) {
+    nombreProductoAlegra = "Envio GAM";
+    precioBase = 2500;
+  } else if (categoria.includes("llavero") || txt.includes("llavero")) {
+    nombreProductoAlegra = "Llavero Deportivo";
+    precioBase = 2500;
+  } else if (categoria.includes("mujer") || txt.includes("(mujer)") || txt.includes("dama") || txt.includes("crop top")) {
+    nombreProductoAlegra = "Camisa Version Fan Mujer";
+    precioBase = 20000;
+  } else if (categoria.includes("nino") || txt.includes("(nino)") || txt.includes("uniforme de nino")) {
+    nombreProductoAlegra = "Uniforme de Niño";
+    precioBase = 20000;
+  } else if (categoria.includes("nacional") || txt.includes("(nacional)")) {
     nombreProductoAlegra = "Camisa Nacional";
     precioBase = 22000;
   } else if (categoria.includes("player") || categoria.includes("jugador") || txt.includes("(player)")) {
@@ -67,18 +83,6 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   } else if (categoria.includes("retro") || txt.includes("(retro)")) {
     nombreProductoAlegra = "Camiseta Deportiva Versión Retro";
     precioBase = 22000;
-  } else if (categoria.includes("mujer") || txt.includes("(mujer)")) {
-    nombreProductoAlegra = "Camisa Version Fan Mujer";
-    precioBase = 20000;
-  } else if (categoria.includes("nino") || txt.includes("(nino)") || txt.includes("uniforme de nino")) {
-    nombreProductoAlegra = "Uniforme de Niño";
-    precioBase = 20000;
-  } else if (categoria.includes("llavero") || txt.includes("llavero")) {
-    nombreProductoAlegra = "Llavero Deportivo";
-    precioBase = 2500;
-  } else if (categoria.includes("envio") || txt.includes("envio gam") || txt.startsWith("envio")) {
-    nombreProductoAlegra = "Envio GAM";
-    precioBase = 2500;
   } else {
     // Fan ((Fan)) y todo el resto (NBA, MLB, NFL, F1, Balón, Abrigos, etc.)
     nombreProductoAlegra = "Camisa Version Fan";
@@ -87,11 +91,21 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
 
   // Buscar el ID exacto en Alegra
   const claveBusqueda = limpiarTexto(nombreProductoAlegra);
-  const idEnAlegra =
-    mapaAlegra[claveBusqueda] ||
-    mapaAlegra["camisa version fan"] ||
-    mapaAlegra["camiseta deportiva version fan"] ||
-    ID_ITEM_FALLBACK;
+  let idEnAlegra = mapaAlegra[claveBusqueda];
+
+  if (!idEnAlegra) {
+    const entradaParcial = Object.entries(mapaAlegra).find(
+      ([k]) => k.includes(claveBusqueda) || claveBusqueda.includes(k)
+    );
+    if (entradaParcial) idEnAlegra = entradaParcial[1];
+  }
+
+  if (!idEnAlegra) {
+    idEnAlegra =
+      mapaAlegra["camisa version fan"] ||
+      mapaAlegra["camiseta deportiva version fan"] ||
+      ID_ITEM_FALLBACK;
+  }
 
   return {
     idAlegra: idEnAlegra,
@@ -116,7 +130,7 @@ router.get('/consultar-cedula/:identificacion', async (req, res) => {
 });
 
 /* ========================================================
-   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA
+   🧾 EMITIR TIQUETE O FACTURA EN ALEGRA + ENVÍO AUTOMÁTICO DE CORREO
    ======================================================== */
 router.post('/emitir-tiquete', async (req, res) => {
   try {
@@ -127,6 +141,7 @@ router.post('/emitir-tiquete', async (req, res) => {
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
     let clientId = 2; // Cliente de Contado / General por defecto en Alegra
+    const correoLimpio = (email && email.includes("@")) ? email.trim() : "";
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -151,7 +166,7 @@ router.post('/emitir-tiquete', async (req, res) => {
 
         // Actualizar correo y/o teléfono si se enviaron en el modal
         const datosActualizar = {};
-        if (email && email.includes("@")) datosActualizar.email = email.trim();
+        if (correoLimpio) datosActualizar.email = correoLimpio;
         if (telefono && telefono.trim() !== "") datosActualizar.phonePrimary = telefono.trim();
 
         if (Object.keys(datosActualizar).length > 0) {
@@ -169,7 +184,7 @@ router.post('/emitir-tiquete', async (req, res) => {
             type: tipoAlegra,
             number: cedulaLimpiada
           },
-          email: (email && email.includes("@")) ? email.trim() : "",
+          email: correoLimpio,
           type: "client"
         };
 
@@ -199,6 +214,17 @@ router.post('/emitir-tiquete', async (req, res) => {
           console.error(JSON.stringify(newContactData, null, 2));
         }
       }
+    } else if (correoLimpio) {
+      // Si es un tiquete sin cédula pero sí pusieron correo, actualizamos temporalmente el correo del cliente genérico (ID 2)
+      try {
+        await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
+          method: "PUT",
+          headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ email: correoLimpio })
+        });
+      } catch (e) {
+        console.log("⚠️ No se pudo actualizar email en cliente genérico:", e.message);
+      }
     }
 
     // 🔥 BUSCAR DINÁMICAMENTE EL IMPUESTO "IVA EXENTO 0%" (Con caché)
@@ -222,7 +248,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       }
     }
 
-    // 🔥 OBTENER MAPA DE PRODUCTOS DE ALEGRA (Camisa Nacional, Player, Retro, Fan, Mujer, Niño, Llavero, Envío)
+    // 🔥 OBTENER MAPA DE PRODUCTOS DE ALEGRA
     const mapaProductos = await obtenerMapaProductosAlegra(credentials);
 
     // 1. Armamos las líneas base con su respectivo Producto de Alegra y su Precio Oficial
@@ -233,45 +259,63 @@ router.post('/emitir-tiquete', async (req, res) => {
       const cantidadUnidades = Number(venta.totalUnidades) || 1;
       const infoCat = resolverProductoYPrecioBase(venta.item, mapaProductos);
 
-      // Si desde el frontend venía un precio personalizado por fila, lo usamos; si no, usamos el de la categoría
       const precioUnitarioDeEstaVenta = Number(venta.precioUnitarioCustom) > 0
         ? Number(venta.precioUnitarioCustom)
         : infoCat.precioBase;
 
-      if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
+      const esLineaEnvio = infoCat.nombreProductoAlegra === "Envio GAM";
+
+      if (!esLineaEnvio && venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
           lineasPreliminares.push({
             id: infoCat.idAlegra,
-            // Se envía el nombre del producto en Alegra o el detalle con talla
-            name: `${infoCat.nombreProductoAlegra} - ${venta.item} (Talla: ${item.talla})`,
+            name: infoCat.nombreProductoAlegra,
+            description: `${venta.item} (Talla: ${item.talla})`,
             precioBaseUnitario: precioUnitarioDeEstaVenta,
-            quantity: 1
+            quantity: 1,
+            esEnvio: false
           });
           sumaPreciosTabla += precioUnitarioDeEstaVenta;
         });
       } else {
         lineasPreliminares.push({
           id: infoCat.idAlegra,
-          name: `${infoCat.nombreProductoAlegra} - ${venta.item || "Camiseta Deportiva"}`,
+          name: infoCat.nombreProductoAlegra,
+          description: esLineaEnvio ? "Servicio de Envío" : `${venta.item || "Camiseta Deportiva"}`,
           precioBaseUnitario: precioUnitarioDeEstaVenta,
-          quantity: cantidadUnidades
+          quantity: cantidadUnidades,
+          esEnvio: esLineaEnvio
         });
         sumaPreciosTabla += (precioUnitarioDeEstaVenta * cantidadUnidades);
       }
     });
 
-    // 2. Ajustamos al precioManual que se envió desde el modal (sin importar el precio fijo que tenga en Alegra)
+    // 2. Ajustamos al precioManual si fue modificado en el modal (sin alterar el monto de envío)
     const montoTotalDeseado = Number(precioManual) > 0 ? Number(precioManual) : sumaPreciosTabla;
-    const factorAjuste = sumaPreciosTabla > 0 ? (montoTotalDeseado / sumaPreciosTabla) : 1;
+    const diferencia = Math.abs(montoTotalDeseado - sumaPreciosTabla);
+
+    const totalSoloEnvios = lineasPreliminares
+      .filter((l) => l.esEnvio)
+      .reduce((acc, l) => acc + (l.precioBaseUnitario * l.quantity), 0);
+    const totalSoloPrendasBase = sumaPreciosTabla - totalSoloEnvios;
+    const montoDeseadoParaPrendas = Math.max(0, montoTotalDeseado - totalSoloEnvios);
+    const factorPrendas = totalSoloPrendasBase > 0 ? (montoDeseadoParaPrendas / totalSoloPrendasBase) : 1;
 
     let totalFactura = 0;
     const itemsAlegra = lineasPreliminares.map((linea) => {
-      const precioFinalUnitario = Number((linea.precioBaseUnitario * factorAjuste).toFixed(5));
+      let precioFinalUnitario = linea.precioBaseUnitario;
+      if (diferencia > 1 && !linea.esEnvio) {
+        precioFinalUnitario = Number((linea.precioBaseUnitario * factorPrendas).toFixed(5));
+      } else {
+        precioFinalUnitario = Number(Number(linea.precioBaseUnitario).toFixed(5));
+      }
+
       totalFactura += (precioFinalUnitario * linea.quantity);
 
       return {
         id: linea.id,
         name: linea.name,
+        description: linea.description,
         price: precioFinalUnitario,
         quantity: linea.quantity,
         tax: [{ id: idImpuestoExento }]
@@ -287,18 +331,18 @@ router.post('/emitir-tiquete', async (req, res) => {
       dueDate: fechaActual,
       client: { id: clientId },
       items: itemsAlegra,
-      
-      // LA COMBINACIÓN MÁGICA PARA CONTADO + SINPE/TRANSFERENCIA
       saleCondition: "CASH",        
       paymentMethod: "TRANSFER",    
-      
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
     };
 
     if (tipo === "hacienda") {
-      payloadAlegra.documentType = "04"; // Tiquete electrónico oficial
+      // 🔥 EMISIÓN Y TIMBRADO ELECTRÓNICO AUTOMÁTICO EN HACIENDA
+      payloadAlegra.documentType = "04"; // Tiquete electrónico oficial (o Factura si tiene cédula)
+      payloadAlegra.stamp = { generateStamp: true };
     } else {
+      // 🔥 TIQUETE INTERNO (NO ELECTRÓNICO)
       payloadAlegra.numberTemplate = { id: ID_NUMERACION_INTERNA };
     }
 
@@ -320,13 +364,59 @@ router.post('/emitir-tiquete', async (req, res) => {
       return res.status(400).json({ error: alegraData.message || "Error al generar factura en Alegra." });
     }
 
-    console.log("✅ 5. FACTURA CREADA CON ÉXITO EN ALEGRA.");
+    console.log(`✅ 5. COMPROBANTE CREADO CON ÉXITO EN ALEGRA (ID: ${alegraData.id}).`);
+
+    // 🔥 6. SI ES HACIENDA Y POR ALGUNA RAZÓN LA CUENTA REQUIERE FORZAR EL TIMBRADO POST-CREACIÓN
+    if (tipo === "hacienda" && alegraData.id && (!alegraData.stamp || alegraData.stamp.legalStatus === "NOT_SENT")) {
+      try {
+        console.log("⚡ Timbrando electrónicamente ante Hacienda...");
+        await fetch(`https://api.alegra.com/api/v1/invoices/stamp`, {
+          method: "POST",
+          headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: [alegraData.id] })
+        });
+      } catch (stampErr) {
+        console.warn("⚠️ Aviso al forzar stamp:", stampErr.message);
+      }
+    }
+
+    // 🔥 7. ENVIAR POR CORREO AUTOMÁTICAMENTE DESDE ALEGRA (TANTO ELECTRÓNICAS COMO INTERNAS NO ELECTRÓNICAS)
+    let correoEnviado = false;
+    if (correoLimpio && alegraData.id) {
+      try {
+        console.log(`📧 6. ENVIANDO COMPROBANTE POR CORREO A: ${correoLimpio}...`);
+        const emailRes = await fetch(`https://api.alegra.com/api/v1/invoices/${alegraData.id}/email`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Basic ${credentials}`,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            emails: [correoLimpio],
+            sendCopyToUser: true
+          })
+        });
+
+        const emailData = await emailRes.json().catch(() => ({}));
+        if (emailRes.ok) {
+          correoEnviado = true;
+          console.log(`✅ 7. CORREO ENVIADO AUTOMÁTICAMENTE DESDE ALEGRA A ${correoLimpio}`);
+        } else {
+          console.warn("⚠️ Alegra no pudo despachar el correo:", JSON.stringify(emailData));
+        }
+      } catch (emailErr) {
+        console.error("⚠️ Error al solicitar envío de correo a Alegra:", emailErr.message);
+      }
+    }
+
     console.log("==================================================");
     
     return res.status(200).json({ 
       success: true, 
       consecutivoOficial: alegraData.numberTemplate ? alegraData.numberTemplate.fullNumber : alegraData.id, 
-      totalCobrado: totalFactura 
+      totalCobrado: totalFactura,
+      correoEnviado
     });
 
   } catch (error) {
