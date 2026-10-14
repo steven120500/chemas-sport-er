@@ -237,7 +237,7 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
- // 🖨️ GENERADOR DE PDF (AJUSTADO PARA 4x6 SIN SALTO DE PÁGINA)
+ // 🖨️ GENERADOR DE PDF (TÍTULO CENTRADO Y 4x6 SIN SALTO DE PÁGINA)
  const handleImprimirPDF = (guia) => {
   const printWindow = window.open("", "_blank", "width=700,height=900");
   if (!printWindow) {
@@ -271,11 +271,12 @@ export default function GuiasPage() {
             max-width: 100%;
           }
           .title {
-            font-size: 24px;
+            text-align: center;
+            font-size: 26px;
             font-weight: 900;
             margin-bottom: 12px;
             border-bottom: 2px solid #000;
-            padding-bottom: 5px;
+            padding-bottom: 8px;
           }
           .line {
             margin-bottom: 10px;
@@ -331,6 +332,7 @@ export default function GuiasPage() {
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 };
+
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
