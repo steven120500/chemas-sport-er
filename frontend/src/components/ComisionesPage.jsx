@@ -653,7 +653,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   };
 
-  // 🚀 VALIDAR Y EMITIR DESDE EL MODAL UNIFICADO (CON SOPORTE PARA ENVÍO PERSONALIZABLE)
+  // 🚀 VALIDAR Y EMITIR DESDE EL MODAL UNIFICADO (CON TODOS LOS DATOS OBLIGATORIOS EN AMBOS TIPOS)
   const confirmarYEmitirFactura = () => {
     const precioPrendas = Number(modalFacturar.precio);
     if (isNaN(precioPrendas) || precioPrendas <= 0) {
@@ -669,11 +669,15 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       return;
     }
 
-    const esHacienda = modalFacturar.tipoEmision === "hacienda";
-
-    // En Hacienda, Cédula y Nombre son obligatorios. En Ticket Normal, NO son obligatorios.
-    if (esHacienda && (!modalFacturar.cedula.trim() || !modalFacturar.nombre.trim())) {
-      toastHOT.error("Para Factura Electrónica (Hacienda), la Cédula y el Nombre son obligatorios.");
+    // 🔥 TODOS LOS DATOS SON OBLIGATORIOS TANTO EN HACIENDA COMO EN TICKET NORMAL (NO ELECTRÓNICO)
+    if (
+      !modalFacturar.tipoIdentificacion ||
+      !modalFacturar.cedula.trim() ||
+      !modalFacturar.nombre.trim() ||
+      !modalFacturar.telefono.trim() ||
+      !modalFacturar.correo.trim()
+    ) {
+      toastHOT.error("Todos los datos del cliente (Tipo ID, Cédula, Nombre, Teléfono y Correo) son obligatorios.");
       return;
     }
 
@@ -718,7 +722,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
 
     const totalCobrarFinal = precioPrendas + montoEnvio;
-    const nombreFinal = modalFacturar.nombre.trim() || modalFacturar.ventas[0]?.cliente || "Cliente de Contado";
+    const nombreFinal = modalFacturar.nombre.trim();
     const cedulaFinal = modalFacturar.cedula.trim();
     const correoFinal = modalFacturar.correo.trim();
     const telefonoFinal = modalFacturar.telefono.trim();
@@ -1256,7 +1260,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                    Tipo ID {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                    Tipo ID *
                   </label>
                   <select 
                     value={modalFacturar.tipoIdentificacion} 
@@ -1274,7 +1278,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
                 <div className="sm:col-span-3">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                    Número de Cédula {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                    Número de Cédula *
                   </label>
                   <div className="flex gap-1.5 mt-1">
                     <input 
@@ -1282,7 +1286,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       value={modalFacturar.cedula} 
                       onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })}
                       onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }}
-                      placeholder={modalFacturar.tipoEmision === "hacienda" ? "Ej. 101110222" : "Opcional..."}
+                      placeholder="Ej. 101110222"
                       className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
                     />
                     <button 
@@ -1300,13 +1304,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               {/* 4. NOMBRE DEL CLIENTE */}
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                  Nombre del Cliente {modalFacturar.tipoEmision === "hacienda" ? "*" : "(Opcional)"}
+                  Nombre del Cliente *
                 </label>
                 <input 
                   type="text" 
                   value={modalFacturar.nombre} 
                   onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })}
-                  placeholder={modalFacturar.tipoEmision === "hacienda" ? "Automático al buscar o escriba..." : "Cliente de Contado (Opcional)"} 
+                  placeholder="Automático al buscar o escriba..." 
                   className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" 
                 />
               </div>
@@ -1314,7 +1318,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               {/* 5. TELÉFONO Y CORREO ELECTRÓNICO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono (Opcional)</label>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono *</label>
                   <input 
                     type="tel" 
                     value={modalFacturar.telefono} 
@@ -1325,7 +1329,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo (Opcional)</label>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo *</label>
                   <input 
                     type="email" 
                     value={modalFacturar.correo} 
