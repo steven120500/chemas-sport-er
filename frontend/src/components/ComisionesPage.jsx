@@ -523,79 +523,95 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-  // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
-  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
-    const printWindow = window.open("", "_blank", "width=400,height=600");
-    if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
+ // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO (CON PRECIO POR PRODUCTO Y TOTAL)
+ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
+  const printWindow = window.open("", "_blank", "width=400,height=600");
+  if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
-    const fechaHoy = new Date().toLocaleString("es-CR");
-    const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
-    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+  const fechaHoy = new Date().toLocaleString("es-CR");
+  const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
+  const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
-    const itemsHTML = ventasArray.map(v => `
-      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-        <span style="flex: 1; padding-right: 10px;">${v.totalUnidades}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}</span>
+  const itemsHTML = ventasArray.map((v) => {
+    const cant = Number(v.totalUnidades) || 1;
+    // Calculamos el subtotal exacto de esa línea (respetando precioUnitarioCustom o el precio de la tabla)
+    const subtotalLinea = Number(v.precioUnitarioCustom) > 0
+      ? Math.round(Number(v.precioUnitarioCustom) * cant)
+      : Math.round(obtenerPrecioVenta(v));
+
+    return `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
+        <span style="flex: 1; padding-right: 8px;">
+          ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
+        </span>
+        <span style="font-weight: bold; white-space: nowrap;">
+          ₡${subtotalLinea.toLocaleString("es-CR")}
+        </span>
       </div>
-    `).join("");
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tiquete ${consecutivoOficial}</title>
-          <style>
-            body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
-            .text-center { text-align: center; }
-            .font-bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
-            h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
-            p { margin: 2px 0; }
-            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
-            .logo-img { max-width: 140px; height: auto; object-fit: contain; }
-          </style>
-        </head>
-        <body>
-          <div class="text-center">
-            <div class="logo-container">
-              <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
-            </div>
-            <h1>CHEMASPORT ER</h1>
-            <p>Ropa y Artículos Deportivos</p>
-            <p>Tel: +50660369857</p>
-            <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
-            <p style="font-size: 10px;">CJ: 3102916554</p>
-            <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
-          </div>
-          <div class="divider"></div>
-          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
-          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
-          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
-          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
-          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
-          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
-          <div class="divider"></div>
-          <p class="font-bold" style="margin-bottom: 8px;">CANT. DESCRIPCIÓN</p>
-          ${itemsHTML}
-          <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
-            <span>TOTAL:</span>
-            <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="text-center" style="margin-top: 20px;">
-            <p>¡Gracias por su compra!</p>
-            <p>Conserve este tiquete para reclamos.</p>
-          </div>
-          <script>
-            window.onload = function() { setTimeout(() => { window.print(); }, 300); };
-          </script>
-        </body>
-      </html>
     `;
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+  }).join("");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Tiquete ${consecutivoOficial}</title>
+        <style>
+          body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: bold; }
+          .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+          h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
+          p { margin: 2px 0; }
+          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
+          .logo-img { max-width: 140px; height: auto; object-fit: contain; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div class="logo-container">
+            <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+          </div>
+          <h1>CHEMASPORT ER</h1>
+          <p>Ropa y Artículos Deportivos</p>
+          <p>Tel: +50660369857</p>
+          <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+          <p style="font-size: 10px;">CJ: 3102916554</p>
+          <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
+        </div>
+        <div class="divider"></div>
+        <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+        <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+        <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+        ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+        ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
+        <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+        <div class="divider"></div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
+          <span>CANT. DESCRIPCIÓN</span>
+          <span>IMPORTE</span>
+        </div>
+        ${itemsHTML}
+        <div class="divider"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+          <span>TOTAL:</span>
+          <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
+        </div>
+        <div class="divider"></div>
+        <div class="text-center" style="margin-top: 20px;">
+          <p>¡Gracias por su compra!</p>
+          <p>Conserve este tiquete para reclamos.</p>
+        </div>
+        <script>
+          window.onload = function() { setTimeout(() => { window.print(); }, 300); };
+        </script>
+      </body>
+    </html>
+  `;
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+};
 
   // 🧾 1. ABRIR EL MODAL UNIFICADO DE FACTURACIÓN CON EL PRECIO DE LA TABLA
   const abrirModalFacturacion = (ventasArray) => {
@@ -1072,7 +1088,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                           {estaEditando ? (
                             <div className="flex items-center gap-1.5">
                               <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-[10px]">₡</span>
+                                <span className="absolute left-2 top-1 -translate-y-1/2 text-zinc-400 font-black text-[10px]">₡</span>
                                 <input
                                   type="number"
                                   value={tempPrecioFila}
@@ -1110,7 +1126,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                                   setEditandoPrecioId(venta._id);
                                   setTempPrecioFila(String(precioActual));
                                 }}
-                                className="p-1.5 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
+                                className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
                                 title="Personalizar precio"
                               >
                                 <FaEdit size={12} />
@@ -1162,7 +1178,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Monto de Productos *</label>
                 <div className="relative mt-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-base">₡</span>
+                  <span className="absolute left-4 top-3 -translate-y-1/2 text-zinc-400 font-black text-base">₡</span>
                   <input 
                     type="number" 
                     value={modalFacturar.precio} 
@@ -1187,7 +1203,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     </span>
                   </div>
                   {modalFacturar.incluyeEnvio && (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <span className="text-[10px] font-bold  text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
                       + ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}
                     </span>
                   )}
@@ -1197,7 +1213,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                   <div className="mt-3 pt-3 border-t border-zinc-200/80">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase">Costo del Envío (Personalizable) *</label>
                     <div className="relative mt-1">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-sm">₡</span>
+                      <span className="absolute left-3.5 top-2 -translate-y-1/2 text-zinc-400 font-black text-sm">₡</span>
                       <input
                         type="number"
                         value={modalFacturar.precioEnvio}
