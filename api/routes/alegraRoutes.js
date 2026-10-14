@@ -74,7 +74,6 @@ router.post('/emitir-tiquete', async (req, res) => {
           },
           email: (email && email.includes("@")) ? email.trim() : "",
           type: "client"
-          // 🔥 ELIMINAMOS EL BLOQUE 'address' POR COMPLETO
         };
 
         console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
@@ -137,14 +136,17 @@ router.post('/emitir-tiquete', async (req, res) => {
     totalFactura = Number(totalFactura.toFixed(2));
     const fechaActual = new Date().toISOString().split('T')[0];
     
-    // 📄 PREPARAMOS LA FACTURA (INCLUYE ESPÍAS DE PAGOS)
+    // 📄 PREPARAMOS LA FACTURA
     const payloadAlegra = {
       date: fechaActual,
       dueDate: fechaActual,
       client: { id: clientId },
       items: itemsAlegra,
-      paymentCondition: "01", // 01 = Contado
-      paymentForm: "04",      // 04 = Transferencia/SINPE Móvil
+      
+      // 🔥 TRADUCCIÓN PERFECTA PARA LA API DE ALEGRA
+      paymentForm: "cash",          // Esto es "Condición: Contado"
+      paymentMethod: "bank_transfer", // Esto es "Medio de Pago: SINPE / Transferencia"
+      
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
     };
