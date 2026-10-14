@@ -33,7 +33,7 @@ router.post('/emitir-tiquete', async (req, res) => {
     if (!ventas || !Array.isArray(ventas) || ventas.length === 0) return res.status(400).json({ error: "Sin ventas." });
 
     const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
-    let clientId = 2; // Cliente por defecto
+    let clientId = 2; // Cliente por defecto si falla algo
 
     if (cedula && cedula.trim() !== "") {
       const cedulaLimpiada = cedula.trim();
@@ -65,7 +65,7 @@ router.post('/emitir-tiquete', async (req, res) => {
           });
         }
       } else {
-        // 📦 CREAR CLIENTE NUEVO CON LOS ACRÓNIMOS EXACTOS
+        // 📦 CREAR CLIENTE NUEVO (SIN DIRECCIÓN PARA EVITAR ERROR 2027)
         const payloadNuevoContacto = {
           name: nombreCliente || "Cliente Electrónico",
           identificationObject: {
@@ -73,13 +73,8 @@ router.post('/emitir-tiquete', async (req, res) => {
             number: cedulaLimpiada
           },
           email: (email && email.includes("@")) ? email.trim() : "",
-          type: "client",
-          address: {
-            address: "Grecia centro",
-            city: "Grecia",
-            state: "Alajuela",
-            country: "Costa Rica"
-          }
+          type: "client"
+          // 🔥 ELIMINAMOS EL BLOQUE 'address' POR COMPLETO
         };
 
         console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
@@ -122,7 +117,6 @@ router.post('/emitir-tiquete', async (req, res) => {
 
       if (venta.items && Array.isArray(venta.items) && venta.items.length > 0) {
         venta.items.forEach((item) => {
-          // 🔥 FIX: Línea corregida (antes tenía un salto de línea que rompía el string)
           itemsAlegra.push({ 
             id: ID_ITEM_CABYS, 
             name: `${venta.item} - Talla: ${item.talla} (${item.tienda})`, 
@@ -150,7 +144,7 @@ router.post('/emitir-tiquete', async (req, res) => {
       client: { id: clientId },
       items: itemsAlegra,
       paymentCondition: "01", // 01 = Contado
-      paymentForm: "04",      // 04 = Transferencia/SINPE Móvil (dejamos este para que el espía lo capture)
+      paymentForm: "04",      // 04 = Transferencia/SINPE Móvil
       status: "open",
       payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
     };
