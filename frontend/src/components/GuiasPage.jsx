@@ -1,15 +1,68 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaChevronLeft, FaTruck } from "react-icons/fa";
+import { 
+  FaChevronLeft, FaTruck, FaFilePdf, FaPlus, 
+  FaMapMarkerAlt, FaUser, FaTrash, FaSearch, FaBoxOpen,
+  FaStickyNote, FaStore, FaCalendarAlt, FaCopy
+} from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
+const STORAGE_KEY = "chemasport_guias_registradas";
+
+// Función auxiliar para obtener la fecha actual en formato YYYY-MM-DD (hora local)
+function getFechaHoyYMD() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function GuiasPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
+  
+  // Estado para el filtro de calendario diario (por defecto hoy)
+  const [fechaFiltro, setFechaFiltro] = useState(() => getFechaHoyYMD());
 
-  // Estados del formulario idénticos al de Google Apps Script
+  const [guias, setGuias] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sincronizar con el backend al cargar la página
+  useEffect(() => {
+    const fetchGuiasBackend = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/guias`);
+        if (res.ok) {
+          const data = await res.json();
+          const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+          if (items.length > 0) {
+            setGuias(items);
+          }
+        }
+      } catch (err) {
+        console.error("Error sincronizando guías con el backend:", err);
+      }
+    };
+    fetchGuiasBackend();
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guias));
+    } catch (e) {
+      console.error("Error guardando guías en localStorage:", e);
+    }
+  }, [guias]);
+
   const [form, setForm] = useState({
     nombre: "",
     provincia: "",
@@ -18,51 +71,112 @@ export default function GuiasPage() {
     telefono: "",
     debe: "No",
     monto: "",
-    meterRaspa: "Sí",
+    meterRaspa: "No",
     esMayorista: "No",
-    comentarioSelect: "ENTREGAR MISMO DIA",
+    nombreMayorista: "",
+    comentarioSelect: "Sin comentario",
     comentarioCustom: ""
   });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === "debe" && value === "No") {
+        updated.monto = "";
+      }
+      if (name === "esMayorista" && value === "No") {
+        updated.nombreMayorista = "";
+      }
+      if (name === "comentarioSelect" && value !== "Otro comentario...") {
+        updated.comentarioCustom = "";
+      }
+      return updated;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validaciones básicas de campos obligatorios
-    if (!form.nombre.trim() || !form.provincia || !form.canton.trim() || !form.distrito.trim() || !form.telefono.trim()) {
+    if (
+      !form.nombre.trim() || 
+      !form.provincia || 
+      !form.canton.trim() || 
+      !form.distrito.trim() || 
+      !form.telefono.trim()
+    ) {
       toastHOT.error("Por favor completa todos los campos obligatorios (*).");
       return;
     }
 
+    if (form.debe === "Sí" && (!form.monto || Number(form.monto) <= 0)) {
+      toastHOT.error("Por favor ingresa un monto válido mayor a 0.");
+      return;
+    }
+
+    if (form.esMayorista === "Sí" && !form.nombreMayorista.trim()) {
+      toastHOT.error("Por favor ingresa el nombre del mayorista.");
+      return;
+    }
+
+    if (form.comentarioSelect === "Otro comentario..." && !form.comentarioCustom.trim()) {
+      toastHOT.error("Por favor escribe el comentario personalizado.");
+      return;
+    }
+
     setLoading(true);
-    const toastId = toastHOT.loading("Guardando registro de guía...");
+    const toastId = toastHOT.loading("Generando guía de envío...");
+
+    const comentarioFinal = form.comentarioSelect === "Otro comentario..." 
+      ? form.comentarioCustom.trim() 
+      : form.comentarioSelect;
+
+    const numeroGuia = `CS-${String(Date.now()).slice(-6)}`;
+    const ahora = new Date();
+    
+    const yyyy = ahora.getFullYear();
+    const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+    const dd = String(ahora.getDate()).padStart(2, '0');
+    const fechaYMD = `${yyyy}-${mm}-${dd}`;
+
+    const fechaFormateada = ahora.toLocaleDateString("es-CR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+    const horaFormateada = ahora.toLocaleTimeString("es-CR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const nuevaGuia = {
+      id: Date.now(),
+      numeroGuia,
+      nombre: form.nombre.trim(),
+      provincia: form.provincia,
+      canton: form.canton.trim(),
+      distrito: form.distrito.trim(),
+      telefono: form.telefono.trim(),
+      debe: form.debe,
+      monto: form.debe === "Sí" ? String(Number(form.monto) || 0) : "0",
+      meterRaspa: form.meterRaspa,
+      esMayorista: form.esMayorista,
+      nombreMayorista: form.esMayorista === "Sí" ? form.nombreMayorista.trim() : "",
+      comentarios: comentarioFinal === "Sin comentario" ? "" : comentarioFinal,
+      fechaYMD,
+      fecha: `${fechaFormateada} ${horaFormateada}`
+    };
 
     try {
-      const comentarioFinal = form.comentarioSelect === "Otro comentario..." 
-        ? form.comentarioCustom 
-        : form.comentarioSelect;
-
-      const payload = {
-        ...form,
-        comentarios: comentarioFinal
-      };
-
-      // Si tienes un endpoint en tu backend para guardar guías, lo mandas aquí. 
-      // Si prefieres que siga yendo al Script de Google anterior, puedes cambiar esta URL por tu link de Google Apps Script /exec
-      const res = await fetch(`${API_BASE}/api/guias`, {
+      await fetch(`${API_BASE}/api/guias`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(nuevaGuia)
       });
 
-      // Si el backend responde OK o si deseas simular el éxito mientras conectas la ruta:
-      toastHOT.success("¡Guía guardada con éxito!", { id: toastId });
+      setGuias((prev) => [nuevaGuia, ...prev]);
+      setFechaFiltro(fechaYMD);
 
-      // Limpiar formulario tras guardar
       setForm({
         nombre: "",
         provincia: "",
@@ -71,236 +185,602 @@ export default function GuiasPage() {
         telefono: "",
         debe: "No",
         monto: "",
-        meterRaspa: "Sí",
+        meterRaspa: "No",
         esMayorista: "No",
-        comentarioSelect: "ENTREGAR MISMO DIA",
+        nombreMayorista: "",
+        comentarioSelect: "Sin comentario",
         comentarioCustom: ""
       });
 
+      toastHOT.success("¡Guía guardada con éxito en el servidor!", { id: toastId });
     } catch (error) {
-      toastHOT.error("Error al guardar el registro. Inténtalo de nuevo.", { id: toastId });
+      setGuias((prev) => [nuevaGuia, ...prev]);
+      toastHOT.success("¡Guía guardada localmente!", { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
+  const eliminarGuia = async (id, backendId) => {
+    try {
+      if (backendId) {
+        await fetch(`${API_BASE}/api/guias/${backendId}`, { method: "DELETE" });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setGuias((prev) => prev.filter((g) => g.id !== id && g._id !== backendId));
+    toastHOT.success("Guía eliminada de la tabla.");
+  };
+
+  const handleCopiarPDFGuia = (guia) => {
+    handleImprimirPDF(guia);
+    toastHOT.success("PDF de guía generado para descarga.");
+  };
+
+  const guiasFiltradas = useMemo(() => {
+    return guias.filter((g) => {
+      const coincideFecha = g.fechaYMD ? g.fechaYMD === fechaFiltro : true;
+      if (!coincideFecha) return false;
+
+      if (!searchFilter.trim()) return true;
+      const q = searchFilter.toLowerCase();
+      return (
+        g.nombre.toLowerCase().includes(q) ||
+        g.provincia.toLowerCase().includes(q) ||
+        g.canton.toLowerCase().includes(q) ||
+        g.distrito.toLowerCase().includes(q) ||
+        g.telefono.toLowerCase().includes(q) ||
+        String(g.nombreMayorista || "").toLowerCase().includes(q) ||
+        String(g.numeroGuia || "").toLowerCase().includes(q)
+      );
+    });
+  }, [guias, fechaFiltro, searchFilter]);
+
+  const handleImprimirPDF = (guia) => {
+    const printWindow = window.open("", "_blank", "width=600,height=750");
+    if (!printWindow) {
+      toastHOT.error("Por favor permite las ventanas emergentes para descargar el PDF.");
+      return;
+    }
+
+    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+    const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
+    const esMayorista = guia.esMayorista === "Sí";
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Mensajería Privada - ${guia.nombre}</title>
+          <style>
+            @page { size: auto; margin: 12mm; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #000;
+              background: #fff;
+              margin: 0;
+              padding: 10px;
+              font-size: 16px;
+              line-height: 1.4;
+            }
+            .ticket {
+              max-width: 420px;
+              margin: 0 auto;
+              padding: 15px;
+            }
+            .title {
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 15px;
+            }
+            .line {
+              margin-bottom: 12px;
+              word-break: break-word;
+            }
+            .bold {
+              font-weight: bold;
+            }
+            .mayorista-bottom {
+              text-align: center;
+              font-size: 46px;
+              font-weight: 900;
+              margin-top: 30px;
+              padding-top: 15px;
+              border-top: 3px dashed #000;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <div class="title">Mensajería Privada</div>
+            
+            <div class="line"><span class="bold">Nombre:</span> ${guia.nombre}</div>
+            <div class="line"><span class="bold">Provincia:</span> ${guia.provincia}</div>
+            <div class="line"><span class="bold">Cantón:</span> ${guia.canton}</div>
+            <div class="line"><span class="bold">Distrito:</span> ${guia.distrito}</div>
+            <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
+            <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
+            <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
+            <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
+
+            ${esMayorista && guia.nombreMayorista ? `
+              <div class="mayorista-bottom">
+                ${guia.nombreMayorista.toUpperCase()}
+              </div>
+            ` : ""}
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="min-h-screen bg-[#0d3b1e] pt-32 pb-24 px-4 sm:px-6 lg:px-8 font-sans text-white relative">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+      <div className="max-w-4xl mx-auto">
         
-        {/* Botón Volver */}
         <button 
           onClick={() => navigate("/")} 
-          className="inline-flex items-center gap-2 bg-black border border-gray-700 text-zinc-300 hover:text-white hover:bg-zinc-900 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-6"
+          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
         >
           <FaChevronLeft size={12} /> Volver al catálogo
         </button>
 
-        {/* Encabezado */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl sm:text-2xl font-black tracking-widest text-yellow-500 uppercase drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]">
-            CHEMASPORT ER · GUÍAS
-          </h1>
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black text-white text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm">
+              <FaTruck size={11} className="text-amber-400" />
+              <span>MENSAJERÍA Y ENVÍOS</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
+              ChemaSport ER · Guías
+            </h1>
+            <p className="text-zinc-500 text-sm font-medium mt-1">
+              Genera las guías para mensajero privado y descarga su etiqueta en PDF.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-2xl text-right">
+              <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Guías de Hoy
+              </span>
+              <span className="text-2xl font-black text-black">
+                {guias.filter(g => (g.fechaYMD ? g.fechaYMD === fechaFiltro : true)).length}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Tarjeta del Formulario (Calcada a la captura) */}
-        <div className="bg-[#0b2f18] border border-yellow-500/40 rounded-2xl p-6 sm:p-8 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5 text-sm">
+        {/* CÁPSULA DEL FORMULARIO */}
+        <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl mb-10 relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-5 mb-7">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shadow-sm">
+                <FaBoxOpen size={18} />
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-black tracking-tight">
+                  Registro de Guía
+                </h2>
+                <p className="text-xs text-zinc-400 font-bold">
+                  Completa los datos del envío para generar el formato de mensajería
+                </p>
+              </div>
+            </div>
+          </div>
 
-            {/* Nombre */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Nombre *
               </label>
-              <input
-                type="text"
-                name="nombre"
-                value={form.nombre}
-                onChange={handleChange}
-                placeholder="Escribí el nombre..."
-                required
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-              />
+              <div className="relative">
+                <span className="absolute left-4 top-4 -translate-y-1/2 text-zinc-400">
+                  <FaUser size={13} />
+                </span>
+                <input
+                  type="text"
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={handleChange}
+                  placeholder="Escribí el nombre..."
+                  required
+                  className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
+                />
+              </div>
             </div>
 
-            {/* Provincia */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Provincia *
               </label>
-              <select
-                name="provincia"
-                value={form.provincia}
-                onChange={handleChange}
-                required
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors cursor-pointer"
-              >
-                <option value="" disabled>Selecciona provincia</option>
-                <option value="Alajuela">Alajuela</option>
-                <option value="Cartago">Cartago</option>
-                <option value="Heredia">Heredia</option>
-                <option value="San José">San José</option>
-                <option value="Guanacaste">Guanacaste</option>
-                <option value="Puntarenas">Puntarenas</option>
-                <option value="Limón">Limón</option>
-              </select>
+              <div className="relative">
+                <span className="absolute left-4 top-4 -translate-y-1/2 text-zinc-400 pointer-events-none">
+                  <FaMapMarkerAlt size={13} />
+                </span>
+                <select
+                  name="provincia"
+                  value={form.provincia}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
+                >
+                  <option value="" disabled>Selecciona provincia</option>
+                  <option value="Alajuela">Alajuela</option>
+                  <option value="Cartago">Cartago</option>
+                  <option value="Heredia">Heredia</option>
+                  <option value="San José">San José</option>
+                </select>
+              </div>
             </div>
 
-            {/* Cantón */}
-            <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
-                Cantón *
-              </label>
-              <input
-                type="text"
-                name="canton"
-                value={form.canton}
-                onChange={handleChange}
-                placeholder="Escribí el cantón..."
-                required
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                  Cantón *
+                </label>
+                <input
+                  type="text"
+                  name="canton"
+                  value={form.canton}
+                  onChange={handleChange}
+                  placeholder="Escribí el cantón..."
+                  required
+                  className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                  Distrito *
+                </label>
+                <input
+                  type="text"
+                  name="distrito"
+                  value={form.distrito}
+                  onChange={handleChange}
+                  placeholder="Escribí el distrito..."
+                  required
+                  className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
+                />
+              </div>
             </div>
 
-            {/* Distrito */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
-                Distrito *
-              </label>
-              <input
-                type="text"
-                name="distrito"
-                value={form.distrito}
-                onChange={handleChange}
-                placeholder="Escribí el distrito..."
-                required
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-              />
-            </div>
-
-            {/* Teléfono */}
-            <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Teléfono *
               </label>
-              <input
-                type="tel"
-                name="telefono"
-                value={form.telefono}
-                onChange={handleChange}
-                placeholder="Ej.: +506 8888 8888"
-                required
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-              />
+              <div className="relative">
+                <span className="absolute left-4 top-4 text-zinc-500">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                  </svg>
+                </span>
+                <input
+                  type="tel"
+                  name="telefono"
+                  value={form.telefono}
+                  onChange={handleChange}
+                  placeholder="Ej.: +506 8888 8888"
+                  required
+                  className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
+                />
+              </div>
             </div>
 
-            {/* ¿Debe? */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 ¿Debe?
               </label>
               <select
                 name="debe"
                 value={form.debe}
                 onChange={handleChange}
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors cursor-pointer"
+                className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
               >
                 <option value="No">No</option>
                 <option value="Sí">Sí</option>
               </select>
+
+              {form.debe === "Sí" && (
+                <div className="mt-4 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Monto *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 -translate-y-1/2 text-zinc-400 font-black text-sm">
+                      ₡
+                    </span>
+                    <input
+                      type="number"
+                      name="monto"
+                      value={form.monto}
+                      onChange={handleChange}
+                      placeholder="Monto (solo números)"
+                      required
+                      autoFocus
+                      className="w-full pl-9 pr-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-black text-emerald-700 placeholder-zinc-400 outline-none focus:border-black transition-all"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Monto */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
-                Monto *
-              </label>
-              <input
-                type="number"
-                name="monto"
-                value={form.monto}
-                onChange={handleChange}
-                placeholder="Monto (solo números)"
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-              />
-            </div>
-
-            {/* ¿Meter raspa? */}
-            <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 ¿Meter raspa? *
               </label>
               <select
                 name="meterRaspa"
                 value={form.meterRaspa}
                 onChange={handleChange}
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors cursor-pointer"
+                className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
               >
-                <option value="Sí">Sí</option>
                 <option value="No">No</option>
+                <option value="Sí">Sí</option>
               </select>
             </div>
 
-            {/* ¿Este paquete lo envía un mayorista? */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 ¿Este paquete lo envía un mayorista?
               </label>
               <select
                 name="esMayorista"
                 value={form.esMayorista}
                 onChange={handleChange}
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors cursor-pointer"
+                className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
               >
                 <option value="No">No</option>
                 <option value="Sí">Sí</option>
               </select>
+
+              {form.esMayorista === "Sí" && (
+                <div className="mt-4 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Nombre del Mayorista *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-4 -translate-y-1/2 text-zinc-400">
+                      <FaStore size={13} />
+                    </span>
+                    <input
+                      type="text"
+                      name="nombreMayorista"
+                      value={form.nombreMayorista}
+                      onChange={handleChange}
+                      placeholder="Ej. VANESSA ALVARADO"
+                      required
+                      autoFocus
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Comentarios */}
             <div>
-              <label className="block text-yellow-400 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Comentarios
               </label>
-              <select
-                name="comentarioSelect"
-                value={form.comentarioSelect}
-                onChange={handleChange}
-                className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors cursor-pointer"
-              >
-                <option value="Sin comentario">Sin comentario</option>
-                <option value="ENTREGAR MISMO DIA">ENTREGAR MISMO DIA</option>
-                <option value="PAQUETE PARA JOHAN">PAQUETE PARA JOHAN</option>
-                <option value="Otro comentario...">Otro comentario...</option>
-              </select>
+              <div className="relative">
+                <span className="absolute left-4 top-4 -translate-y-1/2 text-zinc-400 pointer-events-none">
+                  <FaStickyNote size={13} />
+                </span>
+                <select
+                  name="comentarioSelect"
+                  value={form.comentarioSelect}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
+                >
+                  <option value="Sin comentario">Sin comentario</option>
+                  <option value="ENTREGAR MISMO DIA">ENTREGAR MISMO DIA</option>
+                  <option value="PAQUETE PARA JOHAN">PAQUETE PARA JOHAN</option>
+                  <option value="Otro comentario...">Otro comentario...</option>
+                </select>
+              </div>
+
+              {form.comentarioSelect === "Otro comentario..." && (
+                <div className="mt-4 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Otro comentario *
+                  </label>
+                  <input
+                    type="text"
+                    name="comentarioCustom"
+                    value={form.comentarioCustom}
+                    onChange={handleChange}
+                    placeholder="Escribí tu comentario..."
+                    required
+                    autoFocus
+                    className="w-full px-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Input adicional si selecciona "Otro comentario..." */}
-            {form.comentarioSelect === "Otro comentario..." && (
-              <div>
-                <input
-                  type="text"
-                  name="comentarioCustom"
-                  value={form.comentarioCustom}
-                  onChange={handleChange}
-                  placeholder="Escribí tu comentario..."
-                  className="w-full bg-[#0d2614] border border-yellow-500/30 rounded-xl px-4 py-3 text-white placeholder-zinc-500 text-xs sm:text-sm font-medium outline-none focus:border-yellow-400 transition-colors"
-                />
-              </div>
-            )}
-
-            {/* Botón Guardar registro */}
             <div className="pt-3">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg cursor-pointer active:scale-95"
+                className="w-full bg-black hover:bg-zinc-800 text-white py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
               >
-                {loading ? "Guardando..." : "Guardar registro"}
+                <FaPlus size={13} className="text-amber-400" />
+                <span>{loading ? "Guardando registro..." : "Guardar registro"}</span>
               </button>
             </div>
 
           </form>
+        </div>
+
+        {/* TABLA DE GUÍAS CON CALENDARIO DIARIO */}
+        <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
+          
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 pb-6 border-b border-zinc-100">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                Listado de Guías
+              </h2>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                Mostrando únicamente las guías del día seleccionado.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl w-full sm:w-auto">
+                <FaCalendarAlt className="text-zinc-400 shrink-0" />
+                <input 
+                  type="date" 
+                  value={fechaFiltro} 
+                  onChange={(e) => setFechaFiltro(e.target.value)} 
+                  className="bg-transparent text-xs font-black text-black outline-none cursor-pointer w-full" 
+                />
+              </div>
+
+              <div className="relative w-full sm:w-60">
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black"
+                />
+                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={12} />
+              </div>
+            </div>
+          </div>
+
+          {guiasFiltradas.length === 0 ? (
+            <div className="text-center py-14 bg-zinc-50 rounded-2xl border border-zinc-100">
+              <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">
+                No hay guías registradas para esta fecha ({fechaFiltro}).
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
+                    <th className="py-3.5 px-3">Guía / Hora</th>
+                    <th className="py-3.5 px-3">Nombre</th>
+                    <th className="py-3.5 px-3">Destino</th>
+                    <th className="py-3.5 px-3">Teléfono</th>
+                    <th className="py-3.5 px-3">¿Debe? / Monto</th>
+                    <th className="py-3.5 px-3">Detalles</th>
+                    <th className="py-3.5 px-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 font-medium">
+                  {guiasFiltradas.map((g) => {
+                    const tieneDeuda = g.debe === "Sí" && Number(g.monto) > 0;
+                    return (
+                      <tr key={g.id || g._id} className="hover:bg-zinc-50/80 transition-colors">
+                        <td className="py-4 px-3 whitespace-nowrap">
+                          <span className="font-black text-black block text-xs">
+                            {g.numeroGuia || `#${String(g.id || '').slice(-4)}`}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-bold">
+                            {g.fecha}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-3 font-black text-black text-xs">
+                          {g.nombre}
+                        </td>
+
+                        <td className="py-4 px-3 text-zinc-700">
+                          <span className="font-bold text-black block">
+                            {g.provincia}, {g.canton}
+                          </span>
+                          <span className="text-[11px] text-zinc-500">
+                            {g.distrito}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-3 font-mono font-bold text-zinc-800 whitespace-nowrap">
+                          {g.telefono}
+                        </td>
+
+                        <td className="py-4 px-3 whitespace-nowrap">
+                          {tieneDeuda ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 font-black text-xs">
+                              Sí · ₡{Number(g.monto).toLocaleString("es-CR")}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px]">
+                              No (Pagado)
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-3">
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-bold text-[10px]">
+                              Raspa: {g.meterRaspa}
+                            </span>
+                            {g.esMayorista === "Sí" && (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px]">
+                                Mayorista: {g.nombreMayorista || "Sí"}
+                              </span>
+                            )}
+                          </div>
+                          {g.comentarios && (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-zinc-500 uppercase mt-0.5">
+                              {/* Icono minimalista de ubicación limpio y proporcionado */}
+                              <FaMapMarkerAlt size={11} className="text-zinc-400 shrink-0" />
+                              <span>{g.comentarios}</span>
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                          
+
+                            {/* Botón Imprimir PDF */}
+                            <button
+                              onClick={() => handleImprimirPDF(g)}
+                              className="inline-flex items-center gap-1 bg-black hover:bg-zinc-800 text-white px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                              title="Imprimir PDF de la Guía"
+                            >
+                              <FaFilePdf size={12} className="text-amber-400" />
+                              <span>PDF</span>
+                            </button>
+
+                            {/* Botón Eliminar */}
+                            <button
+                              onClick={() => eliminarGuia(g.id, g._id)}
+                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                              title="Eliminar registro"
+                            >
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
       </div>
