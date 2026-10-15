@@ -344,8 +344,9 @@ const handleDescargarYCompartirPDF = async (guia) => {
       doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
     }
 
-    const nombreLimpio = String(guia.nombre || "Guia").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const fileName = `Guia_${nombreLimpio}.pdf`;
+    // 🔥 NOMBRE DEL ARCHIVO LIMPIO CON ESPACIOS Y SIN GUIONES BAJOS
+    const nombreLimpio = String(guia.nombre || "Guia").replace(/[\\/:*?"<>|_]/g, "").trim();
+    const fileName = `${nombreLimpio}.pdf`;
 
     doc.save(fileName);
 
@@ -354,12 +355,9 @@ const handleDescargarYCompartirPDF = async (guia) => {
 
     if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
-      
-      // 🔥 AQUI ESTÁ EL CAMBIO: Se quitaron title y text para que envíe solo el archivo limpio
       await navigator.share({
         files: [pdfFile]
       }).catch(() => {});
-      
     } else {
       toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
     }
