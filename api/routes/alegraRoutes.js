@@ -23,6 +23,24 @@ function limpiarTexto(str = "") {
     .trim();
 }
 
+// Formatear un contacto de Alegra a un objeto limpio para el Frontend
+function formatearContactoAlegra(c) {
+  const tipoRaw = c.identificationObject?.type || "";
+  let tipoIdentificacion = "01";
+  if (tipoRaw === "CJ") tipoIdentificacion = "02";
+  else if (tipoRaw === "DIMEX") tipoIdentificacion = "03";
+  else if (tipoRaw === "NITE") tipoIdentificacion = "04";
+
+  return {
+    id: c.id,
+    nombre: c.name || "",
+    cedula: c.identificationObject?.number || c.identification || "",
+    tipoIdentificacion,
+    email: c.email || "",
+    telefono: c.phonePrimary || c.mobile || ""
+  };
+}
+
 // 🔥 FUNCIÓN QUE OBTIENE LOS IDs REALES DE TUS PRODUCTOS EN ALEGRA
 async function obtenerMapaProductosAlegra(credentials) {
   if (cacheItemsAlegra && Object.keys(cacheItemsAlegra).length > 0) {
@@ -115,15 +133,83 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
 }
 
 /* ========================================================
-   🔍 CONSULTAR CÉDULA EN HACIENDA
+   ⭐ OBTENER / BUSCAR CONTACTOS Y FAVORITOS EN ALEGRA
+   ======================================================== */
+router.get('/contactos', async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
+
+    const url = q.length > 0
+      ? `https://api.alegra.com/api/v1/contacts?query=${encodeURIComponent(q)}&type=client&limit=20`
+      : `https://api.alegra.com/api/v1/contacts?type=client&limit=30`;
+
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": `Basic ${credentials}`,
+        "Accept": "application/json"
+      }
+    });
+
+    if (!response.ok) return res.json([]);
+    const data = await response.json();
+    const lista = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+
+    // Filtramos el contacto genérico "Cliente de Contado" (ID 2) para dejar solo clientes reales
+    const contactosLimpios = lista
+      .filter((c) => c && c.name && Number(c.id) !== 2 && limpiarTexto(c.name) !== "cliente de contado")
+      .map(formatearContactoAlegra);
+
+    return res.status(200).json(contactosLimpios);
+  } catch (error) {
+    console.error("⚠️ Error obteniendo contactos de Alegra:", error);
+    return res.status(200).json([]);
+  }
+});
+
+/* ========================================================
+   🔍 CONSULTAR CÉDULA (PRIMERO EN ALEGRA, LUEGO EN HACIENDA)
    ======================================================== */
 router.get('/consultar-cedula/:identificacion', async (req, res) => {
   try {
-    const { identificacion } = req.params;
-    const response = await fetch(`https://api.hacienda.go.cr/fe/ae?identificacion=${identificacion}`);
+    const cedulaLimpia = String(req.params.identificacion || "").replace(/\D/g, "");
+    if (!cedulaLimpia) return res.status(400).json({ error: "Cédula inválida." });
+
+    const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
+
+    // 1. Primero buscamos si ya existe en Alegra para devolver también correo y teléfono
+    try {
+      const alegraRes = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${cedulaLimpia}`, {
+        headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+      });
+      if (alegraRes.ok) {
+        const alegraContacts = await alegraRes.json();
+        if (Array.isArray(alegraContacts) && alegraContacts.length > 0) {
+          const c = formatearContactoAlegra(alegraContacts[0]);
+          return res.status(200).json({
+            success: true,
+            enAlegra: true,
+            nombre: c.nombre,
+            cedula: c.cedula,
+            tipoIdentificacion: c.tipoIdentificacion,
+            email: c.email,
+            telefono: c.telefono
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Aviso buscando cédula en Alegra:", e.message);
+    }
+
+    // 2. Si no está en Alegra, consultamos en Hacienda
+    const response = await fetch(`https://api.hacienda.go.cr/fe/ae?identificacion=${cedulaLimpia}`);
     if (!response.ok) return res.status(404).json({ error: "No se encontró información." });
     const data = await response.json();
-    return res.status(200).json({ success: true, nombre: data.nombre || "Cliente Electrónico" });
+    return res.status(200).json({
+      success: true,
+      enAlegra: false,
+      nombre: data.nombre || "Cliente Electrónico"
+    });
   } catch (error) {
     res.status(500).json({ error: "Error de consulta." });
   }
@@ -143,9 +229,11 @@ router.post('/emitir-tiquete', async (req, res) => {
     let clientId = 2; // Cliente de Contado / General por defecto en Alegra
     const correoLimpio = (email && email.includes("@")) ? email.trim() : "";
 
-    if (cedula && cedula.trim() !== "") {
-      const cedulaLimpiada = cedula.trim();
+    // Limpiar guiones o espacios en cédula y teléfono
+    const cedulaLimpiada = cedula ? String(cedula).replace(/\D/g, "") : "";
+    const telefonoLimpiado = telefono ? String(telefono).replace(/\D/g, "") : "";
 
+    if (cedulaLimpiada !== "") {
       // 🔥 TRADUCTOR PERFECTO DE CÉDULAS
       let tipoAlegra = "CF"; 
       if (tipoIdentificacion === "02") tipoAlegra = "CJ"; 
@@ -167,7 +255,7 @@ router.post('/emitir-tiquete', async (req, res) => {
         // Actualizar correo y/o teléfono si se enviaron en el modal
         const datosActualizar = {};
         if (correoLimpio) datosActualizar.email = correoLimpio;
-        if (telefono && telefono.trim() !== "") datosActualizar.phonePrimary = telefono.trim();
+        if (telefonoLimpiado) datosActualizar.phonePrimary = telefonoLimpiado;
 
         if (Object.keys(datosActualizar).length > 0) {
           await fetch(`https://api.alegra.com/api/v1/contacts/${clientId}`, {
@@ -188,8 +276,8 @@ router.post('/emitir-tiquete', async (req, res) => {
           type: "client"
         };
 
-        if (telefono && telefono.trim() !== "") {
-          payloadNuevoContacto.phonePrimary = telefono.trim();
+        if (telefonoLimpiado) {
+          payloadNuevoContacto.phonePrimary = telefonoLimpiado;
         }
 
         console.log("⚠️ 2. CONTACTO NO ENCONTRADO. CREANDO NUEVO...");
