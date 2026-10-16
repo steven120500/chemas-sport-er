@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
   FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt,
-  FaEdit, FaCheck, FaTimes, FaTruck
+  FaEdit, FaCheck, FaTimes, FaTruck, FaStar, FaUserCheck
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -193,6 +193,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [editandoPrecioId, setEditandoPrecioId] = useState(null);
   const [tempPrecioFila, setTempPrecioFila] = useState("");
 
+  // ⭐ Estados para Contactos de Alegra y Favoritos en el Modal
+  const [contactosAlegra, setContactosAlegra] = useState([]);
+  const [mostrarListaContactos, setMostrarListaContactos] = useState(false);
+  const [favoritosIds, setFavoritosIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("chemasport_contactos_favoritos") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
   // 🔥 MODAL UNIFICADO DE FACTURACIÓN (INCLUYE ENVÍO PERSONALIZABLE)
   const [modalFacturar, setModalFacturar] = useState({
     isOpen: false,
@@ -221,6 +232,65 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       storedUser?.rol === "admin"
     );
   }, [isSuperUser, user, storedUser]);
+
+  // ⭐ Cargar lista de contactos de Alegra al abrir el modal
+  const cargarContactosAlegra = async (query = "") => {
+    try {
+      const url = query
+        ? `${API_BASE}/api/alegra/contactos?q=${encodeURIComponent(query)}`
+        : `${API_BASE}/api/alegra/contactos`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setContactosAlegra(data);
+      }
+    } catch (err) {
+      console.error("Error cargando contactos de Alegra:", err);
+    }
+  };
+
+  // ⭐ Alternar un contacto como Favorito
+  const toggleFavoritoContacto = (idContacto, e) => {
+    if (e) e.stopPropagation();
+    const idStr = String(idContacto);
+    setFavoritosIds((prev) => {
+      const nuevos = prev.includes(idStr)
+        ? prev.filter((item) => item !== idStr)
+        : [idStr, ...prev];
+      try {
+        localStorage.setItem("chemasport_contactos_favoritos", JSON.stringify(nuevos));
+      } catch (err) {
+        console.error(err);
+      }
+      return nuevos;
+    });
+  };
+
+ // ⭐ Ordenar: Favoritos primero, mostrando todos los contactos de Alegra listos para elegir
+ const contactosOrdenadosYFiltrados = useMemo(() => {
+  return [...contactosAlegra].sort((a, b) => {
+    const aFav = favoritosIds.includes(String(a.id));
+    const bFav = favoritosIds.includes(String(b.id));
+    if (aFav && !bFav) return -1;
+    if (!aFav && bFav) return 1;
+    return String(a.nombre || "").localeCompare(String(b.nombre || ""));
+  });
+}, [contactosAlegra, favoritosIds]);
+
+// ⭐ Seleccionar un contacto de Alegra y rellenar todos los campos del modal
+const seleccionarContactoAlegra = (c) => {
+  setModalFacturar((prev) => ({
+    ...prev,
+    tipoIdentificacion: c.tipoIdentificacion || "01",
+    cedula: c.cedula || prev.cedula,
+    nombre: c.nombre || prev.nombre,
+    telefono: c.telefono || prev.telefono,
+    correo: c.email || c.correo || prev.correo
+  }));
+  setMostrarListaContactos(false);
+  toastHOT.success(`Datos de ${c.nombre} cargados.`);
+};
 
   // 🛍️ 1. CARGAR CATÁLOGO COMPLETO DE PRODUCTOS
   useEffect(() => {
@@ -620,6 +690,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       ? ventasArray[0].cliente 
       : "";
 
+    setMostrarListaContactos(false);
+    cargarContactosAlegra("");
+
     setModalFacturar({
       isOpen: true,
       ventas: ventasArray,
@@ -635,19 +708,25 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   };
 
-  // 🔍 BUSCAR CÉDULA EN HACIENDA (DENTRO DEL MODAL UNIFICADO)
+  // 🔍 BUSCAR CÉDULA EN ALEGRA / HACIENDA (DENTRO DEL MODAL UNIFICADO)
   const buscarCedulaHacienda = async () => {
     if (!modalFacturar.cedula.trim()) {
       toastHOT.error("Ingrese una cédula para buscar.");
       return;
     }
-    const toastId = toastHOT.loading("Consultando en Hacienda...");
+    const toastId = toastHOT.loading("Consultando cliente...");
     try {
       const res = await fetch(`${API_BASE}/api/alegra/consultar-cedula/${modalFacturar.cedula.trim()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se encontró el cliente");
-      setModalFacturar((prev) => ({ ...prev, nombre: data.nombre }));
-      toastHOT.success("¡Cliente encontrado!", { id: toastId });
+      setModalFacturar((prev) => ({
+        ...prev,
+        nombre: data.nombre || prev.nombre,
+        tipoIdentificacion: data.tipoIdentificacion || prev.tipoIdentificacion,
+        telefono: data.telefono || prev.telefono,
+        correo: data.correo || prev.correo
+      }));
+      toastHOT.success(data.enAlegra ? "¡Cliente cargado desde Alegra!" : "¡Cliente encontrado en Hacienda!", { id: toastId });
     } catch (error) {
       toastHOT.error(error.message, { id: toastId });
     }
@@ -1256,6 +1335,62 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 </select>
               </div>
 
+              {/* ⭐ SELECTOR DESPLEGABLE DE CLIENTES FAVORITOS / GUARDADOS EN ALEGRA */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMostrarListaContactos((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-300 rounded-xl text-xs font-black text-zinc-900 transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <FaStar className="text-amber-500" size={13} />
+                    <span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">
+                    {mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}
+                  </span>
+                </button>
+
+                {mostrarListaContactos && (
+                  <div className="mt-1.5 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-xl divide-y divide-zinc-100 z-30">
+                    {contactosOrdenadosYFiltrados.length === 0 ? (
+                      <p className="p-3 text-center text-[11px] text-zinc-400 font-bold">
+                        No se encontraron contactos guardados en Alegra.
+                      </p>
+                    ) : (
+                      contactosOrdenadosYFiltrados.map((c) => {
+                        const esFav = favoritosIds.includes(String(c.id));
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => seleccionarContactoAlegra(c)}
+                            className="flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50/70 cursor-pointer transition-colors"
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="text-xs font-black text-black truncate flex items-center gap-1.5">
+                                <FaUserCheck className="text-emerald-600 shrink-0" size={11} />
+                                <span className="truncate">{c.nombre}</span>
+                              </p>
+                              <p className="text-[10px] text-zinc-500 font-mono truncate">
+                                {c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""} {c.email ? `· ${c.email}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavoritoContacto(c.id, e)}
+                              className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer shrink-0"
+                              title={esFav ? "Quitar de favoritos" : "Fijar en favoritos"}
+                            >
+                              <FaStar size={13} className={esFav ? "text-amber-400" : "text-zinc-300"} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* 3. TIPO DE IDENTIFICACIÓN Y CÉDULA */}
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 <div className="sm:col-span-2">
@@ -1293,7 +1428,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       type="button"
                       onClick={buscarCedulaHacienda} 
                       className="bg-zinc-800 text-white px-3.5 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" 
-                      title="Buscar nombre en Hacienda"
+                      title="Buscar en Alegra / Hacienda"
                     >
                       <FaSearch size={13} />
                     </button>
@@ -1309,7 +1444,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <input 
                   type="text" 
                   value={modalFacturar.nombre} 
-                  onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setModalFacturar({ ...modalFacturar, nombre: val });
+                    if (val.trim().length >= 2) {
+                      setMostrarListaContactos(true);
+                    }
+                  }}
                   placeholder="Automático al buscar o escriba..." 
                   className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" 
                 />
