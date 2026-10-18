@@ -268,10 +268,10 @@ export default function Header({
                         className="w-full bg-amber-500/10 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaStore size={15} className="text-amber-400 transition-colors" />
-                          <span className="group-hover:text-amber-200 transition-colors">Tienda Física</span>
+                          <FaStore size={15} className="text-yellow-500 transition-colors" />
+                          <span className="group-hover:text-yellow-400 transition-colors">Tienda Física</span>
                         </div>
-                        <FaChevronRight size={12} className="text-amber-600 group-hover:text-amber-400 transition-colors" />
+                        <FaChevronRight size={12} className="text-yellow-600 group-hover:text-amber-400 transition-colors" />
                       </button>
                     )}
 
