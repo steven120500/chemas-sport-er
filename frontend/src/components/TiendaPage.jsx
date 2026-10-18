@@ -4,7 +4,7 @@ import {
   FaChevronLeft, FaStore, FaCalendarAlt, FaSearch, 
   FaTrash, FaReceipt, FaPrint, FaMoneyBillWave, 
   FaCreditCard, FaMobileAlt, FaCashRegister, FaStar, 
-  FaUserCheck, FaBoxOpen, FaPlus, FaShoppingBag
+  FaUserCheck, FaBoxOpen, FaPlus, FaShoppingBag, FaExclamationTriangle
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
@@ -65,50 +65,120 @@ function getProductThumb(p) {
   return "";
 }
 
+// 🔥 EXTRAE TODAS LAS TALLAS CON STOCK > 0 INDICANDO EN QUÉ UBICACIÓN ESTÁN (Tienda, Bodega 1, Bodega 2)
 function getAvailableSizes(p) {
   if (!p) return [];
-  const fuentes = [p.sizesTienda, p.tiendaSizes, p.sizes, p.tallas, p.stock];
-  const acumulado = {};
+  const lista = [];
 
-  for (const fuente of fuentes) {
-    if (!fuente) continue;
-    if (Array.isArray(fuente)) {
-      fuente.forEach((item) => {
+  const agregarDeObjeto = (obj, nombreUbicacion) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) {
+      obj.forEach((item) => {
         if (item && typeof item === "object") {
           const t = String(item.size || item.talla || item.name || "").trim().toUpperCase();
           const c = Number(item.quantity ?? item.stock ?? item.count ?? item.cantidad ?? 0);
-          if (t && c > 0) acumulado[t] = (acumulado[t] || 0) + c;
-        }
-      });
-    } else if (typeof fuente === "object") {
-      Object.entries(fuente).forEach(([key, val]) => {
-        if (val && typeof val === "object" && !Array.isArray(val)) {
-          const cantTienda = Number(val.tienda ?? val.total ?? val.stock ?? val.quantity ?? 0);
-          if (cantTienda > 0) {
-            const t = String(key).trim().toUpperCase();
-            acumulado[t] = (acumulado[t] || 0) + cantTienda;
-          }
-        } else {
-          const cant = Number(val);
-          if (!isNaN(cant) && cant > 0) {
-            const t = String(key).trim().toUpperCase();
-            acumulado[t] = (acumulado[t] || 0) + cant;
+          if (t && c > 0) {
+            lista.push({ talla: t, stock: c, ubicacion: nombreUbicacion });
           }
         }
       });
+      return;
     }
-    if (Object.keys(acumulado).length > 0) break;
+
+    Object.entries(obj).forEach(([key, val]) => {
+      const t = String(key).trim().toUpperCase();
+      if (!t || t === "_ID") return;
+
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const cTienda = Number(val.tienda ?? 0);
+        const cB1 = Number(val.bodega1 ?? val.store1 ?? 0);
+        const cB2 = Number(val.bodega2 ?? val.store2 ?? 0);
+
+        if (cTienda > 0) lista.push({ talla: t, stock: cTienda, ubicacion: "Tienda" });
+        if (cB1 > 0) lista.push({ talla: t, stock: cB1, ubicacion: "Bodega 1" });
+        if (cB2 > 0) lista.push({ talla: t, stock: cB2, ubicacion: "Bodega 2" });
+
+        if (cTienda === 0 && cB1 === 0 && cB2 === 0) {
+          const cGen = Number(val.total ?? val.stock ?? val.quantity ?? 0);
+          if (cGen > 0) lista.push({ talla: t, stock: cGen, ubicacion: nombreUbicacion });
+        }
+      } else {
+        const cant = Number(val);
+        if (!isNaN(cant) && cant > 0) {
+          lista.push({ talla: t, stock: cant, ubicacion: nombreUbicacion });
+        }
+      }
+    });
+  };
+
+  const tieneSeparados = Boolean(
+    p.sizesTienda || p.tiendaSizes || p.sizesBodega1 || p.bodega1 || p.store1 || p.sizesBodega2 || p.bodega2 || p.store2
+  );
+
+  if (tieneSeparados) {
+    agregarDeObjeto(p.sizesTienda || p.tiendaSizes || p.sizes, "Tienda");
+    agregarDeObjeto(p.sizesBodega1 || p.bodega1 || p.store1, "Bodega 1");
+    agregarDeObjeto(p.sizesBodega2 || p.bodega2 || p.store2, "Bodega 2");
+  } else {
+    agregarDeObjeto(p.sizes || p.tallas || p.stock, "Tienda");
   }
 
-  const disponibles = Object.entries(acumulado).map(([talla, stock]) => ({ talla, stock }));
+  // Unificar por (ubicacion + talla) para evitar duplicados
+  const mapaUnico = new Map();
+  lista.forEach((item) => {
+    const k = `${item.ubicacion}_${item.talla}`;
+    if (!mapaUnico.has(k)) {
+      mapaUnico.set(k, { ...item });
+    }
+  });
+
+  const disponibles = Array.from(mapaUnico.values());
   if (disponibles.length > 0) return disponibles;
 
   const tipo = String(p.type || p.tipo || "").toLowerCase();
   const stockGeneral = Number(p.totalStock ?? p.quantity ?? p.countInStock ?? 0);
   if ((tipo.includes("llavero") || tipo.includes("balon") || tipo.includes("balón")) && stockGeneral > 0) {
-    return [{ talla: "Única", stock: stockGeneral }];
+    return [{ talla: "Única", stock: stockGeneral, ubicacion: "Tienda" }];
   }
+
   return [];
+}
+
+// Función local para actualizar el stock en memoria inmediatamente al facturar o anular
+function ajustarStockProductoLocal(prod, tallaBuscada, ubicacionBuscada, deltaCantidad) {
+  if (!prod) return prod;
+  const copia = JSON.parse(JSON.stringify(prod));
+  const tUpper = String(tallaBuscada || "").trim().toUpperCase();
+  const ubiNorm = limpiarTexto(ubicacionBuscada || "Tienda");
+
+  let campo = "sizes";
+  if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1")) {
+    if (copia.sizesBodega1) campo = "sizesBodega1";
+    else if (copia.bodega1) campo = "bodega1";
+    else if (copia.store1) campo = "store1";
+  } else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2")) {
+    if (copia.sizesBodega2) campo = "sizesBodega2";
+    else if (copia.bodega2) campo = "bodega2";
+    else if (copia.store2) campo = "store2";
+  } else {
+    if (copia.sizesTienda) campo = "sizesTienda";
+    else campo = "sizes";
+  }
+
+  if (copia[campo] && typeof copia[campo] === "object" && !Array.isArray(copia[campo])) {
+    const realKey = Object.keys(copia[campo]).find((k) => k.trim().toUpperCase() === tUpper) || tUpper;
+    const valActual = copia[campo][realKey];
+
+    if (valActual && typeof valActual === "object") {
+      let sub = "tienda";
+      if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1")) sub = "bodega1";
+      else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2")) sub = "bodega2";
+      copia[campo][realKey][sub] = Math.max(0, Number(valActual[sub] || 0) + deltaCantidad);
+    } else {
+      copia[campo][realKey] = Math.max(0, Number(valActual || 0) + deltaCantidad);
+    }
+  }
+  return copia;
 }
 
 export default function TiendaPage({ isSuperUser = false, user = null }) {
@@ -127,8 +197,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
   const [mostrarDropdownProductos, setMostrarDropdownProductos] = useState(false);
 
-  // Producto seleccionado y talla
+  // Producto seleccionado, ubicación y talla
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState("Tienda");
   const [tallaSeleccionada, setTallaSeleccionada] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState(1);
   const [precioUnitarioInput, setPrecioUnitarioInput] = useState("");
@@ -207,21 +278,25 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     cargarContactosAlegra("");
   }, []);
 
-  // Tipos disponibles para filtrar
+  // Tipos disponibles para filtrar (solo de prendas con stock)
   const tiposDisponibles = useMemo(() => {
     const setTipos = new Set(["Todos"]);
     catalogoBase.forEach((p) => {
+      if (getAvailableSizes(p).length === 0) return;
       const t = p.type || p.tipo;
       if (t) setTipos.add(String(t).trim());
     });
     return Array.from(setTipos);
   }, [catalogoBase]);
 
-  // Buscador con filtro por tipo y de 15 en 15
+  // 🔥 BUSCADOR CON FILTRO POR TIPO, DE 15 EN 15 Y OCULTANDO LAS AGOTADAS
   useEffect(() => {
     const q = busquedaProducto.trim();
     
     let filtrados = catalogoBase.filter((p) => {
+      // Si está agotada (0 tallas disponibles), NO aparece
+      if (getAvailableSizes(p).length === 0) return false;
+
       if (tipoFiltroSeleccionado !== "Todos") {
         const t = String(p.type || p.tipo || "").trim();
         if (t.toLowerCase() !== tipoFiltroSeleccionado.toLowerCase()) return false;
@@ -239,7 +314,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const timer = setTimeout(async () => {
       setBuscandoProductos(true);
       try {
-        const params = new URLSearchParams({ page: "1", limit: "15", q });
+        const params = new URLSearchParams({ page: "1", limit: "25", q });
         if (tipoFiltroSeleccionado !== "Todos") params.set("type", tipoFiltroSeleccionado);
 
         const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
@@ -248,7 +323,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         if (res.ok) {
           const data = await res.json();
           const remotos = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-          if (remotos.length > 0) setResultadosBusqueda(remotos.slice(0, 15));
+          // Filtramos también los remotos para que NUNCA muestre agotadas
+          const remotosConStock = remotos.filter((p) => getAvailableSizes(p).length > 0);
+          if (remotosConStock.length > 0) setResultadosBusqueda(remotosConStock.slice(0, 15));
         }
       } catch (err) {
         console.error("Error buscando:", err);
@@ -332,9 +409,22 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     fetchResumenTienda(selectedDate);
   }, [selectedDate, nombreUsuarioActual]);
 
-  const tallasDisponiblesActuales = useMemo(() => {
+  // Todas las tallas y ubicaciones disponibles del producto seleccionado
+  const todasTallasDelProducto = useMemo(() => {
     return getAvailableSizes(productoSeleccionado);
   }, [productoSeleccionado]);
+
+  // Ubicaciones que tienen al menos 1 prenda en stock para este producto
+  const ubicacionesConStock = useMemo(() => {
+    const ubis = [...new Set(todasTallasDelProducto.map((x) => x.ubicacion))];
+    return ubis.length > 0 ? ubis : ["Tienda", "Bodega 1", "Bodega 2"];
+  }, [todasTallasDelProducto]);
+
+  // Tallas disponibles filtradas por la ubicación elegida
+  const tallasDisponiblesActuales = useMemo(() => {
+    const porUbi = todasTallasDelProducto.filter((x) => x.ubicacion === ubicacionSeleccionada);
+    return porUbi.length > 0 ? porUbi : todasTallasDelProducto;
+  }, [todasTallasDelProducto, ubicacionSeleccionada]);
 
   const seleccionarProductoBusqueda = (prod) => {
     setProductoSeleccionado(prod);
@@ -342,9 +432,20 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setBusquedaProducto("");
 
     const disponibles = getAvailableSizes(prod);
-    setTallaSeleccionada(disponibles[0]?.talla || "U");
+    const ubiInicial = disponibles[0]?.ubicacion || "Tienda";
+    setUbicacionSeleccionada(ubiInicial);
+    const tallasDeUbi = disponibles.filter((d) => d.ubicacion === ubiInicial);
+    setTallaSeleccionada((tallasDeUbi[0] || disponibles[0])?.talla || "");
     setCantidadVenta(1);
     setPrecioUnitarioInput(String(getProductPrice(prod)));
+  };
+
+  const cambiarUbicacionSeleccionada = (nuevaUbi) => {
+    setUbicacionSeleccionada(nuevaUbi);
+    const tallasEnEsaUbi = todasTallasDelProducto.filter((x) => x.ubicacion === nuevaUbi);
+    if (tallasEnEsaUbi.length > 0) {
+      setTallaSeleccionada(tallasEnEsaUbi[0].talla);
+    }
   };
 
   const agregarPrendaAlCarrito = () => {
@@ -367,7 +468,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
     const infoTalla = tallasDisponiblesActuales.find((t) => t.talla === tallaSeleccionada);
     if (infoTalla && infoTalla.stock < cant) {
-      toastHOT.error(`Solo hay ${infoTalla.stock} disponible(s) en talla ${tallaSeleccionada}.`);
+      toastHOT.error(`Solo hay ${infoTalla.stock} disponible(s) en talla ${tallaSeleccionada} (${ubicacionSeleccionada}).`);
       return;
     }
 
@@ -378,15 +479,20 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       : nombreBase;
 
     const nuevoItem = {
-      uid: `${productoSeleccionado._id || productoSeleccionado.id}_${tallaSeleccionada}_${Date.now()}`,
+      uid: `${productoSeleccionado._id || productoSeleccionado.id}_${ubicacionSeleccionada}_${tallaSeleccionada}_${Date.now()}`,
       productId: productoSeleccionado._id || productoSeleccionado.id || null,
       item: nombreCompleto,
       imagen: getProductThumb(productoSeleccionado),
       talla: tallaSeleccionada,
+      ubicacion: ubicacionSeleccionada,
       tallasTexto: cant > 1 ? `${cant}x ${tallaSeleccionada}` : tallaSeleccionada,
       totalUnidades: cant,
       precioUnitarioCustom: precioUnit,
-      items: Array.from({ length: cant }, () => ({ talla: tallaSeleccionada, tienda: "Tienda", nombre: nombreCompleto }))
+      items: Array.from({ length: cant }, () => ({
+        talla: tallaSeleccionada,
+        tienda: ubicacionSeleccionada,
+        nombre: nombreCompleto
+      }))
     };
 
     setCarritoVentas((prev) => [...prev, nuevoItem]);
@@ -394,7 +500,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setTallaSeleccionada("");
     setCantidadVenta(1);
     setPrecioUnitarioInput("");
-    toastHOT.success("Prenda agregada a la cuenta.");
+    toastHOT.success(`Prenda agregada desde ${ubicacionSeleccionada}.`);
   };
 
   const eliminarItemCarrito = (uid) => {
@@ -517,14 +623,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         productId: productoSeleccionado._id || productoSeleccionado.id || null,
         item: nombreCompleto,
         talla: tallaSeleccionada,
+        ubicacion: ubicacionSeleccionada,
         tallasTexto: cant > 1 ? `${cant}x ${tallaSeleccionada}` : tallaSeleccionada,
         totalUnidades: cant,
         precioUnitarioCustom: precioUnit,
-        items: Array.from({ length: cant }, () => ({ talla: tallaSeleccionada, tienda: "Tienda", nombre: nombreCompleto }))
+        items: Array.from({ length: cant }, () => ({
+          talla: tallaSeleccionada,
+          tienda: ubicacionSeleccionada,
+          nombre: nombreCompleto
+        }))
       }];
     }
     return [];
-  }, [carritoVentas, productoSeleccionado, tallaSeleccionada, cantidadVenta, precioUnitarioInput]);
+  }, [carritoVentas, productoSeleccionado, tallaSeleccionada, ubicacionSeleccionada, cantidadVenta, precioUnitarioInput]);
 
   const totalCalculadoForm = useMemo(() => {
     return listaFinalParaCobrar.reduce(
@@ -565,6 +676,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       _id: `tienda_${Date.now()}_${idx}`,
       item: item.item,
       totalUnidades: Number(item.totalUnidades) || 1,
+      talla: item.talla,
+      ubicacion: item.ubicacion || "Tienda",
       tallasTexto: item.tallasTexto,
       cliente: formCliente.nombre.trim(),
       vendedor: nombreUsuarioActual,
@@ -590,7 +703,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     };
 
     setGenerandoTiquete(true);
-    const toastId = toastHOT.loading("Emitiendo comprobante en Alegra y registrando venta...");
+    const toastId = toastHOT.loading("Emitiendo comprobante, rebajando stock y registrando venta...");
 
     try {
       const response = await fetch(`${API_BASE}/api/tienda/emitir`, {
@@ -601,7 +714,20 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
 
-      toastHOT.success("¡Cobro exitoso y registrado en caja!", { id: toastId });
+      // 🔥 REBAJAR STOCK EN MEMORIA LOCAL PARA QUE SI QUEDA EN 0 DESAPAREZCA DE INMEDIATO
+      setCatalogoBase((prev) =>
+        prev.map((prod) => {
+          let mod = prod;
+          ventasParaEmitir.forEach((v) => {
+            if (String(prod._id || prod.id) === String(v.productId)) {
+              mod = ajustarStockProductoLocal(mod, v.talla, v.ubicacion, -Number(v.totalUnidades || 1));
+            }
+          });
+          return mod;
+        })
+      );
+
+      toastHOT.success("¡Cobro exitoso y stock rebajado!", { id: toastId });
 
       setCarritoVentas([]);
       setProductoSeleccionado(null);
@@ -630,13 +756,41 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     }
   };
 
+  // 🔥 ALERTA CON UBICACIÓN EXACTA AL ANULAR Y DEVOLUCIÓN DE STOCK
   const eliminarRegistroFacturaCaja = (factura) => {
+    const detalleUbicaciones = Array.isArray(factura.ventas)
+      ? factura.ventas.map((v) => {
+          const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+          const talla = v.talla || v.tallasTexto || "U";
+          return `${v.totalUnidades || 1}x ${v.item} (Talla ${talla}) ➔ Devolver a: ${ubi}`;
+        })
+      : [];
+
     toastHOT((t) => (
-      <div className="text-center p-2 text-black font-sans">
-        <p className="font-black text-sm mb-1">¿Anular y quitar esta factura?</p>
-        <p className="text-xs text-zinc-600 mb-3">
-          Se restarán <strong>₡{Number(factura.totalCobrado || 0).toLocaleString("es-CR")}</strong> del arqueo de caja.
+      <div className="text-center p-2.5 text-black font-sans max-w-xs">
+        <div className="flex justify-center text-amber-500 mb-1.5">
+          <FaExclamationTriangle size={22} />
+        </div>
+        <p className="font-black text-sm mb-1 uppercase tracking-wide text-red-600">
+          ¿Anular esta venta?
         </p>
+        <p className="text-xs text-zinc-600 mb-2">
+          Se restarán <strong>₡{Number(factura.totalCobrado || 0).toLocaleString("es-CR")}</strong> de la caja y el stock se sumará de nuevo.
+        </p>
+
+        {detalleUbicaciones.length > 0 && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 mb-3 text-left">
+            <p className="text-[10px] font-black uppercase text-amber-900 mb-1">
+              ⚠️ Atención: Debes devolver o cambiar físicamente la prenda en:
+            </p>
+            {detalleUbicaciones.map((linea, idx) => (
+              <p key={idx} className="text-[11px] font-black text-black leading-snug">
+                • {linea}
+              </p>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2 justify-center">
           <button
             onClick={async () => {
@@ -644,7 +798,23 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               try {
                 const res = await fetch(`${API_BASE}/api/tienda/${factura._id}`, { method: "DELETE" });
                 if (res.ok) {
-                  toastHOT.success("Factura anulada del arqueo.");
+                  // Sumar de vuelta el stock en el estado local de la página
+                  if (Array.isArray(factura.ventas)) {
+                    setCatalogoBase((prev) =>
+                      prev.map((prod) => {
+                        let mod = prod;
+                        factura.ventas.forEach((v) => {
+                          const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+                          const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
+                          if (String(prod._id || prod.id) === String(v.productId)) {
+                            mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
+                          }
+                        });
+                        return mod;
+                      })
+                    );
+                  }
+                  toastHOT.success("Factura anulada y camiseta devuelta al stock.");
                   fetchResumenTienda(selectedDate);
                 }
               } catch (e) {
@@ -653,14 +823,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             }}
             className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
           >
-            Sí, Anular
+            Sí, Anular y Devolver
           </button>
           <button onClick={() => toastHOT.dismiss(t.id)} className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer">
             Cancelar
           </button>
         </div>
       </div>
-    ), { duration: 6000 });
+    ), { duration: 9000 });
   };
 
   const facturasFiltradas = useMemo(() => {
@@ -727,9 +897,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
         </div>
 
-        {/* 💰 TARJETAS DE CAJA CON LOS COLORES SOLICITADOS */}
+        {/* 💰 TARJETAS DE CAJA CON TUS COLORES EXACTOS INTACTOS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* EFECTIVO -> ORANGE-500 */}
+          {/* EFECTIVO */}
           <div className="bg-yellow-50/80 border-2 border-yellow-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Efectivo en Caja</span>
@@ -747,7 +917,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* DATÁFONO -> BLUE-500 */}
+          {/* DATÁFONO */}
           <div className="bg-blue-50/80 border-2 border-blue-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Total en Datáfono</span>
@@ -763,7 +933,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* SINPE -> PURPLE-500 */}
+          {/* SINPE */}
           <div className="bg-purple-50/80 border-2 border-purple-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">Total en SINPE</span>
@@ -779,7 +949,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             </div>
           </div>
 
-          {/* GANANCIA / TOTAL -> AZUL-500 */}
+          {/* GANANCIA / TOTAL */}
           <div className="bg-gradient-to-br from-green-600 to-green-500 text-white border-2 border-green-600 rounded-3xl p-5 shadow-md flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-green-100">Ganancia / Total Día</span>
@@ -809,7 +979,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 Facturar Venta en Mostrador
               </h2>
               <p className="text-xs text-zinc-400 font-bold">
-                Filtra por tipo, busca la prenda, selecciona la talla disponible y emite el comprobante.
+                Filtra por tipo, busca la prenda disponible, selecciona ubicación y talla, y emite el comprobante.
               </p>
             </div>
           </div>
@@ -841,7 +1011,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               </div>
             </div>
 
-            {/* 1. BUSCADOR DE CAMISETAS DE 15 EN 15 CON FOTO MINIMALISTA */}
+            {/* 1. BUSCADOR DE CAMISETAS DE 15 EN 15 CON FOTO MINIMALISTA Y UBICACIÓN */}
             <div className="relative">
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Buscar Camiseta o Artículo *
@@ -866,7 +1036,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 )}
               </div>
 
-              {/* Dropdown de 15 en 15 */}
+              {/* Dropdown de 15 en 15 (Solo con stock > 0) */}
               {mostrarDropdownProductos && resultadosBusqueda.length > 0 && (
                 <div className="absolute left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl z-40 divide-y divide-zinc-100">
                   {resultadosBusqueda.map((p) => {
@@ -896,9 +1066,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                               {nombre} {tipo ? <span className="text-zinc-500 font-bold">({tipo})</span> : ""}
                             </p>
                             <div className="flex flex-wrap gap-1 mt-0.5">
-                              {tallasDisp.map((t) => (
-                                <span key={t.talla} className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[9px] font-bold">
-                                  {t.talla}: {t.stock}
+                              {tallasDisp.map((t, i) => (
+                                <span key={`${t.ubicacion}_${t.talla}_${i}`} className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[9px] font-bold">
+                                  {t.ubicacion} · {t.talla}: {t.stock}
                                 </span>
                               ))}
                             </div>
@@ -915,7 +1085,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               )}
             </div>
 
-            {/* Tarjeta de configuración con selector de tallas reales disponibles */}
+            {/* Tarjeta de configuración con selector de Ubicación (Tienda / Bodega 1 / Bodega 2) y Tallas */}
             {productoSeleccionado && (
               <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between gap-3">
@@ -935,17 +1105,46 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   </button>
                 </div>
 
+                {/* Selector de Ubicación (Tienda, Bodega 1, Bodega 2) */}
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
+                    Ubicación de donde sale la prenda *
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Tienda", "Bodega 1", "Bodega 2"].map((ubi) => {
+                      const tieneEnUbi = ubicacionesConStock.includes(ubi);
+                      const activa = ubicacionSeleccionada === ubi;
+                      return (
+                        <button
+                          key={ubi}
+                          type="button"
+                          onClick={() => cambiarUbicacionSeleccionada(ubi)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                            activa
+                              ? "bg-black text-white border-black shadow-sm"
+                              : tieneEnUbi
+                              ? "bg-white text-gray-800 border-gray-600 hover:border-black"
+                              : "bg-zinc-100 text-zinc-400 border-zinc-200"
+                          }`}
+                        >
+                          {ubi}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Selector de Tallas Disponibles */}
                 <div>
                   <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
-                    Selecciona Talla Disponible *
+                    Selecciona Talla Disponible en {ubicacionSeleccionada} *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {tallasDisponiblesActuales.map((t) => {
                       const activa = tallaSeleccionada === t.talla;
                       return (
                         <button
-                          key={t.talla}
+                          key={`${t.ubicacion}_${t.talla}`}
                           type="button"
                           onClick={() => setTallaSeleccionada(t.talla)}
                           className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
@@ -1001,7 +1200,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         {item.imagen && <img src={item.imagen} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-200 shrink-0" />}
                         <div className="min-w-0">
                           <p className="text-xs font-black text-black truncate">{item.item}</p>
-                          <p className="text-[10px] font-bold text-zinc-500">Cantidad: {item.totalUnidades} · Talla: {item.talla}</p>
+                          <p className="text-[10px] font-bold text-zinc-500">
+                            Cantidad: {item.totalUnidades} · Talla: {item.talla} · Ubicación: <span className="text-black font-black">{item.ubicacion || "Tienda"}</span>
+                          </p>
                         </div>
                       </div>
 
@@ -1184,7 +1385,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
         </div>
 
-        {/* 📋 MINI-HISTORIAL */}
+        {/* 📋 MINI-HISTORIAL CON COLUMNA DE UBICACIÓN (TIENDA, BODEGA 1, BODEGA 2) */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
@@ -1212,6 +1413,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                     <th className="py-3 px-3">Comprobante / Hora</th>
                     <th className="py-3 px-3">Cliente</th>
                     <th className="py-3 px-3">Artículos</th>
+                    <th className="py-3 px-3">Ubicación</th>
                     <th className="py-3 px-3">Método de Pago</th>
                     <th className="py-3 px-3 text-right">Total Cobrado</th>
                     <th className="py-3 px-3 text-right">Acciones</th>
@@ -1238,6 +1440,23 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         ))}
                       </td>
 
+                      {/* 🔥 NUEVA COLUMNA UBICACIÓN (TIENDA, BODEGA 1, BODEGA 2) */}
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          {Array.isArray(f.ventas) && f.ventas.map((v, idx) => {
+                            const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+                            return (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-300 text-black font-black text-[10px] w-fit"
+                              >
+                                {ubi}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+
                       <td className="py-3.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-lg border font-black text-[11px] bg-emerald-100 text-emerald-800 border-emerald-200">
                           {f.metodoPago}
@@ -1255,7 +1474,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                             <span>Reimprimir</span>
                           </button>
 
-                          <button onClick={() => eliminarRegistroFacturaCaja(f)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular factura">
+                          <button onClick={() => eliminarRegistroFacturaCaja(f)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular factura y devolver stock">
                             <FaTrash size={12} />
                           </button>
                         </div>

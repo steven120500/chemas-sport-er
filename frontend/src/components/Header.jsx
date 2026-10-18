@@ -123,9 +123,16 @@ export default function Header({
     { label: "F1", value: "F1" }, 
   ];
 
-  // Verificar si es super admin o el usuario de tienda
-  const usernameLower = String(user?.username || user?.name || user?.firstName || "").toLowerCase();
-  const esAdminTienda = isSuperUser || usernameLower.includes("tienda") || user?.role === "tienda" || user?.rol === "tienda";
+  // 🔥 IDENTIFICAR SI ES EL USUARIO "TIENDA" O SUPER ADMIN 🔥
+  const usernameLower = String(user?.username || user?.name || user?.firstName || "").trim().toLowerCase();
+  const esSoloUsuarioTienda = !isSuperUser && (
+    usernameLower === "tienda" || 
+    usernameLower.includes("tienda") || 
+    user?.role === "tienda" || 
+    user?.rol === "tienda" ||
+    user?.roles?.includes("tienda")
+  );
+  const esAdminTienda = isSuperUser || esSoloUsuarioTienda;
 
   return (
     <header
@@ -258,7 +265,7 @@ export default function Header({
 
                   <nav className="space-y-2.5">
                     
-                    {/* 🔥 BOTÓN TIENDA FÍSICA (EXCLUSIVO PARA SUPER ADMIN O USUARIO TIENDA) 🔥 */}
+                    {/* 🔥 1. BOTÓN TIENDA FÍSICA (PARA USUARIO TIENDA Y SUPER ADMIN) 🔥 */}
                     {esAdminTienda && (
                       <button
                         onClick={() => {
@@ -275,67 +282,73 @@ export default function Header({
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        navigate('/comisiones');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FaPercentage size={15} className="text-yellow-500 transition-colors" />
-                        <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
-                      </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                    </button>
+                    {/* 🔥 ESTAS FUNCIONES SE OCULTAN SI ES EL USUARIO "TIENDA" 🔥 */}
+                    {!esSoloUsuarioTienda && (
+                      <>
+                        <button
+                          onClick={() => {
+                            navigate('/comisiones');
+                            setSidebarOpen(false);
+                          }}
+                          className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FaPercentage size={15} className="text-yellow-500 transition-colors" />
+                            <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
+                          </div>
+                          <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                        </button>
 
-                    <button
-                      onClick={() => {
-                        navigate('/guias');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FaTruck size={15} className="text-yellow-500 transition-colors" />
-                        <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
-                      </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                    </button>
+                        <button
+                          onClick={() => {
+                            navigate('/guias');
+                            setSidebarOpen(false);
+                          }}
+                          className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FaTruck size={15} className="text-yellow-500 transition-colors" />
+                            <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
+                          </div>
+                          <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                        </button>
 
-                    {(isSuperUser || canSeeHistory || user?.roles?.includes("add")) && (
-                      <button
-                        onClick={() => {
-                          setShowRegisterUserModal(true);
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FaUserPlus size={16} className="text-yellow-500 transition-colors" />
-                          <span className="group-hover:text-yellow-400 transition-colors">Agregar usuario</span>
-                        </div>
-                        <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                      </button>
+                        {(isSuperUser || user?.roles?.includes("add")) && (
+                          <button
+                            onClick={() => {
+                              setShowRegisterUserModal(true);
+                              setSidebarOpen(false);
+                            }}
+                            className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FaUserPlus size={16} className="text-yellow-500 transition-colors" />
+                              <span className="group-hover:text-yellow-400 transition-colors">Agregar usuario</span>
+                            </div>
+                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                          </button>
+                        )}
+
+                        {(isSuperUser || user?.roles?.includes("view_users")) && (
+                          <button
+                            onClick={() => {
+                              setShowUserListModal(true);
+                              setSidebarOpen(false);
+                            }}
+                            className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FaUsers size={16} className="text-yellow-500 transition-colors" />
+                              <span className="group-hover:text-yellow-400 transition-colors">Ver usuarios</span>
+                            </div>
+                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                          </button>
+                        )}
+                      </>
                     )}
 
-                    {(isSuperUser || canSeeHistory || user?.roles?.includes("view_users")) && (
-                      <button
-                        onClick={() => {
-                          setShowUserListModal(true);
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FaUsers size={16} className="text-yellow-500 transition-colors" />
-                          <span className="group-hover:text-yellow-400 transition-colors">Ver usuarios</span>
-                        </div>
-                        <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                      </button>
-                    )}
-
-                    {(isSuperUser || canSeeHistory || user?.roles?.includes("history")) && (
+                    {/* 🔥 2. BOTÓN HISTORIAL (VISIBLE PARA USUARIO TIENDA, SUPER ADMIN O CON PERMISO HISTORY) 🔥 */}
+                    {(isSuperUser || esSoloUsuarioTienda || canSeeHistory || user?.roles?.includes("history")) && (
                       <button
                         onClick={() => {
                           setShowHistoryModal(true);
