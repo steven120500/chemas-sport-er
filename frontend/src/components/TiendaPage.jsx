@@ -55,6 +55,7 @@ function getProductPrice(p) {
 
 function getProductThumb(p) {
   if (!p) return "";
+  if (typeof p.imageSrc === "string" && p.imageSrc) return p.imageSrc;
   if (typeof p.image === "string" && p.image) return p.image;
   if (typeof p.imageUrl === "string" && p.imageUrl) return p.imageUrl;
   if (typeof p.img === "string" && p.img) return p.img;
@@ -65,119 +66,53 @@ function getProductThumb(p) {
   return "";
 }
 
-// 🔥 EXTRAE TODAS LAS TALLAS CON STOCK > 0 INDICANDO EN QUÉ UBICACIÓN ESTÁN (Tienda, Bodega 1, Bodega 2)
+// 🔥 LEE EXACTAMENTE LOS CAMPOS tienda, stock (Bodega 1) y bodega (Bodega 2)
 function getAvailableSizes(p) {
-  if (!p) return [];
+  if (!p || typeof p !== "object") return [];
   const lista = [];
 
-  const agregarDeObjeto = (obj, nombreUbicacion) => {
-    if (!obj || typeof obj !== "object") return;
-    if (Array.isArray(obj)) {
-      obj.forEach((item) => {
-        if (item && typeof item === "object") {
-          const t = String(item.size || item.talla || item.name || "").trim().toUpperCase();
-          const c = Number(item.quantity ?? item.stock ?? item.count ?? item.cantidad ?? 0);
-          if (t && c > 0) {
-            lista.push({ talla: t, stock: c, ubicacion: nombreUbicacion });
-          }
-        }
-      });
-      return;
-    }
-
-    Object.entries(obj).forEach(([key, val]) => {
-      const t = String(key).trim().toUpperCase();
-      if (!t || t === "_ID") return;
-
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        const cTienda = Number(val.tienda ?? 0);
-        const cB1 = Number(val.bodega1 ?? val.store1 ?? 0);
-        const cB2 = Number(val.bodega2 ?? val.store2 ?? 0);
-
-        if (cTienda > 0) lista.push({ talla: t, stock: cTienda, ubicacion: "Tienda" });
-        if (cB1 > 0) lista.push({ talla: t, stock: cB1, ubicacion: "Bodega 1" });
-        if (cB2 > 0) lista.push({ talla: t, stock: cB2, ubicacion: "Bodega 2" });
-
-        if (cTienda === 0 && cB1 === 0 && cB2 === 0) {
-          const cGen = Number(val.total ?? val.stock ?? val.quantity ?? 0);
-          if (cGen > 0) lista.push({ talla: t, stock: cGen, ubicacion: nombreUbicacion });
-        }
-      } else {
-        const cant = Number(val);
-        if (!isNaN(cant) && cant > 0) {
-          lista.push({ talla: t, stock: cant, ubicacion: nombreUbicacion });
-        }
+  const leerMapa = (mapa, nombreUbicacion) => {
+    if (!mapa || typeof mapa !== "object" || Array.isArray(mapa)) return;
+    Object.entries(mapa).forEach(([tallaRaw, cantRaw]) => {
+      const t = String(tallaRaw || "").trim().toUpperCase();
+      const c = Number(cantRaw);
+      if (t && Number.isFinite(c) && c > 0) {
+        lista.push({ talla: t, stock: Math.trunc(c), ubicacion: nombreUbicacion });
       }
     });
   };
 
-  const tieneSeparados = Boolean(
-    p.sizesTienda || p.tiendaSizes || p.sizesBodega1 || p.bodega1 || p.store1 || p.sizesBodega2 || p.bodega2 || p.store2
-  );
+  leerMapa(p.tienda, "Tienda");
+  leerMapa(p.stock, "Bodega 1");
+  leerMapa(p.bodega, "Bodega 2");
 
-  if (tieneSeparados) {
-    agregarDeObjeto(p.sizesTienda || p.tiendaSizes || p.sizes, "Tienda");
-    agregarDeObjeto(p.sizesBodega1 || p.bodega1 || p.store1, "Bodega 1");
-    agregarDeObjeto(p.sizesBodega2 || p.bodega2 || p.store2, "Bodega 2");
-  } else {
-    agregarDeObjeto(p.sizes || p.tallas || p.stock, "Tienda");
-  }
-
-  // Unificar por (ubicacion + talla) para evitar duplicados
-  const mapaUnico = new Map();
-  lista.forEach((item) => {
-    const k = `${item.ubicacion}_${item.talla}`;
-    if (!mapaUnico.has(k)) {
-      mapaUnico.set(k, { ...item });
-    }
-  });
-
-  const disponibles = Array.from(mapaUnico.values());
-  if (disponibles.length > 0) return disponibles;
-
-  const tipo = String(p.type || p.tipo || "").toLowerCase();
-  const stockGeneral = Number(p.totalStock ?? p.quantity ?? p.countInStock ?? 0);
-  if ((tipo.includes("llavero") || tipo.includes("balon") || tipo.includes("balón")) && stockGeneral > 0) {
-    return [{ talla: "Única", stock: stockGeneral, ubicacion: "Tienda" }];
-  }
-
-  return [];
+  return lista;
 }
 
-// Función local para actualizar el stock en memoria inmediatamente al facturar o anular
+// Actualiza en memoria local al facturar o anular
 function ajustarStockProductoLocal(prod, tallaBuscada, ubicacionBuscada, deltaCantidad) {
   if (!prod) return prod;
   const copia = JSON.parse(JSON.stringify(prod));
-  const tUpper = String(tallaBuscada || "").trim().toUpperCase();
+  const tUpper = String(tallaBuscada || "").replace(/^\d+x\s*/i, "").trim().toUpperCase();
   const ubiNorm = limpiarTexto(ubicacionBuscada || "Tienda");
 
-  let campo = "sizes";
-  if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1")) {
-    if (copia.sizesBodega1) campo = "sizesBodega1";
-    else if (copia.bodega1) campo = "bodega1";
-    else if (copia.store1) campo = "store1";
-  } else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2")) {
-    if (copia.sizesBodega2) campo = "sizesBodega2";
-    else if (copia.bodega2) campo = "bodega2";
-    else if (copia.store2) campo = "store2";
+  let campo = "tienda";
+  if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1") || ubiNorm === "stock") {
+    campo = "stock";
+  } else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2") || ubiNorm === "bodega") {
+    campo = "bodega";
   } else {
-    if (copia.sizesTienda) campo = "sizesTienda";
-    else campo = "sizes";
+    campo = "tienda";
   }
 
-  if (copia[campo] && typeof copia[campo] === "object" && !Array.isArray(copia[campo])) {
-    const realKey = Object.keys(copia[campo]).find((k) => k.trim().toUpperCase() === tUpper) || tUpper;
-    const valActual = copia[campo][realKey];
-
-    if (valActual && typeof valActual === "object") {
-      let sub = "tienda";
-      if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1")) sub = "bodega1";
-      else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2")) sub = "bodega2";
-      copia[campo][realKey][sub] = Math.max(0, Number(valActual[sub] || 0) + deltaCantidad);
-    } else {
-      copia[campo][realKey] = Math.max(0, Number(valActual || 0) + deltaCantidad);
-    }
+  if (!copia[campo] || typeof copia[campo] !== "object") {
+    copia[campo] = {};
   }
+
+  const realKey = Object.keys(copia[campo]).find((k) => k.trim().toUpperCase() === tUpper) || tUpper;
+  const valActual = Number(copia[campo][realKey] || 0);
+  copia[campo][realKey] = Math.max(0, Math.trunc(valActual + Number(deltaCantidad)));
+
   return copia;
 }
 
@@ -189,7 +124,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     try { return Number(localStorage.getItem("chemasport_tienda_fondo_caja") || 0); } catch { return 0; }
   });
 
-  // Catálogo y filtros por tipo
   const [catalogoBase, setCatalogoBase] = useState([]);
   const [tipoFiltroSeleccionado, setTipoFiltroSeleccionado] = useState("Todos");
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -197,23 +131,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
   const [mostrarDropdownProductos, setMostrarDropdownProductos] = useState(false);
 
-  // Producto seleccionado, ubicación y talla
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState("Tienda");
   const [tallaSeleccionada, setTallaSeleccionada] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState(1);
   const [precioUnitarioInput, setPrecioUnitarioInput] = useState("");
 
-  // Carrito
   const [carritoVentas, setCarritoVentas] = useState([]);
 
-  // Arqueo e historial
   const [facturasEmitidas, setFacturasEmitidas] = useState([]);
   const [resumenCaja, setResumenCaja] = useState({ efectivo: 0, datafono: 0, sinpe: 0, total: 0, cantidadFacturas: 0 });
   const [searchHistorialFilter, setSearchHistorialFilter] = useState("");
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
 
-  // Contactos Alegra y Favoritos
   const [contactosAlegra, setContactosAlegra] = useState([]);
   const [mostrarListaContactos, setMostrarListaContactos] = useState(false);
   const [favoritosIds, setFavoritosIds] = useState(() => {
@@ -258,27 +188,35 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     try { localStorage.setItem("chemasport_tienda_fondo_caja", String(num)); } catch (e) {}
   };
 
-  // Cargar lote inicial
   useEffect(() => {
-    const cargarInicial = async () => {
+    let cancelado = false;
+    const cargarTodoElCatalogo = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/products?page=1&limit=250`, {
-          headers: { "x-admin": "true" }
-        });
-        if (res.ok) {
+        let pageN = 1;
+        const pageSize = 100;
+        const acc = [];
+        while (true) {
+          const res = await fetch(`${API_BASE}/api/products?page=${pageN}&limit=${pageSize}&t=${Date.now()}`, {
+            headers: { "x-admin": "true" },
+            cache: "no-store"
+          });
+          if (!res.ok) break;
           const data = await res.json();
-          const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-          setCatalogoBase(items);
+          const items = Array.isArray(data?.items) ? data.items : [];
+          acc.push(...items);
+          if (!data.total || acc.length >= data.total || items.length === 0) break;
+          pageN += 1;
         }
+        if (!cancelado) setCatalogoBase(acc);
       } catch (err) {
-        console.error("Error cargando base inicial:", err);
+        console.error("Error cargando catálogo:", err);
       }
     };
-    cargarInicial();
+    cargarTodoElCatalogo();
     cargarContactosAlegra("");
+    return () => { cancelado = true; };
   }, []);
 
-  // Tipos disponibles para filtrar (solo de prendas con stock)
   const tiposDisponibles = useMemo(() => {
     const setTipos = new Set(["Todos"]);
     catalogoBase.forEach((p) => {
@@ -289,12 +227,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     return Array.from(setTipos);
   }, [catalogoBase]);
 
-  // 🔥 BUSCADOR CON FILTRO POR TIPO, DE 15 EN 15 Y OCULTANDO LAS AGOTADAS
+  // Buscador con filtro por tipo, de 15 en 15 y ocultando las agotadas
   useEffect(() => {
     const q = busquedaProducto.trim();
     
-    let filtrados = catalogoBase.filter((p) => {
-      // Si está agotada (0 tallas disponibles), NO aparece
+    const filtrados = catalogoBase.filter((p) => {
       if (getAvailableSizes(p).length === 0) return false;
 
       if (tipoFiltroSeleccionado !== "Todos") {
@@ -314,7 +251,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const timer = setTimeout(async () => {
       setBuscandoProductos(true);
       try {
-        const params = new URLSearchParams({ page: "1", limit: "25", q });
+        const params = new URLSearchParams({ page: "1", limit: "30", q });
         if (tipoFiltroSeleccionado !== "Todos") params.set("type", tipoFiltroSeleccionado);
 
         const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
@@ -322,8 +259,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         });
         if (res.ok) {
           const data = await res.json();
-          const remotos = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-          // Filtramos también los remotos para que NUNCA muestre agotadas
+          const remotos = Array.isArray(data?.items) ? data.items : [];
           const remotosConStock = remotos.filter((p) => getAvailableSizes(p).length > 0);
           if (remotosConStock.length > 0) setResultadosBusqueda(remotosConStock.slice(0, 15));
         }
@@ -409,21 +345,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     fetchResumenTienda(selectedDate);
   }, [selectedDate, nombreUsuarioActual]);
 
-  // Todas las tallas y ubicaciones disponibles del producto seleccionado
   const todasTallasDelProducto = useMemo(() => {
     return getAvailableSizes(productoSeleccionado);
   }, [productoSeleccionado]);
 
-  // Ubicaciones que tienen al menos 1 prenda en stock para este producto
+  // 🔥 SOLO LAS UBICACIONES QUE TIENEN UNIDADES > 0
   const ubicacionesConStock = useMemo(() => {
-    const ubis = [...new Set(todasTallasDelProducto.map((x) => x.ubicacion))];
-    return ubis.length > 0 ? ubis : ["Tienda", "Bodega 1", "Bodega 2"];
+    const orden = ["Tienda", "Bodega 1", "Bodega 2"];
+    const disponiblesSet = new Set(todasTallasDelProducto.map((x) => x.ubicacion));
+    return orden.filter((ubi) => disponiblesSet.has(ubi));
   }, [todasTallasDelProducto]);
 
-  // Tallas disponibles filtradas por la ubicación elegida
   const tallasDisponiblesActuales = useMemo(() => {
-    const porUbi = todasTallasDelProducto.filter((x) => x.ubicacion === ubicacionSeleccionada);
-    return porUbi.length > 0 ? porUbi : todasTallasDelProducto;
+    return todasTallasDelProducto.filter((x) => x.ubicacion === ubicacionSeleccionada);
   }, [todasTallasDelProducto, ubicacionSeleccionada]);
 
   const seleccionarProductoBusqueda = (prod) => {
@@ -432,10 +366,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setBusquedaProducto("");
 
     const disponibles = getAvailableSizes(prod);
-    const ubiInicial = disponibles[0]?.ubicacion || "Tienda";
-    setUbicacionSeleccionada(ubiInicial);
-    const tallasDeUbi = disponibles.filter((d) => d.ubicacion === ubiInicial);
-    setTallaSeleccionada((tallasDeUbi[0] || disponibles[0])?.talla || "");
+    const orden = ["Tienda", "Bodega 1", "Bodega 2"];
+    const primeraUbicacionConStock = orden.find((u) => disponibles.some((d) => d.ubicacion === u)) || disponibles[0]?.ubicacion || "Tienda";
+
+    setUbicacionSeleccionada(primeraUbicacionConStock);
+    const tallasDeUbi = disponibles.filter((d) => d.ubicacion === primeraUbicacionConStock);
+    setTallaSeleccionada(tallasDeUbi[0]?.talla || "");
     setCantidadVenta(1);
     setPrecioUnitarioInput(String(getProductPrice(prod)));
   };
@@ -478,9 +414,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       ? `${nombreBase} (${tipoCat})`
       : nombreBase;
 
+    const pid = String(productoSeleccionado._id || productoSeleccionado.id || "");
+
     const nuevoItem = {
-      uid: `${productoSeleccionado._id || productoSeleccionado.id}_${ubicacionSeleccionada}_${tallaSeleccionada}_${Date.now()}`,
-      productId: productoSeleccionado._id || productoSeleccionado.id || null,
+      uid: `${pid}_${ubicacionSeleccionada}_${tallaSeleccionada}_${Date.now()}`,
+      productId: pid,
       item: nombreCompleto,
       imagen: getProductThumb(productoSeleccionado),
       talla: tallaSeleccionada,
@@ -617,10 +555,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const nombreCompleto = tipoCat && !nombreBase.includes(`(${tipoCat})`)
         ? `${nombreBase} (${tipoCat})`
         : nombreBase;
+      const pid = String(productoSeleccionado._id || productoSeleccionado.id || "");
 
       return [{
         uid: "temp_1",
-        productId: productoSeleccionado._id || productoSeleccionado.id || null,
+        productId: pid,
         item: nombreCompleto,
         talla: tallaSeleccionada,
         ubicacion: ubicacionSeleccionada,
@@ -714,7 +653,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
 
-      // 🔥 REBAJAR STOCK EN MEMORIA LOCAL PARA QUE SI QUEDA EN 0 DESAPAREZCA DE INMEDIATO
+      // 🔥 REBAJAR STOCK EN MEMORIA LOCAL EN EL CAMPO EXACTO (tienda / stock / bodega)
       setCatalogoBase((prev) =>
         prev.map((prod) => {
           let mod = prod;
@@ -798,7 +737,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               try {
                 const res = await fetch(`${API_BASE}/api/tienda/${factura._id}`, { method: "DELETE" });
                 if (res.ok) {
-                  // Sumar de vuelta el stock en el estado local de la página
                   if (Array.isArray(factura.ventas)) {
                     setCatalogoBase((prev) =>
                       prev.map((prod) => {

@@ -1,6 +1,7 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import TiendaFactura from '../models/TiendaFactura.js';
+import Product from '../models/Product.js';
+import History from '../models/History.js';
 
 const router = express.Router();
 
@@ -30,87 +31,126 @@ function getHoyYMD() {
 }
 
 /* ========================================================
-   📦 FUNCIÓN INTELIGENTE PARA REBAJAR O DEVOLVER STOCK POR UBICACIÓN
+   📦 FUNCIÓN OFICIAL PARA REBAJAR O DEVOLVER STOCK EN PRODUCT
+   - "Tienda"   -> product.tienda
+   - "Bodega 1" -> product.stock
+   - "Bodega 2" -> product.bodega
    delta = -1 (rebajar al vender) | +1 (devolver al anular)
    ======================================================== */
-async function ajustarStockPorUbicacion({ productId, talla, ubicacion = "Tienda", cantidad = 1, delta = -1, io = null }) {
+async function ajustarStockPorUbicacion({
+  productId,
+  itemNombre = "",
+  talla,
+  ubicacion = "Tienda",
+  cantidad = 1,
+  delta = -1,
+  vendedor = "Tienda",
+  nombreCliente = "Cliente Tienda",
+  crearHistorial = false,
+  io = null
+}) {
   try {
-    if (!productId || !talla) return null;
-    const db = mongoose.connection?.db;
-    if (!db) return null;
+    if (!talla) return { product: null, historyId: null };
 
-    const col = db.collection('products');
-    let queryId = null;
-    if (mongoose.Types.ObjectId.isValid(String(productId))) {
-      queryId = new mongoose.Types.ObjectId(String(productId));
-    } else {
-      return null;
+    let product = null;
+    if (productId) {
+      try {
+        product = await Product.findById(productId);
+      } catch {}
     }
 
-    const prod = await col.findOne({ _id: queryId });
-    if (!prod) return null;
+    if (!product && itemNombre) {
+      let nameQuery = String(itemNombre).trim();
+      let typeQuery = null;
+      const lastParen = nameQuery.lastIndexOf("(");
+      if (lastParen !== -1) {
+        typeQuery = nameQuery.substring(lastParen + 1, nameQuery.length - 1).trim();
+        nameQuery = nameQuery.substring(0, lastParen).trim();
+      }
+      const escapedName = nameQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const queryExact = { name: new RegExp(`^${escapedName}$`, "i") };
+      if (typeQuery) queryExact.type = new RegExp(`^${typeQuery}$`, "i");
+      product = await Product.findOne(queryExact);
+      if (!product) {
+        product = await Product.findOne({ name: new RegExp(escapedName, "i") });
+      }
+    }
 
-    const tallaKey = String(talla).trim();
+    if (!product) return { product: null, historyId: null };
+
+    const tallaLimpia = String(talla).replace(/^\d+x\s*/i, "").trim().toUpperCase();
     const ubiNorm = limpiarTexto(ubicacion);
-    const cambio = Number(cantidad) * Number(delta); // Ej: 1 * -1 = -1 (rebaja) | 1 * 1 = +1 (devuelve)
 
-    // Determinar en qué campo de tu documento Product está guardada esa ubicación
-    let campoObjeto = "sizes"; // Por defecto Tienda principal usa "sizes"
-    if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1") || ubiNorm.includes("tienda 1")) {
-      if (prod.sizesBodega1 && typeof prod.sizesBodega1 === "object") campoObjeto = "sizesBodega1";
-      else if (prod.bodega1 && typeof prod.bodega1 === "object") campoObjeto = "bodega1";
-      else if (prod.store1 && typeof prod.store1 === "object") campoObjeto = "store1";
-    } else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2") || ubiNorm.includes("tienda 2")) {
-      if (prod.sizesBodega2 && typeof prod.sizesBodega2 === "object") campoObjeto = "sizesBodega2";
-      else if (prod.bodega2 && typeof prod.bodega2 === "object") campoObjeto = "bodega2";
-      else if (prod.store2 && typeof prod.store2 === "object") campoObjeto = "store2";
+    let campoDB = "tienda";
+    let etiquetaHistorial = "Tienda";
+
+    if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1") || ubiNorm === "stock") {
+      campoDB = "stock";
+      etiquetaHistorial = "Bodega 1";
+    } else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2") || ubiNorm === "bodega") {
+      campoDB = "bodega";
+      etiquetaHistorial = "Bodega 2";
     } else {
-      if (prod.sizesTienda && typeof prod.sizesTienda === "object") campoObjeto = "sizesTienda";
-      else campoObjeto = "sizes";
+      campoDB = "tienda";
+      etiquetaHistorial = "Tienda";
     }
 
-    const objActual = { ...(prod[campoObjeto] || {}) };
+    const objUbicacion = { ...(product[campoDB] || {}) };
+    const claveReal = Object.keys(objUbicacion).find(
+      (k) => k.trim().toUpperCase() === tallaLimpia
+    ) || tallaLimpia;
 
-    // Buscar la clave exacta de la talla ignorando mayúsculas/minúsculas
-    const claveReal = Object.keys(objActual).find(
-      (k) => k.trim().toUpperCase() === tallaKey.toUpperCase()
-    ) || tallaKey.toUpperCase();
+    const antes = Number(objUbicacion[claveReal] ?? 0);
+    const cambio = Number(cantidad) * Number(delta);
+    const despues = Math.max(0, Math.trunc(antes + cambio));
 
-    const valorViejo = objActual[claveReal];
+    objUbicacion[claveReal] = despues;
+    product[campoDB] = objUbicacion;
+    product.markModified(campoDB);
 
-    // Caso A: El valor de la talla es un sub-objeto { tienda: X, bodega1: Y, bodega2: Z }
-    if (valorViejo && typeof valorViejo === "object" && !Array.isArray(valorViejo)) {
-      let subKey = "tienda";
-      if (ubiNorm.includes("bodega 1") || ubiNorm.includes("bodega1")) subKey = "bodega1";
-      else if (ubiNorm.includes("bodega 2") || ubiNorm.includes("bodega2")) subKey = "bodega2";
-
-      const actualSub = Number(valorViejo[subKey] || 0);
-      const nuevoSub = Math.max(0, actualSub + cambio);
-      objActual[claveReal] = { ...valorViejo, [subKey]: nuevoSub };
-    } 
-    // Caso B: El valor de la talla es directamente el número (ej: sizes: { M: 3 })
-    else {
-      const actualNum = Number(valorViejo || 0);
-      const nuevoNum = Math.max(0, actualNum + cambio);
-      objActual[claveReal] = nuevoNum;
+    if (delta < 0 && antes > despues) {
+      const restadas = antes - despues;
+      if (!Array.isArray(product.popularCountHistory)) {
+        product.popularCountHistory = [];
+      }
+      product.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
+      const now = new Date();
+      const totalMonth = product.popularCountHistory
+        .filter((entry) => {
+          const d = new Date(entry.date);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        })
+        .reduce((sum, e) => sum + Number(e.quantity || 0), 0);
+      product.isPopular = totalMonth >= 10;
     }
 
-    await col.updateOne(
-      { _id: queryId },
-      { $set: { [campoObjeto]: objActual, updatedAt: new Date() } }
-    );
+    await product.save();
 
-    const productoActualizado = await col.findOne({ _id: queryId });
-
-    // Emitir por WebSocket para que todas las pantallas vean el stock actualizado al instante
-    if (io && productoActualizado) {
-      io.emit('productoActualizado', productoActualizado);
+    let historyDoc = null;
+    if (crearHistorial && delta < 0) {
+      const detalleText = `👤 Cliente: ${nombreCliente || "Cliente Tienda"} | [ID:${product._id}] | ${etiquetaHistorial}[${claveReal}]: ${antes} → ${despues}`;
+      historyDoc = await History.create({
+        productId: product._id,
+        user: vendedor || "Tienda",
+        action: "vendió / rebajó stock",
+        item: `${product.name} (${product.type})`,
+        date: new Date(),
+        details: detalleText
+      });
     }
 
-    return productoActualizado;
+    const updatedObj = product.toObject();
+    if (io) {
+      io.emit('productoActualizado', updatedObj);
+    }
+
+    return {
+      product: updatedObj,
+      historyId: historyDoc ? String(historyDoc._id) : null
+    };
   } catch (err) {
     console.error("⚠️ Error ajustando stock en Tienda:", err);
-    return null;
+    return { product: null, historyId: null };
   }
 }
 
@@ -191,9 +231,6 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   return { idAlegra: idEnAlegra, nombreProductoAlegra, precioBase };
 }
 
-/* ========================================================
-   📊 1. OBTENER ARQUEO DE CAJA Y MINI-HISTORIAL DE LA TIENDA
-   ======================================================== */
 router.get('/resumen', async (req, res) => {
   try {
     const fecha = String(req.query.fecha || getHoyYMD()).trim();
@@ -228,9 +265,6 @@ router.get('/resumen', async (req, res) => {
   }
 });
 
-/* ========================================================
-   🧾 2. EMITIR FACTURA DESDE TIENDA, REBAJAR STOCK Y REGISTRAR EN CAJA
-   ======================================================== */
 router.post('/emitir', async (req, res) => {
   try {
     const {
@@ -242,7 +276,7 @@ router.post('/emitir', async (req, res) => {
       email,
       telefono,
       tipoIdentificacion = "01",
-      metodoPago = "Efectivo", // "Efectivo" | "Datáfono" | "SINPE" | "Mixto"
+      metodoPago = "Efectivo",
       montoEfectivo = 0,
       montoDatafono = 0,
       montoSinpe = 0,
@@ -259,7 +293,6 @@ router.post('/emitir', async (req, res) => {
     const cedulaLimpiada = cedula ? String(cedula).replace(/\D/g, "") : "";
     const telefonoLimpiado = telefono ? String(telefono).replace(/\D/g, "") : "";
 
-    // 1. Buscar o crear cliente en Alegra
     if (cedulaLimpiada !== "") {
       let tipoAlegra = "CF";
       if (tipoIdentificacion === "02") tipoAlegra = "CJ";
@@ -309,7 +342,6 @@ router.post('/emitir', async (req, res) => {
       }
     }
 
-    // 2. Impuesto Exento
     let idImpuestoExento = cacheImpuestoExentoId || 2;
     if (!cacheImpuestoExentoId) {
       try {
@@ -327,7 +359,6 @@ router.post('/emitir', async (req, res) => {
       } catch (e) {}
     }
 
-    // 3. Armar líneas de productos para Alegra
     const mapaProductos = await obtenerMapaProductosAlegra(credentials);
     const lineasPreliminares = [];
     let sumaPreciosTabla = 0;
@@ -398,8 +429,6 @@ router.post('/emitir', async (req, res) => {
     totalFactura = Number(totalFactura.toFixed(2));
     const fechaActual = new Date().toISOString().split('T')[0];
 
-    // 🔥 CORRECCIÓN DATÁFONO EN ALEGRA CR:
-    // Alegra Costa Rica usa "CARD" para tarjeta/datáfono ("CREDIT_CARD" da error 400 en v4.3).
     let paymentMethodAlegra = "CASH";
     if (metodoPago === "Datáfono") paymentMethodAlegra = "CARD";
     else if (metodoPago === "SINPE" || metodoPago === "Mixto") paymentMethodAlegra = "TRANSFER";
@@ -432,9 +461,7 @@ router.post('/emitir', async (req, res) => {
 
     let alegraData = await alegraResponse.json();
 
-    // 🔥 RESPALDO AUTOMÁTICO: Si por configuración de cuenta en Alegra "CARD" rebota, reintenta con "TRANSFER" sin fallar
     if (!alegraResponse.ok && metodoPago === "Datáfono") {
-      console.warn("⚠️ Reintentando emisión de Datáfono con código compatible en Alegra...");
       alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
         method: "POST",
         headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
@@ -447,7 +474,6 @@ router.post('/emitir', async (req, res) => {
       return res.status(400).json({ error: alegraData.message || "Error al generar factura en Alegra." });
     }
 
-    // Forzar timbrado si es Hacienda
     if (tipo === "hacienda" && alegraData.id && (!alegraData.stamp || alegraData.stamp.legalStatus === "NOT_SENT")) {
       try {
         await fetch(`https://api.alegra.com/api/v1/invoices/stamp`, {
@@ -458,7 +484,6 @@ router.post('/emitir', async (req, res) => {
       } catch (e) {}
     }
 
-    // Enviar por correo desde Alegra
     let correoEnviado = false;
     if (correoLimpio && alegraData.id) {
       try {
@@ -479,39 +504,40 @@ router.post('/emitir', async (req, res) => {
       ? alegraData.numberTemplate.fullNumber
       : String(alegraData.id);
 
-    // 🔥 4. REBAJAR AUTOMÁTICAMENTE DEL INVENTARIO CADA PRENDA VENDIDA EN SU UBICACIÓN CORRESPONDIENTE
+    // 🔥 REBAJAR STOCK
     const io = req.app.get('io');
-    for (const v of ventas) {
-      if (v.productId) {
-        const ubicacionVenta = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
-        const tallaVenta = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
-        const cantVenta = Number(v.totalUnidades) || 1;
+    const historyIdsCreados = [];
 
-        if (tallaVenta) {
-          await ajustarStockPorUbicacion({
-            productId: v.productId,
-            talla: tallaVenta,
-            ubicacion: ubicacionVenta,
-            cantidad: cantVenta,
-            delta: -1, // Rebajar del stock
-            io
-          });
+    for (const v of ventas) {
+      const ubicacionVenta = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+      const tallaVenta = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
+      const cantVenta = Number(v.totalUnidades) || 1;
+
+      if (tallaVenta && !String(v.item || "").toLowerCase().includes("envio gam")) {
+        const resultado = await ajustarStockPorUbicacion({
+          productId: v.productId,
+          itemNombre: v.item,
+          talla: tallaVenta,
+          ubicacion: ubicacionVenta,
+          cantidad: cantVenta,
+          delta: -1,
+          vendedor: v.vendedor || "Tienda",
+          nombreCliente: nombreCliente || "Cliente Tienda",
+          crearHistorial: true,
+          io
+        });
+
+        if (resultado.historyId) {
+          historyIdsCreados.push(resultado.historyId);
         }
       }
     }
 
-    // 5. Calcular desglose exacto para la caja de la tienda
-    let efec = 0;
-    let dataf = 0;
-    let sinp = 0;
-
-    if (metodoPago === "Efectivo") {
-      efec = totalFactura;
-    } else if (metodoPago === "Datáfono") {
-      dataf = totalFactura;
-    } else if (metodoPago === "SINPE") {
-      sinp = totalFactura;
-    } else if (metodoPago === "Mixto") {
+    let efec = 0, dataf = 0, sinp = 0;
+    if (metodoPago === "Efectivo") efec = totalFactura;
+    else if (metodoPago === "Datáfono") dataf = totalFactura;
+    else if (metodoPago === "SINPE") sinp = totalFactura;
+    else if (metodoPago === "Mixto") {
       efec = Number(montoEfectivo) || 0;
       dataf = Number(montoDatafono) || 0;
       sinp = Number(montoSinpe) || 0;
@@ -520,11 +546,7 @@ router.post('/emitir', async (req, res) => {
     const ahora = new Date();
     const diaRegistro = fechaYMD || getHoyYMD();
     const fechaHoraStr = ahora.toLocaleString("es-CR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
     });
 
     const nuevaFacturaTienda = await TiendaFactura.create({
@@ -547,7 +569,7 @@ router.post('/emitir', async (req, res) => {
       totalCobrado: totalFactura,
       ventas,
       vendedor: ventas[0]?.vendedor || "Tienda",
-      historyIds: ventas.map(v => String(v._id || "")).filter(Boolean)
+      historyIds: historyIdsCreados
     });
 
     return res.status(200).json({
@@ -563,34 +585,29 @@ router.post('/emitir', async (req, res) => {
   }
 });
 
-/* ========================================================
-   🗑️ 3. ANULAR FACTURA DE TIENDA Y DEVOLVER CAMISETAS A SU UBICACIÓN
-   ======================================================== */
 router.delete('/:id', async (req, res) => {
   try {
     const factura = await TiendaFactura.findById(req.params.id);
-    if (!factura) {
-      return res.status(404).json({ error: "Registro no encontrado." });
-    }
+    if (!factura) return res.status(404).json({ error: "Registro no encontrado." });
 
     const io = req.app.get('io');
     const devoluciones = [];
 
-    // Devolver cada camiseta al stock de su ubicación original (Tienda, Bodega 1 o Bodega 2)
     if (Array.isArray(factura.ventas)) {
       for (const v of factura.ventas) {
-        if (v && v.productId) {
+        if (v && (v.productId || v.item)) {
           const ubicacionOrigen = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
           const tallaOrigen = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
           const cantOrigen = Number(v.totalUnidades) || 1;
 
-          if (tallaOrigen) {
+          if (tallaOrigen && !String(v.item || "").toLowerCase().includes("envio gam")) {
             await ajustarStockPorUbicacion({
               productId: v.productId,
+              itemNombre: v.item,
               talla: tallaOrigen,
               ubicacion: ubicacionOrigen,
               cantidad: cantOrigen,
-              delta: 1, // +1 = Devolver al stock
+              delta: 1, // Devolver stock
               io
             });
             devoluciones.push(`${cantOrigen}x ${v.item} (Talla ${tallaOrigen}) → ${ubicacionOrigen}`);
@@ -599,12 +616,13 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
+    if (Array.isArray(factura.historyIds) && factura.historyIds.length > 0) {
+      await History.deleteMany({ _id: { $in: factura.historyIds } }).catch(() => {});
+    }
+
     await TiendaFactura.findByIdAndDelete(req.params.id);
 
-    return res.status(200).json({
-      success: true,
-      devoluciones
-    });
+    return res.status(200).json({ success: true, devoluciones });
   } catch (error) {
     console.error("❌ Error al anular factura de tienda:", error);
     return res.status(500).json({ error: "No se pudo anular el registro." });
