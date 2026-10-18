@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { 
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaPercentage, FaTruck
+  FaPercentage, FaTruck, FaStore
 } from "react-icons/fa";
 
 export default function Header({
@@ -122,6 +122,10 @@ export default function Header({
     { label: "NFL", value: "NFL" },
     { label: "F1", value: "F1" }, 
   ];
+
+  // Verificar si es super admin o el usuario de tienda
+  const usernameLower = String(user?.username || user?.name || user?.firstName || "").toLowerCase();
+  const esAdminTienda = isSuperUser || usernameLower.includes("tienda") || user?.role === "tienda" || user?.rol === "tienda";
 
   return (
     <header
@@ -254,6 +258,23 @@ export default function Header({
 
                   <nav className="space-y-2.5">
                     
+                    {/* 🔥 BOTÓN TIENDA FÍSICA (EXCLUSIVO PARA SUPER ADMIN O USUARIO TIENDA) 🔥 */}
+                    {esAdminTienda && (
+                      <button
+                        onClick={() => {
+                          navigate('/tienda');
+                          setSidebarOpen(false);
+                        }}
+                        className="w-full bg-amber-500/10 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FaStore size={15} className="text-amber-400 transition-colors" />
+                          <span className="group-hover:text-amber-200 transition-colors">Tienda Física</span>
+                        </div>
+                        <FaChevronRight size={12} className="text-amber-600 group-hover:text-amber-400 transition-colors" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         navigate('/comisiones');
@@ -268,7 +289,6 @@ export default function Header({
                       <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
                     </button>
 
-                    {/* 🔥 NUEVO BOTÓN: GUÍAS 🔥 */}
                     <button
                       onClick={() => {
                         navigate('/guias');

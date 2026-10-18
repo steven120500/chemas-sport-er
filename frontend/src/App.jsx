@@ -28,6 +28,7 @@ import Bienvenido from './components/Bienvenido';
 import WorldCupIntro from './components/WorldCupIntro';
 import ComisionesPage from './components/ComisionesPage';
 import GuiasPage from './components/GuiasPage';
+import TiendaPage from './components/TiendaPage';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -486,6 +487,7 @@ function MainApp() {
 
             <Route path="/comisiones" element={<ComisionesPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/guias" element={<GuiasPage isSuperUser={isSuperUser} user={user} />} />
+            <Route path="/tienda" element={<TiendaPage isSuperUser={isSuperUser} user={user} />} />
 
             <Route path="/" element={
               <>
