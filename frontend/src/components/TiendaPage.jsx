@@ -929,23 +929,25 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 Filtrar por Categoría / Tipo
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {tiposDisponibles.map((t) => {
-                  const activo = tipoFiltroSeleccionado === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTipoFiltroSeleccionado(t)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                        activo
-                          ? "bg-black text-white border-black shadow-sm"
-                          : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
+              {tiposDisponibles.map((t) => {
+  // Comparamos convirtiendo ambos a minúsculas para evitar errores de mayúsculas/minúsculas
+  const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
+  
+  return (
+    <button
+      key={t}
+      type="button"
+      onClick={() => setTipoFiltroSeleccionado(t)}
+      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+        activo
+          ? "bg-black text-white border-black shadow-sm" // Seleccionado: Negro con texto blanco
+          : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200" // No seleccionados: Fondo claro con texto negro
+      }`}
+    >
+      {t}
+    </button>
+  );
+})}
               </div>
             </div>
 
@@ -1062,7 +1064,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                               ? "bg-black text-white border-black shadow-sm"
                               : tieneEnUbi
                               ? "bg-white text-gray-800 border-gray-600 hover:border-black"
-                              : "bg-zinc-100 text-zinc-400 border-zinc-200"
+                              : "bg-gray-100 text-gray-400 border-gray-200"
                           }`}
                         >
                           {ubi}
