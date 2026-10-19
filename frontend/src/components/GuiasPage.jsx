@@ -19,6 +19,14 @@ function getFechaHoyYMD() {
   return `${year}-${month}-${day}`;
 }
 
+// Convierte "20.000", "20,000" o "20000" siempre en el número entero 20000
+function limpiarMontoCR(val) {
+  if (typeof val === "number" && !isNaN(val)) return Math.round(val);
+  if (!val) return 0;
+  const soloDigitos = String(val).replace(/\D/g, "");
+  return Number(soloDigitos) || 0;
+}
+
 // Carga dinámica de jsPDF desde CDN para no requerir npm install adicional
 function cargarJsPDF() {
   return new Promise((resolve, reject) => {
@@ -101,7 +109,9 @@ export default function GuiasPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => {
-      const updated = { ...prev, [name]: value };
+      // Si es el campo monto, quitamos puntos, comas o letras al instante ("20.000" -> "20000")
+      const valorFinal = name === "monto" ? value.replace(/\D/g, "") : value;
+      const updated = { ...prev, [name]: valorFinal };
       if (name === "debe" && value === "No") {
         updated.monto = "";
       }
@@ -129,7 +139,9 @@ export default function GuiasPage() {
       return;
     }
 
-    if (form.debe === "Sí" && (!form.monto || Number(form.monto) <= 0)) {
+    const montoLimpio = limpiarMontoCR(form.monto);
+
+    if (form.debe === "Sí" && montoLimpio <= 0) {
       toastHOT.error("Por favor ingresa un monto válido mayor a 0.");
       return;
     }
@@ -178,7 +190,7 @@ export default function GuiasPage() {
       distrito: form.distrito.trim(),
       telefono: form.telefono.trim(),
       debe: form.debe,
-      monto: form.debe === "Sí" ? String(Number(form.monto) || 0) : "0",
+      monto: form.debe === "Sí" ? String(montoLimpio) : "0",
       meterRaspa: form.meterRaspa,
       esMayorista: form.esMayorista,
       nombreMayorista: form.esMayorista === "Sí" ? form.nombreMayorista.trim() : "",
@@ -276,7 +288,8 @@ const handleDescargarYCompartirPDF = async (guia) => {
       format: [101.6, 152.4]
     });
 
-    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
+    const montoGuia = limpiarMontoCR(guia.monto);
+    const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
     const esMayorista = guia.esMayorista === "Sí";
 
     doc.setFont("helvetica", "bold");
@@ -319,7 +332,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
     agregarCampo("Cantón", guia.canton);
     agregarCampo("Distrito", guia.distrito);
     agregarCampo("Teléfono", guia.telefono);
-    agregarCampo("Debe", cobroPendiente ? `¢${Number(guia.monto || 0).toLocaleString("es-CR")}` : "No");
+    agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
     agregarCampo("Raspa", guia.meterRaspa);
     agregarCampo("Comentarios", guia.comentarios);
 
@@ -376,8 +389,9 @@ const handleDescargarYCompartirPDF = async (guia) => {
       return;
     }
 
-    const cobroPendiente = guia.debe === "Sí" && Number(guia.monto) > 0;
-    const montoFormateado = `₡${Number(guia.monto || 0).toLocaleString("es-CR")}`;
+    const montoGuia = limpiarMontoCR(guia.monto);
+    const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
+    const montoFormateado = `₡${montoGuia.toLocaleString("es-CR")}`;
     const esMayorista = guia.esMayorista === "Sí";
 
     const htmlContent = `
@@ -643,11 +657,12 @@ const handleDescargarYCompartirPDF = async (guia) => {
                       ₡
                     </span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       name="monto"
                       value={form.monto}
                       onChange={handleChange}
-                      placeholder="Monto (solo números)"
+                      placeholder="Ej. 20000"
                       required
                       autoFocus
                       className="w-full pl-9 pr-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-black text-emerald-700 placeholder-zinc-400 outline-none focus:border-black transition-all"
@@ -703,7 +718,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
                       placeholder="Ej. VANESSA ALVARADO"
                       required
                       autoFocus
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all"
+                      className="w-full px-10 pr-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all"
                     />
                   </div>
                 </div>
@@ -823,7 +838,8 @@ const handleDescargarYCompartirPDF = async (guia) => {
                 </thead>
                 <tbody className="divide-y divide-zinc-100 font-medium">
                   {guiasFiltradas.map((g) => {
-                    const tieneDeuda = g.debe === "Sí" && Number(g.monto) > 0;
+                    const montoGuia = limpiarMontoCR(g.monto);
+                    const tieneDeuda = g.debe === "Sí" && montoGuia > 0;
                     return (
                       <tr key={g.id || g._id} className="hover:bg-zinc-50/80 transition-colors">
                         <td className="py-4 px-3 whitespace-nowrap">
@@ -855,7 +871,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
                         <td className="py-4 px-3 whitespace-nowrap">
                           {tieneDeuda ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 font-black text-xs">
-                              Sí · ₡{Number(g.monto).toLocaleString("es-CR")}
+                              Sí · ₡{montoGuia.toLocaleString("es-CR")}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px]">
