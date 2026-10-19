@@ -32,9 +32,9 @@ function getHoyYMD() {
 
 /* ========================================================
    📦 FUNCIÓN OFICIAL PARA REBAJAR O DEVOLVER STOCK EN PRODUCT
-   - "Tienda"   -> product.tienda
-   - "Bodega 1" -> product.stock
-   - "Bodega 2" -> product.bodega
+- "Tienda"   -> product.tienda
+- "Bodega 1" -> product.stock
+- "Bodega 2" -> product.bodega
    delta = -1 (rebajar al vender) | +1 (devolver al anular)
    ======================================================== */
 async function ajustarStockPorUbicacion({
@@ -233,8 +233,18 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
 
 router.get('/resumen', async (req, res) => {
   try {
-    const fecha = String(req.query.fecha || getHoyYMD()).trim();
-    const facturas = await TiendaFactura.find({ fechaYMD: fecha }).sort({ createdAt: -1 });
+    const { fecha, mes } = req.query;
+    let queryFiltro = {};
+
+    if (mes) {
+      const mesLimpio = String(mes).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      queryFiltro = { fechaYMD: new RegExp(`^${mesLimpio}`) };
+    } else {
+      const fechaLimpia = String(fecha || getHoyYMD()).trim();
+      queryFiltro = { fechaYMD: fechaLimpia };
+    }
+
+    const facturas = await TiendaFactura.find(queryFiltro).sort({ createdAt: -1 });
 
     let totalEfectivo = 0;
     let totalDatafono = 0;
@@ -249,7 +259,7 @@ router.get('/resumen', async (req, res) => {
     });
 
     return res.status(200).json({
-      fecha,
+      fecha: mes || fecha || getHoyYMD(),
       resumen: {
         efectivo: totalEfectivo,
         datafono: totalDatafono,
@@ -262,6 +272,26 @@ router.get('/resumen', async (req, res) => {
   } catch (error) {
     console.error("❌ Error obteniendo resumen de tienda:", error);
     return res.status(500).json({ error: "Error obteniendo datos de la tienda." });
+  }
+});
+
+// Obtener el link oficial del PDF de Alegra para cualquier factura (útil al compartir por WhatsApp)
+router.get('/pdf/:alegraId', async (req, res) => {
+  try {
+    const { alegraId } = req.params;
+    if (!alegraId) return res.status(400).json({ error: "Falta el ID de Alegra." });
+
+    const credentials = Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
+    const alegraRes = await fetch(`https://api.alegra.com/api/v1/invoices/${encodeURIComponent(alegraId)}?fields=pdf`, {
+      headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+    });
+    const data = await alegraRes.json();
+    const pdfUrl = data?.pdf || data?.pdfUrl || "";
+
+    return res.status(200).json({ pdfUrl });
+  } catch (error) {
+    console.error("❌ Error obteniendo PDF de Alegra:", error);
+    return res.status(500).json({ error: "No se pudo obtener el PDF de Alegra." });
   }
 });
 
@@ -453,7 +483,8 @@ router.post('/emitir', async (req, res) => {
       return p;
     };
 
-    let alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
+    // ?fields=pdf para que Alegra nos devuelva de una vez el enlace público al PDF de la factura
+    let alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices?fields=pdf", {
       method: "POST",
       headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
       body: JSON.stringify(construirPayloadAlegra(paymentMethodAlegra))
@@ -462,7 +493,7 @@ router.post('/emitir', async (req, res) => {
     let alegraData = await alegraResponse.json();
 
     if (!alegraResponse.ok && metodoPago === "Datáfono") {
-      alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices", {
+      alegraResponse = await fetch("https://api.alegra.com/api/v1/invoices?fields=pdf", {
         method: "POST",
         headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
         body: JSON.stringify(construirPayloadAlegra("TRANSFER"))
@@ -481,6 +512,20 @@ router.post('/emitir', async (req, res) => {
           headers: { "Authorization": `Basic ${credentials}`, "Content-Type": "application/json" },
           body: JSON.stringify({ ids: [alegraData.id] })
         });
+      } catch (e) {}
+    }
+
+    // Si por alguna razón Alegra no incluyó el pdf en el POST, lo consultamos rápido con GET ?fields=pdf
+    let pdfUrl = alegraData.pdf || alegraData.pdfUrl || "";
+    if (!pdfUrl && alegraData.id) {
+      try {
+        const pdfRes = await fetch(`https://api.alegra.com/api/v1/invoices/${alegraData.id}?fields=pdf`, {
+          headers: { "Authorization": `Basic ${credentials}`, "Accept": "application/json" }
+        });
+        if (pdfRes.ok) {
+          const pdfData = await pdfRes.json();
+          pdfUrl = pdfData?.pdf || pdfData?.pdfUrl || "";
+        }
       } catch (e) {}
     }
 
@@ -554,6 +599,7 @@ router.post('/emitir', async (req, res) => {
       fechaHora: fechaHoraStr,
       consecutivoOficial,
       alegraId: String(alegraData.id || ""),
+      pdfUrl,
       tipoEmision: tipo,
       cliente: {
         nombre: nombreCliente || "Cliente de Contado",
@@ -577,6 +623,7 @@ router.post('/emitir', async (req, res) => {
       consecutivoOficial,
       totalCobrado: totalFactura,
       correoEnviado,
+      pdfUrl,
       facturaTienda: nuevaFacturaTienda
     });
   } catch (error) {

@@ -119,7 +119,9 @@ function ajustarStockProductoLocal(prod, tallaBuscada, ubicacionBuscada, deltaCa
 export default function TiendaPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
 
+  const [tipoVistaCaja, setTipoVistaCaja] = useState("dia"); // "dia" | "mes"
   const [selectedDate, setSelectedDate] = useState(() => getFechaHoyYMD());
+  const [selectedMesYM, setSelectedMesYM] = useState(() => getFechaHoyYMD().slice(0, 7));
   const [fondoCajaBase, setFondoCajaBase] = useState(() => {
     try { return Number(localStorage.getItem("chemasport_tienda_fondo_caja") || 0); } catch { return 0; }
   });
@@ -316,9 +318,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     toastHOT.success(`Datos de ${c.nombre} cargados.`);
   };
 
-  const fetchResumenTienda = async (fechaStr = selectedDate) => {
+  const fetchResumenTienda = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/tienda/resumen?fecha=${encodeURIComponent(fechaStr)}`);
+      const queryParam = tipoVistaCaja === "mes"
+        ? `mes=${encodeURIComponent(selectedMesYM)}`
+        : `fecha=${encodeURIComponent(selectedDate)}`;
+      const res = await fetch(`${API_BASE}/api/tienda/resumen?${queryParam}`);
       if (!res.ok) return;
       const data = await res.json();
       const todasFacturas = Array.isArray(data?.facturas) ? data.facturas : [];
@@ -342,8 +347,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   };
 
   useEffect(() => {
-    fetchResumenTienda(selectedDate);
-  }, [selectedDate, nombreUsuarioActual]);
+    fetchResumenTienda();
+  }, [selectedDate, selectedMesYM, tipoVistaCaja, nombreUsuarioActual]);
 
   const todasTallasDelProducto = useMemo(() => {
     return getAvailableSizes(productoSeleccionado);
@@ -675,7 +680,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       setPrecioUnitarioInput("");
       setFormCliente((prev) => ({ ...prev, pagoConBillete: "" }));
 
-      fetchResumenTienda(selectedDate);
+      fetchResumenTienda();
 
       imprimirTicketNativo(
         ventasParaEmitir,
@@ -753,7 +758,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                     );
                   }
                   toastHOT.success("Factura anulada y camiseta devuelta al stock.");
-                  fetchResumenTienda(selectedDate);
+                  fetchResumenTienda();
                 }
               } catch (e) {
                 toastHOT.error("Error al anular.");
@@ -796,12 +801,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         {/* ENCABEZADO */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black text-white text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm">
-              <FaStore size={11} className="text-amber-400" />
-              <span>MOSTRADOR DE TIENDA FÍSICA ({nombreUsuarioActual})</span>
-            </div>
+            
             <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
-              ChemaSport ER · Punto de Venta
+              ChemaSport ER 
+            
             </h1>
             <p className="text-zinc-500 text-sm font-medium mt-1">
               Facturación directa y arqueo de caja exclusivo para ventas en mostrador.
@@ -809,14 +812,45 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Switch Día / Mensual */}
+            <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200">
+              <button
+                type="button"
+                onClick={() => setTipoVistaCaja("dia")}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  tipoVistaCaja === "dia" ? "bg-black text-white shadow-sm" : "text-gray-600 bg-white hover:text-black"
+                }`}
+              >
+                Por Día
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipoVistaCaja("mes")}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  tipoVistaCaja === "mes" ? "bg-black text-white shadow-sm" : "text-gray-600 bg-white hover:text-black"
+                }`}
+              >
+                Mensual
+              </button>
+            </div>
+
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <FaCalendarAlt className="text-zinc-400" />
-              <input 
-                type="date" 
-                value={selectedDate} 
-                onChange={(e) => setSelectedDate(e.target.value)} 
-                className="bg-transparent text-xs sm:text-sm font-black text-black outline-none cursor-pointer" 
-              />
+              {tipoVistaCaja === "dia" ? (
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)} 
+                  className="bg-transparent text-xs sm:text-sm font-black text-black outline-none cursor-pointer" 
+                />
+              ) : (
+                <input 
+                  type="month" 
+                  value={selectedMesYM} 
+                  onChange={(e) => setSelectedMesYM(e.target.value)} 
+                  className="bg-transparent text-xs sm:text-sm font-black text-black outline-none cursor-pointer" 
+                />
+              )}
             </div>
 
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
@@ -867,7 +901,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               <p className="text-2xl sm:text-3xl font-black text-blue-950 leading-none">
                 ₡{Number(resumenCaja.datafono || 0).toLocaleString("es-CR")}
               </p>
-              <p className="text-[11px] font-bold text-blue-600 mt-1.5">Tarjetas hoy</p>
+              <p className="text-[11px] font-bold text-blue-600 mt-1.5">
+                {tipoVistaCaja === "mes" ? "Tarjetas del mes" : "Tarjetas hoy"}
+              </p>
             </div>
           </div>
 
@@ -883,14 +919,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               <p className="text-2xl sm:text-3xl font-black text-purple-950 leading-none">
                 ₡{Number(resumenCaja.sinpe || 0).toLocaleString("es-CR")}
               </p>
-              <p className="text-[11px] font-bold text-purple-600 mt-1.5">SINPE Móvil hoy</p>
+              <p className="text-[11px] font-bold text-purple-600 mt-1.5">
+                {tipoVistaCaja === "mes" ? "SINPE Móvil del mes" : "SINPE Móvil hoy"}
+              </p>
             </div>
           </div>
 
           {/* GANANCIA / TOTAL */}
           <div className="bg-gradient-to-br from-green-600 to-green-500 text-white border-2 border-green-600 rounded-3xl p-5 shadow-md flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-100">Ganancia / Total Día</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-green-100">
+                {tipoVistaCaja === "mes" ? "Ganancia / Total Mes" : "Ganancia / Total Día"}
+              </span>
               <div className="w-9 h-9 rounded-2xl bg-white/20 text-white flex items-center justify-center">
                 <FaCashRegister size={15} />
               </div>
@@ -1330,9 +1370,15 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                Mis Comprobantes Emitidos Hoy ({nombreUsuarioActual})
+                {tipoVistaCaja === "mes"
+                  ? `Mis Comprobantes del Mes (${nombreUsuarioActual})`
+                  : `Mis Comprobantes Emitidos Hoy (${nombreUsuarioActual})`}
               </h2>
-              <p className="text-xs text-zinc-500 font-medium mt-0.5">Historial de mostrador en la fecha {selectedDate}.</p>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                {tipoVistaCaja === "mes"
+                  ? `Historial de mostrador en el mes ${selectedMesYM}.`
+                  : `Historial de mostrador en la fecha ${selectedDate}.`}
+              </p>
             </div>
 
             <div className="relative w-full sm:w-64">
@@ -1343,7 +1389,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
           {facturasFiltradas.length === 0 ? (
             <div className="text-center py-12 bg-zinc-50 rounded-2xl border border-zinc-100">
-              <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">No has emitido comprobantes en tienda para esta fecha ({selectedDate}).</p>
+              <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">
+                No has emitido comprobantes en tienda para este periodo ({tipoVistaCaja === "mes" ? selectedMesYM : selectedDate}).
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
