@@ -1,5 +1,5 @@
 import { Toaster } from 'react-hot-toast';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -150,7 +150,6 @@ function MainApp() {
   const [page, setPage] = useState(1);
   const [limit] = useState(21);
   const [total, setTotal] = useState(0);
-  const pages = Math.max(1, Math.ceil(total / limit));
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -230,7 +229,6 @@ function MainApp() {
 
       setProducts(json.items);
       setTotal(json.total);
-      setPage(json.page);
     } catch (err) {
       if (err.name === 'AbortError') {
         return;
@@ -246,8 +244,14 @@ function MainApp() {
 
   const fetchAllForCounts = async () => {
     try {
+      const isAdmin =
+        user?.isSuperUser ||
+        user?.roles?.includes("edit") ||
+        user?.roles?.includes("add") ||
+        user?.roles?.includes("delete");
+
       let pageN = 1;
-      const pageSize = 200;
+      const pageSize = 100; // El backend permite máximo 100 por página
       const acc = [];
       while (true) {
         const params = new URLSearchParams({
@@ -256,14 +260,15 @@ function MainApp() {
           t: Date.now().toString(),
         });
         const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
+          headers: { "x-admin": isAdmin ? "true" : "false" },
           cache: 'no-store',
         });
         if (!res.ok) throw new Error("HTTP " + res.status);
         const json = await res.json();
-        acc.push(...json.items);
-        if (acc.length >= json.total) break;
+        const items = Array.isArray(json?.items) ? json.items : [];
+        acc.push(...items);
+        if (!json.total || acc.length >= json.total || items.length === 0) break;
         pageN += 1;
-        await new Promise((r) => setTimeout(r, 100));
       }
       setAllProductsForCounts(acc);
     } catch {
@@ -299,7 +304,7 @@ function MainApp() {
       fetchProducts({ page, q: searchTerm, type: filterType });
       fetchAllForCounts();
     }
-  }, [location.pathname]);
+  }, [location.pathname, user]);
 
   // 🔥 4. ACTUALIZA LA BÚSQUEDA Y PIDE LOS DATOS
   useEffect(() => {
@@ -324,10 +329,6 @@ function MainApp() {
     }, 50); 
   }, [searchTerm, filterType, filterSizes, page]);
 
-  useEffect(() => {
-    if (products.length > 0) fetchAllForCounts();
-  }, [products]);
-
   const refreshCounts = () => {
     setTimeout(() => fetchAllForCounts(), 600);
   };
@@ -335,6 +336,7 @@ function MainApp() {
   const handleProductUpdate = (updatedProduct, deletedId = null) => {
     if (deletedId) {
       setProducts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
+      setAllProductsForCounts((prev) => prev.filter((p) => getPid(p) !== String(deletedId)));
       navigate('/');
       setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }), 10);
       toast.success('Producto eliminado correctamente');
@@ -343,6 +345,11 @@ function MainApp() {
     }
 
     setProducts((prev) =>
+      prev.map((p) =>
+        getPid(p) === getPid(updatedProduct) ? { ...p, ...updatedProduct } : p
+      )
+    );
+    setAllProductsForCounts((prev) =>
       prev.map((p) =>
         getPid(p) === getPid(updatedProduct) ? { ...p, ...updatedProduct } : p
       )
@@ -365,33 +372,111 @@ function MainApp() {
   const handleRegisterClick = () =>
     setTimeout(() => setShowRegisterUserModal(true), 100);
 
-  const removeAccents = (str) => {
-    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const removeAccents = (str = '') => {
+    return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
 
-  const filteredProducts = products.filter((product) => {
-    if (!canEdit && product.hidden === true) return false;
+  // 🔥 VERIFICADOR EXACTO DE TALLAS Y TIENDAS (SIN DEJAR HUECOS EN LAS PÁGINAS)
+  const checkProductStockAndSizes = (product) => {
+    const tObj = product.tienda || {};
+    const sObj = product.stock || {};
+    const bObj = product.bodega || {};
 
-    const normalizedSearch = removeAccents(searchTerm.toLowerCase());
-    const normalizedProductName = removeAccents(product.name.toLowerCase());
+    const getQtyInStore = (obj, size) => Number(obj?.[size] ?? 0);
+    const hasAnySizeInObj = (obj) => Object.values(obj || {}).some((v) => Number(v) > 0);
 
-    const matchName = normalizedProductName.includes(normalizedSearch);
-    if (!matchName) return false;
+    const activeStore = isSuperUser ? storeView : 'todos';
 
-    if (!filterType || filterType === 'Todos') return true;
-
-    if (filterType === 'Ofertas') return Number(product.discountPrice) > 0;
-    if (filterType === 'Populares') return product.isPopular === true;
-    if (filterType === 'Nuevo') return true; 
-    if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
-    if (filterType === 'Temp 26-27') return product.isTemporada2627 === true;
-
-    if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
-      return product.type === 'Balón' || product.type === 'Balones';
+    // Si el usuario seleccionó tallas en el filtro (ej. ['M'])
+    if (filterSizes.length > 0) {
+      return filterSizes.some((sz) => {
+        const sizeKey = String(sz).trim();
+        if (activeStore === 'tienda') return getQtyInStore(tObj, sizeKey) > 0;
+        if (activeStore === 'bodega1' || activeStore === 'tienda1') return getQtyInStore(sObj, sizeKey) > 0;
+        if (activeStore === 'bodega2' || activeStore === 'tienda2') return getQtyInStore(bObj, sizeKey) > 0;
+        return (
+          getQtyInStore(tObj, sizeKey) > 0 ||
+          getQtyInStore(sObj, sizeKey) > 0 ||
+          getQtyInStore(bObj, sizeKey) > 0
+        );
+      });
     }
 
-    return product.type === filterType;
-  });
+    // Si no seleccionó talla pero el SuperAdmin está filtrando por una vista de inventario específica
+    if (activeStore === 'tienda') return hasAnySizeInObj(tObj);
+    if (activeStore === 'bodega1' || activeStore === 'tienda1') return hasAnySizeInObj(sObj);
+    if (activeStore === 'bodega2' || activeStore === 'tienda2') return hasAnySizeInObj(bObj);
+
+    return true;
+  };
+
+  // 🔥 FILTRADO GLOBAL SOBRE TODO EL CATÁLOGO PARA QUE NUNCA DEJE PÁGINAS CON HUECOS (10 y 10)
+  // Y PARA QUE BUSCAR "real madrid player" BUSQUE EN NOMBRE + CATEGORÍA A LA VEZ
+  const usingFullCatalog = allProductsForCounts.length > 0;
+
+  const allMatchingProducts = useMemo(() => {
+    const sourceList = usingFullCatalog ? allProductsForCounts : products;
+    const searchWords = removeAccents(searchTerm.toLowerCase())
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const filtered = sourceList.filter((product) => {
+      if (!canEdit && product.hidden === true) return false;
+
+      // Buscar cada palabra escrita tanto en el nombre como en el tipo (ej: "real madrid player")
+      if (searchWords.length > 0) {
+        const fullSearchableText = removeAccents(
+          `${product.name || ''} ${product.type || ''}`.toLowerCase()
+        );
+        const matchesAllWords = searchWords.every((word) =>
+          fullSearchableText.includes(word)
+        );
+        if (!matchesAllWords) return false;
+      }
+
+      // Validar tallas y ubicación
+      if (!checkProductStockAndSizes(product)) return false;
+
+      if (!filterType || filterType === 'Todos') return true;
+
+      if (filterType === 'Ofertas') {
+        return Number(product.discountPrice) > 0 && Number(product.discountPrice) < Number(product.price);
+      }
+      if (filterType === 'Populares') return product.isPopular === true;
+      if (filterType === 'Nuevo') return true;
+      if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
+      if (filterType === 'Temp 26-27' || filterType === 'Temporada 26-27') {
+        return product.isTemporada2627 === true || /26-27/i.test(String(product.type || ''));
+      }
+
+      if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
+        return product.type === 'Balón' || product.type === 'Balones';
+      }
+
+      return product.type === filterType;
+    });
+
+    if (usingFullCatalog) {
+      if (filterType === 'Nuevo') {
+        filtered.sort((a, b) => String(b._id || '').localeCompare(String(a._id || '')));
+      } else {
+        filtered.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      }
+    }
+
+    return filtered;
+  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, filterType, filterSizes, storeView, canEdit, isSuperUser]);
+
+  const effectiveTotal = usingFullCatalog ? allMatchingProducts.length : total;
+  const pages = Math.max(1, Math.ceil(effectiveTotal / limit));
+
+  const filteredProducts = useMemo(() => {
+    if (usingFullCatalog) {
+      const start = (page - 1) * limit;
+      return allMatchingProducts.slice(start, start + limit);
+    }
+    return allMatchingProducts;
+  }, [usingFullCatalog, allMatchingProducts, page, limit]);
 
   return (
     <>
@@ -415,6 +500,7 @@ function MainApp() {
             tallaPorTipo={tallaPorTipo}
             onAdd={(newProduct) => {
               setProducts((prev) => [newProduct, ...prev]);
+              setAllProductsForCounts((prev) => [newProduct, ...prev]);
               setShowAddModal(false);
               toast.success('Producto agregado correctamente');
               refreshCounts();
@@ -474,8 +560,8 @@ function MainApp() {
             <Route path="/history" element={<HistoryPage isSuperUser={isSuperUser} />} />
             <Route path="/producto/:id" element={
               <ProductDetailWrapper 
-                products={products} 
-                loadingProducts={loading} 
+                products={allProductsForCounts.length > 0 ? allProductsForCounts : products} 
+                loadingProducts={loading && allProductsForCounts.length === 0} 
                 onClose={handleProductClose} 
                 onUpdate={handleProductUpdate} 
                 user={user} 
@@ -577,7 +663,7 @@ function MainApp() {
                   setSearchTerm={(val) => {
                     if (val !== searchTerm) {
                       setSearchTerm(val);
-                      setLoading(true);
+                      if (!usingFullCatalog) setLoading(true);
                       setPage(1);
                     }
                   }}
@@ -585,14 +671,14 @@ function MainApp() {
                   setFilterType={(t) => { 
                     if (t !== filterType) {
                       setFilterType(t); 
-                      setLoading(true); 
+                      if (!usingFullCatalog) setLoading(true); 
                       setPage(1); 
                     }
                   }}
                   filterSizes={filterSizes}
                   setFilterSizes={(sizes) => { 
                     setFilterSizes(sizes); 
-                    setLoading(true); 
+                    if (!usingFullCatalog) setLoading(true); 
                     setPage(1); 
                   }}
                 />
@@ -610,7 +696,7 @@ function MainApp() {
 
                 <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
                   <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {loading ? (
+                  {loading && !usingFullCatalog ? (
                     Array.from({ length: 6 }).map((_, i) => (
                       <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-[#111] p-4 rounded-3xl border border-[#222]">
                         <div className="w-full h-[350px] bg-[#222] rounded-2xl"></div>
@@ -641,7 +727,7 @@ function MainApp() {
                 </div>
 
                 {/* === PAGINACIÓN MEJORADA (Ajustada para fondo oscuro) === */}
-                {pages > 1 && !loading && (
+                {pages > 1 && !(loading && !usingFullCatalog) && (
                   <div className="mt-16 mb-20 flex flex-col items-center gap-3">
                     <nav className="flex items-center justify-center gap-2 sm:gap-3">
                       
