@@ -153,7 +153,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   });
 
   const [formCliente, setFormCliente] = useState({
-    tipoEmision: "hacienda",
+    tipoEmision: "interno",
     metodoPago: "Efectivo",
     pagoConBillete: "",
     montoEfectivoMixto: "",
