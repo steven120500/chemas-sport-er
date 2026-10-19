@@ -204,14 +204,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   });
 
-  // 🔥 MODAL UNIFICADO DE FACTURACIÓN (INCLUYE ENVÍO PERSONALIZABLE)
+  // 🔥 MODAL UNIFICADO DE FACTURACIÓN (INCLUYE ENVÍO PERSONALIZABLE, TICKET INTERNO POR DEFECTO)
   const [modalFacturar, setModalFacturar] = useState({
     isOpen: false,
     ventas: [],
     precio: "",
     incluyeEnvio: false,
     precioEnvio: "2500",
-    tipoEmision: "hacienda", // "hacienda" | "interno"
+    tipoEmision: "interno", // "interno" | "hacienda"
     tipoIdentificacion: "01",
     cedula: "",
     nombre: "",
@@ -232,6 +232,25 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       storedUser?.rol === "admin"
     );
   }, [isSuperUser, user, storedUser]);
+
+  // Nombre del usuario logueado actualmente para validar que solo pueda anular sus propias ventas
+  const nombreUsuarioActual = useMemo(() => {
+    return String(
+      user?.username ||
+      user?.name ||
+      user?.firstName ||
+      storedUser?.username ||
+      storedUser?.name ||
+      storedUser?.firstName ||
+      ""
+    ).trim();
+  }, [user, storedUser]);
+
+  const puedeAnularVenta = (venta) => {
+    if (esSuperAdmin) return true;
+    if (!nombreUsuarioActual || !venta?.vendedor) return false;
+    return normText(venta.vendedor) === normText(nombreUsuarioActual);
+  };
 
   // ⭐ Cargar lista de contactos de Alegra al abrir el modal
   const cargarContactosAlegra = async (query = "") => {
@@ -558,6 +577,11 @@ const seleccionarContactoAlegra = (c) => {
   };
 
   const ejecutarAnulacion = async (venta) => {
+    if (!puedeAnularVenta(venta)) {
+      toastHOT.error("Solo puedes anular tus propias ventas.");
+      return;
+    }
+
     try {
       const payload = { productId: venta.productId || null, item: venta.item, items: venta.items || [], totalUnidades: venta.totalUnidades || 1 };
       let res = await fetch(`${API_BASE}/api/sales/anular/${venta._id}`, {
@@ -579,6 +603,11 @@ const seleccionarContactoAlegra = (c) => {
   };
 
   const confirmarAnulacion = (venta) => {
+    if (!puedeAnularVenta(venta)) {
+      toastHOT.error(`Solo puedes anular tus propias ventas (esta venta pertenece a ${venta.vendedor}).`);
+      return;
+    }
+
     toastHOT((t) => (
       <div className="text-center p-2 text-black font-sans">
         <p className="font-black text-sm mb-1">¿Anular esta venta?</p>
@@ -683,7 +712,7 @@ const seleccionarContactoAlegra = (c) => {
   printWindow.document.close();
 };
 
-  // 🧾 1. ABRIR EL MODAL UNIFICADO DE FACTURACIÓN CON EL PRECIO DE LA TABLA
+  // 🧾 1. ABRIR EL MODAL UNIFICADO DE FACTURACIÓN CON TICKET INTERNO COMO PRIMERA OPCIÓN POR DEFECTO
   const abrirModalFacturacion = (ventasArray) => {
     const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
     const clienteInicial = ventasArray[0]?.cliente && ventasArray[0]?.cliente !== "Cliente General" 
@@ -699,7 +728,7 @@ const seleccionarContactoAlegra = (c) => {
       precio: String(sumaPreciosTabla),
       incluyeEnvio: false,
       precioEnvio: "2500",
-      tipoEmision: esSuperAdmin ? "hacienda" : "interno",
+      tipoEmision: "interno", // Siempre inicia en Ticket Normal (Uso Interno) como primera opción
       tipoIdentificacion: "01",
       cedula: "",
       nombre: clienteInicial,
@@ -806,7 +835,8 @@ const seleccionarContactoAlegra = (c) => {
     const correoFinal = modalFacturar.correo.trim();
     const telefonoFinal = modalFacturar.telefono.trim();
     const tipoIdFinal = modalFacturar.tipoIdentificacion;
-    const tipoEmisionFinal = modalFacturar.tipoEmision;
+    // Si es usuario normal siempre emite "interno"
+    const tipoEmisionFinal = esSuperAdmin ? modalFacturar.tipoEmision : "interno";
 
     setModalFacturar((prev) => ({ ...prev, isOpen: false }));
 
@@ -1156,6 +1186,7 @@ const seleccionarContactoAlegra = (c) => {
                     const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
                     const precioActual = obtenerPrecioVenta(venta);
                     const estaEditando = editandoPrecioId === venta._id;
+                    const permitidoAnular = puedeAnularVenta(venta);
 
                     return (
                       <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
@@ -1228,9 +1259,20 @@ const seleccionarContactoAlegra = (c) => {
                             <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura">
                               <FaReceipt size={14} />
                             </button>
-                            <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
-                              <FaTrash size={13} />
-                            </button>
+                            {permitidoAnular ? (
+                              <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
+                                <FaTrash size={13} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)}
+                                className="p-2 text-zinc-200 cursor-not-allowed rounded-xl"
+                                title={`Solo ${venta.vendedor} o un Super Admin pueden anular esta venta`}
+                              >
+                                <FaTrash size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1286,7 +1328,7 @@ const seleccionarContactoAlegra = (c) => {
                     </span>
                   </div>
                   {modalFacturar.incluyeEnvio && (
-                    <span className="text-[10px] font-bold  text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
                       + ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}
                     </span>
                   )}
@@ -1319,7 +1361,7 @@ const seleccionarContactoAlegra = (c) => {
                 )}
               </div>
 
-              {/* 2. SELECTOR DE TIPO DE COMPROBANTE (Normal solo habilitado para Super Admin) */}
+              {/* 2. SELECTOR DE TIPO DE COMPROBANTE (Ticket Normal primero por defecto; usuario normal solo tiene Ticket Normal) */}
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Tipo de Comprobante *</label>
                 <select 
@@ -1328,9 +1370,9 @@ const seleccionarContactoAlegra = (c) => {
                   disabled={!esSuperAdmin}
                   className={`w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-black outline-none focus:border-black ${!esSuperAdmin ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
-                  <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
+                  <option value="interno">Ticket Normal (Uso Interno)</option>
                   {esSuperAdmin && (
-                    <option value="interno">Ticket Normal (Uso Interno)</option>
+                    <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
                   )}
                 </select>
               </div>
