@@ -473,7 +473,9 @@ router.post('/emitir', async (req, res) => {
         paymentMethod: metodo,
         status: "open",
         payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }], // 👈 Ponle la coma aquí al final
-        activity: "4771.1" // 👈 Y agrega esta línea aquí
+        economicActivity: {
+          code: "4771.1"
+        } 
       };
       if (tipo === "hacienda") {
         p.documentType = "04";
