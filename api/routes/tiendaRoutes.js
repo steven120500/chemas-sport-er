@@ -5,7 +5,7 @@ import History from '../models/History.js';
 
 const router = express.Router();
 
-const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
+const ALEGRA_EMAIL = "chemasport__er@outlook.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 const ID_NUMERACION_INTERNA = 1;
 const ID_ITEM_FALLBACK = 8;
@@ -472,7 +472,8 @@ router.post('/emitir', async (req, res) => {
         saleCondition: "CASH",
         paymentMethod: metodo,
         status: "open",
-        payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
+        payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }], // 👈 Ponle la coma aquí al final
+        activity: "4771.1" // 👈 Y agrega esta línea aquí
       };
       if (tipo === "hacienda") {
         p.documentType = "04";

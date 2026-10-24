@@ -422,7 +422,8 @@ router.post('/emitir-tiquete', async (req, res) => {
       saleCondition: "CASH",        
       paymentMethod: "TRANSFER",    
       status: "open",
-      payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }]
+      payments: [{ account: { id: 1 }, amount: totalFactura, date: fechaActual }],
+      activity: "4771.1"
     };
 
     if (tipo === "hacienda") {
