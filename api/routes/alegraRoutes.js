@@ -2,7 +2,7 @@ import express from 'express';
 
 const router = express.Router();
 
-const ALEGRA_EMAIL = "emaespinoza21@gmail.com";
+const ALEGRA_EMAIL = "chemasport__er@outlook.com";
 const ALEGRA_TOKEN = "134a1c740dd8a0185278";
 
 // ID DE LA NUMERACIÓN INTERNA (NO ELECTRÓNICA)
