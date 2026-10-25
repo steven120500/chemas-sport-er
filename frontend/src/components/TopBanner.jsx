@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 function TopBanner() {
   const messages = [
-    "STOCK DE +6000 CHEMAS",
+    "STOCK DE +7000 CHEMAS",
     "REGALAMOS CHEMAS LOS VIERNES EN EL CHEMAFEST",
     "MÉTODOS DE PAGO: SINPE, TRANSFERENCIA,",
     "EFECTIVO Y PAGO CON TARJETA",
