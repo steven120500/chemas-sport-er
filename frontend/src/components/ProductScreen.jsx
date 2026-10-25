@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaChevronLeft, FaChevronRight, FaWhatsapp } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle } from "react-icons/fa";
 import { io } from "socket.io-client";
 import ProductAdminEditor from "./ProductAdminEditor"; 
+import Medidas from "./Medidas"; // 🔥 Importamos el modal de Medidas
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -41,6 +42,8 @@ export default function ProductScreen({
   const [idx, setIdx] = useState(0);
   
   const [selectedSize, setSelectedSize] = useState("");
+  // 🔥 Estado para abrir el modal de Medidas desde adentro
+  const [openMedidas, setOpenMedidas] = useState(false);
 
   const displayName = user?.username || user?.email || "ChemaSportER";
 
@@ -151,6 +154,20 @@ export default function ProductScreen({
   const isLlavero = viewProduct?.type === "Llaveros";
   const tallasVisibles = isLlavero ? ["U"] : (isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO);
   
+  // 🔥 Detecta si es versión Player o Femenina/Mujer (por categoría o por nombre del producto)
+  const isCorteAjustado = useMemo(() => {
+    const tipo = (viewProduct?.type || "").toLowerCase();
+    const nombre = (viewProduct?.name || "").toLowerCase();
+    return (
+      tipo === "player" ||
+      tipo === "mujer" ||
+      nombre.includes("player") ||
+      nombre.includes("mujer") ||
+      nombre.includes("dama") ||
+      nombre.includes("femenin")
+    );
+  }, [viewProduct?.type, viewProduct?.name]);
+
   const displayUrl = galleryFromProduct[idx] ? transformCloudinary(galleryFromProduct[idx], MODAL_IMG_MAX_W) : "";
   const hasDiscount = viewProduct?.discountPrice !== undefined && viewProduct?.discountPrice !== null && Number(viewProduct?.discountPrice) > 0;
   const hasMany = galleryFromProduct.length > 1;
@@ -179,7 +196,6 @@ export default function ProductScreen({
   return (
     <div 
       className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-white"
-      // 🔥 Fondo transparente para que el degradado del App.jsx fluya directo al Footer sin rayas 🔥
       style={{ backgroundColor: 'transparent' }}
     >
       <div className="max-w-6xl mx-auto">
@@ -237,12 +253,48 @@ export default function ProductScreen({
                 ) : (
                   <p className="text-5xl font-black text-yellow-500 tracking-tight mb-6 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
                 )}
+
+                {/* 🔥 AVISO PREMIUM DE CORTE AJUSTADO (Solo en Player y Mujer) 🔥 */}
+                {isCorteAjustado && (
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#141109] via-[#1c1608] to-[#111111] border border-yellow-500/40 p-4 shadow-[0_0_25px_rgba(234,179,8,0.1)]">
+                    <div className="flex items-start sm:items-center gap-3.5">
+                      <div className="flex-shrink-0 bg-yellow-500 text-black p-2.5 rounded-xl shadow-[0_0_12px_rgba(234,179,8,0.4)]">
+                        <FaInfoCircle size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black uppercase tracking-widest text-yellow-500">
+                            Corte Ajustado (Slim Fit)
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-200 font-semibold mt-0.5 leading-snug">
+                          Esta prenda viene reducida. <span className="text-yellow-400 font-black underline decoration-yellow-500/60 underline-offset-4">Te recomendamos pedir al menos una talla más</span> de la que usas habitualmente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mb-8">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  {isLlavero ? 'Selecciona la Unidad' : 'Selecciona una Talla'} {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
-                </p>
+                {/* 🔥 CABECERA DE TALLAS + BOTÓN PREMIUM DE VER MEDIDAS 🔥 */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    {isLlavero ? 'Selecciona la Unidad' : 'Selecciona una Talla'} {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
+                  </p>
+
+                  {!isLlavero && !isBalon && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenMedidas(true)}
+                      className="flex items-center gap-2 bg-[#111] hover:bg-yellow-500 text-yellow-500 hover:text-black border border-yellow-500/50 hover:border-yellow-400 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-[0_0_15px_rgba(234,179,8,0.12)] hover:shadow-[0_0_20px_rgba(234,179,8,0.4)] cursor-pointer"
+                    >
+                      <FaRulerCombined size={13} />
+                      Guía de Medidas
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                   {tallasVisibles.map((size) => {
                       const total = getTotalBySize(size);
@@ -362,6 +414,13 @@ export default function ProductScreen({
         )}
 
       </div>
+
+      {/* 🔥 MODAL DE MEDIDAS CONECTADO AL TIPO DEL PRODUCTO ACTUAL 🔥 */}
+      <Medidas
+        open={openMedidas}
+        onClose={() => setOpenMedidas(false)}
+        currentType={viewProduct?.type || "Todos"}
+      />
     </div>
   );
 }
