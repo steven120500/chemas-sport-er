@@ -31,6 +31,7 @@ export default function Medidas({ open, onClose, currentType = "Todos" }) {
 
     // --- GRUPO: MUJER ---
     { id: "mujer", tags: ["Mujer", "Todos"], label: "Versión Mujer", img: "/medidas/Mujer.jpeg", subtitle: "Corte con silueta femenina" },
+    { id: "mujer-nacional", tags: ["Mujer", "Nacional", "Todos"], label: "Nacional Mujer", img: "/medidas/Nacional_Mujer.jpeg", subtitle: "Selección Nacional corte femenino" },
 
     // --- GRUPOS ESPECÍFICOS ---
     { id: "f1", tags: ["F1", "Todos"], label: "Fórmula 1", img: "/medidas/F1.jpeg", subtitle: "Corte casual F1" },
