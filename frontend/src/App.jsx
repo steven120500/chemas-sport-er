@@ -174,7 +174,18 @@ function MainApp() {
   });
 
   const isSuperUser = user?.isSuperUser || false;
-  const canSeeHistory = user?.isSuperUser || user?.roles?.includes('history');
+
+  // 🔥 IDENTIFICAR SI ES EL USUARIO "TIENDA" PARA PERMITIRLE VER HISTORIAL Y DEMÁS SECCIONES 🔥
+  const usernameLower = String(user?.username || user?.name || user?.firstName || "").trim().toLowerCase();
+  const esSoloUsuarioTienda = !isSuperUser && (
+    usernameLower === "tienda" || 
+    usernameLower.includes("tienda") || 
+    user?.role === "tienda" || 
+    user?.rol === "tienda" ||
+    user?.roles?.includes("tienda")
+  );
+
+  const canSeeHistory = isSuperUser || esSoloUsuarioTienda || user?.roles?.includes('history');
   const canAdd = user?.isSuperUser || user?.roles?.includes('add');
   const canEdit = user?.isSuperUser || user?.roles?.includes('edit');
   const canDelete = user?.isSuperUser || user?.roles?.includes('delete');

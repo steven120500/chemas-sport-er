@@ -4,11 +4,13 @@ import {
   FaChevronLeft, FaStore, FaCalendarAlt, FaSearch, 
   FaTrash, FaReceipt, FaPrint, FaMoneyBillWave, 
   FaCreditCard, FaMobileAlt, FaCashRegister, FaStar, 
-  FaUserCheck, FaBoxOpen, FaPlus, FaShoppingBag, FaExclamationTriangle
+  FaUserCheck, FaBoxOpen, FaPlus, FaShoppingBag, FaExclamationTriangle,
+  FaCheckCircle, FaClock, FaTimes
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
+const PENDIENTES_STORAGE_KEY = "chemasport_tienda_ventas_pendientes_v1";
 
 function getFechaHoyYMD() {
   const d = new Date();
@@ -116,6 +118,30 @@ function ajustarStockProductoLocal(prod, tallaBuscada, ubicacionBuscada, deltaCa
   return copia;
 }
 
+// Recalcula montos de pago al quitar una prenda de una factura
+function recalcularMontosFactura(factura, nuevoTotal) {
+  const met = factura.metodoPago || "Efectivo";
+  let montoEfectivo = 0;
+  let montoDatafono = 0;
+  let montoSinpe = 0;
+
+  if (met === "Efectivo") {
+    montoEfectivo = nuevoTotal;
+  } else if (met === "Datáfono") {
+    montoDatafono = nuevoTotal;
+  } else if (met === "SINPE") {
+    montoSinpe = nuevoTotal;
+  } else {
+    const viejoTotal = Number(factura.totalCobrado || 1) || 1;
+    const ratio = nuevoTotal / viejoTotal;
+    montoEfectivo = Math.round(Number(factura.montoEfectivo || 0) * ratio);
+    montoDatafono = Math.round(Number(factura.montoDatafono || 0) * ratio);
+    montoSinpe = Math.max(0, nuevoTotal - montoEfectivo - montoDatafono);
+  }
+
+  return { montoEfectivo, montoDatafono, montoSinpe };
+}
+
 export default function TiendaPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
 
@@ -141,8 +167,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const [carritoVentas, setCarritoVentas] = useState([]);
 
+  // 🔥 COLA DE FACTURAS PENDIENTES POR EMITIR (Guardadas en tabla abajo)
+  const [facturasPendientes, setFacturasPendientes] = useState(() => {
+    try {
+      const guardadas = JSON.parse(localStorage.getItem(PENDIENTES_STORAGE_KEY) || "[]");
+      return Array.isArray(guardadas) ? guardadas : [];
+    } catch {
+      return [];
+    }
+  });
+  const [emitiendoId, setEmitiendoId] = useState(null);
+
   const [facturasEmitidas, setFacturasEmitidas] = useState([]);
-  const [resumenCaja, setResumenCaja] = useState({ efectivo: 0, datafono: 0, sinpe: 0, total: 0, cantidadFacturas: 0 });
   const [searchHistorialFilter, setSearchHistorialFilter] = useState("");
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
 
@@ -165,6 +201,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     telefono: "",
     correo: ""
   });
+
+  // Sincroniza pendientes en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(PENDIENTES_STORAGE_KEY, JSON.stringify(facturasPendientes));
+    } catch (e) {}
+  }, [facturasPendientes]);
 
   const storedUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
@@ -331,15 +374,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         ? todasFacturas 
         : todasFacturas.filter(f => String(f.vendedor || "").toLowerCase() === String(nombreUsuarioActual).toLowerCase());
 
-      let efectivo = 0, datafono = 0, sinpe = 0, total = 0;
-      misFacturas.forEach(f => {
-        efectivo += Number(f.montoEfectivo || 0);
-        datafono += Number(f.montoDatafono || 0);
-        sinpe += Number(f.montoSinpe || 0);
-        total += Number(f.totalCobrado || 0);
-      });
-
-      setResumenCaja({ efectivo, datafono, sinpe, total, cantidadFacturas: misFacturas.length });
       setFacturasEmitidas(misFacturas);
     } catch (err) {
       console.error("Error cargando resumen:", err);
@@ -349,6 +383,38 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   useEffect(() => {
     fetchResumenTienda();
   }, [selectedDate, selectedMesYM, tipoVistaCaja, nombreUsuarioActual]);
+
+  // Pendientes filtradas para el día o mes seleccionado
+  const pendientesDelPeriodo = useMemo(() => {
+    return facturasPendientes.filter((f) => {
+      const mismoVendedor = esSuperAdmin || String(f.vendedor || "").toLowerCase() === String(nombreUsuarioActual).toLowerCase();
+      if (!mismoVendedor) return false;
+      const fFecha = String(f.fechaYMD || "");
+      if (tipoVistaCaja === "mes") {
+        return fFecha.startsWith(selectedMesYM);
+      }
+      return fFecha === selectedDate;
+    });
+  }, [facturasPendientes, esSuperAdmin, nombreUsuarioActual, tipoVistaCaja, selectedMesYM, selectedDate]);
+
+  // Resumen de caja unificado (suma las ya emitidas + las registradas en tabla pendientes por emitir)
+  const resumenCaja = useMemo(() => {
+    let efectivo = 0, datafono = 0, sinpe = 0, total = 0;
+    const todasParaArqueo = [...pendientesDelPeriodo, ...facturasEmitidas];
+    todasParaArqueo.forEach((f) => {
+      efectivo += Number(f.montoEfectivo || 0);
+      datafono += Number(f.montoDatafono || 0);
+      sinpe += Number(f.montoSinpe || 0);
+      total += Number(f.totalCobrado || 0);
+    });
+    return {
+      efectivo,
+      datafono,
+      sinpe,
+      total,
+      cantidadFacturas: todasParaArqueo.length
+    };
+  }, [pendientesDelPeriodo, facturasEmitidas]);
 
   const todasTallasDelProducto = useMemo(() => {
     return getAvailableSizes(productoSeleccionado);
@@ -590,17 +656,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const vueltoCalculado = (Number(formCliente.pagoConBillete) || 0) - totalCalculadoForm;
 
-  const handleCobrarYFacturar = async () => {
+  // 🔥 AHORA ESTE BOTÓN TIRA LA VENTA A LA TABLA DE ABAJO (SIN EMITIR TODAVÍA)
+  const handleAgregarVentaATabla = () => {
     if (listaFinalParaCobrar.length === 0) {
-      toastHOT.error("Agrega al menos una prenda para facturar.");
+      toastHOT.error("Agrega al menos una prenda para registrar en la tabla.");
       return;
     }
     if (totalCalculadoForm <= 0) {
       toastHOT.error("El monto total debe ser mayor a 0.");
-      return;
-    }
-    if (!formCliente.cedula.trim() || !formCliente.nombre.trim() || !formCliente.telefono.trim() || !formCliente.correo.trim()) {
-      toastHOT.error("Todos los datos del cliente son obligatorios.");
       return;
     }
 
@@ -616,38 +679,109 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       }
     }
 
-    const ventasParaEmitir = listaFinalParaCobrar.map((item, idx) => ({
-      _id: `tienda_${Date.now()}_${idx}`,
+    const clienteNombreFinal = formCliente.nombre.trim() || "Cliente de Contado";
+
+    const ventasParaGuardar = listaFinalParaCobrar.map((item, idx) => ({
+      _id: `item_${Date.now()}_${idx}`,
       item: item.item,
       totalUnidades: Number(item.totalUnidades) || 1,
       talla: item.talla,
       ubicacion: item.ubicacion || "Tienda",
       tallasTexto: item.tallasTexto,
-      cliente: formCliente.nombre.trim(),
+      cliente: clienteNombreFinal,
       vendedor: nombreUsuarioActual,
       precioUnitarioCustom: Number(item.precioUnitarioCustom),
       productId: item.productId,
       items: item.items
     }));
 
-    const payloadTienda = {
-      ventas: ventasParaEmitir,
+    const nuevaPendiente = {
+      _id: `pend_${Date.now()}`,
+      esPendiente: true,
+      consecutivoOficial: "PENDIENTE",
+      fechaHora: new Date().toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit" }),
+      fechaYMD: selectedDate,
       tipo: formCliente.tipoEmision,
-      precioManual: totalCalculadoForm,
-      cedula: formCliente.cedula.trim(),
-      nombreCliente: formCliente.nombre.trim(),
-      email: formCliente.correo.trim(),
-      telefono: formCliente.telefono.trim(),
-      tipoIdentificacion: formCliente.tipoIdentificacion,
+      vendedor: nombreUsuarioActual,
+      cliente: {
+        nombre: clienteNombreFinal,
+        cedula: formCliente.cedula.trim(),
+        telefono: formCliente.telefono.trim(),
+        correo: formCliente.correo.trim(),
+        tipoIdentificacion: formCliente.tipoIdentificacion || "01"
+      },
+      ventas: ventasParaGuardar,
       metodoPago: formCliente.metodoPago,
       montoEfectivo: formCliente.metodoPago === "Mixto" ? efecMixto : (formCliente.metodoPago === "Efectivo" ? totalCalculadoForm : 0),
       montoDatafono: formCliente.metodoPago === "Mixto" ? datMixto : (formCliente.metodoPago === "Datáfono" ? totalCalculadoForm : 0),
       montoSinpe: formCliente.metodoPago === "Mixto" ? sinpeMixto : (formCliente.metodoPago === "SINPE" ? totalCalculadoForm : 0),
-      fechaYMD: selectedDate
+      totalCobrado: totalCalculadoForm
     };
 
-    setGenerandoTiquete(true);
-    const toastId = toastHOT.loading("Emitiendo comprobante, rebajando stock y registrando venta...");
+    // Rebajamos en memoria local de una vez para que no se venda duplicada mientras está pendiente en tabla
+    setCatalogoBase((prev) =>
+      prev.map((prod) => {
+        let mod = prod;
+        ventasParaGuardar.forEach((v) => {
+          if (String(prod._id || prod.id) === String(v.productId)) {
+            mod = ajustarStockProductoLocal(mod, v.talla, v.ubicacion, -Number(v.totalUnidades || 1));
+          }
+        });
+        return mod;
+      })
+    );
+
+    setFacturasPendientes((prev) => [nuevaPendiente, ...prev]);
+
+    setCarritoVentas([]);
+    setProductoSeleccionado(null);
+    setBusquedaProducto("");
+    setCantidadVenta(1);
+    setPrecioUnitarioInput("");
+    setFormCliente((prev) => ({ ...prev, pagoConBillete: "" }));
+
+    toastHOT.success("Venta enviada a la tabla inferior. Puedes emitirla cuando gustes.");
+  };
+
+  // 🔥 EMITIR FACTURA DESDE EL BOTÓN DE LA TABLA DE ABAJO
+  const handleEmitirDesdeTabla = async (facturaPendiente) => {
+    if (!Array.isArray(facturaPendiente.ventas) || facturaPendiente.ventas.length === 0) {
+      toastHOT.error("Esta factura no tiene artículos.");
+      return;
+    }
+
+    // Si es para Hacienda, verificamos que tenga los datos del cliente (o usamos los del formulario actual si los acabas de llenar arriba)
+    const cedulaFinal = facturaPendiente.cliente?.cedula?.trim() || formCliente.cedula.trim();
+    const nombreFinal = (facturaPendiente.cliente?.nombre && facturaPendiente.cliente.nombre !== "Cliente de Contado")
+      ? facturaPendiente.cliente.nombre.trim()
+      : (formCliente.nombre.trim() || "Cliente de Contado");
+    const correoFinal = facturaPendiente.cliente?.correo?.trim() || formCliente.correo.trim();
+    const telefonoFinal = facturaPendiente.cliente?.telefono?.trim() || formCliente.telefono.trim();
+    const tipoIdFinal = facturaPendiente.cliente?.tipoIdentificacion || formCliente.tipoIdentificacion || "01";
+
+    if (facturaPendiente.tipo === "hacienda" && (!cedulaFinal || !nombreFinal || !correoFinal || !telefonoFinal)) {
+      toastHOT.error("Para emitir a Hacienda completa Cédula, Nombre, Teléfono y Correo arriba (o cambia a Ticket Interno).");
+      return;
+    }
+
+    const payloadTienda = {
+      ventas: facturaPendiente.ventas,
+      tipo: facturaPendiente.tipo || "interno",
+      precioManual: facturaPendiente.totalCobrado,
+      cedula: cedulaFinal || "000000000",
+      nombreCliente: nombreFinal,
+      email: correoFinal || "cliente@chemasporter.com",
+      telefono: telefonoFinal || "00000000",
+      tipoIdentificacion: tipoIdFinal,
+      metodoPago: facturaPendiente.metodoPago,
+      montoEfectivo: facturaPendiente.montoEfectivo,
+      montoDatafono: facturaPendiente.montoDatafono,
+      montoSinpe: facturaPendiente.montoSinpe,
+      fechaYMD: facturaPendiente.fechaYMD || selectedDate
+    };
+
+    setEmitiendoId(facturaPendiente._id);
+    const toastId = toastHOT.loading("Emitiendo comprobante oficial y descontando stock...");
 
     try {
       const response = await fetch(`${API_BASE}/api/tienda/emitir`, {
@@ -658,46 +792,169 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo emitir el comprobante");
 
-      // 🔥 REBAJAR STOCK EN MEMORIA LOCAL EN EL CAMPO EXACTO (tienda / stock / bodega)
-      setCatalogoBase((prev) =>
-        prev.map((prod) => {
-          let mod = prod;
-          ventasParaEmitir.forEach((v) => {
-            if (String(prod._id || prod.id) === String(v.productId)) {
-              mod = ajustarStockProductoLocal(mod, v.talla, v.ubicacion, -Number(v.totalUnidades || 1));
-            }
-          });
-          return mod;
-        })
-      );
+      toastHOT.success(`¡Factura #${data.consecutivoOficial} emitida con éxito!`, { id: toastId });
 
-      toastHOT.success("¡Cobro exitoso y stock rebajado!", { id: toastId });
-
-      setCarritoVentas([]);
-      setProductoSeleccionado(null);
-      setBusquedaProducto("");
-      setCantidadVenta(1);
-      setPrecioUnitarioInput("");
-      setFormCliente((prev) => ({ ...prev, pagoConBillete: "" }));
-
-      fetchResumenTienda();
+      // La quitamos de las pendientes porque ya pasó al servidor como emitida
+      setFacturasPendientes((prev) => prev.filter((item) => item._id !== facturaPendiente._id));
+      await fetchResumenTienda();
 
       imprimirTicketNativo(
-        ventasParaEmitir,
+        facturaPendiente.ventas,
         data.consecutivoOficial,
         data.totalCobrado,
         {
           nombre: payloadTienda.nombreCliente,
-          cedula: payloadTienda.cedula,
+          cedula: payloadTienda.cedula !== "000000000" ? payloadTienda.cedula : "",
           telefono: payloadTienda.telefono
         },
         payloadTienda.metodoPago
       );
     } catch (error) {
-      toastHOT.error(`Error: ${error.message}`, { id: toastId, duration: 6000 });
+      toastHOT.error(`Error al emitir: ${error.message}`, { id: toastId, duration: 6000 });
     } finally {
-      setGenerandoTiquete(false);
+      setEmitiendoId(null);
     }
+  };
+
+  // Cambiar tipo de comprobante (Interno / Hacienda) directo en la fila pendiente
+  const cambiarTipoEmisionPendiente = (idPendiente, nuevoTipo) => {
+    setFacturasPendientes((prev) =>
+      prev.map((f) => (f._id === idPendiente ? { ...f, tipo: nuevoTipo } : f))
+    );
+  };
+
+  // 🔥 QUITAR UN ARTÍCULO ESPECÍFICO DE UNA FACTURA EN LA TABLA (PENDIENTE O EMITIDA)
+  const quitarArticuloDeFacturaEnTabla = (factura, idxArticulo) => {
+    const ventasActuales = Array.isArray(factura.ventas) ? factura.ventas : [];
+    const articuloQuitado = ventasActuales[idxArticulo];
+    if (!articuloQuitado) return;
+
+    // Si es la única prenda de la factura, usamos el flujo de anular la factura completa
+    if (ventasActuales.length <= 1) {
+      eliminarRegistroFacturaCaja(factura);
+      return;
+    }
+
+    const ubi = articuloQuitado.ubicacion || (articuloQuitado.items && articuloQuitado.items[0]?.tienda) || "Tienda";
+    const talla = articuloQuitado.talla || (articuloQuitado.items && articuloQuitado.items[0]?.talla) || articuloQuitado.tallasTexto || "U";
+    const cantQuitada = Number(articuloQuitado.totalUnidades || 1);
+    const subtotalQuitado = Math.round(Number(articuloQuitado.precioUnitarioCustom || 0) * cantQuitada);
+
+    // 1. Si la factura está PENDIENTE en la tabla (aún no emitida al backend)
+    if (factura.esPendiente) {
+      const nuevasVentas = ventasActuales.filter((_, i) => i !== idxArticulo);
+      const nuevoTotal = nuevasVentas.reduce(
+        (acc, v) => acc + Number(v.precioUnitarioCustom || 0) * Number(v.totalUnidades || 1),
+        0
+      );
+      const nuevosMontos = recalcularMontosFactura(factura, nuevoTotal);
+
+      setFacturasPendientes((prev) =>
+        prev.map((f) =>
+          f._id === factura._id
+            ? { ...f, ventas: nuevasVentas, totalCobrado: nuevoTotal, ...nuevosMontos }
+            : f
+        )
+      );
+
+      // Devolvemos el stock local de esa prenda
+      setCatalogoBase((prev) =>
+        prev.map((prod) => {
+          if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
+            return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+          }
+          return prod;
+        })
+      );
+
+      toastHOT.success(`Se quitó ${articuloQuitado.item} (${talla}) y se devolvió a ${ubi}.`);
+      return;
+    }
+
+    // 2. Si la factura YA FUE EMITIDA en el servidor, pedimos confirmación para quitar esa prenda y reajustar
+    toastHOT((t) => (
+      <div className="text-center p-2.5 text-black font-sans max-w-xs">
+        <div className="flex justify-center text-amber-500 mb-1.5">
+          <FaExclamationTriangle size={22} />
+        </div>
+        <p className="font-black text-sm mb-1 uppercase tracking-wide text-red-600">
+          ¿Quitar este artículo de la factura?
+        </p>
+        <p className="text-xs text-zinc-600 mb-2">
+          Se quitará <strong>{cantQuitada}x {articuloQuitado.item} (Talla {talla})</strong> y se restarán <strong>₡{subtotalQuitado.toLocaleString("es-CR")}</strong> de la factura.
+        </p>
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-2 mb-3 text-left">
+          <p className="text-[11px] font-black text-black leading-snug">
+            • Devolver físicamente a: <span className="underline">{ubi}</span>
+          </p>
+        </div>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={async () => {
+              toastHOT.dismiss(t.id);
+              const toastLoad = toastHOT.loading("Quitando artículo y actualizando stock...");
+              try {
+                const nuevasVentas = ventasActuales.filter((_, i) => i !== idxArticulo);
+                const nuevoTotal = nuevasVentas.reduce(
+                  (acc, v) => acc + Number(v.precioUnitarioCustom || 0) * Number(v.totalUnidades || 1),
+                  0
+                );
+                const nuevosMontos = recalcularMontosFactura(factura, nuevoTotal);
+
+                // Anulamos el registro anterior (lo cual devuelve el stock de todas sus prendas en el backend)
+                const resDel = await fetch(`${API_BASE}/api/tienda/${factura._id}`, { method: "DELETE" });
+                if (!resDel.ok) throw new Error("No se pudo actualizar la factura original");
+
+                // Re-registramos la factura con los artículos restantes (uso interno para no duplicar en Hacienda)
+                const payloadReajuste = {
+                  ventas: nuevasVentas,
+                  tipo: "interno",
+                  precioManual: nuevoTotal,
+                  cedula: factura.cliente?.cedula || "000000000",
+                  nombreCliente: factura.cliente?.nombre || "Cliente de Contado",
+                  email: factura.cliente?.correo || "cliente@chemasporter.com",
+                  telefono: factura.cliente?.telefono || "00000000",
+                  tipoIdentificacion: factura.cliente?.tipoIdentificacion || "01",
+                  metodoPago: factura.metodoPago,
+                  montoEfectivo: nuevosMontos.montoEfectivo,
+                  montoDatafono: nuevosMontos.montoDatafono,
+                  montoSinpe: nuevosMontos.montoSinpe,
+                  fechaYMD: selectedDate
+                };
+
+                const resReemitir = await fetch(`${API_BASE}/api/tienda/emitir`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payloadReajuste)
+                });
+                if (!resReemitir.ok) throw new Error("Error al guardar factura actualizada");
+
+                // Sumamos de vuelta la prenda quitada en memoria local
+                setCatalogoBase((prev) =>
+                  prev.map((prod) => {
+                    if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
+                      return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+                    }
+                    return prod;
+                  })
+                );
+
+                toastHOT.success(`Artículo quitado y devuelto a ${ubi}.`, { id: toastLoad });
+                fetchResumenTienda();
+              } catch (err) {
+                toastHOT.error(err.message || "Error al quitar artículo", { id: toastLoad });
+              }
+            }}
+            className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
+          >
+            Sí, Quitar Prenda
+          </button>
+          <button onClick={() => toastHOT.dismiss(t.id)} className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), { duration: 9000 });
   };
 
   // 🔥 ALERTA CON UBICACIÓN EXACTA AL ANULAR Y DEVOLUCIÓN DE STOCK
@@ -716,7 +973,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <FaExclamationTriangle size={22} />
         </div>
         <p className="font-black text-sm mb-1 uppercase tracking-wide text-red-600">
-          ¿Anular esta venta?
+          {factura.esPendiente ? "¿Eliminar venta pendiente?" : "¿Anular esta venta?"}
         </p>
         <p className="text-xs text-zinc-600 mb-2">
           Se restarán <strong>₡{Number(factura.totalCobrado || 0).toLocaleString("es-CR")}</strong> de la caja y el stock se sumará de nuevo.
@@ -739,6 +996,28 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <button
             onClick={async () => {
               toastHOT.dismiss(t.id);
+              // Si era pendiente, solo la quitamos de la tabla local y devolvemos su stock en memoria
+              if (factura.esPendiente) {
+                if (Array.isArray(factura.ventas)) {
+                  setCatalogoBase((prev) =>
+                    prev.map((prod) => {
+                      let mod = prod;
+                      factura.ventas.forEach((v) => {
+                        const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+                        const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
+                        if (String(prod._id || prod.id) === String(v.productId)) {
+                          mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
+                        }
+                      });
+                      return mod;
+                    })
+                  );
+                }
+                setFacturasPendientes((prev) => prev.filter((item) => item._id !== factura._id));
+                toastHOT.success("Venta pendiente eliminada y stock restaurado.");
+                return;
+              }
+
               try {
                 const res = await fetch(`${API_BASE}/api/tienda/${factura._id}`, { method: "DELETE" });
                 if (res.ok) {
@@ -776,16 +1055,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     ), { duration: 9000 });
   };
 
+  // Combinamos las ventas pendientes arriba y las ya emitidas abajo en la misma tabla
   const facturasFiltradas = useMemo(() => {
-    if (!searchHistorialFilter.trim()) return facturasEmitidas;
+    const combinadas = [...pendientesDelPeriodo, ...facturasEmitidas];
+    if (!searchHistorialFilter.trim()) return combinadas;
     const q = searchHistorialFilter.toLowerCase();
-    return facturasEmitidas.filter(f => {
+    return combinadas.filter(f => {
       const cli = String(f.cliente?.nombre || "").toLowerCase();
       const cons = String(f.consecutivoOficial || "").toLowerCase();
       const met = String(f.metodoPago || "").toLowerCase();
       return cli.includes(q) || cons.includes(q) || met.includes(q);
     });
-  }, [facturasEmitidas, searchHistorialFilter]);
+  }, [pendientesDelPeriodo, facturasEmitidas, searchHistorialFilter]);
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
@@ -940,7 +1221,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 ₡{Number(resumenCaja.total || 0).toLocaleString("es-CR")}
               </p>
               <p className="text-[11px] font-bold text-green-100 mt-1.5">
-                {resumenCaja.cantidadFacturas || 0} comprobante(s) emitido(s)
+                {resumenCaja.cantidadFacturas || 0} venta(s) registrada(s)
               </p>
             </div>
           </div>
@@ -957,7 +1238,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 Facturar Venta en Mostrador
               </h2>
               <p className="text-xs text-zinc-400 font-bold">
-                Filtra por tipo, busca la prenda disponible, selecciona ubicación y talla, y emite el comprobante.
+                Filtra por tipo, selecciona las prendas, regístralas en la tabla inferior y emite la factura cuando quieras.
               </p>
             </div>
           </div>
@@ -970,7 +1251,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               </label>
               <div className="flex flex-wrap gap-1.5">
               {tiposDisponibles.map((t) => {
-  // Comparamos convirtiendo ambos a minúsculas para evitar errores de mayúsculas/minúsculas
   const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
   
   return (
@@ -980,8 +1260,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       onClick={() => setTipoFiltroSeleccionado(t)}
       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
         activo
-          ? "bg-black text-white border-black shadow-sm" // Seleccionado: Negro con texto blanco
-          : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200" // No seleccionados: Fondo claro con texto negro
+          ? "bg-black text-white border-black shadow-sm"
+          : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200"
       }`}
     >
       {t}
@@ -1315,7 +1595,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             {/* CÉDULA */}
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID *</label>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID (Opcional al registrar)</label>
                 <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="w-full px-3 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs font-bold text-black outline-none">
                   <option value="01">Física</option>
                   <option value="02">Jurídica</option>
@@ -1327,7 +1607,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               </div>
 
               <div className="sm:col-span-3">
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula *</label>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula (Opcional al registrar)</label>
                 <div className="flex gap-2">
                   <input type="text" value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
                   <button type="button" onClick={buscarCedulaHacienda} className="bg-black text-white px-5 rounded-2xl hover:bg-zinc-800 transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar">
@@ -1339,45 +1619,43 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
             {/* NOMBRE */}
             <div>
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente *</label>
-              <input type="text" value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Escriba el nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente (Opcional al registrar)</label>
+              <input type="text" value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Cliente de Contado o nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
             </div>
 
             {/* TELÉFONO Y CORREO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono *</label>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono (Opcional al registrar)</label>
                 <input type="tel" value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo *</label>
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo (Opcional al registrar)</label>
                 <input type="email" value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
               </div>
             </div>
 
-            {/* BOTÓN COBRAR Y EMITIR */}
+            {/* 🔥 BOTÓN QUE ENVÍA LA VENTA A LA TABLA DE ABAJO SIN EMITIRLA AÚN */}
             <div className="pt-2">
-              <button type="button" onClick={handleCobrarYFacturar} disabled={generandoTiquete} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]">
-                <FaReceipt size={16} />
-                <span>{generandoTiquete ? "Procesando Cobro..." : `Cobrar ₡${totalCalculadoForm.toLocaleString("es-CR")} (${listaFinalParaCobrar.length} artículo${listaFinalParaCobrar.length === 1 ? "" : "s"}) y Emitir Tiquete`}</span>
+              <button type="button" onClick={handleAgregarVentaATabla} disabled={generandoTiquete} className="w-full bg-black hover:bg-zinc-800 text-white py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]">
+                <FaPlus size={14} className="text-amber-400" />
+                <span>{`Registrar Venta en Tabla abajo · ₡${totalCalculadoForm.toLocaleString("es-CR")} (${listaFinalParaCobrar.length} artículo${listaFinalParaCobrar.length === 1 ? "" : "s"})`}</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* 📋 MINI-HISTORIAL CON COLUMNA DE UBICACIÓN (TIENDA, BODEGA 1, BODEGA 2) */}
+        {/* 📋 TABLA DE COMPROBANTES (PENDIENTES POR EMITIR + EMITIDOS) */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
                 {tipoVistaCaja === "mes"
-                  ? `Mis Comprobantes del Mes (${nombreUsuarioActual})`
-                  : `Mis Comprobantes Emitidos Hoy (${nombreUsuarioActual})`}
+                  ? `Ventas y Comprobantes del Mes (${nombreUsuarioActual})`
+                  : `Ventas y Comprobantes de Hoy (${nombreUsuarioActual})`}
               </h2>
               <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                {tipoVistaCaja === "mes"
-                  ? `Historial de mostrador en el mes ${selectedMesYM}.`
-                  : `Historial de mostrador en la fecha ${selectedDate}.`}
+                Desde aquí puedes quitar prendas individuales o emitir la factura cuando tú quieras.
               </p>
             </div>
 
@@ -1390,7 +1668,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           {facturasFiltradas.length === 0 ? (
             <div className="text-center py-12 bg-zinc-50 rounded-2xl border border-zinc-100">
               <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">
-                No has emitido comprobantes en tienda para este periodo ({tipoVistaCaja === "mes" ? selectedMesYM : selectedDate}).
+                No hay ventas ni comprobantes en tienda para este periodo ({tipoVistaCaja === "mes" ? selectedMesYM : selectedDate}).
               </p>
             </div>
           ) : (
@@ -1398,77 +1676,137 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
-                    <th className="py-3 px-3">Comprobante / Hora</th>
+                    <th className="py-3 px-3">Estado / Hora</th>
                     <th className="py-3 px-3">Cliente</th>
-                    <th className="py-3 px-3">Artículos</th>
+                    <th className="py-3 px-3">Artículos (Quitar prenda)</th>
                     <th className="py-3 px-3">Ubicación</th>
                     <th className="py-3 px-3">Método de Pago</th>
                     <th className="py-3 px-3 text-right">Total Cobrado</th>
-                    <th className="py-3 px-3 text-right">Acciones</th>
+                    <th className="py-3 px-3 text-right">Acciones / Emitir</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 font-medium">
-                  {facturasFiltradas.map((f) => (
-                    <tr key={f._id} className="hover:bg-zinc-50 transition-colors">
-                      <td className="py-3.5 px-3 whitespace-nowrap">
-                        <span className="font-black text-black block text-xs">#{f.consecutivoOficial}</span>
-                        <span className="text-[10px] text-zinc-400 font-bold">{f.fechaHora}</span>
-                      </td>
+                  {facturasFiltradas.map((f) => {
+                    const esPendiente = Boolean(f.esPendiente);
+                    const estaEmitiendoEsta = emitiendoId === f._id;
 
-                      <td className="py-3.5 px-3">
-                        <span className="font-black text-black block text-xs">{f.cliente?.nombre || "Cliente de Contado"}</span>
-                        {f.cliente?.cedula && <span className="text-[10px] text-zinc-500 font-mono">ID: {f.cliente.cedula}</span>}
-                      </td>
+                    return (
+                      <tr key={f._id} className={`${esPendiente ? "bg-amber-50/40 hover:bg-amber-50/70" : "hover:bg-zinc-50"} transition-colors`}>
+                        <td className="py-3.5 px-3 whitespace-nowrap">
+                          {esPendiente ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 font-black text-[10px] uppercase tracking-wider">
+                              <FaClock size={10} /> Por Emitir
+                            </span>
+                          ) : (
+                            <span className="font-black text-black block text-xs">#{f.consecutivoOficial}</span>
+                          )}
+                          <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">{f.fechaHora}</span>
+                        </td>
 
-                      <td className="py-3.5 px-3 text-zinc-700">
-                        {Array.isArray(f.ventas) && f.ventas.map((v, idx) => (
-                          <div key={idx} className="text-[11px] font-bold text-zinc-800">
-                            {v.totalUnidades || 1}x {v.item} {v.tallasTexto ? `(${v.tallasTexto})` : ""}
+                        <td className="py-3.5 px-3">
+                          <span className="font-black text-black block text-xs">{f.cliente?.nombre || "Cliente de Contado"}</span>
+                          {f.cliente?.cedula && <span className="text-[10px] text-zinc-500 font-mono">ID: {f.cliente.cedula}</span>}
+                        </td>
+
+                        {/* 🔥 COLUMNA DE ARTÍCULOS CON OPCIÓN DE QUITAR PRENDA INDIVIDUALMENTE */}
+                        <td className="py-3.5 px-3 text-zinc-700">
+                          <div className="flex flex-col gap-1.5">
+                            {Array.isArray(f.ventas) && f.ventas.map((v, idx) => (
+                              <div key={idx} className="inline-flex items-center justify-between gap-2 bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-[11px] font-bold text-zinc-800 w-fit shadow-2xs">
+                                <span>
+                                  {v.totalUnidades || 1}x {v.item} {v.tallasTexto ? `(${v.tallasTexto})` : ""}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => quitarArticuloDeFacturaEnTabla(f, idx)}
+                                  className="text-zinc-400 hover:text-red-600 p-0.5 rounded transition-colors cursor-pointer"
+                                  title="Quitar este artículo de la factura y devolver al stock"
+                                >
+                                  <FaTimes size={11} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </td>
+                        </td>
 
-                      {/* 🔥 NUEVA COLUMNA UBICACIÓN (TIENDA, BODEGA 1, BODEGA 2) */}
-                      <td className="py-3.5 px-3 whitespace-nowrap">
-                        <div className="flex flex-col gap-1">
-                          {Array.isArray(f.ventas) && f.ventas.map((v, idx) => {
-                            const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
-                            return (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-300 text-black font-black text-[10px] w-fit"
+                        {/* COLUMNA UBICACIÓN */}
+                        <td className="py-3.5 px-3 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            {Array.isArray(f.ventas) && f.ventas.map((v, idx) => {
+                              const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
+                              return (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-300 text-black font-black text-[10px] w-fit"
+                                >
+                                  {ubi}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg border font-black text-[11px] bg-emerald-100 text-emerald-800 border-emerald-200">
+                            {f.metodoPago}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-3 text-right font-black text-blue-600 text-xs whitespace-nowrap">
+                          ₡{Number(f.totalCobrado || 0).toLocaleString("es-CR")}
+                        </td>
+
+                        {/* 🔥 ACCIONES: BOTÓN EMITIR (SI ESTÁ PENDIENTE) O REIMPRIMIR + ANULAR */}
+                        <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            {esPendiente ? (
+                              <>
+                                <select
+                                  value={f.tipo || "interno"}
+                                  onChange={(e) => cambiarTipoEmisionPendiente(f._id, e.target.value)}
+                                  className="px-2 py-1.5 bg-white border border-zinc-300 rounded-xl text-[10px] font-black text-black outline-none cursor-pointer"
+                                  title="Tipo de emisión"
+                                >
+                                  <option value="interno">Interno</option>
+                                  <option value="hacienda">Hacienda</option>
+                                </select>
+
+                                <button
+                                  type="button"
+                                  disabled={estaEmitiendoEsta}
+                                  onClick={() => handleEmitirDesdeTabla(f)}
+                                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                                  title="Emitir Factura Ahora"
+                                >
+                                  <FaReceipt size={12} />
+                                  <span>{estaEmitiendoEsta ? "Emitiendo..." : "Emitir Factura"}</span>
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
+                                className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                                title="Reimprimir"
                               >
-                                {ubi}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
+                                <FaPrint size={12} className="text-amber-400" />
+                                <span>Reimprimir</span>
+                              </button>
+                            )}
 
-                      <td className="py-3.5 px-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg border font-black text-[11px] bg-emerald-100 text-emerald-800 border-emerald-200">
-                          {f.metodoPago}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-3 text-right font-black text-blue-600 text-xs whitespace-nowrap">
-                        ₡{Number(f.totalCobrado || 0).toLocaleString("es-CR")}
-                      </td>
-
-                      <td className="py-3.5 px-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-2">
-                          <button onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)} className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm" title="Reimprimir">
-                            <FaPrint size={12} className="text-amber-400" />
-                            <span>Reimprimir</span>
-                          </button>
-
-                          <button onClick={() => eliminarRegistroFacturaCaja(f)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular factura y devolver stock">
-                            <FaTrash size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <button
+                              type="button"
+                              onClick={() => eliminarRegistroFacturaCaja(f)}
+                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                              title="Anular factura completa y devolver stock"
+                            >
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -282,37 +282,39 @@ export default function Header({
                       </button>
                     )}
 
-                    {/* 🔥 ESTAS FUNCIONES SE OCULTAN SI ES EL USUARIO "TIENDA" 🔥 */}
+                    {/* 🔥 2. BOTÓN COMISIONES (VISIBLE PARA TODOS LOS USUARIOS LOGUEADOS INCLUYENDO TIENDA) 🔥 */}
+                    <button
+                      onClick={() => {
+                        navigate('/comisiones');
+                        setSidebarOpen(false);
+                      }}
+                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FaPercentage size={15} className="text-yellow-500 transition-colors" />
+                        <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
+                      </div>
+                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                    </button>
+
+                    {/* 🔥 3. BOTÓN GUÍAS (VISIBLE PARA TODOS LOS USUARIOS LOGUEADOS INCLUYENDO TIENDA) 🔥 */}
+                    <button
+                      onClick={() => {
+                        navigate('/guias');
+                        setSidebarOpen(false);
+                      }}
+                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FaTruck size={15} className="text-yellow-500 transition-colors" />
+                        <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
+                      </div>
+                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                    </button>
+
+                    {/* 🔥 ESTAS FUNCIONES DE GESTIÓN DE USUARIOS SE OCULTAN SI ES EL USUARIO "TIENDA" 🔥 */}
                     {!esSoloUsuarioTienda && (
                       <>
-                        <button
-                          onClick={() => {
-                            navigate('/comisiones');
-                            setSidebarOpen(false);
-                          }}
-                          className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FaPercentage size={15} className="text-yellow-500 transition-colors" />
-                            <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
-                          </div>
-                          <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            navigate('/guias');
-                            setSidebarOpen(false);
-                          }}
-                          className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FaTruck size={15} className="text-yellow-500 transition-colors" />
-                            <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
-                          </div>
-                          <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
-                        </button>
-
                         {(isSuperUser || user?.roles?.includes("add")) && (
                           <button
                             onClick={() => {
@@ -347,7 +349,7 @@ export default function Header({
                       </>
                     )}
 
-                    {/* 🔥 2. BOTÓN HISTORIAL (VISIBLE PARA USUARIO TIENDA, SUPER ADMIN O CON PERMISO HISTORY) 🔥 */}
+                    {/* 🔥 4. BOTÓN HISTORIAL (VISIBLE PARA USUARIO TIENDA, SUPER ADMIN O CON PERMISO HISTORY) 🔥 */}
                     {(isSuperUser || esSoloUsuarioTienda || canSeeHistory || user?.roles?.includes("history")) && (
                       <button
                         onClick={() => {
