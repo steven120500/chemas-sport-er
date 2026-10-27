@@ -261,17 +261,28 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     cargarContactosAlegra("");
     return () => { cancelado = true; };
   }, []);
-
-  const tiposDisponibles = useMemo(() => {
-    const setTipos = new Set(["Todos"]);
-    catalogoBase.forEach((p) => {
-      if (getAvailableSizes(p).length === 0) return;
-      const t = p.type || p.tipo;
-      if (t) setTipos.add(String(t).trim());
-    });
-    return Array.from(setTipos);
-  }, [catalogoBase]);
-
+// 🔥 Categorías fijas ("quemadas") para que aparezcan de inmediato sin esperar al backend
+const tiposDisponibles = [
+  "Todos",
+  "Temp 26-27",
+  "Nuevo",
+  "Populares",
+  "Mundial 2026",
+  "Ofertas",
+  "Nacional",
+  "Player",
+  "Fan",
+  "Retro",
+  "Mujer",
+  "Niño",
+  "Balón",
+  "Abrigos",
+  "Llaveros",
+  "NBA",
+  "MLB",
+  "NFL",
+  "F1"
+];
   // Buscador con filtro por tipo, de 15 en 15 y ocultando las agotadas
   useEffect(() => {
     const q = busquedaProducto.trim();
