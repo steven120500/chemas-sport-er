@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  FaChevronLeft, FaTrophy, FaCalendarAlt, FaSearch, 
+  FaChevronLeft, FaChevronRight, FaTrophy, FaCalendarAlt, FaSearch, 
   FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt,
   FaEdit, FaCheck, FaTimes, FaTruck, FaStar, FaUserCheck
 } from "react-icons/fa";
@@ -70,6 +70,17 @@ function getProductPrice(p) {
     if (num > 0) return num;
   }
   return 0;
+}
+
+// Genera los números de página del paginado
+function buildPages(page, pages) {
+  const pageNumbers = [];
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || (i >= page - 2 && i <= page + 2)) {
+      pageNumbers.push(i);
+    }
+  }
+  return pageNumbers;
 }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Melissa", "Ashly"];
@@ -181,6 +192,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
   const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
+
+  // 📄 Estados para el paginado de la tabla
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // ✏️ Estados para Precios Personalizados en la Tabla (con persistencia en localStorage)
   const [preciosPersonalizados, setPreciosPersonalizados] = useState(() => {
@@ -378,9 +393,14 @@ const seleccionarContactoAlegra = (c) => {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchVentas();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedMonth]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchFilter]);
 
   const ventasFiltradas = useMemo(() => {
     if (!Array.isArray(logs)) return [];
@@ -536,6 +556,15 @@ const seleccionarContactoAlegra = (c) => {
     const q = searchFilter.toLowerCase();
     return ventasFiltradas.filter((v) => v.vendedor.toLowerCase().includes(q) || v.cliente.toLowerCase().includes(q) || String(v.item || "").toLowerCase().includes(q));
   }, [ventasFiltradas, searchFilter]);
+
+  // 📄 Cálculo de páginas y recorte de filas para la página actual
+  const totalPages = Math.max(1, Math.ceil(tablaVentas.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const tablaVentasPaginadas = useMemo(() => {
+    const start = (safeCurrentPage - 1) * itemsPerPage;
+    return tablaVentas.slice(start, start + itemsPerPage);
+  }, [tablaVentas, safeCurrentPage, itemsPerPage]);
 
   const top1 = ranking.at(0) || null;
   const top2 = ranking.at(1) || null;
@@ -1145,6 +1174,11 @@ const seleccionarContactoAlegra = (c) => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">Detalle de Ventas del Periodo</h2>
+              {!loading && tablaVentas.length > 0 && (
+                <p className="text-[11px] font-bold text-zinc-400 mt-0.5">
+                  Mostrando {(safeCurrentPage - 1) * itemsPerPage + 1} - {Math.min(safeCurrentPage * itemsPerPage, tablaVentas.length)} de {tablaVentas.length} ventas
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-4 w-full sm:w-auto">
               {ventasSeleccionadas.length > 0 && (
@@ -1153,8 +1187,8 @@ const seleccionarContactoAlegra = (c) => {
                 </button>
               )}
               <div className="relative w-full sm:w-64">
-                <input type="text" value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder="Buscar por cliente..." className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black" />
-                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
+                <input type="text" value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder="Buscar por cliente o empleado ..." className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-black outline-none focus:border-black" />
+                <FaSearch className="absolute left-3.5 top-3 -translate-y-1/2 text-zinc-400" size={13} />
               </div>
             </div>
           </div>
@@ -1166,121 +1200,180 @@ const seleccionarContactoAlegra = (c) => {
               <p className="text-zinc-500 font-bold text-xs uppercase tracking-wider">No hay ventas registradas.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
-                    <th className="py-3 px-3 text-center">Sel.</th>
-                    <th className="py-3 px-3">Fecha</th>
-                    <th className="py-3 px-3">Vendedor</th>
-                    <th className="py-3 px-3">Cliente</th>
-                    <th className="py-3 px-3">Precio</th>
-                    <th className="py-3 px-3">Artículo / Tallas</th>
-                    <th className="py-3 px-3 text-right">Cant.</th>
-                    <th className="py-3 px-3 text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 font-medium">
-                  {tablaVentas.map((venta) => {
-                    const dateObj = venta.date ? new Date(venta.date) : null;
-                    const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
-                    const precioActual = obtenerPrecioVenta(venta);
-                    const estaEditando = editandoPrecioId === venta._id;
-                    const permitidoAnular = puedeAnularVenta(venta);
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
+                      <th className="py-3 px-3 text-center">Sel.</th>
+                      <th className="py-3 px-3">Fecha</th>
+                      <th className="py-3 px-3">Vendedor</th>
+                      <th className="py-3 px-3">Cliente</th>
+                      <th className="py-3 px-3">Precio</th>
+                      <th className="py-3 px-3">Artículo / Tallas</th>
+                      <th className="py-3 px-3 text-right">Cant.</th>
+                      <th className="py-3 px-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 font-medium">
+                    {tablaVentasPaginadas.map((venta) => {
+                      const dateObj = venta.date ? new Date(venta.date) : null;
+                      const isSelected = ventasSeleccionadas.some(v => v._id === venta._id);
+                      const precioActual = obtenerPrecioVenta(venta);
+                      const estaEditando = editandoPrecioId === venta._id;
+                      const permitidoAnular = puedeAnularVenta(venta);
 
-                    return (
-                      <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
-                        <td className="py-3.5 px-3 text-center">
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleSeleccionVenta(venta)} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-black" />
-                        </td>
-                        <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">{dateObj ? `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}` : ""}</td>
-                        <td className="py-3.5 px-3 font-black text-black">{venta.vendedor}</td>
-                        <td className="py-3.5 px-3 font-bold text-zinc-800">{venta.cliente}</td>
-                        
-                        {/* 🔥 COLUMNA DE PRECIO CONECTADA AL CATÁLOGO + LÁPIZ */}
-                        <td className="py-3.5 px-3 whitespace-nowrap">
-                          {estaEditando ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="relative">
-                                <span className="absolute left-2 top-1 -translate-y-1/2 text-zinc-400 font-black text-[10px]">₡</span>
-                                <input
-                                  type="number"
-                                  value={tempPrecioFila}
-                                  onChange={(e) => setTempPrecioFila(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") guardarPrecioFila(venta._id);
-                                    if (e.key === "Escape") setEditandoPrecioId(null);
-                                  }}
-                                  autoFocus
-                                  className="w-24 pl-5 pr-2 py-1 bg-white border border-black rounded-lg text-xs font-black text-black outline-none"
-                                />
+                      return (
+                        <tr key={venta._id} className={`hover:bg-zinc-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                          <td className="py-3.5 px-3 text-center">
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSeleccionVenta(venta)} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-black" />
+                          </td>
+                          <td className="py-3.5 px-3 text-zinc-500 whitespace-nowrap">{dateObj ? `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}` : ""}</td>
+                          <td className="py-3.5 px-3 font-black text-black">{venta.vendedor}</td>
+                          <td className="py-3.5 px-3 font-bold text-zinc-800">{venta.cliente}</td>
+                          
+                          {/* 🔥 COLUMNA DE PRECIO CONECTADA AL CATÁLOGO + LÁPIZ */}
+                          <td className="py-3.5 px-3 whitespace-nowrap">
+                            {estaEditando ? (
+                              <div className="flex items-center gap-1.5">
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 -translate-y-1/2 text-zinc-400 font-black text-[10px]">₡</span>
+                                  <input
+                                    type="number"
+                                    value={tempPrecioFila}
+                                    onChange={(e) => setTempPrecioFila(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") guardarPrecioFila(venta._id);
+                                      if (e.key === "Escape") setEditandoPrecioId(null);
+                                    }}
+                                    autoFocus
+                                    className="w-24 pl-5 pr-2 py-1 bg-white border border-black rounded-lg text-xs font-black text-black outline-none"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => guardarPrecioFila(venta._id)}
+                                  className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
+                                  title="Guardar precio"
+                                >
+                                  <FaCheck size={10} />
+                                </button>
+                                <button
+                                  onClick={() => setEditandoPrecioId(null)}
+                                  className="p-1.5 bg-zinc-200 text-zinc-600 rounded-lg hover:bg-zinc-300 transition-colors cursor-pointer"
+                                  title="Cancelar"
+                                >
+                                  <FaTimes size={10} />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => guardarPrecioFila(venta._id)}
-                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
-                                title="Guardar precio"
-                              >
-                                <FaCheck size={10} />
-                              </button>
-                              <button
-                                onClick={() => setEditandoPrecioId(null)}
-                                className="p-1.5 bg-zinc-200 text-zinc-600 rounded-lg hover:bg-zinc-300 transition-colors cursor-pointer"
-                                title="Cancelar"
-                              >
-                                <FaTimes size={10} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="font-black text-emerald-700 text-xs">
-                                ₡{precioActual.toLocaleString("es-CR")}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  setEditandoPrecioId(venta._id);
-                                  setTempPrecioFila(String(precioActual));
-                                }}
-                                className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
-                                title="Personalizar precio"
-                              >
-                                <FaEdit size={12} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-3 text-zinc-700">
-                          <span className="font-bold text-black block">{venta.item}</span>
-                          {venta.tallasTexto && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">Tallas: {venta.tallasTexto}</span>}
-                        </td>
-                        <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
-                        <td className="py-3.5 px-3 text-center">
-                          <div className="flex justify-center items-center gap-3">
-                            <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura">
-                              <FaReceipt size={14} />
-                            </button>
-                            {permitidoAnular ? (
-                              <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
-                                <FaTrash size={13} />
-                              </button>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)}
-                                className="p-2 text-zinc-200 cursor-not-allowed rounded-xl"
-                                title={`Solo ${venta.vendedor} o un Super Admin pueden anular esta venta`}
-                              >
-                                <FaTrash size={13} />
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-emerald-700 text-xs">
+                                  ₡{precioActual.toLocaleString("es-CR")}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setEditandoPrecioId(venta._id);
+                                    setTempPrecioFila(String(precioActual));
+                                  }}
+                                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
+                                  title="Personalizar precio"
+                                >
+                                  <FaEdit size={12} />
+                                </button>
+                              </div>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+
+                          <td className="py-3.5 px-3 text-zinc-700">
+                            <span className="font-bold text-black block">{venta.item}</span>
+                            {venta.tallasTexto && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">Tallas: {venta.tallasTexto}</span>}
+                          </td>
+                          <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
+                          <td className="py-3.5 px-3 text-center">
+                            <div className="flex justify-center items-center gap-3">
+                              <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura">
+                                <FaReceipt size={14} />
+                              </button>
+                              {permitidoAnular ? (
+                                <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
+                                  <FaTrash size={13} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)}
+                                  className="p-2 text-zinc-200 cursor-not-allowed rounded-xl"
+                                  title={`Solo ${venta.vendedor} o un Super Admin pueden anular esta venta`}
+                                >
+                                  <FaTrash size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 📄 CONTROLES DE PAGINADO DE LA TABLA */}
+              {totalPages > 1 && (
+                <div className="mt-6 pt-5 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
+                    Página {safeCurrentPage} de {totalPages}
+                  </span>
+
+                  <nav className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={safeCurrentPage === 1}
+                      className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                    >
+                      <FaChevronLeft size={11} />
+                    </button>
+
+                    {(() => {
+                      const nums = buildPages(safeCurrentPage, totalPages);
+                      return nums.map((n, i) => {
+                        const prev = nums[i - 1];
+                        const showDots = i > 0 && n - prev > 1;
+                        const isCurrent = n === safeCurrentPage;
+
+                        return (
+                          <span key={n} className="flex items-center gap-1.5">
+                            {showDots && (
+                              <span className="px-1.5 text-zinc-400 font-bold text-xs">...</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setCurrentPage(n)}
+                              className={`min-w-[34px] h-9 px-2.5 text-xs font-black rounded-xl transition-all cursor-pointer border ${
+                                isCurrent
+                                  ? "bg-black text-white border-black shadow-sm"
+                                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-black hover:bg-zinc-100"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          </span>
+                        );
+                      });
+                    })()}
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safeCurrentPage === totalPages}
+                      className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+                    >
+                      <FaChevronRight size={11} />
+                    </button>
+                  </nav>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
