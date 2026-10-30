@@ -43,7 +43,6 @@ function parsePrecioCR(val) {
   if (typeof val === "number" && !isNaN(val)) return val;
   if (!val) return 0;
   let str = String(val).trim();
-  // Si viene con decimales tipo 22000.00
   if (/^\d+\.\d{2}$/.test(str)) {
     return Math.round(Number(str));
   }
@@ -159,7 +158,6 @@ function parseSaleDetails(log) {
     .map(([talla, cant]) => (cant > 1 ? `${cant}x ${talla}` : `${talla}`))
     .join(", ");
 
-  // Si el log ya traía precio directo guardado
   let precioEnLog = parsePrecioCR(log?.price || log?.precio || log?.total || 0);
   if (!precioEnLog) {
     const matchPrecio = detailsStr.match(/(?:Precio|Total|Monto)\s*:\s*₡?\s*([\d.,]+)/i);
@@ -219,14 +217,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   });
 
-  // 🔥 MODAL UNIFICADO DE FACTURACIÓN (INCLUYE ENVÍO PERSONALIZABLE, TICKET INTERNO POR DEFECTO)
+  // 🔥 MODAL UNIFICADO DE FACTURACIÓN
   const [modalFacturar, setModalFacturar] = useState({
     isOpen: false,
     ventas: [],
     precio: "",
     incluyeEnvio: false,
     precioEnvio: "2500",
-    tipoEmision: "interno", // "interno" | "hacienda"
+    tipoEmision: "interno",
     tipoIdentificacion: "01",
     cedula: "",
     nombre: "",
@@ -248,7 +246,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     );
   }, [isSuperUser, user, storedUser]);
 
-  // Nombre del usuario logueado actualmente para validar que solo pueda anular sus propias ventas
   const nombreUsuarioActual = useMemo(() => {
     return String(
       user?.username ||
@@ -267,7 +264,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     return normText(venta.vendedor) === normText(nombreUsuarioActual);
   };
 
-  // ⭐ Cargar lista de contactos de Alegra al abrir el modal
   const cargarContactosAlegra = async (query = "") => {
     try {
       const url = query
@@ -284,7 +280,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   };
 
-  // ⭐ Alternar un contacto como Favorito
   const toggleFavoritoContacto = (idContacto, e) => {
     if (e) e.stopPropagation();
     const idStr = String(idContacto);
@@ -301,30 +296,28 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   };
 
- // ⭐ Ordenar: Favoritos primero, mostrando todos los contactos de Alegra listos para elegir
- const contactosOrdenadosYFiltrados = useMemo(() => {
-  return [...contactosAlegra].sort((a, b) => {
-    const aFav = favoritosIds.includes(String(a.id));
-    const bFav = favoritosIds.includes(String(b.id));
-    if (aFav && !bFav) return -1;
-    if (!aFav && bFav) return 1;
-    return String(a.nombre || "").localeCompare(String(b.nombre || ""));
-  });
-}, [contactosAlegra, favoritosIds]);
+  const contactosOrdenadosYFiltrados = useMemo(() => {
+    return [...contactosAlegra].sort((a, b) => {
+      const aFav = favoritosIds.includes(String(a.id));
+      const bFav = favoritosIds.includes(String(b.id));
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return String(a.nombre || "").localeCompare(String(b.nombre || ""));
+    });
+  }, [contactosAlegra, favoritosIds]);
 
-// ⭐ Seleccionar un contacto de Alegra y rellenar todos los campos del modal
-const seleccionarContactoAlegra = (c) => {
-  setModalFacturar((prev) => ({
-    ...prev,
-    tipoIdentificacion: c.tipoIdentificacion || "01",
-    cedula: c.cedula || prev.cedula,
-    nombre: c.nombre || prev.nombre,
-    telefono: c.telefono || prev.telefono,
-    correo: c.email || c.correo || prev.correo
-  }));
-  setMostrarListaContactos(false);
-  toastHOT.success(`Datos de ${c.nombre} cargados.`);
-};
+  const seleccionarContactoAlegra = (c) => {
+    setModalFacturar((prev) => ({
+      ...prev,
+      tipoIdentificacion: c.tipoIdentificacion || "01",
+      cedula: c.cedula || prev.cedula,
+      nombre: c.nombre || prev.nombre,
+      telefono: c.telefono || prev.telefono,
+      correo: c.email || c.correo || prev.correo
+    }));
+    setMostrarListaContactos(false);
+    toastHOT.success(`Datos de ${c.nombre} cargados.`);
+  };
 
   // 🛍️ 1. CARGAR CATÁLOGO COMPLETO DE PRODUCTOS
   useEffect(() => {
@@ -373,18 +366,60 @@ const seleccionarContactoAlegra = (c) => {
     fetchCatalogo();
   }, []);
 
+  // 🔥 CARGA TODAS LAS PÁGINAS DEL HISTORIAL DEL MES CON PERMISO GLOBAL PARA QUE A TODOS LES SUME IGUAL QUE A STEVEN
   const fetchVentas = async () => {
     setLoading(true);
     setVentasSeleccionadas([]); 
     try {
-      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
-      const params = new URLSearchParams({ page: "1", limit: "3000", month: selectedMonth, _: String(Date.now()) });
-      const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
-        headers: { "Content-Type": "application/json", "x-super": storedUser?.isSuperUser ? "true" : "false", "x-roles": roles },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setLogs(Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []));
+      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "history";
+      let pageN = 1;
+      const pageSize = 3000;
+      const acumulados = [];
+      const vistos = new Set();
+
+      while (true) {
+        const params = new URLSearchParams({
+          page: String(pageN),
+          limit: String(pageSize),
+          month: selectedMonth,
+          _: String(Date.now())
+        });
+        const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
+          headers: {
+            "Content-Type": "application/json",
+            "x-super": "true",
+            "x-roles": roles
+          },
+          cache: "no-store"
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+
+        let nuevosEnEstaPagina = 0;
+        items.forEach((it) => {
+          const idKey = String(it?._id || it?.id || `${it?.date}_${it?.item}_${it?.details}`);
+          if (!vistos.has(idKey)) {
+            vistos.add(idKey);
+            acumulados.push(it);
+            nuevosEnEstaPagina += 1;
+          }
+        });
+
+        // Si el backend no pagina o ya trajo todos los registros del mes, salimos del ciclo
+        if (
+          !data?.total ||
+          acumulados.length >= data.total ||
+          items.length === 0 ||
+          nuevosEnEstaPagina === 0 ||
+          pageN >= 5
+        ) {
+          break;
+        }
+        pageN += 1;
+      }
+
+      setLogs(acumulados);
     } catch (err) {
       setLogs([]);
     } finally {
@@ -402,18 +437,27 @@ const seleccionarContactoAlegra = (c) => {
     setCurrentPage(1);
   }, [searchFilter]);
 
+  // 🔥 MISMA LÓGICA ORIGINAL + ORDENADO DE MÁS RECIENTE A MÁS ANTIGUO PARA QUE LA PÁGINA 1 TENGA LAS VENTAS DE HOY
   const ventasFiltradas = useMemo(() => {
     if (!Array.isArray(logs)) return [];
-    return logs.map((log) => {
+    const procesadas = logs.map((log) => {
       const parsed = parseSaleDetails(log);
       const actionStr = String(log?.action || "").toLowerCase();
       const detailsStr = String(log?.details || "").toLowerCase();
       const esVenta = actionStr.includes("vend") || (parsed.totalUnidades > 0 && !actionStr.includes("ajust") && !actionStr.includes("actualiz") && !detailsStr.includes("ajuste"));
       return { ...log, ...parsed, esVenta };
     }).filter((v) => v.esVenta && v.totalUnidades > 0);
+
+    // Aseguramos que las más recientes estén siempre al principio (Página 1)
+    return procesadas.sort((a, b) => {
+      const tA = a.date ? new Date(a.date).getTime() : 0;
+      const tB = b.date ? new Date(b.date).getTime() : 0;
+      if (tB !== tA) return tB - tA;
+      return String(b._id || "").localeCompare(String(a._id || ""));
+    });
   }, [logs]);
 
-  // 🔍 2. SI ALGUNA VENTA TIENE PRODUCT_ID PERO NO VINO EN EL CATÁLOGO GENERAL (EJ. AGOTADO O PAGINADO), LO BUSCA INDIVIDUALMENTE
+  // 🔍 2. SI ALGUNA VENTA TIENE PRODUCT_ID PERO NO VINO EN EL CATÁLOGO GENERAL, LO BUSCA INDIVIDUALMENTE
   useEffect(() => {
     const missingIds = [
       ...new Set(
@@ -439,9 +483,7 @@ const seleccionarContactoAlegra = (c) => {
             if (pUnit > 0) {
               encontrados[id] = pUnit;
             }
-          } catch {
-            // Ignorar si no existe el endpoint individual
-          }
+          } catch {}
         })
       );
 
@@ -459,19 +501,16 @@ const seleccionarContactoAlegra = (c) => {
 
   // 💰 FUNCIÓN QUE CALCULA EL PRECIO EXACTO DE LA CAMISETA
   const obtenerPrecioVenta = (venta) => {
-    // 1. Si el usuario lo personalizó con el lápiz, usar ese precio
     if (preciosPersonalizados[venta._id] !== undefined) {
       return Number(preciosPersonalizados[venta._id]);
     }
 
     const cantidad = Number(venta.totalUnidades) || 1;
 
-    // 2. Búsqueda exacta por ID de MongoDB del producto
     if (venta.productId && catalogoMap.byId[venta.productId]) {
       return catalogoMap.byId[venta.productId] * cantidad;
     }
 
-    // 3. Búsqueda exacta por Nombre + Categoría (ej: "AC Milan Local 06-07 Kaká" + "Niño")
     const baseName = normBaseName(venta.item);
     const catFromLog = extractCatFromItem(venta.item);
     const fullText = normText(venta.item);
@@ -484,19 +523,16 @@ const seleccionarContactoAlegra = (c) => {
       return catalogoMap.byFullKey[fullText] * cantidad;
     }
 
-    // 4. Búsqueda exacta por el nombre limpio de la camiseta
     if (baseName && catalogoMap.byBaseName[baseName]) {
       return catalogoMap.byBaseName[baseName] * cantidad;
     }
 
-    // 5. Si el log de venta ya traía el precio guardado
     if (venta.precioEnLog > 0) {
       return venta.precioEnLog;
     }
 
-    // 6. Respaldo oficial según la tabla de productos de Alegra
     const itemLower = String(venta.item || "").toLowerCase();
-    let unitarioFallback = 20000; // Fan y resto por defecto
+    let unitarioFallback = 20000;
     if (itemLower.includes("llavero") || itemLower.includes("envio") || itemLower.includes("envío")) {
       unitarioFallback = 2500;
     } else if (
@@ -518,7 +554,6 @@ const seleccionarContactoAlegra = (c) => {
     return unitarioFallback * cantidad;
   };
 
-  // Guardar precio editado con el lápiz en la fila
   const guardarPrecioFila = (ventaId) => {
     const valorNum = Number(tempPrecioFila);
     if (isNaN(valorNum) || valorNum <= 0) {
@@ -651,97 +686,95 @@ const seleccionarContactoAlegra = (c) => {
     ), { duration: 6000 });
   };
 
- // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO (CON PRECIO POR PRODUCTO Y TOTAL)
- const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
-  const printWindow = window.open("", "_blank", "width=400,height=600");
-  if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
+  // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
+  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
-  const fechaHoy = new Date().toLocaleString("es-CR");
-  const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
-  const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+    const fechaHoy = new Date().toLocaleString("es-CR");
+    const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
+    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
-  const itemsHTML = ventasArray.map((v) => {
-    const cant = Number(v.totalUnidades) || 1;
-    // Calculamos el subtotal exacto de esa línea (respetando precioUnitarioCustom o el precio de la tabla)
-    const subtotalLinea = Number(v.precioUnitarioCustom) > 0
-      ? Math.round(Number(v.precioUnitarioCustom) * cant)
-      : Math.round(obtenerPrecioVenta(v));
+    const itemsHTML = ventasArray.map((v) => {
+      const cant = Number(v.totalUnidades) || 1;
+      const subtotalLinea = Number(v.precioUnitarioCustom) > 0
+        ? Math.round(Number(v.precioUnitarioCustom) * cant)
+        : Math.round(obtenerPrecioVenta(v));
 
-    return `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
-        <span style="flex: 1; padding-right: 8px;">
-          ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
-        </span>
-        <span style="font-weight: bold; white-space: nowrap;">
-          ₡${subtotalLinea.toLocaleString("es-CR")}
-        </span>
-      </div>
-    `;
-  }).join("");
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
+          <span style="flex: 1; padding-right: 8px;">
+            ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
+          </span>
+          <span style="font-weight: bold; white-space: nowrap;">
+            ₡${subtotalLinea.toLocaleString("es-CR")}
+          </span>
+        </div>
+      `;
+    }).join("");
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Tiquete ${consecutivoOficial}</title>
-        <style>
-          body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: bold; }
-          .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
-          h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
-          p { margin: 2px 0; }
-          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
-          .logo-img { max-width: 140px; height: auto; object-fit: contain; }
-        </style>
-      </head>
-      <body>
-        <div class="text-center">
-          <div class="logo-container">
-            <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Tiquete ${consecutivoOficial}</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+            h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
+            p { margin: 2px 0; }
+            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
+            .logo-img { max-width: 140px; height: auto; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <div class="text-center">
+            <div class="logo-container">
+              <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+            </div>
+            <h1>CHEMASPORT ER</h1>
+            <p>Ropa y Artículos Deportivos</p>
+            <p>Tel: +50660369857</p>
+            <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+            <p style="font-size: 10px;">CJ: 3102916554</p>
+            <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
           </div>
-          <h1>CHEMASPORT ER</h1>
-          <p>Ropa y Artículos Deportivos</p>
-          <p>Tel: +50660369857</p>
-          <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
-          <p style="font-size: 10px;">CJ: 3102916554</p>
-          <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
-        </div>
-        <div class="divider"></div>
-        <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
-        <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
-        <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
-        ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
-        ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
-        <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
-        <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
-          <span>CANT. DESCRIPCIÓN</span>
-          <span>IMPORTE</span>
-        </div>
-        ${itemsHTML}
-        <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
-          <span>TOTAL:</span>
-          <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
-        </div>
-        <div class="divider"></div>
-        <div class="text-center" style="margin-top: 20px;">
-          <p>¡Gracias por su compra!</p>
-          <p>Conserve este tiquete para reclamos.</p>
-        </div>
-        <script>
-          window.onload = function() { setTimeout(() => { window.print(); }, 300); };
-        </script>
-      </body>
-    </html>
-  `;
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-};
+          <div class="divider"></div>
+          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
+          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+          <div class="divider"></div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
+            <span>CANT. DESCRIPCIÓN</span>
+            <span>IMPORTE</span>
+          </div>
+          ${itemsHTML}
+          <div class="divider"></div>
+          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+            <span>TOTAL:</span>
+            <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="text-center" style="margin-top: 20px;">
+            <p>¡Gracias por su compra!</p>
+            <p>Conserve este tiquete para reclamos.</p>
+          </div>
+          <script>
+            window.onload = function() { setTimeout(() => { window.print(); }, 300); };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
-  // 🧾 1. ABRIR EL MODAL UNIFICADO DE FACTURACIÓN CON TICKET INTERNO COMO PRIMERA OPCIÓN POR DEFECTO
   const abrirModalFacturacion = (ventasArray) => {
     const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
     const clienteInicial = ventasArray[0]?.cliente && ventasArray[0]?.cliente !== "Cliente General" 
@@ -757,7 +790,7 @@ const seleccionarContactoAlegra = (c) => {
       precio: String(sumaPreciosTabla),
       incluyeEnvio: false,
       precioEnvio: "2500",
-      tipoEmision: "interno", // Siempre inicia en Ticket Normal (Uso Interno) como primera opción
+      tipoEmision: "interno",
       tipoIdentificacion: "01",
       cedula: "",
       nombre: clienteInicial,
@@ -766,7 +799,6 @@ const seleccionarContactoAlegra = (c) => {
     });
   };
 
-  // 🔍 BUSCAR CÉDULA EN ALEGRA / HACIENDA (DENTRO DEL MODAL UNIFICADO)
   const buscarCedulaHacienda = async () => {
     if (!modalFacturar.cedula.trim()) {
       toastHOT.error("Ingrese una cédula para buscar.");
@@ -790,7 +822,6 @@ const seleccionarContactoAlegra = (c) => {
     }
   };
 
-  // 🚀 VALIDAR Y EMITIR DESDE EL MODAL UNIFICADO (CON TODOS LOS DATOS OBLIGATORIOS EN AMBOS TIPOS)
   const confirmarYEmitirFactura = () => {
     const precioPrendas = Number(modalFacturar.precio);
     if (isNaN(precioPrendas) || precioPrendas <= 0) {
@@ -806,7 +837,6 @@ const seleccionarContactoAlegra = (c) => {
       return;
     }
 
-    // 🔥 TODOS LOS DATOS SON OBLIGATORIOS TANTO EN HACIENDA COMO EN TICKET NORMAL (NO ELECTRÓNICO)
     if (
       !modalFacturar.tipoIdentificacion ||
       !modalFacturar.cedula.trim() ||
@@ -818,7 +848,6 @@ const seleccionarContactoAlegra = (c) => {
       return;
     }
 
-    // Si el usuario editó el precio de una sola venta en el modal, sincronizar el precio de la prenda con la tabla
     if (modalFacturar.ventas.length === 1) {
       const unicaVentaId = modalFacturar.ventas[0]._id;
       const nuevosPrecios = { ...preciosPersonalizados, [unicaVentaId]: precioPrendas };
@@ -830,11 +859,9 @@ const seleccionarContactoAlegra = (c) => {
       }
     }
 
-    // Calculamos el factor de ajuste sobre las prendas por si el usuario modificó el monto en el modal
     const sumaOriginalPrendas = modalFacturar.ventas.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
     const factorPrendas = sumaOriginalPrendas > 0 ? (precioPrendas / sumaOriginalPrendas) : 1;
 
-    // Preparamos cada venta con su precio unitario exacto para que el backend no mezcle el precio del envío con las camisas
     const ventasParaEmitir = modalFacturar.ventas.map((v) => {
       const cant = Number(v.totalUnidades) || 1;
       const totalFilaAjustado = obtenerPrecioVenta(v) * factorPrendas;
@@ -844,7 +871,6 @@ const seleccionarContactoAlegra = (c) => {
       };
     });
 
-    // 🚚 Si marcó el checkbox de Envío, agregamos la línea de "Envio GAM" con su precio personalizado
     if (llevaEnvio && montoEnvio > 0) {
       ventasParaEmitir.push({
         _id: `envio_${Date.now()}`,
@@ -864,7 +890,6 @@ const seleccionarContactoAlegra = (c) => {
     const correoFinal = modalFacturar.correo.trim();
     const telefonoFinal = modalFacturar.telefono.trim();
     const tipoIdFinal = modalFacturar.tipoIdentificacion;
-    // Si es usuario normal siempre emite "interno"
     const tipoEmisionFinal = esSuperAdmin ? modalFacturar.tipoEmision : "interno";
 
     setModalFacturar((prev) => ({ ...prev, isOpen: false }));
@@ -881,7 +906,6 @@ const seleccionarContactoAlegra = (c) => {
     );
   };
 
-  // 🚀 FUNCIÓN UNIFICADA DE EMISIÓN CON BACKEND
   const ejecutarEmisionTiqueteConDatos = async (
     ventasArray, tipoEmision, precioManual, cedula, nombreCliente, email, tipoIdentificacion, telefono = ""
   ) => {
@@ -1232,7 +1256,6 @@ const seleccionarContactoAlegra = (c) => {
                           <td className="py-3.5 px-3 font-black text-black">{venta.vendedor}</td>
                           <td className="py-3.5 px-3 font-bold text-zinc-800">{venta.cliente}</td>
                           
-                          {/* 🔥 COLUMNA DE PRECIO CONECTADA AL CATÁLOGO + LÁPIZ */}
                           <td className="py-3.5 px-3 whitespace-nowrap">
                             {estaEditando ? (
                               <div className="flex items-center gap-1.5">
@@ -1392,7 +1415,6 @@ const seleccionarContactoAlegra = (c) => {
             </p>
             
             <div className="flex flex-col gap-4 mb-6">
-              {/* 1. MONTO DE LAS PRENDAS EDITABLE (Trae por defecto el de la tabla) */}
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Monto de Productos *</label>
                 <div className="relative mt-1">
@@ -1406,7 +1428,6 @@ const seleccionarContactoAlegra = (c) => {
                 </div>
               </div>
 
-              {/* 🚚 CHECKBOX DE ENVÍO + MONTO DE ENVÍO PERSONALIZABLE */}
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 transition-all">
                 <label className="flex items-center justify-between cursor-pointer select-none">
                   <div className="flex items-center gap-2.5">
@@ -1443,7 +1464,6 @@ const seleccionarContactoAlegra = (c) => {
                   </div>
                 )}
 
-                {/* Resumen del Total Final si lleva envío */}
                 {modalFacturar.incluyeEnvio && (
                   <div className="mt-2.5 flex items-center justify-between text-xs font-black text-zinc-900 pt-1">
                     <span>TOTAL A FACTURAR:</span>
@@ -1454,7 +1474,6 @@ const seleccionarContactoAlegra = (c) => {
                 )}
               </div>
 
-              {/* 2. SELECTOR DE TIPO DE COMPROBANTE (Ticket Normal primero por defecto; usuario normal solo tiene Ticket Normal) */}
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Tipo de Comprobante *</label>
                 <select 
@@ -1470,7 +1489,6 @@ const seleccionarContactoAlegra = (c) => {
                 </select>
               </div>
 
-              {/* ⭐ SELECTOR DESPLEGABLE DE CLIENTES FAVORITOS / GUARDADOS EN ALEGRA */}
               <div className="relative">
                 <button
                   type="button"
@@ -1526,7 +1544,6 @@ const seleccionarContactoAlegra = (c) => {
                 )}
               </div>
 
-              {/* 3. TIPO DE IDENTIFICACIÓN Y CÉDULA */}
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">
@@ -1571,7 +1588,6 @@ const seleccionarContactoAlegra = (c) => {
                 </div>
               </div>
 
-              {/* 4. NOMBRE DEL CLIENTE */}
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 uppercase">
                   Nombre del Cliente *
@@ -1591,7 +1607,6 @@ const seleccionarContactoAlegra = (c) => {
                 />
               </div>
 
-              {/* 5. TELÉFONO Y CORREO ELECTRÓNICO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono *</label>

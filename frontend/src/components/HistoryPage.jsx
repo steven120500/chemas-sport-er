@@ -7,9 +7,9 @@ const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
 
-const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie"];
+const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie", "Steven"];
 
-// 🛡️️ PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
+// 🛡 PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
 function parseLogDetails(log) {
   let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
@@ -20,7 +20,7 @@ function parseLogDetails(log) {
   const matchCliente = detailsStr.match(/Cliente:\s*([^|]+)/i);
   if (matchCliente && matchCliente[1]) cliente = matchCliente[1].trim();
 
-  const vendedor = log.user || "Sistema";
+  const vendedor = log.user || log.vendedor || "Sistema";
   const nombreChema = log.item || "No especificado";
 
   const items = [];
@@ -100,6 +100,15 @@ export default function HistoryPage({ isSuperUser = false }) {
     }
   }, []);
 
+  const esSuperAdmin = useMemo(() => {
+    return Boolean(
+      isSuperUser || 
+      storedUser?.isSuperUser === true || 
+      storedUser?.role === "admin" || 
+      storedUser?.rol === "admin"
+    );
+  }, [isSuperUser, storedUser]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -112,7 +121,7 @@ export default function HistoryPage({ isSuperUser = false }) {
     setLoading(true);
     setErrMsg("");
     try {
-      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
+      const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "history";
       const currentPage = overridePage !== undefined ? overridePage : page;
 
       const finalStart = overrideStart !== undefined ? overrideStart : startDate;
@@ -123,7 +132,7 @@ export default function HistoryPage({ isSuperUser = false }) {
       const finalQ = overrideQ !== undefined ? overrideQ : q;
 
       const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalType || finalQ.trim());
-      const limitVal = isFiltering ? "1000" : "30";
+      const limitVal = isFiltering ? "1000" : "50"; // Ampliado a 50 por defecto para ver más registros recientes
 
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -141,7 +150,7 @@ export default function HistoryPage({ isSuperUser = false }) {
       const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
         headers: {
           "Content-Type": "application/json",
-          "x-super": storedUser?.isSuperUser ? "true" : "false",
+          "x-super": "true", // Permitir lectura completa al usuario autenticado (incluyendo tienda)
           "x-roles": roles,
         },
       });
@@ -179,11 +188,11 @@ export default function HistoryPage({ isSuperUser = false }) {
   };
 
   async function doClear() {
-    if (!isSuperUser) return;
+    if (!esSuperAdmin) return;
     setLoading(true);
     try {
       const roles = Array.isArray(storedUser?.roles) ? storedUser.roles.join(",") : "";
-      const xsuper = storedUser?.isSuperUser ? "true" : "false";
+      const xsuper = esSuperAdmin ? "true" : "false";
       const res = await fetch(`${API_BASE}/api/history`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "x-super": xsuper, "x-roles": roles },
@@ -200,7 +209,7 @@ export default function HistoryPage({ isSuperUser = false }) {
   }
 
   function askClear() {
-    if (!isSuperUser || loading) return;
+    if (!esSuperAdmin || loading) return;
     toastHOT((t) => (
       <div className="text-center p-2">
         <p className="font-black text-gray-800 mb-3 text-sm sm:text-base">¿Eliminar todo el historial permanentemente?</p>
@@ -252,7 +261,7 @@ export default function HistoryPage({ isSuperUser = false }) {
   };
 
   const uniqueUsers = useMemo(() => {
-    const usersFromLogs = logs.map(l => l.user).filter(Boolean);
+    const usersFromLogs = logs.map(l => l.user || l.vendedor).filter(Boolean);
     return [...new Set([...BASE_USERS, ...usersFromLogs])].sort();
   }, [logs]);
 
@@ -275,7 +284,7 @@ export default function HistoryPage({ isSuperUser = false }) {
               <h2 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight tracking-tight">Historial de Registros</h2>
             </div>
 
-            {isSuperUser && (
+            {esSuperAdmin && (
               <button
                 onClick={askClear}
                 disabled={loading || logs.length === 0}
@@ -394,7 +403,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <option value="Retro">Retro</option>
                         <option value="F1">F1</option>
                         <option value="NFL">NFL</option>
-                        <option value="Llaveros">Llaveros</option> {/* 🔥 OPCIÓN DE LLAVEROS AÑADIDA AQUÍ */}
+                        <option value="Llaveros">Llaveros</option>
                       </select>
                     </div>
                   </div>
@@ -437,7 +446,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                               />
                           </div>
                           <div className="w-full min-w-0">
-                              <div className="mb-2"><strong className="text-gray-900 font-black text-sm">{log.user || "Desconocido"}</strong></div>
+                              <div className="mb-2"><strong className="text-gray-900 font-black text-sm">{log.user || log.vendedor || "Desconocido"}</strong></div>
                               <em className="text-gray-800 font-bold block text-sm not-italic leading-tight">{log.item || "—"}</em>
                               <small className="flex items-center gap-1.5 text-gray-400 block mt-2 font-semibold text-xs"><FaCalendarAlt size={10} className="mb-0.5" />{dateStr} — {timeStr}</small>
                               
