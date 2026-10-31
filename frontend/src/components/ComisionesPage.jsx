@@ -686,12 +686,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-// 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
+// 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO (PARA COMISIONES PAGE)
 const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
-  const printWindow = window.open("", "_blank", "width=400,height=600");
+  const printWindow = window.open("", "_blank", "width=400,height=650");
   if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
-  const fechaHoy = new Date().toLocaleString("es-CR");
+  const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
   const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
   const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
@@ -699,14 +699,14 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
     const cant = Number(v.totalUnidades) || 1;
     const subtotalLinea = Number(v.precioUnitarioCustom) > 0
       ? Math.round(Number(v.precioUnitarioCustom) * cant)
-      : Math.round(obtenerPrecioVenta(v));
+      : Math.round(typeof obtenerPrecioVenta === "function" ? obtenerPrecioVenta(v) : (Number(v.precio || 0) * cant));
 
     return `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
         <span style="flex: 1; padding-right: 8px;">
           ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
         </span>
-        <span style="font-weight: bold; white-space: nowrap;">
+        <span style="font-weight: 900; white-space: nowrap;">
           ₡${subtotalLinea.toLocaleString("es-CR")}
         </span>
       </div>
@@ -719,40 +719,46 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
       <head>
         <title>Tiquete ${consecutivoOficial}</title>
         <style>
-          /* 🔥 Forçar o tamanho exato para rolo térmico de 80mm e remover margens da folha */
           @page {
             size: 80mm auto;
             margin: 0;
           }
+          * {
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body { 
-            font-family: 'Courier New', Courier, monospace; 
-            color: #000; 
+            font-family: Arial, Helvetica, sans-serif; 
+            color: #000000; 
+            font-weight: 700;
             margin: 0; 
-            padding: 8px; 
+            padding: 6px 8px; 
             width: 100%; 
             max-width: 72mm; 
             font-size: 12px; 
+            line-height: 1.35;
           }
           .text-center { text-align: center; }
-          .font-bold { font-weight: bold; }
-          .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
-          h1 { font-size: 16px; margin: 0 0 4px 0; text-transform: uppercase; }
-          p { margin: 2px 0; }
-          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
-          .logo-img { max-width: 140px; height: auto; object-fit: contain; }
+          .font-bold { font-weight: 900; }
+          .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
+          h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+          p { margin: 3px 0; font-weight: 700; }
+          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
+          .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
         </style>
       </head>
       <body>
         <div class="text-center">
           <div class="logo-container">
-            <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+            <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
           </div>
           <h1>CHEMASPORT ER</h1>
           <p>Ropa y Artículos Deportivos</p>
           <p>Tel: +50660369857</p>
-          <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
-          <p style="font-size: 10px;">CJ: 3102916554</p>
-          <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
+          <p style="font-size: 11px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+          <p style="font-size: 11px;">CJ: 3102916554</p>
+          <p style="font-size: 11px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
         </div>
         <div class="divider"></div>
         <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
@@ -762,23 +768,37 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
         ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
         <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
         <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
           <span>CANT. DESCRIPCIÓN</span>
           <span>IMPORTE</span>
         </div>
         ${itemsHTML}
         <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; margin-top: 10px;">
           <span>TOTAL:</span>
           <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
         </div>
         <div class="divider"></div>
-        <div class="text-center" style="margin-top: 20px;">
+        <div class="text-center" style="margin-top: 15px; font-weight: 900;">
           <p>¡Gracias por su compra!</p>
-          <p>Conserve este tiquete para reclamos.</p>
+          <p style="font-size: 11px;">Conserve este tiquete para reclamos.</p>
         </div>
         <script>
-          window.onload = function() { setTimeout(() => { window.print(); }, 300); };
+          function dispararImpresion() {
+            setTimeout(function() {
+              window.focus();
+              window.print();
+            }, 250);
+          }
+          window.onload = function() {
+            var img = document.getElementById('ticket-logo');
+            if (img && !img.complete) {
+              img.onload = dispararImpresion;
+              img.onerror = dispararImpresion;
+            } else {
+              dispararImpresion();
+            }
+          };
         </script>
       </body>
     </html>

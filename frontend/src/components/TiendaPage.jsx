@@ -588,9 +588,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const cant = Number(v.totalUnidades) || 1;
       const subtotalLinea = Math.round(Number(v.precioUnitarioCustom || v.precio || 0) * cant);
       return `
-        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
           <span style="flex: 1; padding-right: 8px;">${cant}x ${v.item} (${v.tallasTexto || v.talla || 'U'})</span>
-          <span style="font-weight: bold;">₡${subtotalLinea.toLocaleString("es-CR")}</span>
+          <span style="font-weight: 900; white-space: nowrap;">₡${subtotalLinea.toLocaleString("es-CR")}</span>
         </div>
       `;
     }).join("");
@@ -601,20 +601,45 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         <head>
           <title>Tiquete ${consecutivoOficial}</title>
           <style>
-            body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            * {
+              color: #000000 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body { 
+              font-family: Arial, Helvetica, sans-serif; 
+              color: #000000; 
+              font-weight: 700;
+              margin: 0; 
+              padding: 6px 8px; 
+              width: 100%; 
+              max-width: 72mm; 
+              font-size: 12px; 
+              line-height: 1.35;
+            }
             .text-center { text-align: center; }
-            .font-bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
-            h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
-            p { margin: 2px 0; }
+            .font-bold { font-weight: 900; }
+            .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
+            h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            p { margin: 3px 0; font-weight: 700; }
+            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
+            .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
           </style>
         </head>
         <body>
           <div class="text-center">
+            <div class="logo-container">
+              <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+            </div>
             <h1>CHEMASPORT ER</h1>
             <p>Tienda Física Mostrador</p>
             <p>Tel: +50660369857</p>
-            <p style="font-size: 10px;">50 metros oeste bomba Delta, Grecia</p>
+            <p style="font-size: 11px;">50 metros oeste bomba Delta, Grecia</p>
+            <p style="font-size: 11px;">CJ: 3102916554</p>
           </div>
           <div class="divider"></div>
           <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
@@ -624,21 +649,38 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <p><span class="font-bold">Método Pago:</span> ${metodoPago}</p>
           <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
           <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
             <span>CANT. DESCRIPCIÓN</span>
             <span>IMPORTE</span>
           </div>
           ${itemsHTML}
           <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; margin-top: 10px;">
             <span>TOTAL:</span>
             <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
           </div>
           <div class="divider"></div>
-          <div class="text-center" style="margin-top: 15px;">
+          <div class="text-center" style="margin-top: 15px; font-weight: 900;">
             <p>¡Gracias por su compra!</p>
+            <p style="font-size: 11px;">Conserve este tiquete para cambios o garantías.</p>
           </div>
-          <script>window.onload = function() { setTimeout(() => window.print(), 300); };</script>
+          <script>
+            function dispararImpresion() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 250);
+            }
+            window.onload = function() {
+              var img = document.getElementById('ticket-logo');
+              if (img && !img.complete) {
+                img.onload = dispararImpresion;
+                img.onerror = dispararImpresion;
+              } else {
+                dispararImpresion();
+              }
+            };
+          </script>
         </body>
       </html>
     `;
