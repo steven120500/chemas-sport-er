@@ -616,7 +616,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               font-weight: 700;
               margin: 0; 
               /* 🔥 AQUÍ ESTÁ EL TRUCO: Aumentamos el margen izquierdo global del body para centrar todo por igual */
-              padding: 6px 4px 6px 36px; 
+              padding: 6px 4px 6px 26px; 
               width: 100%; 
               max-width: 72mm; 
               font-size: 12px; 
