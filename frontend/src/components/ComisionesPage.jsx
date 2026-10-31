@@ -733,7 +733,7 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
             color: #000000; 
             font-weight: 700;
             margin: 0; 
-            padding: 6px 8px; 
+            padding: 6px 4px 6px 8px; 
             width: 100%; 
             max-width: 72mm; 
             font-size: 12px; 
@@ -743,6 +743,9 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
           .font-bold { font-weight: 900; }
           .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
           h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+          .ticket-info {
+            padding-left: 3mm;
+          }
           p { margin: 3px 0; font-weight: 700; }
           .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
           .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
@@ -761,12 +764,14 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
           <p style="font-size: 11px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
         </div>
         <div class="divider"></div>
-        <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
-        <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
-        <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
-        ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
-        ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
-        <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+        <div class="ticket-info">
+          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
+          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+        </div>
         <div class="divider"></div>
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
           <span>CANT. DESCRIPCIÓN</span>
@@ -807,6 +812,7 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 };
+
   const abrirModalFacturacion = (ventasArray) => {
     const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
     const clienteInicial = ventasArray[0]?.cliente && ventasArray[0]?.cliente !== "Cliente General" 
