@@ -1106,9 +1106,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         {/* ENCABEZADO */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
-              ChemaSport ER 
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
+                ChemaSport ER 
+              </h1>
+              {/* 🔥 Contador de Chemas visual */}
+              <div className="bg-black text-white px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-md">
+                <FaShoppingBag className="text-white" size={14} />
+                <span className="text-xs font-black uppercase tracking-widest">
+                  {resumenCaja.totalPrendas || 0} Chemas
+                </span>
+              </div>
+            </div>
             <p className="text-zinc-500 text-sm font-medium mt-1">
               Facturación directa y arqueo de caja exclusivo para ventas en mostrador.
             </p>

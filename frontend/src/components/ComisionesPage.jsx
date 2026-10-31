@@ -686,95 +686,107 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-  // 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
-  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
-    const printWindow = window.open("", "_blank", "width=400,height=600");
-    if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
+// 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO
+const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
+  const printWindow = window.open("", "_blank", "width=400,height=600");
+  if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
-    const fechaHoy = new Date().toLocaleString("es-CR");
-    const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
-    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+  const fechaHoy = new Date().toLocaleString("es-CR");
+  const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
+  const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
-    const itemsHTML = ventasArray.map((v) => {
-      const cant = Number(v.totalUnidades) || 1;
-      const subtotalLinea = Number(v.precioUnitarioCustom) > 0
-        ? Math.round(Number(v.precioUnitarioCustom) * cant)
-        : Math.round(obtenerPrecioVenta(v));
+  const itemsHTML = ventasArray.map((v) => {
+    const cant = Number(v.totalUnidades) || 1;
+    const subtotalLinea = Number(v.precioUnitarioCustom) > 0
+      ? Math.round(Number(v.precioUnitarioCustom) * cant)
+      : Math.round(obtenerPrecioVenta(v));
 
-      return `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
-          <span style="flex: 1; padding-right: 8px;">
-            ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
-          </span>
-          <span style="font-weight: bold; white-space: nowrap;">
-            ₡${subtotalLinea.toLocaleString("es-CR")}
-          </span>
-        </div>
-      `;
-    }).join("");
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tiquete ${consecutivoOficial}</title>
-          <style>
-            body { font-family: 'Courier New', Courier, monospace; color: #000; margin: 0; padding: 15px; width: 100%; max-width: 300px; font-size: 12px; }
-            .text-center { text-align: center; }
-            .font-bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
-            h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
-            p { margin: 2px 0; }
-            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
-            .logo-img { max-width: 140px; height: auto; object-fit: contain; }
-          </style>
-        </head>
-        <body>
-          <div class="text-center">
-            <div class="logo-container">
-              <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
-            </div>
-            <h1>CHEMASPORT ER</h1>
-            <p>Ropa y Artículos Deportivos</p>
-            <p>Tel: +50660369857</p>
-            <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
-            <p style="font-size: 10px;">CJ: 3102916554</p>
-            <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
-          </div>
-          <div class="divider"></div>
-          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
-          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
-          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
-          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
-          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
-          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
-          <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
-            <span>CANT. DESCRIPCIÓN</span>
-            <span>IMPORTE</span>
-          </div>
-          ${itemsHTML}
-          <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
-            <span>TOTAL:</span>
-            <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="text-center" style="margin-top: 20px;">
-            <p>¡Gracias por su compra!</p>
-            <p>Conserve este tiquete para reclamos.</p>
-          </div>
-          <script>
-            window.onload = function() { setTimeout(() => { window.print(); }, 300); };
-          </script>
-        </body>
-      </html>
+    return `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin-bottom: 6px;">
+        <span style="flex: 1; padding-right: 8px;">
+          ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
+        </span>
+        <span style="font-weight: bold; white-space: nowrap;">
+          ₡${subtotalLinea.toLocaleString("es-CR")}
+        </span>
+      </div>
     `;
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+  }).join("");
 
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Tiquete ${consecutivoOficial}</title>
+        <style>
+          /* 🔥 Forçar o tamanho exato para rolo térmico de 80mm e remover margens da folha */
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          body { 
+            font-family: 'Courier New', Courier, monospace; 
+            color: #000; 
+            margin: 0; 
+            padding: 8px; 
+            width: 100%; 
+            max-width: 72mm; 
+            font-size: 12px; 
+          }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: bold; }
+          .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+          h1 { font-size: 16px; margin: 0 0 4px 0; text-transform: uppercase; }
+          p { margin: 2px 0; }
+          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 10px; }
+          .logo-img { max-width: 140px; height: auto; object-fit: contain; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div class="logo-container">
+            <img src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+          </div>
+          <h1>CHEMASPORT ER</h1>
+          <p>Ropa y Artículos Deportivos</p>
+          <p>Tel: +50660369857</p>
+          <p style="font-size: 10px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+          <p style="font-size: 10px;">CJ: 3102916554</p>
+          <p style="font-size: 10px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
+        </div>
+        <div class="divider"></div>
+        <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+        <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+        <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+        ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+        ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
+        <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+        <div class="divider"></div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px;">
+          <span>CANT. DESCRIPCIÓN</span>
+          <span>IMPORTE</span>
+        </div>
+        ${itemsHTML}
+        <div class="divider"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
+          <span>TOTAL:</span>
+          <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
+        </div>
+        <div class="divider"></div>
+        <div class="text-center" style="margin-top: 20px;">
+          <p>¡Gracias por su compra!</p>
+          <p>Conserve este tiquete para reclamos.</p>
+        </div>
+        <script>
+          window.onload = function() { setTimeout(() => { window.print(); }, 300); };
+        </script>
+      </body>
+    </html>
+  `;
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+};
   const abrirModalFacturacion = (ventasArray) => {
     const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
     const clienteInicial = ventasArray[0]?.cliente && ventasArray[0]?.cliente !== "Cliente General" 
