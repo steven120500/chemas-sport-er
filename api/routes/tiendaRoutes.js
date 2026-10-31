@@ -591,8 +591,15 @@ router.post('/emitir', async (req, res) => {
 
     const ahora = new Date();
     const diaRegistro = fechaYMD || getHoyYMD();
+   
     const fechaHoraStr = ahora.toLocaleString("es-CR", {
-      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+      timeZone: "America/Costa_Rica",
+      day: "2-digit", 
+      month: "2-digit", 
+      year: "numeric", 
+      hour: "2-digit", 
+      minute: "2-digit",
+      hour12: true
     });
 
     const nuevaFacturaTienda = await TiendaFactura.create({
