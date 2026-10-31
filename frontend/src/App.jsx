@@ -434,6 +434,14 @@ function MainApp() {
     const filtered = sourceList.filter((product) => {
       if (!canEdit && product.hidden === true) return false;
 
+      // 🔥 Ocultar productos agotados a los usuarios clientes
+      if (!canEdit) {
+        const totalStockGlobal = Object.values(product.tienda || {}).reduce((a, b) => a + Number(b || 0), 0) +
+                                 Object.values(product.stock || {}).reduce((a, b) => a + Number(b || 0), 0) +
+                                 Object.values(product.bodega || {}).reduce((a, b) => a + Number(b || 0), 0);
+        if (totalStockGlobal <= 0) return false;
+      }
+
       // Buscar cada palabra escrita tanto en el nombre como en el tipo (ej: "real madrid player")
       if (searchWords.length > 0) {
         const fullSearchableText = removeAccents(
