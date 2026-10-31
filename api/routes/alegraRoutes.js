@@ -411,7 +411,15 @@ router.post('/emitir-tiquete', async (req, res) => {
     });
 
     totalFactura = Number(totalFactura.toFixed(2));
-    const fechaActual = new Date().toISOString().split('T')[0];
+
+    // 🔥 Obtener la fecha local exacta de Costa Rica (YYYY-MM-DD) sin desfasarse por UTC
+const formatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Costa_Rica',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+const fechaActual = formatter.format(new Date());
     
     // 📄 PREPARAMOS LA FACTURA
     const payloadAlegra = {
