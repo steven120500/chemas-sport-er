@@ -25,6 +25,9 @@ export default function Header({
   const scrollRef = useRef(null);
   const [isDraggingCSS, setIsDraggingCSS] = useState(false);
   
+  // 🔥 ESTADO PARA LA ANIMACIÓN DEL FONDO Y LETRAS 🔥
+  const [isLightMode, setIsLightMode] = useState(false);
+  
   const isMouseDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftPos = useRef(0);
@@ -32,6 +35,15 @@ export default function Header({
   
   const accumulator = useRef(0); 
 
+  // 🔥 Efecto para alternar entre Blanco y Negro cada 4 segundos 🔥
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsLightMode((prev) => !prev);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Efecto del auto-scroll de las categorías
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -123,7 +135,7 @@ export default function Header({
     { label: "F1", value: "F1" }, 
   ];
 
-  // 🔥 IDENTIFICAR SI ES EL USUARIO "TIENDA" O SUPER ADMIN 🔥
+  // IDENTIFICAR SI ES EL USUARIO "TIENDA" O SUPER ADMIN
   const usernameLower = String(user?.username || user?.name || user?.firstName || "").trim().toLowerCase();
   const esSoloUsuarioTienda = !isSuperUser && (
     usernameLower === "tienda" || 
@@ -136,10 +148,12 @@ export default function Header({
 
   return (
     <header
-      className="sticky top-0 z-50 w-full shadow-md border-none"
-      style={{ backgroundColor: '#050505' }}
+      className={`sticky top-0 z-50 w-full shadow-md border-none transition-colors duration-1000 ${
+        isLightMode ? "bg-white" : "bg-black"
+      }`}
     >
       <div className="relative px-2 sm:px-6 py-2 sm:py-4">
+        {/* Capa sutil de fondo */}
         <div
           className="absolute inset-0 opacity-10"
           style={{ backgroundSize: "cover", backgroundPosition: "center" }}
@@ -147,12 +161,21 @@ export default function Header({
 
         <div className="relative z-10 flex items-center justify-between w-full">
           <button onClick={onLogoClick} className="focus:outline-none bg-transparent cursor-pointer" title="Volver al inicio">
-            <img src={logo} alt="Logo Chemas Sport" className="h-14 sm:h-16 transition-transform duration-700 hover:scale-105" />
+            {/* 🔥 Logo: Se invierte el color cuando el fondo es blanco 🔥 */}
+            <img 
+              src={logo} 
+              alt="Logo Chemas Sport" 
+              className={`h-14 sm:h-16 transition-all duration-1000 hover:scale-105 ${
+                isLightMode ? "invert brightness-0" : ""
+              }`} 
+            />
           </button>
 
-          {/* 🔥 Letras en amarillo con resplandor 🔥 */}
+          {/* 🔥 Letras del título limpias, cambiando solo de color 🔥 */}
           <h1
-            className="absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)] transition-colors duration-700"
+            className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-1000 ${
+              isLightMode ? "text-black" : "text-white"
+            }`}
           >
             ChemaSport ER
           </h1>
@@ -162,7 +185,11 @@ export default function Header({
               <button
                 onClick={() => setSidebarOpen(true)}
                 title={user ? "Menú de usuario" : "Iniciar sesión"}
-                className="rounded-full p-3 shadow-lg transition-all duration-300 cursor-pointer border border-[#333] bg-[#111] text-yellow-500 hover:text-white hover:border-gray-500"
+                className={`rounded-full p-3 shadow-lg transition-all duration-1000 cursor-pointer border ${
+                  isLightMode 
+                    ? "bg-gray-100 border-gray-300 text-black hover:border-black" 
+                    : "bg-black border-zinc-700 text-white hover:border-gray-500"
+                }`}
               >
                 {user ? (
                   <div className="w-5 h-5 flex items-center justify-center font-black text-xs">
@@ -177,7 +204,10 @@ export default function Header({
         </div>
       </div>
 
-      <div className="w-full border-t border-[#1a1a1a] overflow-hidden">
+      {/* 🔥 Divisor inferior del header animado 🔥 */}
+      <div className={`w-full border-t overflow-hidden transition-colors duration-1000 ${
+        isLightMode ? "border-gray-200" : "border-zinc-800"
+      }`}>
         <div className="w-full relative">
           <nav 
             ref={scrollRef}
@@ -203,19 +233,20 @@ export default function Header({
                        if (setFilterType) setFilterType(item.value);
                      }
                   }}
-                  className={`group relative flex items-center text-[11px] sm:text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-colors duration-300 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 cursor-pointer ${
+                  className={`group relative flex items-center text-[11px] sm:text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-colors duration-1000 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 cursor-pointer ${
                     isActive 
-                      ? "text-yellow-500 drop-shadow-[0_0_5px_#ca8a04]" 
-                      : "text-gray-400 hover:text-yellow-400"
+                      ? (isLightMode ? "text-black" : "text-white") 
+                      : (isLightMode ? "text-gray-500 hover:text-black" : "text-gray-500 hover:text-white")
                   }`}
                 >
                   {item.label}
                   
+                  {/* 🔥 Línea indicadora inferior animada 🔥 */}
                   <span 
-                    className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-300 ${
+                    className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-1000 ${
                       isActive 
-                        ? "w-full bg-yellow-500 shadow-[0_0_8px_#ca8a04]" 
-                        : "w-0 group-hover:w-full bg-[#333]"
+                        ? `w-full ${isLightMode ? "bg-black shadow-[0_0_8px_rgba(0,0,0,0.4)]" : "bg-white shadow-[0_0_8px_#ffffff]"}` 
+                        : `w-0 group-hover:w-full ${isLightMode ? "bg-gray-400" : "bg-white"}`
                     }`}
                   />
                 </button>
@@ -234,12 +265,12 @@ export default function Header({
             className="fixed top-0 right-0 h-full w-80 sm:w-88 shadow-[-10px_0_30px_rgba(0,0,0,0.8)] animate-in slide-in-from-right duration-300 border-l border-[#222]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 🔥 Sidebar en modo oscuro premium 🔥 */}
+            {/* Sidebar en modo oscuro premium (Este se mantiene oscuro por estética) */}
             <div className="relative h-full flex flex-col justify-between p-6 sm:p-7 text-white font-sans" style={{ backgroundColor: '#0a0a0a' }}>
               
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="absolute top-5 right-5 p-2 text-gray-400 hover:text-yellow-500 hover:bg-[#111] rounded-full transition-colors cursor-pointer z-10 bg-transparent border-0"
+                className="absolute top-5 right-5 p-2 text-gray-400 hover:text-white hover:bg-[#111] rounded-full transition-colors cursor-pointer z-10 bg-transparent border-0"
                 title="Cerrar"
               >
                 <FaTimes size={20} />
@@ -249,7 +280,7 @@ export default function Header({
                 <div className="mt-8 flex-grow overflow-y-auto pr-1">
                   
                   <div className="mb-6 p-4 rounded-2xl bg-[#111] border border-[#222] flex items-center gap-3.5 shadow-sm">
-                    <div className="w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(202,138,4,0.4)]">
+                    <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                       {getInitials(user.firstName || user.username || user.name)}
                     </div>
                     <div className="overflow-hidden min-w-0 flex-1">
@@ -265,54 +296,50 @@ export default function Header({
 
                   <nav className="space-y-2.5">
                     
-                    {/* 🔥 1. BOTÓN TIENDA FÍSICA (PARA USUARIO TIENDA Y SUPER ADMIN) 🔥 */}
                     {esAdminTienda && (
                       <button
                         onClick={() => {
                           navigate('/tienda');
                           setSidebarOpen(false);
                         }}
-                        className="w-full bg-amber-500/10 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                        className="w-full bg-white/5 border border-white/20 hover:border-white/40 hover:bg-white/10 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaStore size={15} className="text-yellow-500 transition-colors" />
-                          <span className="group-hover:text-yellow-400 transition-colors">Tienda Física</span>
+                          <FaStore size={15} className="text-white transition-colors" />
+                          <span className="group-hover:text-gray-200 transition-colors">Tienda Física</span>
                         </div>
-                        <FaChevronRight size={12} className="text-yellow-600 group-hover:text-amber-400 transition-colors" />
+                        <FaChevronRight size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                       </button>
                     )}
 
-                    {/* 🔥 2. BOTÓN COMISIONES (VISIBLE PARA TODOS LOS USUARIOS LOGUEADOS INCLUYENDO TIENDA) 🔥 */}
                     <button
                       onClick={() => {
                         navigate('/comisiones');
                         setSidebarOpen(false);
                       }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                      className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                     >
                       <div className="flex items-center gap-3">
-                        <FaPercentage size={15} className="text-yellow-500 transition-colors" />
-                        <span className="group-hover:text-yellow-400 transition-colors">Comisiones</span>
+                        <FaPercentage size={15} className="text-white transition-colors" />
+                        <span className="group-hover:text-white transition-colors">Comisiones</span>
                       </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
                     </button>
 
-                    {/* 🔥 3. BOTÓN GUÍAS (VISIBLE PARA TODOS LOS USUARIOS LOGUEADOS INCLUYENDO TIENDA) 🔥 */}
                     <button
                       onClick={() => {
                         navigate('/guias');
                         setSidebarOpen(false);
                       }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                      className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                     >
                       <div className="flex items-center gap-3">
-                        <FaTruck size={15} className="text-yellow-500 transition-colors" />
-                        <span className="group-hover:text-yellow-400 transition-colors">Guías</span>
+                        <FaTruck size={15} className="text-white transition-colors" />
+                        <span className="group-hover:text-white transition-colors">Guías</span>
                       </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
                     </button>
 
-                    {/* 🔥 ESTAS FUNCIONES DE GESTIÓN DE USUARIOS SE OCULTAN SI ES EL USUARIO "TIENDA" 🔥 */}
                     {!esSoloUsuarioTienda && (
                       <>
                         {(isSuperUser || user?.roles?.includes("add")) && (
@@ -321,13 +348,13 @@ export default function Header({
                               setShowRegisterUserModal(true);
                               setSidebarOpen(false);
                             }}
-                            className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                            className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                           >
                             <div className="flex items-center gap-3">
-                              <FaUserPlus size={16} className="text-yellow-500 transition-colors" />
-                              <span className="group-hover:text-yellow-400 transition-colors">Agregar usuario</span>
+                              <FaUserPlus size={16} className="text-white transition-colors" />
+                              <span className="group-hover:text-white transition-colors">Agregar usuario</span>
                             </div>
-                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
                           </button>
                         )}
 
@@ -337,32 +364,31 @@ export default function Header({
                               setShowUserListModal(true);
                               setSidebarOpen(false);
                             }}
-                            className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                            className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                           >
                             <div className="flex items-center gap-3">
-                              <FaUsers size={16} className="text-yellow-500 transition-colors" />
-                              <span className="group-hover:text-yellow-400 transition-colors">Ver usuarios</span>
+                              <FaUsers size={16} className="text-white transition-colors" />
+                              <span className="group-hover:text-white transition-colors">Ver usuarios</span>
                             </div>
-                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
                           </button>
                         )}
                       </>
                     )}
 
-                    {/* 🔥 4. BOTÓN HISTORIAL (VISIBLE PARA USUARIO TIENDA, SUPER ADMIN O CON PERMISO HISTORY) 🔥 */}
                     {(isSuperUser || esSoloUsuarioTienda || canSeeHistory || user?.roles?.includes("history")) && (
                       <button
                         onClick={() => {
                           setShowHistoryModal(true);
                           setSidebarOpen(false);
                         }}
-                        className="w-full bg-[#111] border border-[#222] hover:border-yellow-500 hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
+                        className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
                       >
                         <div className="flex items-center gap-3">
-                          <FaHistory size={15} className="text-yellow-500 transition-colors" />
-                          <span className="group-hover:text-yellow-400 transition-colors">Historial</span>
+                          <FaHistory size={15} className="text-white transition-colors" />
+                          <span className="group-hover:text-white transition-colors">Historial</span>
                         </div>
-                        <FaChevronRight size={12} className="text-gray-600 group-hover:text-yellow-500 transition-colors" />
+                        <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
                       </button>
                     )}
 
@@ -381,7 +407,7 @@ export default function Header({
                 </div>
               ) : (
                 <div className="my-auto flex flex-col items-center text-center px-4 w-full">
-                  <div className="w-16 h-16 rounded-full bg-[#111] border border-[#333] flex items-center justify-center text-yellow-500 mb-5 shadow-[0_0_15px_rgba(202,138,4,0.15)]">
+                  <div className="w-16 h-16 rounded-full bg-[#111] border border-[#333] flex items-center justify-center text-white mb-5 shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                     <FaUser size={24} />
                   </div>
                   <h3 className="text-3xl font-black text-white tracking-tight mb-1.5">
@@ -395,7 +421,7 @@ export default function Header({
                       onLoginClick();
                       setSidebarOpen(false);
                     }}
-                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_5px_15px_rgba(202,138,4,0.3)] active:scale-95 cursor-pointer"
+                    className="w-full bg-white hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_5px_15px_rgba(255,255,255,0.2)] active:scale-95 cursor-pointer"
                   >
                     INICIAR SESIÓN
                   </button>

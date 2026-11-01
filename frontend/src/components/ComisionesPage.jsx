@@ -733,7 +733,7 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
             color: #000000; 
             font-weight: 700;
             margin: 0; 
-            padding: 6px 4px 6px 26px; 
+            padding: 6px 4px 8px 24px; 
             width: 100%; 
             max-width: 72mm; 
             font-size: 12px; 

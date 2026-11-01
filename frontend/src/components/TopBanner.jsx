@@ -28,11 +28,11 @@ function TopBanner() {
   return (
     <div 
       // 🔥 Fondo oscuro premium fusionado con el Header 🔥
-      className="text-center py-2.5 sm:py-5   overflow-hidden"
-      style={{ backgroundColor: '#050505' }}
+      className="text-center py-2.5 sm:py-5   overflow-hidden bg-white"
+
     >
       <div 
-        className={`text-[10px] sm:text-m font-black tracking-[0.2em] text-yellow-500 uppercase transition-opacity duration-500 ease-in-out ${
+        className={`text-[10px] sm:text-m font-black tracking-[0.2em] text-black uppercase transition-opacity duration-500 ease-in-out ${
           fade ? 'opacity-100' : 'opacity-0'
         }`}
       >

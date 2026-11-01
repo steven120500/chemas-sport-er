@@ -3,19 +3,15 @@ import React, { useState, useEffect } from 'react';
 const IntroLoader = ({ onFinished }) => {
   const [visible, setVisible] = useState(true);
   const [fadeIntro, setFadeIntro] = useState(false);
-  // Usaremos decimales para que el cálculo visual sea sub-píxel perfecto
-  const [progress, setProgress] = useState(0); 
-  
-  // 🔥 FASES FANTASMA: 0=Levitando, 1=Invocación (Brazos arriba), 2=Impacto CHEMA, 3=Impacto ER
+  const [progress, setProgress] = useState(0);
   const [cinePhase, setCinePhase] = useState(0);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
 
-    // 1. Barra de progreso sincronizada a los fotogramas del dispositivo (60/120fps)
     let animationFrameId;
     const startTime = performance.now();
-    const duration = 2000; // 2 segundos exactos para llegar a 100%
+    const duration = 2000;
 
     const updateProgress = (currentTime) => {
       const elapsed = currentTime - startTime;
@@ -30,18 +26,17 @@ const IntroLoader = ({ onFinished }) => {
 
     animationFrameId = requestAnimationFrame(updateProgress);
     
-    // 2. TIMELINE PARANORMAL
-    const t1 = setTimeout(() => setCinePhase(1), 1800); // Se detiene y levanta los brazos
-    const t2 = setTimeout(() => setCinePhase(2), 2200); // Aparece CHEMA SPORT
-    const t3 = setTimeout(() => setCinePhase(3), 2500); // Aparece ER
+    // TIMELINE DE LA JUGADA Y EL GOL
+    const t1 = setTimeout(() => setCinePhase(1), 1700); // Remate al arco
+    const t2 = setTimeout(() => setCinePhase(2), 2050); // ¡Gol! Impacto en la red y aparece CHEMA SPORT
+    const t3 = setTimeout(() => setCinePhase(3), 2300); // Aparece ER
     
-    // 3. Salida y cierre (Total: ~3.8 segundos)
-    const fadeTimer = setTimeout(() => setFadeIntro(true), 3200); 
+    const fadeTimer = setTimeout(() => setFadeIntro(true), 3100); 
     const endTimer = setTimeout(() => {
       setVisible(false);
       document.body.style.overflow = 'auto';
       if (onFinished) onFinished();
-    }, 3900);
+    }, 3800);
 
     return () => {
       document.body.style.overflow = 'auto';
@@ -56,177 +51,246 @@ const IntroLoader = ({ onFinished }) => {
 
   if (!visible) return null;
 
-  const startX = 15;
-  // Avanza hasta el 50% y ahí se queda flotando
-  const stickmanPosition = Math.min(startX + (progress * 0.45), 50);
+  const startX = 12;
+  const playerPosition = Math.min(startX + (progress * 0.38), 50);
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between px-6 py-12 transition-opacity duration-[700ms] ease-out ${
-        fadeIntro ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      } bg-black overflow-hidden`} 
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between px-6 py-10 transition-all duration-700 ease-out select-none ${
+        fadeIntro ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
+      } bg-white text-black overflow-hidden font-sans`} 
     >
       <style>
         {`
-          /* ⭐ IMPACTOS GLITCH Y SANGRE ⭐ */
-          @keyframes textSlam {
-            0% { transform: scale(2.5) translateY(20px); opacity: 0; filter: blur(8px) drop-shadow(0 0 20px #dc2626); color: #dc2626; }
-            40% { transform: scale(0.9); opacity: 1; filter: blur(0px) drop-shadow(0 0 0px transparent); color: #fff; }
-            50% { transform: scale(1.05); color: #ea580c; } 
-            100% { transform: scale(1); opacity: 1; color: #fff; }
+          @keyframes pulsePitch {
+            0%, 100% { opacity: 0.03; transform: scale(1); }
+            50% { opacity: 0.07; transform: scale(1.02); }
           }
-          .animate-slam { animation: textSlam 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-          
-          @keyframes glitchEffect {
-             0% { opacity: 1; transform: translate(0); filter: hue-rotate(0deg); }
-             20% { opacity: 0.8; transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
-             40% { opacity: 1; transform: translate(2px, -2px); filter: hue-rotate(-90deg); }
-             60% { opacity: 0.9; transform: translate(-2px, -2px); filter: hue-rotate(180deg); color: #dc2626; }
-             80% { opacity: 1; transform: translate(2px, 2px); filter: hue-rotate(0deg); }
-             100% { opacity: 1; transform: translate(0); color: #fff; }
+          .pitch-lines { animation: pulsePitch 4s infinite ease-in-out; }
+
+          /* ⭐ ANIMACIÓN DE LA RED DE LA PORTERÍA AL RECIBIR EL GOL ⭐ */
+          @keyframes netImpact {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.04) translateY(-4px); filter: drop-shadow(0 15px 10px rgba(0,0,0,0.15)); }
+            60% { transform: scale(0.98); }
+            100% { transform: scale(1); }
           }
-          .animate-glitch { animation: glitchEffect 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+          .animate-net-goal { animation: netImpact 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-          /* ⭐ ANIMACIONES DEL ESCENARIO ⭐ */
-          @keyframes cobwebSway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg); } }
-          .animate-cobweb { animation: cobwebSway 6s infinite alternate ease-in-out; transform-origin: top right; }
-
-          @keyframes batsFly {
-            0% { transform: translate(-10px, 10px) scale(0.9); opacity: 0; }
-            30% { opacity: 0.6; }
-            100% { transform: translate(30px, -20px) scale(1.05); opacity: 0.6; }
+          @keyframes goalSlam {
+            0% { transform: scale(2.8) translateY(10px); opacity: 0; filter: blur(12px); }
+            35% { transform: scale(0.94); opacity: 1; filter: blur(0px); }
+            60% { transform: scale(1.03); }
+            100% { transform: scale(1); opacity: 1; }
           }
-          .animate-bats { animation: batsFly 4s ease-out forwards; }
+          .animate-goal-slam { animation: goalSlam 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-          /* ⭐ LEVITACIÓN FANTASMAL (Flota arriba y abajo) ⭐ */
-          @keyframes ghostHover { 
-            0%, 100% { transform: translateY(-10px) rotate(5deg); } 
-            50% { transform: translateY(-25px) rotate(8deg); } 
+          @keyframes shockwave {
+            0% { transform: scale(0.2); opacity: 0.7; border-width: 6px; }
+            100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
           }
-          
-          /* Brazos y piernas colgando sin vida */
-          @keyframes dangleArm1 { 0%, 100% { transform: rotate(15deg); } 50% { transform: rotate(20deg); } }
-          @keyframes dangleArm2 { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(-5deg); } }
-          @keyframes dangleLeg1 { 0%, 100% { transform: rotate(10deg); } 50% { transform: rotate(15deg); } }
-          @keyframes dangleLeg2 { 0%, 100% { transform: rotate(25deg); } 50% { transform: rotate(30deg); } }
-          
-          /* Animación de la Bola de Alma Fatuo */
-          @keyframes ghostFloat { 0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.8; } 50% { transform: translate(-2px, -8px) scale(1.1); opacity: 1; filter: drop-shadow(0 0 5px #ea580c); } }
+          .animate-shockwave { animation: shockwave 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-          /* ⭐ ANIMACIÓN DE INVOCACIÓN (Susto) ⭐ */
-          @keyframes scarePose { 0% { transform: translateY(-15px) rotate(5deg) scale(1); } 100% { transform: translateY(-30px) rotate(-5deg) scale(1.15); filter: drop-shadow(0 0 8px #dc2626); } }
-          @keyframes armsUp { 0% { transform: rotate(15deg); } 100% { transform: rotate(-150deg); } }
-          
-          @keyframes shootGhost {
-            0% { transform: translate(0px, 0px) scale(1); opacity: 1; background: #ea580c; }
-            80% { transform: translate(15px, -240px) scale(4); opacity: 1; background: #dc2626; filter: blur(2px); }
-            100% { transform: translate(15px, -260px) scale(8); opacity: 0; filter: blur(10px); }
+          @keyframes badgeSlide {
+            0% { opacity: 0; transform: translateY(15px) scale(0.9); letter-spacing: 0.8em; }
+            100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.35em; }
+          }
+          .animate-badge { animation: badgeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+          /* Biomecánica de carrera */
+          @keyframes bodyBounce {
+            0%, 100% { transform: translateY(0px) rotate(12deg); }
+            50% { transform: translateY(-4px) rotate(16deg); }
+          }
+          @keyframes runArmLeft {
+            0%, 100% { transform: rotate(-40deg); }
+            50% { transform: rotate(45deg); }
+          }
+          @keyframes runArmRight {
+            0%, 100% { transform: rotate(45deg); }
+            50% { transform: rotate(-40deg); }
+          }
+          @keyframes runLegLeft {
+            0%, 100% { transform: rotate(-50deg); }
+            50% { transform: rotate(40deg); }
+          }
+          @keyframes runLegRight {
+            0%, 100% { transform: rotate(40deg); }
+            50% { transform: rotate(-50deg); }
+          }
+          @keyframes ballDribbleReal {
+            0%, 100% { transform: translate(-2px, 0px) rotate(0deg) scale(0.95); }
+            25% { transform: translate(2px, -3px) rotate(90deg) scale(1); }
+            50% { transform: translate(-1px, 1px) rotate(180deg) scale(0.95); }
+            75% { transform: translate(4px, -2px) rotate(270deg) scale(1.02); }
           }
 
-          /* ⭐ ESTRUCTURA CSS DEL FANTASMA ⭐ */
-          .stickman-wrapper { position: relative; width: 20px; height: 42px; }
-          /* Ahora el fantasma brilla un poco en la oscuridad */
-          .sm-head { position: absolute; top: 2px; left: 6px; width: 14px; height: 14px; border: 2.5px solid #fff; border-radius: 50%; background: #000; z-index: 10; box-shadow: 0 0 6px rgba(255,255,255,0.4); }
-          .sm-body { position: absolute; top: 13px; left: 9px; width: 2.5px; height: 16px; background: #fff; z-index: 5; box-shadow: 0 0 4px rgba(255,255,255,0.4); }
-          .sm-arm-1 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 14px; background: #fff; transform-origin: top center; z-index: 6; }
-          .sm-arm-2 { position: absolute; top: 14px; left: 9px; width: 2.5px; height: 14px; background: #fff; transform-origin: top center; z-index: 4; }
-          .sm-leg-1 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #fff; transform-origin: top center; z-index: 6; }
-          .sm-leg-2 { position: absolute; top: 27px; left: 9px; width: 2.5px; height: 15px; background: #fff; transform-origin: top center; z-index: 4; }
-          .sm-ball { position: absolute; bottom: -10px; right: -10px; width: 10px; height: 10px; background: #ea580c; border-radius: 50%; z-index: 10; box-shadow: 0 0 8px #ea580c; }
+          @keyframes realKickBody {
+            0% { transform: translateY(0) rotate(12deg); }
+            25% { transform: translateY(2px) rotate(25deg); } 
+            60% { transform: translateY(-8px) rotate(-10deg); } 
+            100% { transform: translateY(-4px) rotate(-5deg); }
+          }
+          @keyframes realKickLeg {
+            0% { transform: rotate(20deg); }
+            25% { transform: rotate(75deg); } 
+            55% { transform: rotate(-130deg); } 
+            100% { transform: rotate(-90deg); }
+          }
+          @keyframes supportLegPlant {
+            0% { transform: rotate(-10deg); }
+            30% { transform: rotate(25deg); filter: drop-shadow(2px 0 0 rgba(0,0,0,0.2)); } 
+            100% { transform: rotate(20deg); }
+          }
+          @keyframes armsStrikeBalance {
+            0% { transform: rotate(0deg); }
+            30% { transform: rotate(20deg); } 
+            100% { transform: rotate(-40deg); }
+          }
+          @keyframes ballRocketShot {
+            0% { transform: translate(0px, 0px) scale(1); filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
+            40% { transform: translate(10px, -80px) scale(1.6); filter: blur(0.5px); } 
+            100% { transform: translate(25px, -280px) scale(4.5); opacity: 0; filter: blur(8px); } 
+          }
 
-          /* ESTADOS DEL FANTASMA PRINCIPAL */
-          .state-levitating { animation: ghostHover 1.5s infinite ease-in-out; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
-          .state-levitating .sm-body { transform: rotate(10deg); } /* Inclinado hacia adelante */
-          .state-levitating .sm-arm-1 { animation: dangleArm1 1.5s infinite alternate ease-in-out; }
-          .state-levitating .sm-arm-2 { animation: dangleArm2 1.5s infinite alternate ease-in-out; }
-          .state-levitating .sm-leg-1 { animation: dangleLeg1 1.5s infinite alternate ease-in-out; }
-          .state-levitating .sm-leg-2 { animation: dangleLeg2 1.5s infinite alternate ease-in-out; }
-          .state-levitating .sm-ball  { animation: ghostFloat 1s infinite alternate ease-in-out; }
+          .player-rig { position: relative; width: 26px; height: 48px; }
+          .p-head { 
+            position: absolute; top: -1px; left: 6px; width: 13px; height: 13px; 
+            border: 2.5px solid #000; border-radius: 50%; background: #fff; z-index: 10;
+            box-shadow: 0 0 6px rgba(0,0,0,0.15);
+          }
+          .p-torso { 
+            position: absolute; top: 11px; left: 10px; width: 3.5px; height: 17px; 
+            background: #000; border-radius: 2px; z-index: 5; transform-origin: top center;
+          }
+          .p-arm-l, .p-arm-r { 
+            position: absolute; top: 12px; left: 10px; width: 2.5px; height: 13px; 
+            background: #3f3f46; border-radius: 2px; transform-origin: top center; 
+          }
+          .p-leg-l, .p-leg-r { 
+            position: absolute; top: 26px; left: 10px; width: 3.2px; height: 17px; 
+            background: #000; border-radius: 2px; transform-origin: top center; 
+          }
+          .p-ball { 
+            position: absolute; bottom: 2px; right: -8px; width: 10px; height: 10px; 
+            background: #000; border: 2px solid #fff; border-radius: 50%; z-index: 15;
+            box-shadow: 0 0 6px rgba(0,0,0,0.3);
+          }
 
-          .state-summoning { animation: scarePose 0.3s forwards; }
-          .state-summoning .sm-head { transform: rotate(-10deg); box-shadow: inset 0 0 6px #dc2626, 0 0 10px #dc2626; }
-          .state-summoning .sm-arm-1 { animation: armsUp 0.3s forwards; }
-          .state-summoning .sm-arm-2 { animation: armsUp 0.3s forwards; }
-          .state-summoning .sm-leg-1 { transform: rotate(15deg); }
-          .state-summoning .sm-leg-2 { transform: rotate(25deg); }
-          .state-summoning .sm-ball  { animation: shootGhost 0.4s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+          .state-dribbling { animation: bodyBounce 0.28s infinite ease-in-out; }
+          .state-dribbling .p-arm-l { animation: runArmLeft 0.28s infinite ease-in-out; z-index: 7; }
+          .state-dribbling .p-arm-r { animation: runArmRight 0.28s infinite ease-in-out; z-index: 3; opacity: 0.7; }
+          .state-dribbling .p-leg-l { animation: runLegLeft 0.28s infinite ease-in-out; z-index: 7; }
+          .state-dribbling .p-leg-r { animation: runLegRight 0.28s infinite ease-in-out; z-index: 3; opacity: 0.7; }
+          .state-dribbling .p-ball  { animation: ballDribbleReal 0.28s infinite ease-in-out; }
 
-          .state-faded { opacity: 0.3; filter: blur(2px); transform: translateY(-30px) rotate(-5deg) scale(1.15); }
-          .state-faded .sm-head { transform: rotate(-10deg); }
-          .state-faded .sm-arm-1 { transform: rotate(-150deg); }
-          .state-faded .sm-arm-2 { transform: rotate(-150deg); }
-          .state-faded .sm-leg-1 { transform: rotate(15deg); }
-          .state-faded .sm-leg-2 { transform: rotate(25deg); }
-          .state-faded .sm-ball  { opacity: 0; }
+          .state-shooting { animation: realKickBody 0.4s forwards cubic-bezier(0.2, 0.8, 0.2, 1); }
+          .state-shooting .p-arm-l { animation: armsStrikeBalance 0.4s forwards; }
+          .state-shooting .p-arm-r { transform: rotate(45deg); }
+          .state-shooting .p-leg-l { animation: realKickLeg 0.4s forwards cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 10; }
+          .state-shooting .p-leg-r { animation: supportLegPlant 0.4s forwards; }
+          .state-shooting .p-ball  { animation: ballRocketShot 0.42s forwards cubic-bezier(0.1, 1, 0.2, 1); }
+
+          .state-after-goal { opacity: 0.15; filter: blur(1px); transform: translateY(-4px) rotate(-5deg) scale(0.95); transition: all 0.5s ease; }
+          .state-after-goal .p-leg-l { transform: rotate(-90deg); }
+          .state-after-goal .p-leg-r { transform: rotate(20deg); }
+          .state-after-goal .p-arm-l { transform: rotate(-40deg); }
+          .state-after-goal .p-ball  { opacity: 0; }
         `}
       </style>
 
-      {/* --- SUPERIOR --- */}
-      <div className="w-full flex justify-between items-center opacity-30 text-xs tracking-widest uppercase font-mono text-neutral-400 z-10 relative">
-        <span>ChemaSport ER</span>
-        <span>Maldición 2026</span>
+      {/* --- LÍNEAS DE CANCHA EN EL FONDO --- */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none pitch-lines">
+        <div className="w-[320px] h-[320px] sm:w-[480px] sm:h-[480px] rounded-full border-2 border-gray-300 flex items-center justify-center relative">
+          <div className="w-3 h-3 bg-black rounded-full"></div>
+          <div className="absolute w-[150vw] h-[2px] bg-gray-300"></div>
+        </div>
       </div>
 
-      {/* --- CENTRO: LOGO TIPOGRÁFICO --- */}
-      <div className="flex flex-col items-center justify-center my-auto w-full text-center min-h-[220px]">
+      {/* --- BARRA SUPERIOR --- */}
+      <div className="w-full max-w-5xl flex justify-between items-center text-[11px] sm:text-xs tracking-[0.25em] uppercase font-bold text-gray-400 z-10 border-b border-gray-200 pb-4">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-black"></span>
+          <span className="text-black font-black">CHEMA SPORT ER</span>
+        </div>
+        <span>PAGINA OFICIAL</span>
+      </div>
+
+      {/* --- CENTRO: MARCO DE LA PORTERÍA Y TÍTULO --- */}
+      <div className={`flex flex-col items-center justify-center my-auto w-full text-center relative transition-all duration-300 ${cinePhase >= 2 ? 'animate-net-goal' : ''}`}>
+        
+        {/* 🔥 EL MARCO DE LA PORTERÍA (Aparece y enmarca la marca al hacer gol) 🔥 */}
+        <div className={`absolute w-[280px] sm:w-[420px] md:w-[560px] h-[160px] sm:h-[220px] border-[6px] sm:border-[8px] border-black rounded-t-xl bg-gray-black backdrop-blur-[2px] pointer-events-none flex items-center justify-center transition-all duration-500 shadow-2xl ${
+          cinePhase >= 2 ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+        }`}>
+          {/* Simulación visual sutil de la red dentro del marco */}
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:12px_12px]"></div>
+        </div>
+
         {cinePhase >= 2 && (
-          <div className="animate-slam flex flex-col items-center relative z-20">
-            <h1 className="text-white text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">
+          <div className="absolute w-32 h-32 rounded-full border border-black pointer-events-none animate-shockwave"></div>
+        )}
+
+        {cinePhase >= 2 && (
+          <div className="animate-goal-slam flex flex-col items-center relative z-20">
+            <h1 className="text-black text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter uppercase leading-none drop-shadow-md">
               CHEMA
             </h1>
-            <h1 className="text-white text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter uppercase leading-none -mt-2 sm:-mt-4 md:-mt-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">
+            <h1 className="text-transparent bg-clip-text bg-gradient-to-b from-black to-gray-500 text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter uppercase leading-none -mt-1 sm:-mt-3 md:-mt-4">
               SPORT
             </h1>
           </div>
         )}
+
         {cinePhase >= 3 && (
-          <div className="animate-glitch mt-4 md:mt-6 z-20">
-            <div className="flex items-center justify-center gap-4">
-              <div className="h-[2px] w-8 md:w-16 bg-red-600 shadow-[0_0_8px_#dc2626]"></div>
-              <span className="text-red-500 font-black text-xl sm:text-2xl md:text-4xl tracking-[0.3em] uppercase drop-shadow-[0_0_5px_#dc2626]">
-                ER 
+          <div className="animate-badge mt-4 md:mt-5 z-20">
+            <div className="inline-flex items-center justify-center gap-4 bg-black text-white px-6 py-1.5 sm:px-8 sm:py-2 rounded-full shadow-lg">
+              <span className="font-black text-lg sm:text-2xl md:text-3xl tracking-[0.35em] uppercase pl-[0.35em]">
+                ER
               </span>
-              <div className="h-[2px] w-8 md:w-16 bg-red-600 shadow-[0_0_8px_#dc2626]"></div>
             </div>
           </div>
         )}
       </div>
 
-      {/* --- INFERIOR: BARRA DE PROGRESO Y FANTASMA --- */}
-      <div className="w-full max-w-xl flex flex-col gap-2 relative pb-6">
-        
-        {/* EL FANTASMA PRINCIPAL */}
+      {/* --- INFERIOR: JUGADOR Y BARRA DE CARGA --- */}
+      <div className="w-full max-w-xl flex flex-col gap-2 relative pb-4 z-20">
         <div 
-          className="absolute bottom-20 origin-bottom z-10 will-change-[left,transform]"
-          style={{ left: `${stickmanPosition}%`, transform: 'translateX(-50%) scale(2.6)' }}
+          className="absolute bottom-16 origin-bottom z-10 will-change-[left,transform]"
+          style={{ left: `${playerPosition}%`, transform: 'translateX(-50%) scale(2.4)' }}
         >
-          <div className={`stickman-wrapper ${
-            cinePhase === 0 ? 'state-levitating' : 
-            cinePhase === 1 ? 'state-summoning' : 'state-faded'
+          <div className={`player-rig ${
+            cinePhase === 0 ? 'state-dribbling' : 
+            cinePhase === 1 ? 'state-shooting' : 'state-after-goal'
           }`}>
-            <div className="sm-head"></div>
-            <div className="sm-body"></div>
-            <div className="sm-arm-1"></div>
-            <div className="sm-arm-2"></div>
-            <div className="sm-leg-1"></div>
-            <div className="sm-leg-2"></div>
-            <div className="sm-ball"></div> {/* El alma / fuego fatuo que lo sigue */}
+            <div className="p-head"></div>
+            <div className="p-torso"></div>
+            <div className="p-arm-l"></div>
+            <div className="p-arm-r"></div>
+            <div className="p-leg-l"></div>
+            <div className="p-leg-r"></div>
+            <div className="p-ball"></div>
           </div>
         </div>
 
-        <div className="flex justify-between items-end text-xs md:text-sm font-medium uppercase tracking-widest text-neutral-500 mt-8 z-20">
-          <span>{cinePhase < 2 ? 'Invocando espíritus...' : 'Maldición completada.'}</span>
-          <span className="font-mono text-orange-500 font-bold text-base drop-shadow-[0_0_3px_#ea580c]">{Math.floor(progress)}%</span>
+        <div className="flex justify-between items-end text-[11px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-500 mt-10">
+          <span>
+            {cinePhase === 0 && 'Saltando a la cancha...'}
+            {cinePhase === 1 && '¡Zapatazo al arco!'}
+            {cinePhase >= 2 && '¡GOL! Catálogo listo'}
+          </span>
+          <span className="font-mono text-black font-black text-sm sm:text-base">
+            {Math.floor(progress)}%
+          </span>
         </div>
 
-        <div className="w-full h-[3px] bg-neutral-900 overflow-hidden relative rounded-full z-20">
+        <div className="w-full h-[4px] bg-gray-200 overflow-hidden relative rounded-full border border-gray-300">
           <div 
-            className="absolute top-0 left-0 bottom-0 rounded-full bg-gradient-to-r from-orange-600 to-red-600 shadow-[0_0_8px_#dc2626] will-change-[width]"
+            className="absolute top-0 left-0 bottom-0 rounded-full bg-black will-change-[width]"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
       </div>
-
     </div>
   );
 };

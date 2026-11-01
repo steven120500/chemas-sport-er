@@ -165,18 +165,13 @@ const Bienvenido = ({ onNavigate }) => {
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black/95 z-10 pointer-events-none" />
 
 
-    {/* 🔥 DECORACIONES HALLOWEEN 🔥 */}
-    <img 
-        src="/Araña.png" 
-        alt="Telaraña" 
-        className="absolute top-0 left-0 w-80 h-80 sm:w-80 sm:h-80 md:w-80 md:h-auto lg:w-[400px] lg:h-auto object-cover object-top opacity-15 invert pointer-events-none scale-x-[-1] z-40" 
-      />
+   
       
 
       {/* 🏆 ENCABEZADO */}
       <div className="relative z-20 flex flex-col items-center text-center px-4 max-w-4xl mx-auto mb-1 md:mb-2 pointer-events-none">
         {/* 🔥 Título con brillo Amarillo 🔥 */}
-        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-yellow-500 drop-shadow-[0_0_12px_rgba(202,138,4,0.6)] transition-all">
+        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_12px_rgba(202,138,4,0.6)] transition-all">
           NUEVA TEMPORADA 26-27
         </h1>
       </div>
@@ -205,19 +200,19 @@ const Bienvenido = ({ onNavigate }) => {
               <div
                 key={`${item.id}-${index}`}
                 // 🔥 Tarjeta: Borde y Sombra Amarilla al hacer hover 🔥
-                className={`group relative bg-black hover:bg-black/80 backdrop-blur-xl border border-white/10 hover:border-yellow-500 rounded-3xl shadow-2xl hover:shadow-[0_0_20px_rgba(202,138,4,0.3)] flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
+                className={`group relative bg-black hover:bg-black/80 backdrop-blur-xl border border-white/10 hover:border-white rounded-3xl shadow-2xl hover:shadow-[0_0_20px_rgba(202,138,4,0.3)] flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
                   isPSG
                     ? "w-100 sm:w-80 md:w-80 lg:w-96 p-10 md:p-36"
                     : "w-78 sm:w-50 md:w-50 lg:w-78 p-6 md:p-28"
                 }`}
               >
                 {/* 🔥 Aura interna amarilla 🔥 */}
-                <div className="absolute inset-0 bg-yellow-500/0 rounded-3xl blur-xl group-hover:bg-yellow-500/5 transition-all duration-500 pointer-events-none" />
+                <div className="absolute inset-0 bg-black rounded-3xl blur-xl group-hover:bg-black transition-all duration-500 pointer-events-none" />
 
                 {/* Tag superior */}
                 <div className="relative z-10 flex items-center justify-between pointer-events-none">
                   {/* 🔥 Tag cambia a amarillo brillante 🔥 */}
-                  <span className="text-xs font-extrabold tracking-[0.25em] text-gray-400 group-hover:text-yellow-500 transition-colors duration-300 uppercase whitespace-nowrap">
+                  <span className="text-xs font-extrabold tracking-[0.25em] text-gray-400 group-hover:text-gray-100 transition-colors duration-300 uppercase whitespace-nowrap">
                     TEMP 26-27
                   </span>
                 </div>
@@ -245,7 +240,7 @@ const Bienvenido = ({ onNavigate }) => {
                 {/* Nombre, tipo y botón */}
                 <div className="relative z-10 mt-2 border-t border-white/10 pt-3 md:pt-4 text-center">
                   {/* 🔥 Título del equipo en amarillo al hover 🔥 */}
-                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide group-hover:text-yellow-500 transition-colors truncate pointer-events-none">
+                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide group-hover:text-gray-100 transition-colors truncate pointer-events-none">
                     {item.equipo}
                   </h3>
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-0.5 pointer-events-none">
@@ -255,7 +250,7 @@ const Bienvenido = ({ onNavigate }) => {
                   <button
                     onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
                     // 🔥 Botón de tarjeta se vuelve amarillo 🔥
-                    className="mt-3.5 w-full py-2.5 px-4 rounded-full bg-white/5 hover:bg-yellow-500 text-gray-300 hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/10 hover:border-yellow-500 hover:shadow-[0_0_15px_rgba(202,138,4,0.4)] cursor-pointer active:scale-95 whitespace-nowrap"
+                    className="mt-3.5 w-full py-2.5 px-4 rounded-full bg-white/5 hover:bg-white text-gray-300 hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/10 hover:border-white hover:shadow-[0_0_15px_rgba(202,138,4,0.4)] cursor-pointer active:scale-95 whitespace-nowrap"
                   >
                     <span>Ver {item.equipo}</span>
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -274,7 +269,7 @@ const Bienvenido = ({ onNavigate }) => {
         <button
           onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')}
           // 🔥 Botón principal en Amarillo 🔥
-          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-yellow-500 text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-yellow-400 shadow-[0_5px_25px_rgba(202,138,4,0.35)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
+          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-gray-400 shadow-[0_5px_25px_rgba(202,138,4,0.35)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
         >
           <span>VER TODA LA COLECCIÓN</span>
           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
