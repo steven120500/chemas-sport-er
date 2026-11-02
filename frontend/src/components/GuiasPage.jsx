@@ -1,16 +1,16 @@
+
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTruck, FaFilePdf, FaPlus, 
   FaMapMarkerAlt, FaUser, FaTrash, FaSearch, FaBoxOpen,
-  FaStickyNote, FaStore, FaCalendarAlt, FaPrint
+  FaStickyNote, FaStore, FaCalendarAlt, FaPrint, FaPencilAlt, FaCheck, FaTimes as FaTimesIcon
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const STORAGE_KEY = "chemasport_guias_registradas";
 
-// Función auxiliar para obtener la fecha actual en formato YYYY-MM-DD (hora local)
 function getFechaHoyYMD() {
   const d = new Date();
   const year = d.getFullYear();
@@ -19,7 +19,6 @@ function getFechaHoyYMD() {
   return `${year}-${month}-${day}`;
 }
 
-// Convierte "20.000", "20,000" o "20000" siempre en el número entero 20000
 function limpiarMontoCR(val) {
   if (typeof val === "number" && !isNaN(val)) return Math.round(val);
   if (!val) return 0;
@@ -27,7 +26,6 @@ function limpiarMontoCR(val) {
   return Number(soloDigitos) || 0;
 }
 
-// Carga dinámica de jsPDF desde CDN para no requerir npm install adicional
 function cargarJsPDF() {
   return new Promise((resolve, reject) => {
     if (window.jspdf && window.jspdf.jsPDF) {
@@ -51,9 +49,11 @@ export default function GuiasPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
-  
-  // Estado para el filtro de calendario diario (por defecto hoy)
   const [fechaFiltro, setFechaFiltro] = useState(() => getFechaHoyYMD());
+
+  // Estado para saber qué celda específica se está editando: { rowId, field }
+  const [editingCell, setEditingCell] = useState(null);
+  const [tempValue, setTempValue] = useState("");
 
   const [guias, setGuias] = useState(() => {
     try {
@@ -64,7 +64,6 @@ export default function GuiasPage() {
     }
   });
 
-  // Sincronizar con el backend al cargar la página
   useEffect(() => {
     const fetchGuiasBackend = async () => {
       try {
@@ -109,7 +108,6 @@ export default function GuiasPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => {
-      // Si es el campo monto, quitamos puntos, comas o letras al instante ("20.000" -> "20000")
       const valorFinal = name === "monto" ? value.replace(/\D/g, "") : value;
       const updated = { ...prev, [name]: valorFinal };
       if (name === "debe" && value === "No") {
@@ -206,7 +204,6 @@ export default function GuiasPage() {
         body: JSON.stringify(nuevaGuia)
       });
       const data = await res.json();
-      // Si el backend devuelve un _id oficial, lo integramos al objeto
       if (data && data._id) {
         nuevaGuia._id = data._id;
       }
@@ -238,7 +235,6 @@ export default function GuiasPage() {
     }
   };
 
-  // 🔥 ELIMINAR UNA SOLA LÍNEA DE FORMA SEGURA
   const eliminarGuia = async (gTarget) => {
     try {
       if (gTarget._id) {
@@ -256,6 +252,57 @@ export default function GuiasPage() {
     }));
 
     toastHOT.success("Guía eliminada de la tabla.");
+  };
+
+  // 🔥 EDICIÓN RÁPIDA CELDA POR CELDA CON LÁPIZ
+  const iniciarEdicionCelda = (g, field) => {
+    const rowId = g._id || g.id;
+    setEditingCell({ rowId, field });
+    setTempValue(g[field] !== undefined ? String(g[field]) : "");
+  };
+
+  const guardarEdicionCelda = async (gTarget, field) => {
+    const rowId = gTarget._id || gTarget.id;
+    let valorFinal = tempValue;
+
+    if (field === "monto") {
+      valorFinal = String(limpiarMontoCR(tempValue));
+      if (gTarget.debe === "Sí" && Number(valorFinal) <= 0) {
+        toastHOT.error("El monto debe ser mayor a 0.");
+        return;
+      }
+    }
+
+    const guiaActualizada = {
+      ...gTarget,
+      [field]: typeof valorFinal === "string" ? valorFinal.trim() : valorFinal
+    };
+
+    try {
+      if (gTarget._id) {
+        await fetch(`${API_BASE}/api/guias/${gTarget._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(guiaActualizada)
+        });
+      }
+    } catch (e) {
+      console.error("Error actualizando en backend:", e);
+    }
+
+    setGuias((prev) => prev.map((item) => {
+      const itemId = item._id || item.id;
+      return itemId === rowId ? guiaActualizada : item;
+    }));
+
+    setEditingCell(null);
+    setTempValue("");
+    toastHOT.success("Campo actualizado.");
+  };
+
+  const cancelarEdicionCelda = () => {
+    setEditingCell(null);
+    setTempValue("");
   };
 
   const guiasFiltradas = useMemo(() => {
@@ -277,111 +324,106 @@ export default function GuiasPage() {
     });
   }, [guias, fechaFiltro, searchFilter]);
 
-// 📥 DESCARGAR Y COMPARTIR ARCHIVO .PDF REAL (AJUSTADO A 1 SOLA PÁGINA)
-const handleDescargarYCompartirPDF = async (guia) => {
-  const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
-  try {
-    const jsPDF = await cargarJsPDF();
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [101.6, 152.4]
-    });
+  const handleDescargarYCompartirPDF = async (guia) => {
+    const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
+    try {
+      const jsPDF = await cargarJsPDF();
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [101.6, 152.4]
+      });
 
-    const montoGuia = limpiarMontoCR(guia.monto);
-    const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
-    const esMayorista = guia.esMayorista === "Sí";
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
-
-    doc.setLineWidth(0.6);
-    doc.line(6, 16.5, 95.6, 16.5);
-
-    let y = 25;
-    const margenIzq = 6;
-    const anchoMax = 89.6;
-
-    const agregarCampo = (etiqueta, valor) => {
-      const textoValor = String(valor || "").trim();
-      if (!textoValor) return;
+      const montoGuia = limpiarMontoCR(guia.monto);
+      const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
+      const esMayorista = guia.esMayorista === "Sí";
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      
-      // Si es "Comentarios", ponemos la etiqueta arriba con sus dos puntos y el texto detallado abajo limpio
-      if (etiqueta === "Comentarios") {
-        doc.text(`${etiqueta}:`, margenIzq, y);
-        y += 6;
-        doc.setFont("helvetica", "normal");
-        const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
-        doc.text(lineasValor, margenIzq, y);
-        y += (lineasValor.length * 6) + 4;
-      } else {
-        doc.text(`${etiqueta}:`, margenIzq, y);
-        doc.setFont("helvetica", "normal");
-        const lineasValor = doc.splitTextToSize(textoValor, anchoMax - 26);
-        doc.text(lineasValor, margenIzq + 26, y);
-        y += (lineasValor.length * 6) + 3;
+      doc.setFontSize(18);
+      doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
+
+      doc.setLineWidth(0.6);
+      doc.line(6, 16.5, 95.6, 16.5);
+
+      let y = 25;
+      const margenIzq = 6;
+      const anchoMax = 89.6;
+
+      const agregarCampo = (etiqueta, valor) => {
+        const textoValor = String(valor || "").trim();
+        if (!textoValor) return;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        
+        if (etiqueta === "Comentarios") {
+          doc.text(`${etiqueta}:`, margenIzq, y);
+          y += 6;
+          doc.setFont("helvetica", "normal");
+          const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
+          doc.text(lineasValor, margenIzq, y);
+          y += (lineasValor.length * 6) + 4;
+        } else {
+          doc.text(`${etiqueta}:`, margenIzq, y);
+          doc.setFont("helvetica", "normal");
+          const lineasValor = doc.splitTextToSize(textoValor, anchoMax - 26);
+          doc.text(lineasValor, margenIzq + 26, y);
+          y += (lineasValor.length * 6) + 3;
+        }
+      };
+
+      agregarCampo("Nombre", guia.nombre);
+      agregarCampo("Provincia", guia.provincia);
+      agregarCampo("Cantón", guia.canton);
+      agregarCampo("Distrito", guia.distrito);
+      agregarCampo("Teléfono", guia.telefono);
+      agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
+      agregarCampo("Raspa", guia.meterRaspa);
+      agregarCampo("Comentarios", guia.comentarios);
+
+      if (esMayorista && guia.nombreMayorista) {
+        const yLinea = Math.max(y + 2, 115);
+        doc.setLineWidth(0.7);
+        doc.setLineDashPattern([2, 2], 0);
+        doc.line(6, yLinea, 95.6, yLinea);
+        doc.setLineDashPattern([], 0);
+
+        const textoMay = guia.nombreMayorista.toUpperCase();
+        
+        let tamFuente = 24;
+        if (textoMay.length > 12) tamFuente = 18;
+        if (textoMay.length > 20) tamFuente = 14;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(tamFuente);
+        
+        const lineasMayorista = doc.splitTextToSize(textoMay, 88);
+        doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
       }
-    };
 
-    agregarCampo("Nombre", guia.nombre);
-    agregarCampo("Provincia", guia.provincia);
-    agregarCampo("Cantón", guia.canton);
-    agregarCampo("Distrito", guia.distrito);
-    agregarCampo("Teléfono", guia.telefono);
-    agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
-    agregarCampo("Raspa", guia.meterRaspa);
-    agregarCampo("Comentarios", guia.comentarios);
+      const nombreLimpio = String(guia.nombre || "Guia").replace(/[\\/:*?"<>|_]/g, "").trim();
+      const fileName = `${nombreLimpio}.pdf`;
 
-    // 🔥 NOMBRE DE MAYORISTA ADAPTABLE PARA QUE NUNCA SALTE DE PÁGINA
-    if (esMayorista && guia.nombreMayorista) {
-      const yLinea = Math.max(y + 2, 115);
-      doc.setLineWidth(0.7);
-      doc.setLineDashPattern([2, 2], 0);
-      doc.line(6, yLinea, 95.6, yLinea);
-      doc.setLineDashPattern([], 0);
+      doc.save(fileName);
 
-      const textoMay = guia.nombreMayorista.toUpperCase();
-      
-      let tamFuente = 24;
-      if (textoMay.length > 12) tamFuente = 18;
-      if (textoMay.length > 20) tamFuente = 14;
+      const pdfBlob = doc.output("blob");
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(tamFuente);
-      
-      const lineasMayorista = doc.splitTextToSize(textoMay, 88);
-      doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
+        await navigator.share({
+          files: [pdfFile]
+        }).catch(() => {});
+      } else {
+        toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
+      }
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      toastHOT.error("Error al descargar el PDF, abriendo vista de impresión...", { id: toastId });
+      handleVistaImpresion(guia);
     }
+  };
 
-    // 🔥 NOMBRE DEL ARCHIVO LIMPIO CON ESPACIOS Y SIN GUIONES BAJOS
-    const nombreLimpio = String(guia.nombre || "Guia").replace(/[\\/:*?"<>|_]/g, "").trim();
-    const fileName = `${nombreLimpio}.pdf`;
-
-    doc.save(fileName);
-
-    const pdfBlob = doc.output("blob");
-    const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-
-    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      toastHOT.success("¡PDF descargado! Abriendo menú para compartir...", { id: toastId });
-      await navigator.share({
-        files: [pdfFile]
-      }).catch(() => {});
-    } else {
-      toastHOT.success("¡PDF descargado correctamente!", { id: toastId });
-    }
-  } catch (err) {
-    console.error("Error generando PDF:", err);
-    toastHOT.error("Error al descargar el PDF, abriendo vista de impresión...", { id: toastId });
-    handleVistaImpresion(guia);
-  }
-};
-
-  // 🖨️ VISTA DE IMPRESIÓN DIRECTA
   const handleVistaImpresion = (guia) => {
     const printWindow = window.open("", "_blank", "width=700,height=900");
     if (!printWindow) {
@@ -480,7 +522,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
 
   return (
     <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         
         <button 
           onClick={() => navigate("/")} 
@@ -515,7 +557,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
           </div>
         </div>
 
-        {/* CÁPSULA DEL FORMULARIO */}
+        {/* CÁPSULA DEL FORMULARIO CON TEXTAREA GRANDE PARA COMENTARIOS */}
         <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl mb-10 relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-zinc-100 pb-5 mb-7">
             <div className="flex items-center gap-3">
@@ -725,6 +767,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
               )}
             </div>
 
+            {/* 🔥 CAJA DE COMENTARIOS GRANDE (TEXTAREA AMPLIADA) */}
             <div>
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Comentarios
@@ -749,17 +792,17 @@ const handleDescargarYCompartirPDF = async (guia) => {
               {form.comentarioSelect === "Otro comentario..." && (
                 <div className="mt-4 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
                   <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                    Otro comentario *
+                    Otro comentario * (Caja grande para revisar errores)
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     name="comentarioCustom"
                     value={form.comentarioCustom}
                     onChange={handleChange}
-                    placeholder="Escribí tu comentario..."
+                    placeholder="Escribí tu comentario detallado aquí..."
                     required
+                    rows={5}
                     autoFocus
-                    className="w-full px-4 py-3 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all"
+                    className="w-full p-4 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all resize-y"
                   />
                 </div>
               )}
@@ -779,7 +822,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
           </form>
         </div>
 
-        {/* TABLA DE GUÍAS CON CALENDARIO DIARIO */}
+        {/* TABLA DE GUÍAS CON EDICIÓN CELDA POR CELDA (INCLUYENDO RASPA) */}
         <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
           
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 pb-6 border-b border-zinc-100">
@@ -788,7 +831,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
                 Listado de Guías
               </h2>
               <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                Mostrando únicamente las guías del día seleccionado.
+                Haz clic en el lápiz al lado de cualquier dato (incluyendo Raspa) para editarlo directamente en la tabla.
               </p>
             </div>
 
@@ -829,7 +872,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
                   <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
                     <th className="py-3.5 px-3">Guía / Hora</th>
                     <th className="py-3.5 px-3">Nombre</th>
-                    <th className="py-3.5 px-3">Destino</th>
+                    <th className="py-3.5 px-3">Destino (Provincia / Cantón / Distrito)</th>
                     <th className="py-3.5 px-3">Teléfono</th>
                     <th className="py-3.5 px-3">¿Debe? / Monto</th>
                     <th className="py-3.5 px-3">Detalles</th>
@@ -838,10 +881,16 @@ const handleDescargarYCompartirPDF = async (guia) => {
                 </thead>
                 <tbody className="divide-y divide-zinc-100 font-medium">
                   {guiasFiltradas.map((g) => {
+                    const rowId = g._id || g.id;
                     const montoGuia = limpiarMontoCR(g.monto);
                     const tieneDeuda = g.debe === "Sí" && montoGuia > 0;
+
+                    const isEditingField = (field) => editingCell && editingCell.rowId === rowId && editingCell.field === field;
+
                     return (
-                      <tr key={g.id || g._id} className="hover:bg-zinc-50/80 transition-colors">
+                      <tr key={rowId} className="hover:bg-zinc-50/80 transition-colors">
+                        
+                        {/* GUÍA / HORA */}
                         <td className="py-4 px-3 whitespace-nowrap">
                           <span className="font-black text-black block text-xs">
                             {g.numeroGuia || `#${String(g.id || '').slice(-4)}`}
@@ -851,56 +900,192 @@ const handleDescargarYCompartirPDF = async (guia) => {
                           </span>
                         </td>
 
+                        {/* NOMBRE (EDITABLE CON LÁPIZ) */}
                         <td className="py-4 px-3 font-black text-black text-xs">
-                          {g.nombre}
-                        </td>
-
-                        <td className="py-4 px-3 text-zinc-700">
-                          <span className="font-bold text-black block">
-                            {g.provincia}, {g.canton}
-                          </span>
-                          <span className="text-[11px] text-zinc-500">
-                            {g.distrito}
-                          </span>
-                        </td>
-
-                        <td className="py-4 px-3 font-mono font-bold text-zinc-800 whitespace-nowrap">
-                          {g.telefono}
-                        </td>
-
-                        <td className="py-4 px-3 whitespace-nowrap">
-                          {tieneDeuda ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 font-black text-xs">
-                              Sí · ₡{montoGuia.toLocaleString("es-CR")}
-                            </span>
+                          {isEditingField("nombre") ? (
+                            <div className="flex items-center gap-1.5">
+                              <input 
+                                type="text" 
+                                value={tempValue} 
+                                onChange={(e) => setTempValue(e.target.value)} 
+                                className="p-1.5 bg-white border border-black rounded-lg text-xs font-bold w-full"
+                                autoFocus
+                              />
+                              <button onClick={() => guardarEdicionCelda(g, "nombre")} className="p-1.5 bg-black text-white rounded-md cursor-pointer"><FaCheck size={10} /></button>
+                              <button onClick={cancelarEdicionCelda} className="p-1.5 bg-zinc-200 text-black rounded-md cursor-pointer"><FaTimesIcon size={10} /></button>
+                            </div>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px]">
-                              No (Pagado)
-                            </span>
+                            <div className="flex items-center gap-1.5 group">
+                              <span>{g.nombre}</span>
+                              <button onClick={() => iniciarEdicionCelda(g, "nombre")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white transition-opacity cursor-pointer" title="Editar nombre">
+                                <FaPencilAlt size={11} />
+                              </button>
+                            </div>
                           )}
                         </td>
 
+                        {/* DESTINO (PROVINCIA / CANTÓN / DISTRITO) */}
+                        <td className="py-4 px-3 text-zinc-700">
+                          <div className="flex items-center gap-1 group">
+                            {isEditingField("provincia") ? (
+                              <select value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-white border border-black rounded text-xs font-bold">
+                                <option value="Alajuela">Alajuela</option>
+                                <option value="Cartago">Cartago</option>
+                                <option value="Heredia">Heredia</option>
+                                <option value="San José">San José</option>
+                              </select>
+                            ) : (
+                              <span className="font-bold text-black">{g.provincia}</span>
+                            )}
+                            {isEditingField("provincia") ? (
+                              <>
+                                <button onClick={() => guardarEdicionCelda(g, "provincia")} className="p-1 bg-black text-white rounded cursor-pointer"><FaCheck size={9} /></button>
+                                <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded cursor-pointer"><FaTimesIcon size={9} /></button>
+                              </>
+                            ) : (
+                              <button onClick={() => iniciarEdicionCelda(g, "provincia")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar provincia"><FaPencilAlt size={10} /></button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 group mt-0.5">
+                            {isEditingField("canton") ? (
+                              <input type="text" value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-white border border-black rounded text-xs font-bold w-28" autoFocus />
+                            ) : (
+                              <span className="text-zinc-800 font-semibold">{g.canton}</span>
+                            )}
+                            {isEditingField("canton") ? (
+                              <>
+                                <button onClick={() => guardarEdicionCelda(g, "canton")} className="p-1 bg-black text-white rounded cursor-pointer"><FaCheck size={9} /></button>
+                                <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded cursor-pointer"><FaTimesIcon size={9} /></button>
+                              </>
+                            ) : (
+                              <button onClick={() => iniciarEdicionCelda(g, "canton")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar cantón"><FaPencilAlt size={10} /></button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 group mt-0.5">
+                            {isEditingField("distrito") ? (
+                              <input type="text" value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-white border border-black rounded text-xs font-bold w-28" autoFocus />
+                            ) : (
+                              <span className="text-[11px] text-zinc-500">{g.distrito}</span>
+                            )}
+                            {isEditingField("distrito") ? (
+                              <>
+                                <button onClick={() => guardarEdicionCelda(g, "distrito")} className="p-1 bg-black text-white rounded cursor-pointer"><FaCheck size={9} /></button>
+                                <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded cursor-pointer"><FaTimesIcon size={9} /></button>
+                              </>
+                            ) : (
+                              <button onClick={() => iniciarEdicionCelda(g, "distrito")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar distrito"><FaPencilAlt size={10} /></button>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* TELÉFONO (EDITABLE) */}
+                        <td className="py-4 px-3 font-mono font-bold text-zinc-800 whitespace-nowrap">
+                          {isEditingField("telefono") ? (
+                            <div className="flex items-center gap-1">
+                              <input type="tel" value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-white border border-black rounded text-xs w-28" autoFocus />
+                              <button onClick={() => guardarEdicionCelda(g, "telefono")} className="p-1 bg-black text-white rounded cursor-pointer"><FaCheck size={9} /></button>
+                              <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded cursor-pointer"><FaTimesIcon size={9} /></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 group">
+                              <span>{g.telefono}</span>
+                              <button onClick={() => iniciarEdicionCelda(g, "telefono")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar teléfono"><FaPencilAlt size={10} /></button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* ¿DEBE? / MONTO (EDITABLE) */}
+                        <td className="py-4 px-3 whitespace-nowrap">
+                          {isEditingField("debe") || isEditingField("monto") ? (
+                            <div className="p-2 bg-white border border-black rounded-xl space-y-2">
+                              <select value={isEditingField("debe") ? tempValue : g.debe} onChange={(e) => {
+                                if (isEditingField("debe")) setTempValue(e.target.value);
+                              }} className="p-1 bg-zinc-100 rounded text-xs font-bold">
+                                <option value="No">No</option>
+                                <option value="Sí">Sí</option>
+                              </select>
+                              <input 
+                                type="text" 
+                                value={isEditingField("monto") ? tempValue : g.monto} 
+                                onChange={(e) => setTempValue(e.target.value.replace(/\D/g, ""))} 
+                                placeholder="Monto ₡" 
+                                className="p-1 bg-zinc-100 rounded text-xs font-bold w-24 text-emerald-700" 
+                              />
+                              <div className="flex gap-1">
+                                <button onClick={() => guardarEdicionCelda(g, "debe")} className="p-1 bg-black text-white rounded text-[10px] cursor-pointer">Guardar</button>
+                                <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded text-[10px] cursor-pointer">X</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 group">
+                              {tieneDeuda ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 font-black text-xs">
+                                  Sí · ₡{montoGuia.toLocaleString("es-CR")}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px]">
+                                  No (Pagado)
+                                </span>
+                              )}
+                              <button onClick={() => iniciarEdicionCelda(g, "debe")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar deuda/monto"><FaPencilAlt size={10} /></button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* DETALLES Y COMENTARIOS (EDITABLES, INCLUYENDO RASPA) */}
                         <td className="py-4 px-3">
-                          <div className="flex flex-wrap gap-1 mb-1">
-                            <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-bold text-[10px]">
-                              Raspa: {g.meterRaspa}
-                            </span>
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                            {/* 🔥 RASPA EDITABLE CON LÁPIZ */}
+                            <div className="flex items-center gap-1 group/raspa bg-zinc-100 px-2 py-0.5 rounded-md">
+                              {isEditingField("meterRaspa") ? (
+                                <div className="flex items-center gap-1">
+                                  <select value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-0.5 bg-white border border-black rounded text-[10px] font-bold">
+                                    <option value="No">No</option>
+                                    <option value="Sí">Sí</option>
+                                  </select>
+                                  <button onClick={() => guardarEdicionCelda(g, "meterRaspa")} className="p-0.5 bg-black text-white rounded"><FaCheck size={8} /></button>
+                                  <button onClick={cancelarEdicionCelda} className="p-0.5 bg-zinc-200 rounded"><FaTimesIcon size={8} /></button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-zinc-800 font-bold text-[10px]">Raspa: {g.meterRaspa}</span>
+                                  <button onClick={() => iniciarEdicionCelda(g, "meterRaspa")} className="opacity-0 group-hover/raspa:opacity-100 text-white hover:text-white cursor-pointer" title="Editar raspa"><FaPencilAlt size={9} /></button>
+                                </>
+                              )}
+                            </div>
+
                             {g.esMayorista === "Sí" && (
                               <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px]">
                                 Mayorista: {g.nombreMayorista || "Sí"}
                               </span>
                             )}
                           </div>
-                          {g.comentarios && (
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-zinc-500 uppercase mt-0.5">
-                              <FaMapMarkerAlt size={11} className="text-zinc-400 shrink-0" />
-                              <span>{g.comentarios}</span>
-                            </span>
-                          )}
+
+                          <div className="flex items-center gap-1 group mt-0.5">
+                            {isEditingField("comentarios") ? (
+                              <div className="flex items-center gap-1">
+                                <textarea rows={2} value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-white border border-black rounded text-xs font-bold" autoFocus />
+                                <button onClick={() => guardarEdicionCelda(g, "comentarios")} className="p-1 bg-black text-white rounded cursor-pointer"><FaCheck size={9} /></button>
+                                <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded cursor-pointer"><FaTimesIcon size={9} /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 group">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-zinc-500 uppercase">
+                                  <FaMapMarkerAlt size={11} className="text-zinc-400 shrink-0" />
+                                  <span>{g.comentarios || "Sin comentarios"}</span>
+                                </span>
+                                <button onClick={() => iniciarEdicionCelda(g, "comentarios")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar comentarios"><FaPencilAlt size={10} /></button>
+                              </div>
+                            )}
+                          </div>
                         </td>
 
+                        {/* ACCIONES FINALES (PDF, TÉRMICA, ELIMINAR) */}
                         <td className="py-4 px-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-1.5">
+                            
                             {/* Botón Descargar y Compartir PDF */}
                             <button
                               onClick={() => handleDescargarYCompartirPDF(g)}
@@ -914,7 +1099,7 @@ const handleDescargarYCompartirPDF = async (guia) => {
                             {/* Botón Impresión Directa Térmica */}
                             <button
                               onClick={() => handleVistaImpresion(g)}
-                              className="p-2.5 bg-zinc-100 hover:bg-zinc-200 text-white rounded-xl transition-all cursor-pointer shadow-sm"
+                              className="p-2.5 bg-black text-white text-black rounded-xl transition-all cursor-pointer shadow-sm"
                               title="Imprimir en térmica"
                             >
                               <FaPrint size={12} />
@@ -923,13 +1108,14 @@ const handleDescargarYCompartirPDF = async (guia) => {
                             {/* Botón Eliminar Individual */}
                             <button
                               onClick={() => eliminarGuia(g)}
-                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                              className="p-2 text-white  hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                               title="Eliminar registro"
                             >
                               <FaTrash size={12} />
                             </button>
                           </div>
                         </td>
+
                       </tr>
                     );
                   })}
