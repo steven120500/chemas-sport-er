@@ -1415,8 +1415,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 }}
                 className="w-full px-4 py-3.5 bg-white border-2 border-zinc-900 rounded-2xl text-xs sm:text-sm font-black text-black outline-none cursor-pointer shadow-sm"
               >
-                <option value="catalogo">👕 Venta Normal de Inventario (Buscar prenda y descontar stock)</option>
-                <option value="extra">💵 Abono / Saldo Restante / Prenda ya rebajada o sin stock (Suma a Caja sin tocar stock)</option>
+                <option value="catalogo">Venta Normal de Inventario (Buscar prenda y descontar stock)</option>
+                <option value="extra">Abono / Saldo Restante / Prenda ya rebajada o sin stock (Suma a Caja sin tocar stock)</option>
               </select>
             </div>
 
