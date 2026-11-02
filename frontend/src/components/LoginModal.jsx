@@ -15,7 +15,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
     if (!username || !password) {
       toast.warn('Todos los campos son requeridos', {
-        style: { background: '#111', color: '#fff' }
+        style: { background: '#000', color: '#fff' }
       });
       return;
     }
@@ -46,26 +46,19 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       onClose();
     } catch (err) {
       toast.error(err.message || 'Error desconocido', {
-        style: { background: '#111', color: '#fff' }
+        style: { background: '#000', color: '#fff' }
       });
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      {/* Contenedor Principal Modo Halloween / Premium */}
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+      {/* Contenedor Principal Minimalista Blanco y Negro */}
       <div 
-        className="relative bg-[#111] p-8 rounded-3xl shadow-[0_0_40px_rgba(234,179,8,0.15)] border border-yellow-500/30 w-full max-w-sm overflow-hidden"
+        className="relative bg-white p-8 rounded-3xl shadow-2xl border border-gray-200 w-full max-w-sm overflow-hidden text-black"
       >
-        {/* Telaraña Decorativa de Halloween */}
-        <img 
-          src="/Araña.png" 
-          alt="Decoración Halloween" 
-          className="absolute top-0 right-0 w-32 opacity-20 invert pointer-events-none transform rotate-90" 
-        />
-
         <div className="relative z-10">
-          <h2 className="text-2xl font-black mb-6 text-center tracking-widest uppercase text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)] flex items-center justify-center gap-2">
+          <h2 className="text-2xl font-black mb-6 text-center tracking-widest uppercase text-black flex items-center justify-center gap-2">
             <span></span> {isRegister ? 'Registrarse' : 'Ingresar'} <span></span>
           </h2>
 
@@ -80,7 +73,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 placeholder="Ingresa tu usuario"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-black font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner"
+                className="w-full bg-gray-50 border border-gray-300 px-4 py-3.5 rounded-xl text-black placeholder-gray-400 font-medium outline-none focus:border-black focus:bg-white transition-colors shadow-inner"
               />
             </div>
 
@@ -93,12 +86,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3.5 rounded-xl text-black font-medium outline-none focus:border-yellow-500 transition-colors shadow-inner pr-20"
+                className="w-full bg-gray-50 border border-gray-300 px-4 py-3.5 rounded-xl text-black placeholder-gray-400 font-medium outline-none focus:border-black focus:bg-white transition-colors shadow-inner pr-20"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-[38px] text-[10px] font-black uppercase tracking-wider text-yellow-600 hover:text-yellow-400 bg-transparent transition-colors"
+                className="absolute right-3 top-[38px] text-[10px] font-black uppercase tracking-wider text-gray-500 hover:text-black bg-transparent transition-colors cursor-pointer"
               >
                 {showPassword ? 'Ocultar' : 'Mostrar'}
               </button>
@@ -107,7 +100,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             <div className="flex flex-col gap-3 mt-6">
               <button
                 type="submit"
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-2xl font-black tracking-widest uppercase shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-transform transform hover:-translate-y-1"
+                className="w-full bg-black hover:bg-zinc-800 text-white py-4 rounded-2xl font-black tracking-widest uppercase shadow-md transition-transform transform hover:-translate-y-0.5 cursor-pointer"
               >
                 {isRegister ? 'Crear Cuenta' : 'Iniciar Sesión'}
               </button>
@@ -115,7 +108,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full bg-transparent border-2 border-[#333] text-gray-400 hover:bg-[#1a1a1a] hover:text-white hover:border-gray-600 py-3.5 rounded-2xl font-bold tracking-widest uppercase transition-colors"
+                className="w-full bg-white border-2 border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-black hover:border-black py-3.5 rounded-2xl font-bold tracking-widest uppercase transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
