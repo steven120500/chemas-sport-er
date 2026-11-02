@@ -169,6 +169,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     try { return Number(localStorage.getItem("chemasport_tienda_fondo_caja") || 0); } catch { return 0; }
   });
 
+  // 🔥 NUEVOS ESTADOS PARA INGRESO EXTRA / ABONO SIN DESCONTAR STOCK
+  const [modoIngresoProducto, setModoIngresoProducto] = useState("catalogo"); // "catalogo" | "extra"
+  const [conceptoExtraTipo, setConceptoExtraTipo] = useState("Camiseta Versión Fan (Abono / Saldo)");
+  const [detalleExtraCustom, setDetalleExtraCustom] = useState("");
+  const [tallaExtraCustom, setTallaExtraCustom] = useState("U");
+  const [cantidadExtraCustom, setCantidadExtraCustom] = useState(1);
+  const [montoExtraCustom, setMontoExtraCustom] = useState("");
+
   const [catalogoBase, setCatalogoBase] = useState([]);
   const [tipoFiltroSeleccionado, setTipoFiltroSeleccionado] = useState("Todos");
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -486,6 +494,46 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     }
   };
 
+  // 🔥 FUNCIÓN PARA AGREGAR ABONO / INGRESO EXTRA AL CARRITO (SIN TOCAR STOCK)
+  const agregarIngresoExtraAlCarrito = () => {
+    const monto = Number(montoExtraCustom) || 0;
+    const cant = Number(cantidadExtraCustom) || 1;
+    if (monto <= 0) {
+      toastHOT.error("Ingresa el monto del abono o pago (ej. 10000 o 5000).");
+      return;
+    }
+
+    const nombreFinal = detalleExtraCustom.trim()
+      ? `${conceptoExtraTipo} - ${detalleExtraCustom.trim()}`
+      : conceptoExtraTipo;
+
+    const tallaFinal = String(tallaExtraCustom || "U").trim().toUpperCase();
+
+    const nuevoItemExtra = {
+      uid: `extra_${Date.now()}`,
+      productId: null, // No descuenta stock de ningún artículo
+      esIngresoExtra: true,
+      item: nombreFinal,
+      imagen: "",
+      talla: tallaFinal,
+      ubicacion: "Ingreso / Abono",
+      tallasTexto: cant > 1 ? `${cant}x ${tallaFinal}` : tallaFinal,
+      totalUnidades: cant,
+      precioUnitarioCustom: monto,
+      items: Array.from({ length: cant }, () => ({
+        talla: tallaFinal,
+        tienda: "Ingreso / Abono",
+        nombre: nombreFinal
+      }))
+    };
+
+    setCarritoVentas((prev) => [...prev, nuevoItemExtra]);
+    setDetalleExtraCustom("");
+    setMontoExtraCustom("");
+    setCantidadExtraCustom(1);
+    toastHOT.success("Abono / Ingreso extra agregado a la cuenta.");
+  };
+
   const agregarPrendaAlCarrito = () => {
     if (!productoSeleccionado) {
       toastHOT.error("Selecciona una prenda.");
@@ -615,7 +663,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               color: #000000; 
               font-weight: 700;
               margin: 0; 
-              /* 🔥 AQUÍ ESTÁ EL TRUCO: Aumentamos el margen izquierdo global del body para centrar todo por igual */
               padding: 6px 4px 8px 24px; 
               width: 100%; 
               max-width: 72mm; 
@@ -692,7 +739,35 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const listaFinalParaCobrar = useMemo(() => {
     if (carritoVentas.length > 0) return carritoVentas;
-    if (productoSeleccionado && tallaSeleccionada) {
+
+    // Si está en modo Ingreso Extra / Abono y puso un monto directo sin darle a "Agregar a cuenta"
+    if (modoIngresoProducto === "extra" && Number(montoExtraCustom) > 0) {
+      const cant = Number(cantidadExtraCustom) || 1;
+      const precioUnit = Number(montoExtraCustom) || 0;
+      const nombreFinal = detalleExtraCustom.trim()
+        ? `${conceptoExtraTipo} - ${detalleExtraCustom.trim()}`
+        : conceptoExtraTipo;
+      const tallaFinal = String(tallaExtraCustom || "U").trim().toUpperCase();
+
+      return [{
+        uid: "temp_extra_1",
+        productId: null,
+        esIngresoExtra: true,
+        item: nombreFinal,
+        talla: tallaFinal,
+        ubicacion: "Ingreso / Abono",
+        tallasTexto: cant > 1 ? `${cant}x ${tallaFinal}` : tallaFinal,
+        totalUnidades: cant,
+        precioUnitarioCustom: precioUnit,
+        items: Array.from({ length: cant }, () => ({
+          talla: tallaFinal,
+          tienda: "Ingreso / Abono",
+          nombre: nombreFinal
+        }))
+      }];
+    }
+
+    if (modoIngresoProducto === "catalogo" && productoSeleccionado && tallaSeleccionada) {
       const cant = Number(cantidadVenta) || 1;
       const precioUnit = Number(precioUnitarioInput) || getProductPrice(productoSeleccionado);
       const nombreBase = productoSeleccionado.name || productoSeleccionado.nombre || productoSeleccionado.title || "Camiseta";
@@ -719,7 +794,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       }];
     }
     return [];
-  }, [carritoVentas, productoSeleccionado, tallaSeleccionada, ubicacionSeleccionada, cantidadVenta, precioUnitarioInput]);
+  }, [
+    carritoVentas, modoIngresoProducto, montoExtraCustom, cantidadExtraCustom,
+    detalleExtraCustom, conceptoExtraTipo, tallaExtraCustom,
+    productoSeleccionado, tallaSeleccionada, ubicacionSeleccionada, cantidadVenta, precioUnitarioInput
+  ]);
 
   const totalCalculadoForm = useMemo(() => {
     return listaFinalParaCobrar.reduce(
@@ -732,7 +811,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const handleAgregarVentaATabla = () => {
     if (listaFinalParaCobrar.length === 0) {
-      toastHOT.error("Agrega al menos una prenda para registrar en la tabla.");
+      toastHOT.error("Agrega al menos una prenda o un abono/ingreso extra para registrar en la tabla.");
       return;
     }
     if (totalCalculadoForm <= 0) {
@@ -764,7 +843,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       cliente: clienteNombreFinal,
       vendedor: nombreUsuarioActual,
       precioUnitarioCustom: Number(item.precioUnitarioCustom),
-      productId: item.productId,
+      productId: item.productId || null,
+      esIngresoExtra: Boolean(item.esIngresoExtra),
       items: item.items
     }));
 
@@ -791,11 +871,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       totalCobrado: totalCalculadoForm
     };
 
+    // Solo descuenta stock local si el ítem tiene productId (los ingresos extra tienen productId: null)
     setCatalogoBase((prev) =>
       prev.map((prod) => {
         let mod = prod;
         ventasParaGuardar.forEach((v) => {
-          if (String(prod._id || prod.id) === String(v.productId)) {
+          if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
             mod = ajustarStockProductoLocal(mod, v.talla, v.ubicacion, -Number(v.totalUnidades || 1));
           }
         });
@@ -810,9 +891,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setBusquedaProducto("");
     setCantidadVenta(1);
     setPrecioUnitarioInput("");
+    setDetalleExtraCustom("");
+    setMontoExtraCustom("");
+    setCantidadExtraCustom(1);
     setFormCliente((prev) => ({ ...prev, pagoConBillete: "" }));
 
-    toastHOT.success("Venta enviada a la tabla inferior. Puedes emitirla cuando gustes.");
+    toastHOT.success("Venta / ingreso enviado a la tabla inferior. Puedes emitirlo cuando gustes.");
   };
 
   const handleEmitirDesdeTabla = async (facturaPendiente) => {
@@ -852,7 +936,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     };
 
     setEmitiendoId(facturaPendiente._id);
-    const toastId = toastHOT.loading("Emitiendo comprobante oficial y descontando stock...");
+    const toastId = toastHOT.loading("Emitiendo comprobante oficial...");
 
     try {
       const response = await fetch(`${API_BASE}/api/tienda/emitir`, {
@@ -923,16 +1007,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         )
       );
 
-      setCatalogoBase((prev) =>
-        prev.map((prod) => {
-          if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
-            return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
-          }
-          return prod;
-        })
-      );
+      if (articuloQuitado.productId) {
+        setCatalogoBase((prev) =>
+          prev.map((prod) => {
+            if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
+              return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+            }
+            return prod;
+          })
+        );
+      }
 
-      toastHOT.success(`Se quitó ${articuloQuitado.item} (${talla}) y se devolvió a ${ubi}.`);
+      toastHOT.success(`Se quitó ${articuloQuitado.item} (${talla}).`);
       return;
     }
 
@@ -949,14 +1035,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         </p>
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-2 mb-3 text-left">
           <p className="text-[11px] font-black text-black leading-snug">
-            • Devolver físicamente a: <span className="underline">{ubi}</span>
+            • Ubicación: <span className="underline">{ubi}</span>
           </p>
         </div>
         <div className="flex gap-2 justify-center">
           <button
             onClick={async () => {
               toastHOT.dismiss(t.id);
-              const toastLoad = toastHOT.loading("Quitando artículo y actualizando stock...");
+              const toastLoad = toastHOT.loading("Quitando artículo y actualizando...");
               try {
                 const nuevasVentas = ventasActuales.filter((_, i) => i !== idxArticulo);
                 const nuevoTotal = nuevasVentas.reduce(
@@ -991,16 +1077,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 });
                 if (!resReemitir.ok) throw new Error("Error al guardar factura actualizada");
 
-                setCatalogoBase((prev) =>
-                  prev.map((prod) => {
-                    if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
-                      return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
-                    }
-                    return prod;
-                  })
-                );
+                if (articuloQuitado.productId) {
+                  setCatalogoBase((prev) =>
+                    prev.map((prod) => {
+                      if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
+                        return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+                      }
+                      return prod;
+                    })
+                  );
+                }
 
-                toastHOT.success(`Artículo quitado y devuelto a ${ubi}.`, { id: toastLoad });
+                toastHOT.success(`Artículo quitado correctamente.`, { id: toastLoad });
                 fetchResumenTienda();
               } catch (err) {
                 toastHOT.error(err.message || "Error al quitar artículo", { id: toastLoad });
@@ -1023,7 +1111,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       ? factura.ventas.map((v) => {
           const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
           const talla = v.talla || v.tallasTexto || "U";
-          return `${v.totalUnidades || 1}x ${v.item} (Talla ${talla}) ➔ Devolver a: ${ubi}`;
+          return `${v.totalUnidades || 1}x ${v.item} (Talla ${talla}) ➔ ${ubi}`;
         })
       : [];
 
@@ -1036,13 +1124,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           {factura.esPendiente ? "¿Eliminar venta pendiente?" : "¿Anular esta venta?"}
         </p>
         <p className="text-xs text-zinc-600 mb-2">
-          Se restarán <strong>₡{Number(factura.totalCobrado || 0).toLocaleString("es-CR")}</strong> de la caja y el stock se sumará de nuevo.
+          Se restarán <strong>₡{Number(factura.totalCobrado || 0).toLocaleString("es-CR")}</strong> de la caja.
         </p>
 
         {detalleUbicaciones.length > 0 && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 mb-3 text-left">
             <p className="text-[10px] font-black uppercase text-amber-900 mb-1">
-              ⚠️ Atención: Debes devolver o cambiar físicamente la prenda en:
+              ⚠️ Detalle del registro:
             </p>
             {detalleUbicaciones.map((linea, idx) => (
               <p key={idx} className="text-[11px] font-black text-black leading-snug">
@@ -1064,7 +1152,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       factura.ventas.forEach((v) => {
                         const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
                         const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
-                        if (String(prod._id || prod.id) === String(v.productId)) {
+                        if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
                           mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
                         }
                       });
@@ -1073,7 +1161,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   );
                 }
                 setFacturasPendientes((prev) => prev.filter((item) => item._id !== factura._id));
-                toastHOT.success("Venta pendiente eliminada y stock restaurado.");
+                toastHOT.success("Venta pendiente eliminada.");
                 return;
               }
 
@@ -1087,7 +1175,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         factura.ventas.forEach((v) => {
                           const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
                           const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
-                          if (String(prod._id || prod.id) === String(v.productId)) {
+                          if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
                             mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
                           }
                         });
@@ -1095,7 +1183,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       })
                     );
                   }
-                  toastHOT.success("Factura anulada y camiseta devuelta al stock.");
+                  toastHOT.success("Factura anulada correctamente.");
                   fetchResumenTienda();
                 }
               } catch (e) {
@@ -1104,7 +1192,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             }}
             className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-red-700 cursor-pointer"
           >
-            Sí, Anular y Devolver
+            Sí, Anular
           </button>
           <button onClick={() => toastHOT.dismiss(t.id)} className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-zinc-200 cursor-pointer">
             Cancelar
@@ -1313,190 +1401,311 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="space-y-6">
-            <div>
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-2">
-                Filtrar por Categoría / Tipo
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {tiposDisponibles.map((t) => {
-                  const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTipoFiltroSeleccionado(t)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                        activo
-                          ? "bg-black text-white border-black shadow-sm"
-                          : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="relative">
+            {/* 🔥 SELECT ANTES DEL PRODUCTO: VENTA NORMAL VS ABONO / RESTANTE / EXTRA */}
+            <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                Buscar Camiseta o Artículo *
+                Tipo de Operación / Ingreso *
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={busquedaProducto}
-                  onFocus={() => setMostrarDropdownProductos(true)}
-                  onChange={(e) => {
-                    setBusquedaProducto(e.target.value);
-                    setMostrarDropdownProductos(true);
-                  }}
-                  placeholder="Escribe el equipo, jugador o categoría..."
-                  className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all"
-                />
-                <FaSearch className="absolute left-3.5 top-5 -translate-y-1/2 text-zinc-400" size={13} />
-                {buscandoProductos && (
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-zinc-400">
-                    Buscando...
-                  </span>
-                )}
-              </div>
-
-              {mostrarDropdownProductos && resultadosBusqueda.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl z-40 divide-y divide-zinc-100">
-                  {resultadosBusqueda.map((p) => {
-                    const nombre = p.name || p.nombre || p.title || "Camiseta";
-                    const tipo = p.type || p.tipo || "";
-                    const precio = getProductPrice(p);
-                    const thumb = getProductThumb(p);
-                    const tallasDisp = getAvailableSizes(p);
-
-                    return (
-                      <div
-                        key={p._id || p.id}
-                        onClick={() => seleccionarProductoBusqueda(p)}
-                        className="px-3.5 py-2.5 hover:bg-zinc-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {thumb ? (
-                            <img src={thumb} alt="" className="w-11 h-11 rounded-xl object-cover border border-zinc-200 bg-zinc-100 shrink-0" />
-                          ) : (
-                            <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400 shrink-0">
-                              <FaShoppingBag size={14} />
-                            </div>
-                          )}
-
-                          <div className="min-w-0 flex-1">
-                            <p className="font-black text-xs text-black truncate">
-                              {nombre} {tipo ? <span className="text-zinc-500 font-bold">({tipo})</span> : ""}
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                              {tallasDisp.map((t, i) => (
-                                <span key={`${t.ubicacion}_${t.talla}_${i}`} className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[9px] font-bold">
-                                  {t.ubicacion} · {t.talla}: {t.stock}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span className="font-black text-xs text-blue-600 shrink-0">
-                          ₡{precio.toLocaleString("es-CR")}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <select
+                value={modoIngresoProducto}
+                onChange={(e) => {
+                  setModoIngresoProducto(e.target.value);
+                  setProductoSeleccionado(null);
+                  setMostrarDropdownProductos(false);
+                }}
+                className="w-full px-4 py-3.5 bg-white border-2 border-zinc-900 rounded-2xl text-xs sm:text-sm font-black text-black outline-none cursor-pointer shadow-sm"
+              >
+                <option value="catalogo">👕 Venta Normal de Inventario (Buscar prenda y descontar stock)</option>
+                <option value="extra">💵 Abono / Saldo Restante / Prenda ya rebajada o sin stock (Suma a Caja sin tocar stock)</option>
+              </select>
             </div>
 
-            {productoSeleccionado && (
-              <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {getProductThumb(productoSeleccionado) && (
-                      <img src={getProductThumb(productoSeleccionado)} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-200 bg-white shrink-0" />
+            {modoIngresoProducto === "catalogo" ? (
+              <>
+                <div>
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-2">
+                    Filtrar por Categoría / Tipo
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tiposDisponibles.map((t) => {
+                      const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setTipoFiltroSeleccionado(t)}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                            activo
+                              ? "bg-black text-white border-black shadow-sm"
+                              : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Buscar Camiseta o Artículo *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={busquedaProducto}
+                      onFocus={() => setMostrarDropdownProductos(true)}
+                      onChange={(e) => {
+                        setBusquedaProducto(e.target.value);
+                        setMostrarDropdownProductos(true);
+                      }}
+                      placeholder="Escribe el equipo, jugador o categoría..."
+                      className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all"
+                    />
+                    <FaSearch className="absolute left-3.5 top-5 -translate-y-1/2 text-zinc-400" size={13} />
+                    {buscandoProductos && (
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-zinc-400">
+                        Buscando...
+                      </span>
                     )}
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 block">Prenda Seleccionada</span>
-                      <h4 className="text-sm font-black text-black truncate">
-                        {productoSeleccionado.name || productoSeleccionado.nombre} {productoSeleccionado.type ? `(${productoSeleccionado.type})` : ""}
-                      </h4>
+                  </div>
+
+                  {mostrarDropdownProductos && resultadosBusqueda.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl z-40 divide-y divide-zinc-100">
+                      {resultadosBusqueda.map((p) => {
+                        const nombre = p.name || p.nombre || p.title || "Camiseta";
+                        const tipo = p.type || p.tipo || "";
+                        const precio = getProductPrice(p);
+                        const thumb = getProductThumb(p);
+                        const tallasDisp = getAvailableSizes(p);
+
+                        return (
+                          <div
+                            key={p._id || p.id}
+                            onClick={() => seleccionarProductoBusqueda(p)}
+                            className="px-3.5 py-2.5 hover:bg-zinc-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {thumb ? (
+                                <img src={thumb} alt="" className="w-11 h-11 rounded-xl object-cover border border-zinc-200 bg-zinc-100 shrink-0" />
+                              ) : (
+                                <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400 shrink-0">
+                                  <FaShoppingBag size={14} />
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black text-xs text-black truncate">
+                                  {nombre} {tipo ? <span className="text-zinc-500 font-bold">({tipo})</span> : ""}
+                                </p>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {tallasDisp.map((t, i) => (
+                                    <span key={`${t.ubicacion}_${t.talla}_${i}`} className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[9px] font-bold">
+                                      {t.ubicacion} · {t.talla}: {t.stock}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="font-black text-xs text-blue-600 shrink-0">
+                              ₡{precio.toLocaleString("es-CR")}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {productoSeleccionado && (
+                  <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {getProductThumb(productoSeleccionado) && (
+                          <img src={getProductThumb(productoSeleccionado)} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-200 bg-white shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 block">Prenda Seleccionada</span>
+                          <h4 className="text-sm font-black text-black truncate">
+                            {productoSeleccionado.name || productoSeleccionado.nombre} {productoSeleccionado.type ? `(${productoSeleccionado.type})` : ""}
+                          </h4>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setProductoSeleccionado(null)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-red-600 cursor-pointer">
+                        ✕
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
+                        Ubicación de donde sale la prenda *
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {["Tienda", "Bodega 1", "Bodega 2"].map((ubi) => {
+                          const tieneEnUbi = ubicacionesConStock.includes(ubi);
+                          const activa = ubicacionSeleccionada === ubi;
+                          return (
+                            <button
+                              key={ubi}
+                              type="button"
+                              onClick={() => cambiarUbicacionSeleccionada(ubi)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                                activa
+                                  ? "bg-black text-white border-black shadow-sm"
+                                  : tieneEnUbi
+                                  ? "bg-white text-gray-800 border-gray-600 hover:border-black"
+                                  : "bg-gray-100 text-gray-400 border-gray-200"
+                              }`}
+                            >
+                              {ubi}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
+                        Selecciona Talla Disponible en {ubicacionSeleccionada} *
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {tallasDisponiblesActuales.map((t) => {
+                          const activa = tallaSeleccionada === t.talla;
+                          return (
+                            <button
+                              key={`${t.ubicacion}_${t.talla}`}
+                              type="button"
+                              onClick={() => setTallaSeleccionada(t.talla)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                                activa
+                                  ? "bg-black text-white border-black shadow-sm"
+                                  : "bg-white text-gray-800 border-gray-600 hover:border-black"
+                              }`}
+                            >
+                              {t.talla} <span className="text-[10px] opacity-75">({t.stock})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Cantidad *</label>
+                        <input type="number" min="1" value={cantidadVenta} onChange={(e) => setCantidadVenta(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black" />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Precio Unitario ₡ *</label>
+                        <input type="number" value={precioUnitarioInput} onChange={(e) => setPrecioUnitarioInput(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-blue-600 outline-none focus:border-black" />
+                      </div>
+
+                      <div className="flex items-end">
+                        <button type="button" onClick={agregarPrendaAlCarrito} className="w-full py-2.5 px-4 bg-black hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all">
+                          <FaPlus size={11} className="text-amber-400" />
+                          <span>Agregar a cuenta</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setProductoSeleccionado(null)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-red-600 cursor-pointer">
-                     ✕
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
-                    Ubicación de donde sale la prenda *
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {["Tienda", "Bodega 1", "Bodega 2"].map((ubi) => {
-                      const tieneEnUbi = ubicacionesConStock.includes(ubi);
-                      const activa = ubicacionSeleccionada === ubi;
-                      return (
-                        <button
-                          key={ubi}
-                          type="button"
-                          onClick={() => cambiarUbicacionSeleccionada(ubi)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                            activa
-                              ? "bg-black text-white border-black shadow-sm"
-                              : tieneEnUbi
-                              ? "bg-white text-gray-800 border-gray-600 hover:border-black"
-                              : "bg-gray-100 text-gray-400 border-gray-200"
-                          }`}
-                        >
-                          {ubi}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
-                    Selecciona Talla Disponible en {ubicacionSeleccionada} *
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {tallasDisponiblesActuales.map((t) => {
-                      const activa = tallaSeleccionada === t.talla;
-                      return (
-                        <button
-                          key={`${t.ubicacion}_${t.talla}`}
-                          type="button"
-                          onClick={() => setTallaSeleccionada(t.talla)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                            activa
-                              ? "bg-black text-white border-black shadow-sm"
-                              : "bg-white text-gray-800 border-gray-600 hover:border-black"
-                          }`}
-                        >
-                          {t.talla} <span className="text-[10px] opacity-75">({t.stock})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                )}
+              </>
+            ) : (
+              /* 🔥 BLOQUE PARA INGRESAR ABONO / RESTANTE / PRENDA SIN STOCK */
+              <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Cantidad *</label>
-                    <input type="number" min="1" value={cantidadVenta} onChange={(e) => setCantidadVenta(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 block">
+                      Ingreso directo a Caja (No descuenta inventario)
+                    </span>
+                    <h4 className="text-sm font-black text-black">
+                      Registrar Abono, Saldo Restante o Prenda Fuera de Stock
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
+                      Concepto Base *
+                    </label>
+                    <select
+                      value={conceptoExtraTipo}
+                      onChange={(e) => setConceptoExtraTipo(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black cursor-pointer"
+                    >
+                      <option value="Camiseta Versión Fan (Abono / Saldo)">Camiseta Versión Fan (Abono / Saldo)</option>
+                      <option value="Camiseta Versión Fan (Adelanto / Encargo)">Camiseta Versión Fan (Adelanto / Encargo)</option>
+                      <option value="Camiseta Versión Player (Abono / Saldo)">Camiseta Versión Player (Abono / Saldo)</option>
+                      <option value="Camiseta Retro / Nacional (Abono / Saldo)">Camiseta Retro / Nacional (Abono / Saldo)</option>
+                      <option value="Ingreso Extra / Pago Restante">Ingreso Extra / Pago Restante</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Precio Unitario ₡ *</label>
-                    <input type="number" value={precioUnitarioInput} onChange={(e) => setPrecioUnitarioInput(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-blue-600 outline-none focus:border-black" />
+                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
+                      Detalle opcional (Ej. Real Madrid, Restante, etc.)
+                    </label>
+                    <input
+                      type="text"
+                      value={detalleExtraCustom}
+                      onChange={(e) => setDetalleExtraCustom(e.target.value)}
+                      placeholder="Ej. Restante de camiseta ya entregada..."
+                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-black outline-none focus:border-black"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
+                      Talla / Ref
+                    </label>
+                    <input
+                      type="text"
+                      value={tallaExtraCustom}
+                      onChange={(e) => setTallaExtraCustom(e.target.value)}
+                      placeholder="Ej. M, L o U"
+                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
+                      Cantidad *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={cantidadExtraCustom}
+                      onChange={(e) => setCantidadExtraCustom(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
+                      Monto a Cobrar ₡ *
+                    </label>
+                    <input
+                      type="number"
+                      value={montoExtraCustom}
+                      onChange={(e) => setMontoExtraCustom(e.target.value)}
+                      placeholder="Ej. 10000 o 5000"
+                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-blue-600 outline-none focus:border-black"
+                    />
                   </div>
 
                   <div className="flex items-end">
-                    <button type="button" onClick={agregarPrendaAlCarrito} className="w-full py-2.5 px-4 bg-black hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all">
+                    <button
+                      type="button"
+                      onClick={agregarIngresoExtraAlCarrito}
+                      className="w-full py-2.5 px-4 bg-black hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                    >
                       <FaPlus size={11} className="text-amber-400" />
-                      <span>Agregar a cuenta</span>
+                      <span>Agregar Abono</span>
                     </button>
                   </div>
                 </div>
