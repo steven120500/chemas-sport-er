@@ -169,7 +169,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     try { return Number(localStorage.getItem("chemasport_tienda_fondo_caja") || 0); } catch { return 0; }
   });
 
-  // 🔥 NUEVOS ESTADOS PARA INGRESO EXTRA / ABONO SIN DESCONTAR STOCK
   const [modoIngresoProducto, setModoIngresoProducto] = useState("catalogo"); // "catalogo" | "extra"
   const [conceptoExtraTipo, setConceptoExtraTipo] = useState("Camiseta Versión Fan (Abono / Saldo)");
   const [detalleExtraCustom, setDetalleExtraCustom] = useState("");
@@ -192,7 +191,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const [carritoVentas, setCarritoVentas] = useState([]);
 
-  // 📄 Estados para el paginado de la tabla inferior
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -494,7 +492,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     }
   };
 
-  // 🔥 FUNCIÓN PARA AGREGAR ABONO / INGRESO EXTRA AL CARRITO (SIN TOCAR STOCK)
   const agregarIngresoExtraAlCarrito = () => {
     const monto = Number(montoExtraCustom) || 0;
     const cant = Number(cantidadExtraCustom) || 1;
@@ -511,7 +508,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
     const nuevoItemExtra = {
       uid: `extra_${Date.now()}`,
-      productId: null, // No descuenta stock de ningún artículo
+      productId: null,
       esIngresoExtra: true,
       item: nombreFinal,
       imagen: "",
@@ -663,13 +660,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               color: #000000; 
               font-weight: 800;
               margin: 0; 
-              /* 📐 AQUÍ ESTÁN LOS CAMBIOS:
-                 - El último valor (36px) le da un gran espacio en blanco abajo.
-                 - El penúltimo valor (38px) desplaza todo el contenido hacia la derecha. */
               padding: 6px 4px 36px 40px; 
               width: 100%; 
               max-width: 72mm; 
-              /* 🔠 Letra general más grande */
               font-size: 14px; 
               line-height: 1.4;
             }
@@ -741,11 +734,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     printWindow.document.close();
   };
 
-
   const listaFinalParaCobrar = useMemo(() => {
     if (carritoVentas.length > 0) return carritoVentas;
 
-    // Si está en modo Ingreso Extra / Abono y puso un monto directo sin darle a "Agregar a cuenta"
     if (modoIngresoProducto === "extra" && Number(montoExtraCustom) > 0) {
       const cant = Number(cantidadExtraCustom) || 1;
       const precioUnit = Number(montoExtraCustom) || 0;
@@ -857,7 +848,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       _id: `pend_${Date.now()}`,
       esPendiente: true,
       consecutivoOficial: "PENDIENTE",
-      fechaHora: getHoraActualCR(), // 🔥 Hora correcta en CR
+      fechaHora: getHoraActualCR(),
       fechaYMD: selectedDate,
       tipo: formCliente.tipoEmision,
       vendedor: nombreUsuarioActual,
@@ -876,7 +867,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       totalCobrado: totalCalculadoForm
     };
 
-    // Solo descuenta stock local si el ítem tiene productId (los ingresos extra tienen productId: null)
     setCatalogoBase((prev) =>
       prev.map((prod) => {
         let mod = prod;
@@ -956,18 +946,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
       setFacturasPendientes((prev) => prev.filter((item) => item._id !== facturaPendiente._id));
       await fetchResumenTienda();
-
-      imprimirTicketNativo(
-        facturaPendiente.ventas,
-        data.consecutivoOficial,
-        data.totalCobrado,
-        {
-          nombre: payloadTienda.nombreCliente,
-          cedula: payloadTienda.cedula !== "000000000" ? payloadTienda.cedula : "",
-          telefono: payloadTienda.telefono
-        },
-        payloadTienda.metodoPago
-      );
     } catch (error) {
       toastHOT.error(`Error al emitir: ${error.message}`, { id: toastId, duration: 6000 });
     } finally {
@@ -1219,7 +1197,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     });
   }, [pendientesDelPeriodo, facturasEmitidas, searchHistorialFilter]);
 
-  // 📄 Paginado de la tabla inferior
   const totalPages = Math.max(1, Math.ceil(facturasFiltradas.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
@@ -1246,7 +1223,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
                 ChemaSport ER 
               </h1>
-              {/* 🔥 Contador de Chemas visual */}
               <div className="bg-black text-white px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-md">
                 <FaShoppingBag className="text-white" size={14} />
                 <span className="text-xs font-black uppercase tracking-widest">
@@ -1406,7 +1382,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
 
           <div className="space-y-6">
-            {/* 🔥 SELECT ANTES DEL PRODUCTO: VENTA NORMAL VS ABONO / RESTANTE / EXTRA */}
             <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                 Tipo de Operación / Ingreso *
@@ -1618,7 +1593,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 )}
               </>
             ) : (
-              /* 🔥 BLOQUE PARA INGRESAR ABONO / RESTANTE / PRENDA SIN STOCK */
               <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1951,7 +1925,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       <th className="py-3 px-3">Ubicación</th>
                       <th className="py-3 px-3">Método de Pago</th>
                       <th className="py-3 px-3 text-right">Total Cobrado</th>
-                      <th className="py-3 px-3 text-right">Acciones / Emitir</th>
+                      <th className="py-3 px-3 text-right">Acciones (Imprimir / Emitir)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 font-medium">
@@ -2027,6 +2001,18 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                             <div className="inline-flex items-center justify-end gap-2">
                               {esPendiente ? (
                                 <>
+                                  {/* 🔥 1. IMPRIMIR RÁPIDO PARA DARLE AL CLIENTE */}
+                                  <button
+                                    type="button"
+                                    onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial || "PENDIENTE", f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
+                                    className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                                    title="Imprimir Tiquete de inmediato"
+                                  >
+                                    <FaPrint size={12} className="text-amber-400" />
+                                    <span>Imprimir</span>
+                                  </button>
+
+                                  {/* 🚀 2. EMITIR A HACIENDA EN SEGUNDO PLANO */}
                                   <select
                                     value={f.tipo || "interno"}
                                     onChange={(e) => cambiarTipoEmisionPendiente(f._id, e.target.value)}
@@ -2042,22 +2028,25 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                     disabled={estaEmitiendoEsta}
                                     onClick={() => handleEmitirDesdeTabla(f)}
                                     className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-                                    title="Emitir Factura Ahora"
+                                    title="Emitir Comprobante"
                                   >
                                     <FaReceipt size={12} />
-                                    <span>{estaEmitiendoEsta ? "Emitiendo..." : "Emitir Factura"}</span>
+                                    <span>{estaEmitiendoEsta ? "Emitiendo..." : "Emitir"}</span>
                                   </button>
                                 </>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
-                                  className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-                                  title="Reimprimir"
-                                >
-                                  <FaPrint size={12} className="text-amber-400" />
-                                  <span>Reimprimir</span>
-                                </button>
+                                <>
+                                  {/* 🔥 3. REIMPRESIÓN RÁPIDA PARA YA EMITIDAS */}
+                                  <button
+                                    type="button"
+                                    onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
+                                    className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                                    title="Reimprimir Tiquete"
+                                  >
+                                    <FaPrint size={12} className="text-amber-400" />
+                                    <span>Reimprimir</span>
+                                  </button>
+                                </>
                               )}
 
                               <button
