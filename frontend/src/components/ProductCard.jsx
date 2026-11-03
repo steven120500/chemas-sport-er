@@ -91,12 +91,11 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileHover={{ scale: 1.03, y: -5, transition: { duration: 0.2 } }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onClick(product)}
-      // 🔥 EL CONTENEDOR EXTERIOR AHORA NO TIENE BORDES NI FONDO, ES SOLO LA CAJA LIMITADORA 🔥
       className={`group/card relative w-full p-0 transition-all duration-300 cursor-pointer flex flex-col font-sans shadow-sm hover:shadow-xl rounded-2xl sm:rounded-[24px]
         ${isAdmin && product.hidden ? "opacity-60 grayscale" : ""}
       `}
     >
-      {/* Etiqueta de "NEW" colocada por fuera del grid (con z-50 y márgenes negativos) */}
+      {/* Etiqueta de "NEW" en blanco y negro */}
       {isNuevo && !isTotalAgotado && (
         <div className="absolute -top-3 -right-3 sm:-top-5 sm:-right-5 z-40 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center -rotate-12 shine-sutil pointer-events-none transition-all">
           <svg className="w-full h-full text-black drop-shadow-md" viewBox="0 0 100 100" fill="currentColor">
@@ -128,7 +127,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             55%, 100% { opacity: 0; }
           }
           
-          /* Colores de los puntos (dots) en escala de grises */
           @keyframes dot1Sync {
             0%, 45% { opacity: 0.3; width: 6px; background-color: #9ca3af; }
             55%, 100% { opacity: 1; width: 14px; background-color: #000000; }
@@ -171,14 +169,23 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         `}
       </style>
 
-      {/* 🔥 EL CONTENEDOR INTERNO AHORA TIENE LOS BORDES, EL FONDO Y EL OVERFLOW-HIDDEN.
-             ASÍ NADA SE SALE DEL BORDE REDONDEADO[cite: 8] 🔥 */}
+      {/* Contenedor interno con bordes y fondo blanco puro */}
       <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px] bg-white overflow-hidden rounded-[14px] sm:rounded-[24px] border-2 sm:border-4 border-gray-200 group-hover/card:border-black transition-colors duration-300">
         
+        {/* 🎀 CINTA Y LAZO NAVIDEÑO ATRAVESANDO LA PARTE SUPERIOR EN LÍNEA RECTA */}
+        <div className="absolute top-2 left-0 right-0 z-30 h-10 pointer-events-none flex items-center justify-center overflow-visible">
+          <img 
+            src="/lazo.png" 
+            alt="Lazo Navideño" 
+            className="w-96 h-96 sm:w-96 sm:h-96 object-contain drop-shadow-md transform -translate-y-1"
+            onError={(e) => e.target.style.display = 'none'} 
+          />
+        </div>
+
         {/* --- COLUMNA IZQUIERDA: INFORMACIÓN --- */}
         <div className="col-span-6 flex flex-col justify-between p-3.5 sm:p-6 pr-2 sm:pr-5 z-10">
           
-          <div className="flex flex-col gap-1.5 sm:gap-2 items-start w-full relative z-10">
+          <div className="flex flex-col gap-1.5 sm:gap-2 items-start w-full relative z-10 pt-2">
             {product.type && (
               <span className="shine-desktop-tipo bg-black text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm">
                 {product.type}
@@ -188,20 +195,20 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
               {product.isPopular === true && (
                 <>
-                  <span className="sm:hidden bg-yellow-500 text-black p-1.5 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="sm:hidden bg-black text-white p-1.5 rounded-full flex items-center justify-center shadow-sm">
                     <FaStar size={9} />
                   </span>
-                  <span className="hidden sm:inline-flex bg-yellow-500 text-black text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                  <span className="hidden sm:inline-flex bg-black text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     POPULAR
                   </span>
                 </>
               )}
               {hasDiscount && !isTotalAgotado && (
                 <>
-                  <span className="sm:hidden bg-green-500 text-white p-1.5 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="sm:hidden bg-zinc-800 text-white p-1.5 rounded-full flex items-center justify-center shadow-sm">
                     <FaTag size={9} />
                   </span>
-                  <span className="hidden sm:inline-flex bg-green-500 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                  <span className="hidden sm:inline-flex bg-zinc-800 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     OFERTA
                   </span>
                 </>
@@ -236,7 +243,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
            {product.isTemporada2627 === true && (
               <div className="mt-3 sm:mt-6 transform -rotate-12 select-none pointer-events-none transition-transform duration-300 group-hover/card:rotate-0 self-start">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 sm:border-[3px] border-dashed border-gray-300 bg-gray-50 flex items-center justify-center relative transition-transform duration-700 group-hover/card:rotate-180">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-200 flex flex-col items-center justify-center text-center p-1 bg-white/90 backdrop-blur-sm shadow-sm">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-gray-200 flex flex-col items-center justify-center text-center p-1 bg-white/95 backdrop-blur-sm shadow-sm">
                     <span className="text-xs sm:text-[11px] font-black tracking-widest text-black uppercase leading-none">TEMP</span>
                     <div className="w-10 sm:w-18 border-t border-gray-200 my-1.5 sm:my-1.5 mx-auto"></div>
                     <span className="text-xs sm:text-[15px] font-black text-black tracking-tighter leading-none">26-27</span>
@@ -259,7 +266,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
         {/* --- COLUMNA DERECHA: IMÁGENES --- */}
         <div className="col-span-6 relative w-full h-full z-10">
-          <div className="relative w-full h-full bg-gray-200">
+          <div className="relative w-full h-full bg-gray-100">
             {(() => {
               const screenWidth = window.innerWidth;
               let H = 1000;
@@ -351,8 +358,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
           )}
 
           {traspasosUrgentes.length > 0 && (
-            <div className="mt-2 border-l-4 border-red-600 bg-red-50 text-red-800 p-2 rounded">
-              <p className="font-bold text-red-700 mb-0.5">🚨 Traspasos a Tienda urgentes:</p>
+            <div className="mt-2 border-l-4 border-black bg-gray-100 text-black p-2 rounded">
+              <p className="font-bold mb-0.5">🚨 Traspasos a Tienda urgentes:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosUrgentes.map((t, i) => (
                   <li key={i}>Talla <b>{t.talla}</b> (B1: {t.bodega1}, B2: {t.bodega2})</li>
@@ -362,8 +369,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
           )}
 
           {traspasosSugeridos.length > 0 && (
-            <div className="mt-2 border-l-4 border-amber-500 bg-amber-50 text-amber-800 p-2 rounded">
-              <p className="font-bold text-amber-600 mb-0.5">📦 Traspasos a Tienda sugeridos:</p>
+            <div className="mt-2 border-l-4 border-gray-400 bg-gray-50 text-gray-800 p-2 rounded">
+              <p className="font-bold mb-0.5">📦 Traspasos a Tienda sugeridos:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {traspasosSugeridos.map((t, i) => (
                   <li key={i}>Talla <b>{t.talla}</b> (B1: {t.bodega1}, B2: {t.bodega2})</li>

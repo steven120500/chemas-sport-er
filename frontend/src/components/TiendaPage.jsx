@@ -636,7 +636,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const cant = Number(v.totalUnidades) || 1;
       const subtotalLinea = Math.round(Number(v.precioUnitarioCustom || v.precio || 0) * cant);
       return `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; font-weight: 900; color: #000; margin-bottom: 6px;">
           <span style="flex: 1; padding-right: 8px;">${cant}x ${v.item} (${v.tallasTexto || v.talla || 'U'})</span>
           <span style="font-weight: 900; white-space: nowrap;">₡${subtotalLinea.toLocaleString("es-CR")}</span>
         </div>
@@ -663,17 +663,21 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               color: #000000; 
               font-weight: 700;
               margin: 0; 
-              padding: 6px 4px 8px 24px; 
+              /* 📐 AQUÍ ESTÁN LOS CAMBIOS:
+                 - El último valor (36px) le da un gran espacio en blanco abajo.
+                 - El penúltimo valor (38px) desplaza todo el contenido hacia la derecha. */
+              padding: 6px 4px 36px 38px; 
               width: 100%; 
               max-width: 72mm; 
-              font-size: 12px; 
-              line-height: 1.35;
+              /* 🔠 Letra general más grande */
+              font-size: 14px; 
+              line-height: 1.4;
             }
             .text-center { text-align: center; }
             .font-bold { font-weight: 900; }
             .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
-            h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-            p { margin: 3px 0; font-weight: 700; }
+            h1 { font-size: 20px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            p { margin: 4px 0; font-weight: 700; }
             .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
             .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
           </style>
@@ -686,8 +690,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             <h1>CHEMASPORT ER</h1>
             <p>Tienda Física Mostrador</p>
             <p>Tel: +50660369857</p>
-            <p style="font-size: 11px;">50 metros oeste bomba Delta, Grecia</p>
-            <p style="font-size: 11px;">CJ: 3102916554</p>
+            <p style="font-size: 12px;">50 metros oeste bomba Delta, Grecia</p>
+            <p style="font-size: 12px;">CJ: 3102916554</p>
           </div>
           <div class="divider"></div>
           <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
@@ -697,20 +701,20 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <p><span class="font-bold">Método Pago:</span> ${metodoPago}</p>
           <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
           <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 13px; margin-bottom: 8px;">
             <span>CANT. DESCRIPCIÓN</span>
             <span>IMPORTE</span>
           </div>
           ${itemsHTML}
           <div class="divider"></div>
-          <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; margin-top: 10px;">
             <span>TOTAL:</span>
             <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
           </div>
           <div class="divider"></div>
           <div class="text-center" style="margin-top: 15px; font-weight: 900;">
             <p>¡Gracias por su compra!</p>
-            <p style="font-size: 11px;">Conserve este tiquete para cambios o garantías.</p>
+            <p style="font-size: 12px;">Conserve este tiquete para cambios o garantías.</p>
           </div>
           <script>
             function dispararImpresion() {
@@ -737,6 +741,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     printWindow.document.close();
   };
 
+  
   const listaFinalParaCobrar = useMemo(() => {
     if (carritoVentas.length > 0) return carritoVentas;
 

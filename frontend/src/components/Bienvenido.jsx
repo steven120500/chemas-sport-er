@@ -135,9 +135,9 @@ const Bienvenido = ({ onNavigate }) => {
 
   return (
     <section
-      className="relative w-full overflow-hidden flex flex-col justify-center items-center font-sans py-4 md:py-8 gap-3 md:gap-5 text-white select-none"
+      className="relative w-full overflow-hidden flex flex-col justify-center items-center font-sans py-4 md:py-8 gap-3 md:gap-5 bg-white text-white select-none"
     >
-      {/* 🔮 Animaciones Halloween */}
+      {/* 🎄 Animaciones */}
       <style>{`
         @keyframes floatItem {
           0%, 100% { transform: translateY(0px); }
@@ -155,31 +155,27 @@ const Bienvenido = ({ onNavigate }) => {
         }
       `}</style>
 
-      {/* 🖼️ FONDO OSCURO */}
+      {/* 🖼️ FONDO DE ATRÁS BLANCO */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0 pointer-events-none transition-all duration-700 scale-105"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0 pointer-events-none transition-all duration-700 scale-105 opacity-10"
         style={{
           backgroundImage: `url(${isMobile ? '/FondoMovil.png' : '/FondoDes.png'})`,
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black/95 z-10 pointer-events-none" />
-
-
-   
-      
+      <div className="absolute inset-0 bg-white/95 z-10 pointer-events-none" />
 
       {/* 🏆 ENCABEZADO */}
       <div className="relative z-20 flex flex-col items-center text-center px-4 max-w-4xl mx-auto mb-1 md:mb-2 pointer-events-none">
-        {/* 🔥 Título con brillo Amarillo 🔥 */}
-        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_12px_rgba(202,138,4,0.6)] transition-all">
+        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-red-700 drop-shadow-[0_2px_10px_rgba(239,68,68,0.25)] transition-all">
           NUEVA TEMPORADA 26-27
         </h1>
       </div>
 
       {/* 🚀 CINTA DESLIZABLE */}
       <div className="relative z-20 w-full overflow-hidden py-2 md:py-4">
-        <div className="absolute top-0 left-0 bottom-0 w-12 md:w-36 bg-gradient-to-r from-black via-black/80 to-transparent z-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 bottom-0 w-12 md:w-36 bg-gradient-to-l from-black via-black/80 to-transparent z-30 pointer-events-none" />
+        {/* Degradados laterales en blanco para fundirse con el fondo */}
+        <div className="absolute top-0 left-0 bottom-0 w-12 md:w-36 bg-gradient-to-r from-white via-white/80 to-transparent z-30 pointer-events-none" />
+        <div className="absolute top-0 right-0 bottom-0 w-12 md:w-36 bg-gradient-to-l from-white via-white/80 to-transparent z-30 pointer-events-none" />
 
         <div
           ref={scrollRef}
@@ -195,24 +191,25 @@ const Bienvenido = ({ onNavigate }) => {
         >
           {marqueeItems.map((item, index) => {
             const isPSG = item.equipo === 'PSG';
+            // 🎄 Intercalado: una caja Roja (red-500) y una caja Verde (green-500) 🎄
+            const isRedCard = index % 2 === 0;
 
             return (
               <div
                 key={`${item.id}-${index}`}
-                // 🔥 Tarjeta: Borde y Sombra Amarilla al hacer hover 🔥
-                className={`group relative bg-black hover:bg-black/80 backdrop-blur-xl border border-white/10 hover:border-white rounded-3xl shadow-2xl hover:shadow-[0_0_20px_rgba(202,138,4,0.3)] flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
+                className={`group relative ${
+                  isRedCard
+                    ? "bg-red-700 shadow-[0_10px_25px_rgba(239,68,68,0.35)] hover:shadow-[0_15px_35px_rgba(239,68,68,0.55)]"
+                    : "bg-green-700 shadow-[0_10px_25px_rgba(34,197,94,0.35)] hover:shadow-[0_15px_35px_rgba(34,197,94,0.55)]"
+                } border-2 border-white rounded-3xl flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
                   isPSG
                     ? "w-100 sm:w-80 md:w-80 lg:w-96 p-10 md:p-36"
                     : "w-78 sm:w-50 md:w-50 lg:w-78 p-6 md:p-28"
                 }`}
               >
-                {/* 🔥 Aura interna amarilla 🔥 */}
-                <div className="absolute inset-0 bg-black rounded-3xl blur-xl group-hover:bg-black transition-all duration-500 pointer-events-none" />
-
-                {/* Tag superior */}
+                {/* Tag superior en blanco */}
                 <div className="relative z-10 flex items-center justify-between pointer-events-none">
-                  {/* 🔥 Tag cambia a amarillo brillante 🔥 */}
-                  <span className="text-xs font-extrabold tracking-[0.25em] text-gray-400 group-hover:text-gray-100 transition-colors duration-300 uppercase whitespace-nowrap">
+                  <span className="text-xs font-extrabold tracking-[0.25em] text-white uppercase whitespace-nowrap">
                     TEMP 26-27
                   </span>
                 </div>
@@ -231,26 +228,25 @@ const Bienvenido = ({ onNavigate }) => {
                       src={item.img}
                       alt={`${item.equipo} ${item.tipo}`}
                       draggable={false}
-                      // 🔥 Aura amarilla en la camisa al hacer hover 🔥
-                      className="anim-float max-h-full w-auto object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.95)] group-hover:drop-shadow-[0_10px_25px_rgba(202,138,4,0.5)] transition-all duration-500 select-none"
+                      className="anim-float max-h-full w-auto object-contain drop-shadow-[0_15px_25px_rgba(0,0,0,0.35)] group-hover:drop-shadow-[0_10px_25px_rgba(255,255,255,0.45)] transition-all duration-500 select-none"
                     />
                   </div>
                 </div>
 
-                {/* Nombre, tipo y botón */}
-                <div className="relative z-10 mt-2 border-t border-white/10 pt-3 md:pt-4 text-center">
-                  {/* 🔥 Título del equipo en amarillo al hover 🔥 */}
-                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide group-hover:text-gray-100 transition-colors truncate pointer-events-none">
+                {/* Nombre, tipo y botón con detalles en blanco */}
+                <div className="relative z-10 mt-2 border-t border-white/40 pt-3 md:pt-4 text-center">
+                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide truncate pointer-events-none">
                     {item.equipo}
                   </h3>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-0.5 pointer-events-none">
+                  <p className="text-xs font-bold uppercase tracking-widest text-white/90 mt-0.5 pointer-events-none">
                     {item.tipo}
                   </p>
 
                   <button
                     onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
-                    // 🔥 Botón de tarjeta se vuelve amarillo 🔥
-                    className="mt-3.5 w-full py-2.5 px-4 rounded-full bg-white/5 hover:bg-white text-gray-300 hover:text-black font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border border-white/10 hover:border-white hover:shadow-[0_0_15px_rgba(202,138,4,0.4)] cursor-pointer active:scale-95 whitespace-nowrap"
+                    className={`mt-3.5 w-full py-2.5 px-4 rounded-full bg-white font-bold text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border-2 border-white shadow-md hover:scale-105 cursor-pointer active:scale-95 whitespace-nowrap ${
+                      isRedCard ? "text-red-700" : "text-green-700"
+                    }`}
                   >
                     <span>Ver {item.equipo}</span>
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -268,8 +264,7 @@ const Bienvenido = ({ onNavigate }) => {
       <div className="relative z-20 flex flex-col items-center w-full mt-2 md:mt-3">
         <button
           onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')}
-          // 🔥 Botón principal en Amarillo 🔥
-          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 hover:bg-gray-400 shadow-[0_5px_25px_rgba(202,138,4,0.35)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
+          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-red-700 hover:bg-green-700 text-white border-2 border-white font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 shadow-[0_5px_20px_rgba(239,68,68,0.4)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
         >
           <span>VER TODA LA COLECCIÓN</span>
           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
