@@ -169,16 +169,29 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         `}
       </style>
 
-      {/* Contenedor interno con bordes y fondo blanco puro */}
-      <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px] bg-white overflow-hidden rounded-[14px] sm:rounded-[24px] border-2 sm:border-4 border-gray-200 group-hover/card:border-black transition-colors duration-300">
+  {/* Contenedor interno con bordes y fondo blanco puro */}
+  <div className="relative grid grid-cols-12 w-full items-stretch min-h-[260px] sm:min-h-[380px] bg-white overflow-visible rounded-[14px] sm:rounded-[24px] border-2 sm:border-4 border-gray-200 group-hover/card:border-black transition-colors duration-300">
         
-        {/* 🎀 CINTA Y LAZO NAVIDEÑO ATRAVESANDO LA PARTE SUPERIOR EN LÍNEA RECTA */}
-        <div className="absolute top-2 left-0 right-0 z-30 h-10 pointer-events-none flex items-center justify-center overflow-visible">
+        {/* 🎀 CINTA HORIZONTAL SUPERIOR (De lado a lado) */}
+        <div className="absolute -top-3 left-0 right-0 z-48 h-8 pointer-events-none flex items-center justify-center overflow-visible">
+          <div className="absolute w-full h-3.5 bg-gradient-to-r from-red-700 via-red-500 to-red-700 border-y border-amber-300 shadow-sm"></div>
+        </div>
+
+        {/* 🎀 CINTA VERTICAL AL MEDIO (En la división exacta) */}
+        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 z-40 w-3.5 pointer-events-none flex justify-center overflow-visible">
+          <div className="w-full h-full bg-gradient-to-b from-red-700 via-red-500 to-red-700 border-x border-amber-300 shadow-sm"></div>
+        </div>
+
+        {/* 🎀 MOÑO UBICADO EN LA ESQUINA SUPERIOR IZQUIERDA */}
+        <div className="absolute -top-8 -left-3 z-40 pointer-events-none flex items-center justify-center">
           <img 
-            src="/lazo.png" 
-            alt="Lazo Navideño" 
-            className="w-96 h-96 sm:w-96 sm:h-96 object-contain drop-shadow-md transform -translate-y-1"
-            onError={(e) => e.target.style.display = 'none'} 
+            src="/mono.png" 
+            alt="Moño Navideño" 
+            className="w-14 h-14 sm:w-20 sm:h-20 object-contain drop-shadow-2xl"
+            onError={(e) => {
+              console.error("Error cargando /mono.jpg");
+              e.target.style.display = 'none';
+            }} 
           />
         </div>
 
