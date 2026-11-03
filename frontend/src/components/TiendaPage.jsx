@@ -661,12 +661,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             body { 
               font-family: Arial, Helvetica, sans-serif; 
               color: #000000; 
-              font-weight: 700;
+              font-weight: 800;
               margin: 0; 
               /* 📐 AQUÍ ESTÁN LOS CAMBIOS:
                  - El último valor (36px) le da un gran espacio en blanco abajo.
                  - El penúltimo valor (38px) desplaza todo el contenido hacia la derecha. */
-              padding: 6px 4px 36px 38px; 
+              padding: 6px 4px 36px 40px; 
               width: 100%; 
               max-width: 72mm; 
               /* 🔠 Letra general más grande */
@@ -741,7 +741,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     printWindow.document.close();
   };
 
-  
+
   const listaFinalParaCobrar = useMemo(() => {
     if (carritoVentas.length > 0) return carritoVentas;
 
