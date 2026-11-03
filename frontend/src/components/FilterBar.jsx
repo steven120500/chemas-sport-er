@@ -86,7 +86,6 @@ export default function FilterBar({
       <div 
         className="sticky top-0 z-40 w-full transition-all duration-300 md:static pb-6 -mb-6"
         style={isScrolled ? { 
-          // 🔥 Degradado suave ajustado para fondo blanco 🔥
           background: 'linear-gradient(to bottom, rgba(255,255,255,1) 65%, rgba(255,255,255,0.85) 85%, rgba(255,255,255,0) 100%)',
           pointerEvents: 'none' 
         } : { 
@@ -106,13 +105,13 @@ export default function FilterBar({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            {/* Buscador minimalista */}
+            {/* Buscador minimalista con acento navideño al enfocar */}
             <input
               type="text"
               placeholder="Buscar artículo..."
               value={localSearch}
               onChange={handleInputChange}
-              className="w-full pl-5 pr-4 py-3 bg-white border border-gray-300 rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-black focus:shadow-md transition-all text-black placeholder-gray-400"
+              className="w-full pl-5 pr-4 py-3 bg-white border border-gray-300 rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-red-600 focus:shadow-[0_0_10px_rgba(220,38,38,0.2)] transition-all text-black placeholder-gray-400"
             />
           </motion.div>
 
@@ -128,8 +127,8 @@ export default function FilterBar({
                 setActiveAccordion(""); 
                 onToggleTallas?.();
               }}
-              // Botón Filtrar Negro
-              className="relative z-10 flex items-center justify-center px-6 py-3 md:py-3.5 bg-black text-white rounded-full hover:bg-zinc-800 transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border border-transparent"
+              // 🎄 Botón Filtrar en Rojo Navideño
+              className="relative z-10 flex items-center justify-center px-6 py-3 md:py-3.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border border-transparent"
             >
               Filtrar
             </button>
@@ -174,10 +173,10 @@ export default function FilterBar({
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
-                      className="w-full flex text-black items-center justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-gray-600 transition-colors"
+                      className="w-full flex text-black items-center justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-red-600 transition-colors"
                     >
                       <span>Versión / Categoría</span>
-                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "categoria" ? "rotate-180 text-black" : ""}`} />
+                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "categoria" ? "rotate-180 text-red-600" : ""}`} />
                     </button>
                     {activeAccordion === "categoria" && (
                       <motion.div 
@@ -198,8 +197,8 @@ export default function FilterBar({
                               className={`
                                 flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-none cursor-pointer border
                                 ${isActive 
-                                  ? 'bg-black text-white border-black shadow-sm' 
-                                  : 'bg-white text-gray-600 border-gray-200 hover:border-black hover:text-black'}
+                                  ? 'bg-red-600 text-white border-red-600 shadow-sm' 
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-red-600 hover:text-red-600'}
                               `}
                             >
                               <span>{cat.label}</span>
@@ -214,10 +213,10 @@ export default function FilterBar({
                   <div className="py-4">
                     <button
                       onClick={() => setActiveAccordion(activeAccordion === "talla" ? "" : "talla")}
-                      className="w-full flex items-center text-black justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-gray-600 transition-colors"
+                      className="w-full flex items-center text-black justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-red-600 transition-colors"
                     >
                       <span>Talla</span>
-                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "talla" ? "rotate-180 text-black" : ""}`} />
+                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "talla" ? "rotate-180 text-red-600" : ""}`} />
                     </button>
                     {activeAccordion === "talla" && (
                       <motion.div 
@@ -244,8 +243,8 @@ export default function FilterBar({
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
-                                      ? "bg-black text-white border-black shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-black hover:text-black"
+                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
+                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
                                   }`}
                                 >
                                   {size}
@@ -273,8 +272,8 @@ export default function FilterBar({
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
-                                      ? "bg-black text-white border-black shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-black hover:text-black"
+                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
+                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
                                   }`}
                                 >
                                   {label}
@@ -302,8 +301,8 @@ export default function FilterBar({
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
                                     isActive 
-                                      ? "bg-black text-white border-black shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-black hover:text-black"
+                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
+                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
                                   }`}
                                 >
                                   {label}
@@ -322,7 +321,7 @@ export default function FilterBar({
               <div className="pt-4 border-t border-gray-100 mt-4 relative z-10">
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm tracking-wider uppercase shadow-md hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-sm tracking-wider uppercase shadow-md hover:bg-red-700 transition-colors cursor-pointer"
                 >
                   Cerrar
                 </button>
@@ -343,7 +342,7 @@ export default function FilterBar({
           >
             <button
               onClick={handleClearFilters}
-              className="flex items-center gap-2.5 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg border border-red-500 active:scale-95 transition-transform cursor-pointer pointer-events-auto"
+              className="flex items-center gap-2.5 px-6 py-3.5 bg-red-700 hover:bg-red-800 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg border border-red-600 active:scale-95 transition-transform cursor-pointer pointer-events-auto"
             >
               <FaTrashAlt size={10} />
               <span>Borrar filtros</span>
@@ -353,4 +352,4 @@ export default function FilterBar({
       </AnimatePresence>
     </>
   );
-}                    
+}

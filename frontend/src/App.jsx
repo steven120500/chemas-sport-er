@@ -704,7 +704,7 @@ function MainApp() {
                 <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
                   <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
                       <span className="text-sm sm:text-base text-zinc-600 font-bold">¿Querés saber tu talla?</span>
-                      <button onClick={() => setShowMedidas(true)} className="bg-black text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
+                      <button onClick={() => setShowMedidas(true)} className="bg-green-700 text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
                       VER MEDIDAS
                       </button>
                   </div>
@@ -753,7 +753,7 @@ function MainApp() {
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="p-3 text-xs text-white bg-black rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="p-3 text-xs text-white bg-green-700 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
                         <FaChevronLeft size={14} />
                       </button>
@@ -773,7 +773,7 @@ function MainApp() {
                                 onClick={() => setPage(n)}
                                 className={`min-w-[40px] h-10 px-3 text-sm font-black rounded-xl transition-all cursor-pointer border-2 ${
                                   isCurrent
-                                    ? 'bg-black text-white border-black shadow-lg scale-[1.05]'
+                                    ? 'bg-red-700 text-white border-white shadow-lg scale-[1.05]'
                                     : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black hover:bg-gray-300'
                                 }`}
                               >
@@ -788,7 +788,7 @@ function MainApp() {
                       <button
                         onClick={() => setPage((p) => Math.min(pages, p + 1))}
                         disabled={page === pages}
-                        className="p-3 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="p-3 text-xs text-white bg-green-700 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
                       >
                         <FaChevronRight size={14} />
                       </button>
