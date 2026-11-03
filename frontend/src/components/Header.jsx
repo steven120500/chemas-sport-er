@@ -154,15 +154,7 @@ export default function Header({
     >
       <div className="relative px-2 sm:px-6 py-2 sm:py-4 overflow-hidden">
         
-        {/* 🎄 IMAGEN DE BOLAS NAVIDEÑAS A LA IZQUIERDA 🎄 */}
-        <div className="absolute righ-4 top-0 bottom-0 pointer-events-none z-0 flex items-center opacity-85">
-          <img 
-            src="/bolas.png" 
-            alt="Decoración navideña izquierda" 
-            className="h-28 sm:h-30 w-auto object-contain transform -scale-x-100" 
-            onError={(e) => e.target.style.display = 'none'}
-          />
-        </div>
+ 
 
        
 
