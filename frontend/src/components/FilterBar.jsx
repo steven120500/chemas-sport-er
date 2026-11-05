@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaCheck, FaChevronDown, FaTrashAlt } from "react-icons/fa";
+import { FaTimes, FaCheck, FaChevronDown, FaTrashAlt, FaEyeSlash } from "react-icons/fa";
 
 const categories = [
   { label: "Todos", value: "" },
@@ -46,13 +46,17 @@ export default function FilterBar({
   filterSizes = [],
   setFilterSizes,
   onToggleTallas,
+  // 🔒 Nuevas props para controlar el filtro de ocultos en Super Admin
+  esSuperAdmin = false,
+  soloOcultos = false,
+  setSoloOcultos,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState(""); 
   const [localSearch, setLocalSearch] = useState(searchTerm || "");
   const [isScrolled, setIsScrolled] = useState(false);
 
-  const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0);
+  const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0) || soloOcultos;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -77,6 +81,7 @@ export default function FilterBar({
   const handleClearFilters = () => {
     if (setFilterType) setFilterType("");
     if (setFilterSizes) setFilterSizes([]);
+    if (setSoloOcultos) setSoloOcultos(false);
     setLocalSearch("");
     if (setSearchTerm) setSearchTerm("");
   };
@@ -115,24 +120,48 @@ export default function FilterBar({
             />
           </motion.div>
 
-          <motion.div 
-            className="flex shrink-0 justify-center relative"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <button
-              onClick={() => {
-                setIsOpen(true);
-                setActiveAccordion(""); 
-                onToggleTallas?.();
-              }}
-              // 🎄 Botón Filtrar en Rojo Navideño
-              className="relative z-10 flex items-center justify-center px-6 py-3 md:py-3.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border border-transparent"
+          <div className="flex items-center gap-2 shrink-0">
+            {/* 🔒 BOTÓN EXCLUSIVO SUPER ADMIN: VER OCULTOS */}
+            {esSuperAdmin && (
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+              >
+                <button
+                  onClick={() => setSoloOcultos?.(!soloOcultos)}
+                  className={`relative z-10 flex items-center gap-2 px-5 py-3 md:py-3.5 rounded-full transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border ${
+                    soloOcultos 
+                      ? "bg-zinc-900 text-white border-zinc-900 ring-2 ring-red-600" 
+                      : "bg-white text-black border-zinc-300 hover:bg-zinc-100"
+                  }`}
+                  title="Ver únicamente productos ocultos del catálogo"
+                >
+                  <FaEyeSlash size={13} className={soloOcultos ? "text-red-500" : "text-zinc-500"} />
+                  <span>{soloOcultos ? "Viendo Ocultos" : "Ocultos"}</span>
+                </button>
+              </motion.div>
+            )}
+
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
             >
-              Filtrar
-            </button>
-          </motion.div>
+              <button
+                onClick={() => {
+                  setIsOpen(true);
+                  setActiveAccordion(""); 
+                  onToggleTallas?.();
+                }}
+                // 🎄 Botón Filtrar en Rojo Navideño
+                className="relative z-10 flex items-center justify-center px-6 py-3 md:py-3.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border border-transparent"
+              >
+                Filtrar
+              </button>
+            </motion.div>
+          </div>
 
         </div>
       </div>

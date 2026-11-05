@@ -36,6 +36,7 @@ export default function ProductAdminEditor({
   onSaveSuccess,
   onDeleteSuccess,
   canDelete,
+  user,
 }) {
   const [invMode, setInvMode] = useState("stock"); 
   const [editedTienda, setEditedTienda] = useState(product?.tienda || {}); 
@@ -169,7 +170,7 @@ export default function ProductAdminEditor({
         imageSrc: typeof localImages[0]?.src === "string" ? localImages[0].src : null,
         imageSrc2: typeof localImages[1]?.src === "string" ? localImages[1].src : null,
         imageAlt: editedName.trim(), 
-        hidden: editedHidden, 
+        hidden: Boolean(user?.isSuperUser) ? editedHidden : (product?.hidden || false), 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
         customerName: finalCustomer,
@@ -258,7 +259,7 @@ export default function ProductAdminEditor({
                   <button onClick={() => handleImageRemove(i)} className="absolute -top-3 -right-3 bg-red-600 text-white rounded-full p-2.5 shadow-lg hover:bg-red-700 cursor-pointer transition-transform hover:scale-105">
                     <FaTimes size={12} />
                   </button>
-                  <div className="absolute inset-x-0 bottom-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl border-t border-gray-200 backdrop-blur-sm">
+                  <div className="absolute inset-x-0 bottom-0 bg-white opacity-0 group-hover:opacity-100 transition-opacity flex justify-center py-2.5 rounded-b-2xl border-t border-gray-200 backdrop-blur-sm">
                     <label className="text-black text-xs cursor-pointer font-bold tracking-wide uppercase">
                       Cambiar
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, i)} />
@@ -379,17 +380,21 @@ export default function ProductAdminEditor({
           <div className="mb-8 p-5 rounded-2xl border border-gray-200 bg-white shadow-sm">
             <p className="text-xs text-black font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
             <div className="flex flex-col gap-4">
-              <label className="flex items-center gap-4 cursor-pointer group">
-                <div className="relative flex items-center">
-                  <input type="checkbox" checked={editedHidden} onChange={(e) => setEditedHidden(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${editedHidden ? 'bg-black' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedHidden ? 'transform translate-x-5' : ''}`}></div>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-black">Ocultar Producto</span>
-                  <span className="text-xs text-gray-500 font-medium">Nadie podrá verlo en la tienda.</span>
-                </div>
-              </label>
+              
+              {/* 🔒 SOLO EL SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
+              {Boolean(user?.isSuperUser) && (
+                <label className="flex items-center gap-4 cursor-pointer group">
+                  <div className="relative flex items-center">
+                    <input type="checkbox" checked={editedHidden} onChange={(e) => setEditedHidden(e.target.checked)} className="sr-only" />
+                    <div className={`w-11 h-6 rounded-full transition-colors ${editedHidden ? 'bg-black' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedHidden ? 'transform translate-x-5' : ''}`}></div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-black text-black">Ocultar Producto</span>
+                    <span className="text-xs text-gray-500 font-medium">Nadie podrá verlo en la tienda.</span>
+                  </div>
+                </label>
+              )}
 
               <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center">

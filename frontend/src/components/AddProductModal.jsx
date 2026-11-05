@@ -68,6 +68,9 @@ async function srcToBlob(src) {
 }
 
 export default function AddProductModal({ onAdd, onCancel, user }) {
+  // 🔒 Verificamos si el usuario actual es Super Admin
+  const isSuperAdmin = Boolean(user?.isSuperUser);
+
   const [images, setImages] = useState([]);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -194,7 +197,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("type", type.trim());
 
       formData.append("isNew", isNew ? "true" : "false");
-      formData.append("hidden", hidden ? "true" : "false"); 
+      formData.append("hidden", isSuperAdmin && hidden ? "true" : "false"); 
       formData.append("isMundial2026", isMundial2026 ? "true" : "false");
       formData.append("isTemporada2627", isTemporada2627 ? "true" : "false");
 
@@ -435,14 +438,17 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               Opciones del Sistema
             </label>
             <div className="flex flex-col gap-4">
-              <label className="flex items-center justify-between cursor-pointer group">
-                <span className="text-sm font-bold text-gray-800 select-none">Ocultar Producto</span>
-                <div className="relative flex items-center">
-                  <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${hidden ? 'bg-red-500' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${hidden ? 'transform translate-x-5' : ''}`}></div>
-                </div>
-              </label>
+              {/* 🔒 SOLO SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
+              {isSuperAdmin && (
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <span className="text-sm font-bold text-gray-800 select-none">Ocultar Producto</span>
+                  <div className="relative flex items-center">
+                    <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} className="sr-only" />
+                    <div className={`w-11 h-6 rounded-full transition-colors ${hidden ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${hidden ? 'transform translate-x-5' : ''}`}></div>
+                  </div>
+                </label>
+              )}
 
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="text-sm font-bold text-gray-800 select-none">Torneo: Mundial 2026</span>

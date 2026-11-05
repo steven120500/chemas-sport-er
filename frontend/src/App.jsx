@@ -140,6 +140,7 @@ function MainApp() {
   };
 
   const [storeView, setStoreView] = useState('todos');
+  const [soloOcultos, setSoloOcultos] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -328,7 +329,7 @@ function MainApp() {
 
   // 🔥 5. SCROLL INMEDIATO
   useEffect(() => {
-    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || page > 1;
+    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || soloOcultos || page > 1;
     
     setTimeout(() => {
       if (hasFilters && pageTopRef.current) {
@@ -338,7 +339,7 @@ function MainApp() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }, 50); 
-  }, [searchTerm, filterType, filterSizes, page]);
+  }, [searchTerm, filterType, filterSizes, soloOcultos, page]);
 
   const refreshCounts = () => {
     setTimeout(() => fetchAllForCounts(), 600);
@@ -432,7 +433,11 @@ function MainApp() {
       .filter(Boolean);
 
     const filtered = sourceList.filter((product) => {
-      if (!canEdit && product.hidden === true) return false;
+      if (soloOcultos) {
+        if (!product.hidden) return false;
+      } else {
+        if (!canEdit && product.hidden === true) return false;
+      }
 
       // 🔥 Ocultar productos agotados a los usuarios clientes
       if (!canEdit) {
@@ -484,7 +489,7 @@ function MainApp() {
     }
 
     return filtered;
-  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, filterType, filterSizes, storeView, canEdit, isSuperUser]);
+  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, filterType, filterSizes, storeView, canEdit, isSuperUser, soloOcultos]);
 
   const effectiveTotal = usingFullCatalog ? allMatchingProducts.length : total;
   const pages = Math.max(1, Math.ceil(effectiveTotal / limit));
@@ -552,6 +557,7 @@ function MainApp() {
               setFilterType('');
               setSearchTerm('');
               setFilterSizes([]);
+              setSoloOcultos(false);
               setPage(1);
               navigate('/');
             }}
@@ -698,6 +704,12 @@ function MainApp() {
                     setFilterSizes(sizes); 
                     if (!usingFullCatalog) setLoading(true); 
                     setPage(1); 
+                  }}
+                  esSuperAdmin={isSuperUser}
+                  soloOcultos={soloOcultos}
+                  setSoloOcultos={(val) => {
+                    setSoloOcultos(val);
+                    setPage(1);
                   }}
                 />
 
