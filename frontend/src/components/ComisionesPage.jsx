@@ -1339,7 +1339,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top1?.contrapedidoUds || 0} ✏️
+                        +{top1?.contrapedidoUds || 0} 
                       </button>
                     )
                   ) : (
@@ -1394,7 +1394,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top3?.contrapedidoUds || 0} ✏️
+                        +{top3?.contrapedidoUds || 0} 
                       </button>
                     )
                   ) : (
