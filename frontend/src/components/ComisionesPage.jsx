@@ -188,6 +188,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [selectedMonth, setSelectedMonth] = useState(() => ymLocal());
   const [searchFilter, setSearchFilter] = useState("");
   const [comisionPorPrenda, setComisionPorPrenda] = useState(800);
+  const [comisionContrapedido, setComisionContrapedido] = useState(400); 
   const [generandoTiquete, setGenerandoTiquete] = useState(false);
   const [ventasSeleccionadas, setVentasSeleccionadas] = useState([]);
 
@@ -195,7 +196,20 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // ✏️ Estados para Precios Personalizados en la Tabla (con persistencia en localStorage)
+  // ✏️ Contrapedido por vendedor persistente por mes
+  const [contrapedidosMes, setContrapedidosMes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("chemasport_contrapedidos_mes") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  // Estado para controlar qué bloque de contrapedido se está editando (tanto en podio como en posiciones generales)
+  const [editandoContrapVendedor, setEditandoContrapVendedor] = useState(null);
+  const [tempContrapValor, setTempContrapValor] = useState("");
+
+  // ✏️ Estados para Precios Personalizados en la Tabla
   const [preciosPersonalizados, setPreciosPersonalizados] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("chemasport_precios_custom") || "{}");
@@ -366,7 +380,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     fetchCatalogo();
   }, []);
 
-  // 🔥 CARGA TODAS LAS PÁGINAS DEL HISTORIAL DEL MES CON PERMISO GLOBAL PARA QUE A TODOS LES SUME IGUAL QUE A STEVEN
+  // 🔥 CARGA TODAS LAS PÁGINAS DEL HISTORIAL DEL MES
   const fetchVentas = async () => {
     setLoading(true);
     setVentasSeleccionadas([]); 
@@ -406,7 +420,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
           }
         });
 
-        // Si el backend no pagina o ya trajo todos los registros del mes, salimos del ciclo
         if (
           !data?.total ||
           acumulados.length >= data.total ||
@@ -437,7 +450,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     setCurrentPage(1);
   }, [searchFilter]);
 
-  // 🔥 MISMA LÓGICA ORIGINAL + ORDENADO DE MÁS RECIENTE A MÁS ANTIGUO PARA QUE LA PÁGINA 1 TENGA LAS VENTAS DE HOY
   const ventasFiltradas = useMemo(() => {
     if (!Array.isArray(logs)) return [];
     const procesadas = logs.map((log) => {
@@ -448,7 +460,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       return { ...log, ...parsed, esVenta };
     }).filter((v) => v.esVenta && v.totalUnidades > 0);
 
-    // Aseguramos que las más recientes estén siempre al principio (Página 1)
     return procesadas.sort((a, b) => {
       const tA = a.date ? new Date(a.date).getTime() : 0;
       const tB = b.date ? new Date(b.date).getTime() : 0;
@@ -457,7 +468,34 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   }, [logs]);
 
-  // 🔍 2. SI ALGUNA VENTA TIENE PRODUCT_ID PERO NO VINO EN EL CATÁLOGO GENERAL, LO BUSCA INDIVIDUALMENTE
+  // Guardar el número exacto digitado en el input de contrapedido (Solo Super Admin)
+  const guardarContrapedidoDirecto = (vendedor) => {
+    if (!esSuperAdmin) {
+      toastHOT.error("Solo el Super Admin puede modificar los contrapedidos.");
+      return;
+    }
+    const num = Math.max(0, Number(tempContrapValor) || 0);
+    setContrapedidosMes((prev) => {
+      const mesActualObj = prev[selectedMonth] || {};
+      const actualizado = {
+        ...prev,
+        [selectedMonth]: {
+          ...mesActualObj,
+          [vendedor]: num
+        }
+      };
+      try {
+        localStorage.setItem("chemasport_contrapedidos_mes", JSON.stringify(actualizado));
+      } catch (e) {
+        console.error(e);
+      }
+      return actualizado;
+    });
+    setEditandoContrapVendedor(null);
+    setTempContrapValor("");
+    toastHOT.success("Contrapedido actualizado.");
+  };
+
   useEffect(() => {
     const missingIds = [
       ...new Set(
@@ -499,7 +537,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     return () => { cancelado = true; };
   }, [ventasFiltradas, catalogoMap.byId]);
 
-  // 💰 FUNCIÓN QUE CALCULA EL PRECIO EXACTO DE LA CAMISETA
   const obtenerPrecioVenta = (venta) => {
     if (preciosPersonalizados[venta._id] !== undefined) {
       return Number(preciosPersonalizados[venta._id]);
@@ -580,11 +617,30 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       conteo[vend].ventas += 1;
       conteo[vend].unidades += v.totalUnidades;
     });
+
+    const mesContrapedidos = contrapedidosMes[selectedMonth] || {};
+
     return Object.entries(conteo)
-      .map(([vendedor, stats]) => ({ vendedor, ventas: stats.ventas, unidades: stats.unidades, totalComision: stats.unidades * comisionPorPrenda }))
-      .filter((item) => storedUser?.isSuperUser || item.unidades > 0)
-      .sort((a, b) => b.unidades - a.unidades);
-  }, [ventasFiltradas, comisionPorPrenda, storedUser?.isSuperUser]);
+      .map(([vendedor, stats]) => {
+        const contrapedidoUds = Number(mesContrapedidos[vendedor]) || 0;
+        const stockUds = stats.unidades;
+        const totalUdsCombinadas = stockUds + contrapedidoUds;
+        
+        // Comisión total: Stock * 800 + Contrapedido * 400
+        const totalComision = (stockUds * comisionPorPrenda) + (contrapedidoUds * comisionContrapedido);
+
+        return {
+          vendedor,
+          ventas: stats.ventas,
+          unidades: stockUds,
+          contrapedidoUds,
+          totalUdsCombinadas,
+          totalComision
+        };
+      })
+      .filter((item) => storedUser?.isSuperUser || item.totalUdsCombinadas > 0)
+      .sort((a, b) => b.totalUdsCombinadas - a.totalUdsCombinadas);
+  }, [ventasFiltradas, comisionPorPrenda, comisionContrapedido, contrapedidosMes, selectedMonth, storedUser?.isSuperUser]);
 
   const tablaVentas = useMemo(() => {
     if (!searchFilter.trim()) return ventasFiltradas;
@@ -592,7 +648,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     return ventasFiltradas.filter((v) => v.vendedor.toLowerCase().includes(q) || v.cliente.toLowerCase().includes(q) || String(v.item || "").toLowerCase().includes(q));
   }, [ventasFiltradas, searchFilter]);
 
-  // 📄 Cálculo de páginas y recorte de filas para la página actual
   const totalPages = Math.max(1, Math.ceil(tablaVentas.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
@@ -605,8 +660,11 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const top2 = ranking.at(1) || null;
   const top3 = ranking.at(2) || null;
   const restoRanking = ranking.slice(3);
-  const totalPrendasMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
-  const totalComisionesMes = totalPrendasMes * comisionPorPrenda;
+  
+  const totalPrendasStockMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
+  const totalPrendasContrapedidoMes = Object.values(contrapedidosMes[selectedMonth] || {}).reduce((a, b) => a + Number(b), 0);
+  const totalPrendasMes = totalPrendasStockMes + totalPrendasContrapedidoMes;
+  const totalComisionesMes = ranking.reduce((acc, r) => acc + r.totalComision, 0);
 
   const ejecutarResetGlobal = async () => {
     try {
@@ -686,132 +744,131 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 6000 });
   };
 
-// 🖨️ IMPRESIÓN NATIVA ESTILO POS TÉRMICO (PARA COMISIONES PAGE)
-const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
-  const printWindow = window.open("", "_blank", "width=400,height=650");
-  if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
+  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}) => {
+    const printWindow = window.open("", "_blank", "width=400,height=650");
+    if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
-  const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
-  const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
-  const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+    const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
+    const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
+    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
 
-  const itemsHTML = ventasArray.map((v) => {
-    const cant = Number(v.totalUnidades) || 1;
-    const subtotalLinea = Number(v.precioUnitarioCustom) > 0
-      ? Math.round(Number(v.precioUnitarioCustom) * cant)
-      : Math.round(typeof obtenerPrecioVenta === "function" ? obtenerPrecioVenta(v) : (Number(v.precio || 0) * cant));
+    const itemsHTML = ventasArray.map((v) => {
+      const cant = Number(v.totalUnidades) || 1;
+      const subtotalLinea = Number(v.precioUnitarioCustom) > 0
+        ? Math.round(Number(v.precioUnitarioCustom) * cant)
+        : Math.round(typeof obtenerPrecioVenta === "function" ? obtenerPrecioVenta(v) : (Number(v.precio || 0) * cant));
 
-    return `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
-        <span style="flex: 1; padding-right: 8px;">
-          ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
-        </span>
-        <span style="font-weight: 900; white-space: nowrap;">
-          ₡${subtotalLinea.toLocaleString("es-CR")}
-        </span>
-      </div>
-    `;
-  }).join("");
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
+          <span style="flex: 1; padding-right: 8px;">
+            ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
+          </span>
+          <span style="font-weight: 900; white-space: nowrap;">
+            ₡${subtotalLinea.toLocaleString("es-CR")}
+          </span>
+        </div>
+      `;
+    }).join("");
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Tiquete ${consecutivoOficial}</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
-          * {
-            color: #000000 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          body { 
-            font-family: Arial, Helvetica, sans-serif; 
-            color: #000000; 
-            font-weight: 700;
-            margin: 0; 
-            padding: 6px 4px 8px 24px; 
-            width: 100%; 
-            max-width: 72mm; 
-            font-size: 12px; 
-            line-height: 1.35;
-          }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: 900; }
-          .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
-          h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-          .ticket-info {
-            padding-left: 3mm;
-          }
-          p { margin: 3px 0; font-weight: 700; }
-          .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
-          .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
-        </style>
-      </head>
-      <body>
-        <div class="text-center">
-          <div class="logo-container">
-            <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
-          </div>
-          <h1>CHEMASPORT ER</h1>
-          <p>Ropa y Artículos Deportivos</p>
-          <p>Tel: +50660369857</p>
-          <p style="font-size: 11px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
-          <p style="font-size: 11px;">CJ: 3102916554</p>
-          <p style="font-size: 11px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
-        </div>
-        <div class="divider"></div>
-        <div class="ticket-info">
-          <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
-          <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
-          <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
-          ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
-          ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
-          <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
-        </div>
-        <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
-          <span>CANT. DESCRIPCIÓN</span>
-          <span>IMPORTE</span>
-        </div>
-        ${itemsHTML}
-        <div class="divider"></div>
-        <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; margin-top: 10px;">
-          <span>TOTAL:</span>
-          <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
-        </div>
-        <div class="divider"></div>
-        <div class="text-center" style="margin-top: 15px; font-weight: 900;">
-          <p>¡Gracias por su compra!</p>
-          <p style="font-size: 11px;">Conserve este tiquete para reclamos.</p>
-        </div>
-        <script>
-          function dispararImpresion() {
-            setTimeout(function() {
-              window.focus();
-              window.print();
-            }, 250);
-          }
-          window.onload = function() {
-            var img = document.getElementById('ticket-logo');
-            if (img && !img.complete) {
-              img.onload = dispararImpresion;
-              img.onerror = dispararImpresion;
-            } else {
-              dispararImpresion();
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Tiquete ${consecutivoOficial}</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0;
             }
-          };
-        </script>
-      </body>
-    </html>
-  `;
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-};
+            * {
+              color: #000000 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body { 
+              font-family: Arial, Helvetica, sans-serif; 
+              color: #000000; 
+              font-weight: 700;
+              margin: 0; 
+              padding: 6px 4px 8px 24px; 
+              width: 100%; 
+              max-width: 72mm; 
+              font-size: 12px; 
+              line-height: 1.35;
+            }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: 900; }
+            .divider { border-bottom: 2px dashed #000000; margin: 8px 0; }
+            h1 { font-size: 18px; font-weight: 900; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            .ticket-info {
+              padding-left: 3mm;
+            }
+            p { margin: 3px 0; font-weight: 700; }
+            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 8px; }
+            .logo-img { max-width: 130px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
+          </style>
+        </head>
+        <body>
+          <div class="text-center">
+            <div class="logo-container">
+              <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+            </div>
+            <h1>CHEMASPORT ER</h1>
+            <p>Ropa y Artículos Deportivos</p>
+            <p>Tel: +50660369857</p>
+            <p style="font-size: 11px; margin-top: 4px;">50 metros oeste de la bomba Delta, Grecia</p>
+            <p style="font-size: 11px;">CJ: 3102916554</p>
+            <p style="font-size: 11px; margin-bottom: 5px;">chemasport__er@outlook.com</p>
+          </div>
+          <div class="divider"></div>
+          <div class="ticket-info">
+            <p><span class="font-bold">Comprobante N°:</span> ${consecutivoOficial}</p>
+            <p><span class="font-bold">Fecha:</span> ${fechaHoy}</p>
+            <p><span class="font-bold">Cliente:</span> ${clienteNombre}</p>
+            ${datosCliente.cedula ? `<p><span class="font-bold">Cédula:</span> ${datosCliente.cedula}</p>` : ""}
+            ${datosCliente.telefono ? `<p><span class="font-bold">Tel:</span> ${datosCliente.telefono}</p>` : ""}
+            <p><span class="font-bold">Atendió:</span> ${vendedorNombre}</p>
+          </div>
+          <div class="divider"></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; margin-bottom: 8px;">
+            <span>CANT. DESCRIPCIÓN</span>
+            <span>IMPORTE</span>
+          </div>
+          ${itemsHTML}
+          <div class="divider"></div>
+          <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 900; margin-top: 10px;">
+            <span>TOTAL:</span>
+            <span>₡${Number(totalCobrado).toLocaleString("es-CR")}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="text-center" style="margin-top: 15px; font-weight: 900;">
+            <p>¡Gracias por su compra!</p>
+            <p style="font-size: 11px;">Conserve este tiquete para reclamos.</p>
+          </div>
+          <script>
+            function dispararImpresion() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 250);
+            }
+            window.onload = function() {
+              var img = document.getElementById('ticket-logo');
+              if (img && !img.complete) {
+                img.onload = dispararImpresion;
+                img.onerror = dispararImpresion;
+              } else {
+                dispararImpresion();
+              }
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   const abrirModalFacturacion = (ventasArray) => {
     const sumaPreciosTabla = ventasArray.reduce((acc, v) => acc + obtenerPrecioVenta(v), 0);
@@ -1044,7 +1101,7 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
 
           <div class="summary-box">
             <div class="summary-item">
-              <div class="summary-label">Prendas Vendidas</div>
+              <div class="summary-label">Prendas (Stock + Contrap.)</div>
               <div class="summary-value">${totalPrendasMes} uds.</div>
             </div>
             <div class="summary-item">
@@ -1052,23 +1109,25 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
               <div class="summary-value">₡${totalComisionesMes.toLocaleString("es-CR")}</div>
             </div>
             <div class="summary-item">
-              <div class="summary-label">Tarifa por Prenda</div>
-              <div class="summary-value">₡${comisionPorPrenda.toLocaleString("es-CR")}</div>
+              <div class="summary-label">Tarifas (Stock/Contrap.)</div>
+              <div class="summary-value">₡${comisionPorPrenda}/₡${comisionContrapedido}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">Líder del Mes</div>
-              <div class="summary-value">${top1?.vendedor || "N/A"} (${top1?.unidades || 0})</div>
+              <div class="summary-value">${top1?.vendedor || "N/A"} (${top1?.totalUdsCombinadas || 0})</div>
             </div>
           </div>
 
-          <div class="section-title">1. Resumen por Vendedor</div>
+          <div class="section-title">1. Resumen por Vendedor (Stock & Contrapedido)</div>
           <table>
             <thead>
               <tr>
-                <th style="width: 10%;">Pos.</th>
-                <th style="width: 45%;">Vendedor</th>
-                <th class="text-right" style="width: 20%;">Prendas</th>
-                <th class="text-right" style="width: 25%;">Total Comisión</th>
+                <th style="width: 8%;">Pos.</th>
+                <th style="width: 32%;">Vendedor</th>
+                <th class="text-right" style="width: 15%;">Stock (₡${comisionPorPrenda})</th>
+                <th class="text-right" style="width: 18%;">Contrap. (₡${comisionContrapedido})</th>
+                <th class="text-right" style="width: 12%;">Total Uds.</th>
+                <th class="text-right" style="width: 15%;">Comisión</th>
               </tr>
             </thead>
             <tbody>
@@ -1077,13 +1136,15 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
                   <td class="font-bold">${i + 1}º</td>
                   <td class="font-bold">${r.vendedor}</td>
                   <td class="text-right">${r.unidades}</td>
+                  <td class="text-right">${r.contrapedidoUds}</td>
+                  <td class="text-right font-bold">${r.totalUdsCombinadas}</td>
                   <td class="text-right font-bold">₡${r.totalComision.toLocaleString("es-CR")}</td>
                 </tr>
               `).join("")}
             </tbody>
           </table>
 
-          <div class="section-title">2. Registro Detallado de Ventas</div>
+          <div class="section-title">2. Registro Detallado de Ventas (Stock)</div>
           <table>
             <thead>
               <tr>
@@ -1146,7 +1207,7 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
               <span>TABLERO DE COMISIONES</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">Ranking de Vendedores</h1>
-            <p className="text-zinc-500 text-sm font-medium mt-1">Registro de ventas y comisiones acumuladas del mes.</p>
+            <p className="text-zinc-500 text-sm font-medium mt-1">Stock (₡{comisionPorPrenda}) y Contrapedido (₡{comisionContrapedido}) acumulados del mes.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -1163,70 +1224,282 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
                 <span className="hidden sm:inline">Reiniciar</span>
               </button>
             )}
+
             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
               <FaCalendarAlt className="text-zinc-400" />
               <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent text-sm font-black text-black outline-none cursor-pointer" />
             </div>
-            <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border ${esSuperAdmin ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
-              {!esSuperAdmin ? <FaLock className="text-zinc-400" size={10} title="Solo administradores" /> : <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">₡/Prenda:</span>}
-              <input type="number" min="0" step="100" value={comisionPorPrenda} onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)} disabled={!esSuperAdmin} className={`w-20 bg-transparent text-sm font-black text-black outline-none ${!esSuperAdmin ? 'cursor-not-allowed text-zinc-500 select-none' : ''}`} />
+
+            {/* Configuración de Tarifas (Solo Super Admin) */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border ${esSuperAdmin ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-100 border-zinc-200 opacity-80'}`}>
+              {!esSuperAdmin ? <FaLock className="text-zinc-400" size={10} title="Solo administradores" /> : <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Stock:</span>}
+              <input type="number" min="0" step="100" value={comisionPorPrenda} onChange={(e) => setComisionPorPrenda(Number(e.target.value) || 0)} disabled={!esSuperAdmin} className={`w-16 bg-transparent text-xs font-black text-black outline-none ${!esSuperAdmin ? 'cursor-not-allowed text-zinc-500' : ''}`} title="Tarifa Stock (₡800)" />
+              <span className="text-zinc-300">|</span>
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Contrap:</span>
+              <input type="number" min="0" step="100" value={comisionContrapedido} onChange={(e) => setComisionContrapedido(Number(e.target.value) || 0)} disabled={!esSuperAdmin} className={`w-16 bg-transparent text-xs font-black text-black outline-none ${!esSuperAdmin ? 'cursor-not-allowed text-zinc-500' : ''}`} title="Tarifa Contrapedido (₡400)" />
             </div>
           </div>
         </div>
 
-        {/* Podio Top 3 */}
+        {/* Podio Top 3 con soporte para edición directa de contrapedido */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
+          {/* 2º LUGAR */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-2 md:order-1">
             <div className="w-12 h-12 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xl font-black mb-3 shadow-inner">🥈</div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">2º LUGAR</span>
             <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">{top2?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
-              <p className="text-3xl font-black text-black leading-none">{top2?.unidades || 0}</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Prendas vendidas</p>
+              <div className="flex justify-around text-center mb-2 items-center">
+                <div>
+                  <p className="text-xl font-black text-black">{top2?.unidades || 0}</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Stock</p>
+                </div>
+                <div className="border-r border-zinc-200 h-6"></div>
+                <div>
+                  {esSuperAdmin && top2?.vendedor ? (
+                    editandoContrapVendedor === top2.vendedor ? (
+                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={tempContrapValor} 
+                          onChange={(e) => setTempContrapValor(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") guardarContrapedidoDirecto(top2.vendedor);
+                            if (e.key === "Escape") setEditandoContrapVendedor(null);
+                          }}
+                          autoFocus
+                          className="w-12 text-center text-sm font-black text-emerald-800 bg-transparent outline-none py-0.5"
+                        />
+                        <button type="button" onClick={() => guardarContrapedidoDirecto(top2.vendedor)} className="bg-emerald-600 text-white px-1.5 py-1 cursor-pointer"><FaCheck size={9} /></button>
+                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-1.5 py-1 cursor-pointer"><FaTimes size={9} /></button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditandoContrapVendedor(top2.vendedor);
+                          setTempContrapValor(String(top2.contrapedidoUds));
+                        }}
+                        className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
+                        title="Clic para editar contrapedido"
+                      >
+                        +{top2?.contrapedidoUds || 0} 
+                      </button>
+                    )
+                  ) : (
+                    <p className="text-xl font-black text-emerald-700">+{top2?.contrapedidoUds || 0}</p>
+                  )}
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Contrap.</p>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{top2?.totalUdsCombinadas || 0}</strong> prendas</p>
               <p className="text-sm font-black text-emerald-600 mt-2">₡{(top2?.totalComision || 0).toLocaleString("es-CR")}</p>
             </div>
           </div>
+
+          {/* 1º LUGAR (LÍDER) */}
           <div className="bg-gradient-to-b from-amber-500/10 via-white to-white rounded-3xl p-7 border-2 border-amber-400 shadow-xl flex flex-col items-center text-center relative order-1 md:order-2 -mt-4 md:-mt-6">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-black flex items-center justify-center text-3xl font-black mb-3 shadow-md">🥇</div>
             <span className="text-xs font-black tracking-widest text-amber-600 uppercase flex items-center gap-1">★ LÍDER EN VENTAS ★</span>
             <h3 className="text-2xl sm:text-3xl font-black text-black mt-1 truncate max-w-full">{top1?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-amber-50/60 rounded-2xl p-4 border border-amber-200">
-              <p className="text-4xl font-black text-black leading-none">{top1?.unidades || 0}</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mt-1">Prendas vendidas</p>
+              <div className="flex justify-around text-center mb-2 items-center">
+                <div>
+                  <p className="text-2xl font-black text-black">{top1?.unidades || 0}</p>
+                  <p className="text-[9px] font-bold text-zinc-500 uppercase">Stock</p>
+                </div>
+                <div className="border-r border-amber-300 h-8"></div>
+                <div>
+                  {esSuperAdmin && top1?.vendedor ? (
+                    editandoContrapVendedor === top1.vendedor ? (
+                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={tempContrapValor} 
+                          onChange={(e) => setTempContrapValor(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") guardarContrapedidoDirecto(top1.vendedor);
+                            if (e.key === "Escape") setEditandoContrapVendedor(null);
+                          }}
+                          autoFocus
+                          className="w-14 text-center text-base font-black text-emerald-800 bg-transparent outline-none py-0.5"
+                        />
+                        <button type="button" onClick={() => guardarContrapedidoDirecto(top1.vendedor)} className="bg-emerald-600 text-white px-2 py-1 cursor-pointer"><FaCheck size={10} /></button>
+                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-2 py-1 cursor-pointer"><FaTimes size={10} /></button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditandoContrapVendedor(top1.vendedor);
+                          setTempContrapValor(String(top1.contrapedidoUds));
+                        }}
+                        className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
+                        title="Clic para editar contrapedido"
+                      >
+                        +{top1?.contrapedidoUds || 0} ✏️
+                      </button>
+                    )
+                  ) : (
+                    <p className="text-2xl font-black text-emerald-700">+{top1?.contrapedidoUds || 0}</p>
+                  )}
+                  <p className="text-[9px] font-bold text-zinc-500 uppercase">Contrap.</p>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mt-1">Total: <strong>{top1?.totalUdsCombinadas || 0}</strong> prendas</p>
               <p className="text-lg font-black text-emerald-600 mt-2">₡{(top1?.totalComision || 0).toLocaleString("es-CR")}</p>
             </div>
           </div>
+
+          {/* 3º LUGAR */}
           <div className="bg-white rounded-3xl p-6 border-2 border-zinc-200 shadow-sm flex flex-col items-center text-center relative order-3">
             <div className="w-12 h-12 rounded-full bg-amber-700/20 text-amber-800 flex items-center justify-center text-xl font-black mb-3 shadow-inner">🥉</div>
             <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">3º LUGAR</span>
             <h3 className="text-xl font-black text-black mt-1 truncate max-w-full">{top3?.vendedor || "Sin ventas"}</h3>
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
-              <p className="text-3xl font-black text-black leading-none">{top3?.unidades || 0}</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Prendas vendidas</p>
+              <div className="flex justify-around text-center mb-2 items-center">
+                <div>
+                  <p className="text-xl font-black text-black">{top3?.unidades || 0}</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Stock</p>
+                </div>
+                <div className="border-r border-zinc-200 h-6"></div>
+                <div>
+                  {esSuperAdmin && top3?.vendedor ? (
+                    editandoContrapVendedor === top3.vendedor ? (
+                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={tempContrapValor} 
+                          onChange={(e) => setTempContrapValor(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") guardarContrapedidoDirecto(top3.vendedor);
+                            if (e.key === "Escape") setEditandoContrapVendedor(null);
+                          }}
+                          autoFocus
+                          className="w-12 text-center text-sm font-black text-emerald-800 bg-transparent outline-none py-0.5"
+                        />
+                        <button type="button" onClick={() => guardarContrapedidoDirecto(top3.vendedor)} className="bg-emerald-600 text-white px-1.5 py-1 cursor-pointer"><FaCheck size={9} /></button>
+                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-1.5 py-1 cursor-pointer"><FaTimes size={9} /></button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditandoContrapVendedor(top3.vendedor);
+                          setTempContrapValor(String(top3.contrapedidoUds));
+                        }}
+                        className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
+                        title="Clic para editar contrapedido"
+                      >
+                        +{top3?.contrapedidoUds || 0} ✏️
+                      </button>
+                    )
+                  ) : (
+                    <p className="text-xl font-black text-emerald-700">+{top3?.contrapedidoUds || 0}</p>
+                  )}
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Contrap.</p>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{top3?.totalUdsCombinadas || 0}</strong> prendas</p>
               <p className="text-sm font-black text-emerald-600 mt-2">₡{(top3?.totalComision || 0).toLocaleString("es-CR")}</p>
             </div>
           </div>
         </div>
 
+        {/* Posiciones Generales - Optimizado Responsivo Celular con Bloque Directo */}
         {restoRanking.length > 0 && (
-          <div className="bg-white rounded-3xl border border-zinc-200 p-6 mb-8 shadow-sm">
+          <div className="bg-white rounded-3xl border border-zinc-200 p-4 sm:p-6 mb-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">Posiciones Generales</h3>
-            <div className="divide-y divide-zinc-100">
-              {restoRanking.map((item, idx) => (
-                <div key={item.vendedor} className="py-3.5 flex items-center justify-between hover:bg-zinc-50 px-3 rounded-xl transition-colors">
-                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                    <span className="w-7 h-7 shrink-0 rounded-full bg-zinc-100 font-black text-xs text-zinc-700 flex items-center justify-center">{idx + 4}</span>
-                    <span className="font-black text-sm text-black truncate">{item.vendedor}</span>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 sm:gap-6 text-right shrink-0 ml-2">
-                    <div className="w-20 sm:w-24">
-                      <span className="font-black text-base text-black">{item.unidades}</span>
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase ml-1">prendas</span>
+            <div className="space-y-3 sm:space-y-2">
+              {restoRanking.map((item, idx) => {
+                const estaEditandoEste = editandoContrapVendedor === item.vendedor;
+
+                return (
+                  <div key={item.vendedor} className="py-3 px-3.5 bg-zinc-50/60 sm:bg-transparent border border-zinc-100 sm:border-0 rounded-2xl sm:rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50 transition-colors">
+                    
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-7 h-7 shrink-0 rounded-full bg-zinc-200/70 font-black text-xs text-zinc-800 flex items-center justify-center">{idx + 4}</span>
+                      <span className="font-black text-sm sm:text-base text-black truncate">{item.vendedor}</span>
                     </div>
-                    <span className="font-black text-sm text-emerald-600 w-20 sm:w-24 text-right">₡{item.totalComision.toLocaleString("es-CR")}</span>
+
+                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-y-2 gap-x-4 sm:gap-6 text-right pt-2 sm:pt-0 border-t border-zinc-200/50 sm:border-t-0">
+                      
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-600">
+                        <span>Stock: <strong className="text-black">{item.unidades}</strong></span>
+                        <span className="text-zinc-300">|</span>
+                        
+                        {/* Contrapedido: Bloque clickeable o Input directo */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-emerald-700">Contrap:</span>
+                          {esSuperAdmin ? (
+                            estaEditandoEste ? (
+                              <div className="inline-flex items-center bg-white border-2 border-black rounded-lg shadow-sm overflow-hidden">
+                                <input 
+                                  type="number" 
+                                  min="0"
+                                  value={tempContrapValor} 
+                                  onChange={(e) => setTempContrapValor(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") guardarContrapedidoDirecto(item.vendedor);
+                                    if (e.key === "Escape") setEditandoContrapVendedor(null);
+                                  }}
+                                  autoFocus
+                                  className="w-14 text-center text-xs font-black text-emerald-800 bg-transparent outline-none py-1"
+                                />
+                                <button 
+                                  type="button" 
+                                  onClick={() => guardarContrapedidoDirecto(item.vendedor)}
+                                  className="bg-emerald-600 text-white px-2 py-1 hover:bg-emerald-700 cursor-pointer"
+                                  title="Guardar"
+                                >
+                                  <FaCheck size={10} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setEditandoContrapVendedor(null)}
+                                  className="bg-zinc-200 text-zinc-700 px-2 py-1 hover:bg-zinc-300 cursor-pointer"
+                                  title="Cancelar"
+                                >
+                                  <FaTimes size={10} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditandoContrapVendedor(item.vendedor);
+                                  setTempContrapValor(String(item.contrapedidoUds));
+                                }}
+                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 font-black text-xs transition-all cursor-pointer shadow-sm"
+                                title="Hacer clic para editar número exacto"
+                              >
+                                +{item.contrapedidoUds} 
+                              </button>
+                            )
+                          ) : (
+                            <strong className="text-emerald-800">+{item.contrapedidoUds}</strong>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 sm:gap-6 ml-auto sm:ml-0">
+                        <div>
+                          <span className="font-black text-sm sm:text-base text-black">{item.totalUdsCombinadas}</span>
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase ml-1">TOT.</span>
+                        </div>
+                        <span className="font-black text-sm sm:text-base text-emerald-600 min-w-[85px] sm:w-24 text-right">
+                          ₡{item.totalComision.toLocaleString("es-CR")}
+                        </span>
+                      </div>
+
+                    </div>
+
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1311,36 +1584,13 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
                                     className="w-24 pl-5 pr-2 py-1 bg-white border border-black rounded-lg text-xs font-black text-black outline-none"
                                   />
                                 </div>
-                                <button
-                                  onClick={() => guardarPrecioFila(venta._id)}
-                                  className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
-                                  title="Guardar precio"
-                                >
-                                  <FaCheck size={10} />
-                                </button>
-                                <button
-                                  onClick={() => setEditandoPrecioId(null)}
-                                  className="p-1.5 bg-zinc-200 text-zinc-600 rounded-lg hover:bg-zinc-300 transition-colors cursor-pointer"
-                                  title="Cancelar"
-                                >
-                                  <FaTimes size={10} />
-                                </button>
+                                <button onClick={() => guardarPrecioFila(venta._id)} className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer" title="Guardar precio"><FaCheck size={10} /></button>
+                                <button onClick={() => setEditandoPrecioId(null)} className="p-1.5 bg-zinc-200 text-zinc-600 rounded-lg hover:bg-zinc-300 transition-colors cursor-pointer" title="Cancelar"><FaTimes size={10} /></button>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <span className="font-black text-emerald-700 text-xs">
-                                  ₡{precioActual.toLocaleString("es-CR")}
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    setEditandoPrecioId(venta._id);
-                                    setTempPrecioFila(String(precioActual));
-                                  }}
-                                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
-                                  title="Personalizar precio"
-                                >
-                                  <FaEdit size={12} />
-                                </button>
+                                <span className="font-black text-emerald-700 text-xs">₡{precioActual.toLocaleString("es-CR")}</span>
+                                <button onClick={() => { setEditandoPrecioId(venta._id); setTempPrecioFila(String(precioActual)); }} className="p-1.5 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-lg transition-all cursor-pointer" title="Personalizar precio"><FaEdit size={12} /></button>
                               </div>
                             )}
                           </td>
@@ -1352,22 +1602,11 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
                           <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
                           <td className="py-3.5 px-3 text-center">
                             <div className="flex justify-center items-center gap-3">
-                              <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura">
-                                <FaReceipt size={14} />
-                              </button>
+                              <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura"><FaReceipt size={14} /></button>
                               {permitidoAnular ? (
-                                <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta">
-                                  <FaTrash size={13} />
-                                </button>
+                                <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta"><FaTrash size={13} /></button>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)}
-                                  className="p-2 text-zinc-200 cursor-not-allowed rounded-xl"
-                                  title={`Solo ${venta.vendedor} o un Super Admin pueden anular esta venta`}
-                                >
-                                  <FaTrash size={13} />
-                                </button>
+                                <button type="button" onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)} className="p-2 text-zinc-200 cursor-not-allowed rounded-xl" title="Acción restringida"><FaTrash size={13} /></button>
                               )}
                             </div>
                           </td>
@@ -1378,59 +1617,25 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
                 </table>
               </div>
 
-              {/* 📄 CONTROLES DE PAGINADO DE LA TABLA */}
               {totalPages > 1 && (
                 <div className="mt-6 pt-5 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
                     Página {safeCurrentPage} de {totalPages}
                   </span>
-
                   <nav className="flex items-center justify-center gap-1.5 sm:gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={safeCurrentPage === 1}
-                      className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
-                    >
-                      <FaChevronLeft size={11} />
-                    </button>
-
-                    {(() => {
-                      const nums = buildPages(safeCurrentPage, totalPages);
-                      return nums.map((n, i) => {
-                        const prev = nums[i - 1];
-                        const showDots = i > 0 && n - prev > 1;
-                        const isCurrent = n === safeCurrentPage;
-
-                        return (
-                          <span key={n} className="flex items-center gap-1.5">
-                            {showDots && (
-                              <span className="px-1.5 text-zinc-400 font-bold text-xs">...</span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setCurrentPage(n)}
-                              className={`min-w-[34px] h-9 px-2.5 text-xs font-black rounded-xl transition-all cursor-pointer border ${
-                                isCurrent
-                                  ? "bg-black text-white border-black shadow-sm"
-                                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-black hover:bg-zinc-100"
-                              }`}
-                            >
-                              {n}
-                            </button>
-                          </span>
-                        );
-                      });
-                    })()}
-
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safeCurrentPage === totalPages}
-                      className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
-                    >
-                      <FaChevronRight size={11} />
-                    </button>
+                    <button type="button" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safeCurrentPage === 1} className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"><FaChevronLeft size={11} /></button>
+                    {buildPages(safeCurrentPage, totalPages).map((n, i, nums) => {
+                      const prev = nums[i - 1];
+                      const showDots = i > 0 && n - prev > 1;
+                      const isCurrent = n === safeCurrentPage;
+                      return (
+                        <span key={n} className="flex items-center gap-1.5">
+                          {showDots && <span className="px-1.5 text-zinc-400 font-bold text-xs">...</span>}
+                          <button type="button" onClick={() => setCurrentPage(n)} className={`min-w-[34px] h-9 px-2.5 text-xs font-black rounded-xl transition-all cursor-pointer border ${isCurrent ? "bg-black text-white border-black shadow-sm" : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-black hover:bg-zinc-100"}`}>{n}</button>
+                        </span>
+                      );
+                    })}
+                    <button type="button" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safeCurrentPage === totalPages} className="p-2.5 text-xs text-white bg-black rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"><FaChevronRight size={11} /></button>
                   </nav>
                 </div>
               )}
@@ -1439,141 +1644,68 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
         </div>
       </div>
 
-      {/* 🔥 MODAL UNIFICADO DE FACTURACIÓN */}
+      {/* MODAL DE FACTURACIÓN */}
       {modalFacturar.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl animate-fade-in-up my-8">
-            <h3 className="text-lg font-black text-center text-zinc-900 uppercase tracking-widest mb-1">
-              Emitir Comprobante
-            </h3>
-            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">
-              {modalFacturar.ventas.length === 1 
-                ? `${modalFacturar.ventas[0].totalUnidades}x ${modalFacturar.ventas[0].item}`
-                : `${modalFacturar.ventas.length} ventas seleccionadas`}
-            </p>
+            <h3 className="text-lg font-black text-center text-zinc-900 uppercase tracking-widest mb-1">Emitir Comprobante</h3>
+            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">{modalFacturar.ventas.length === 1 ? `${modalFacturar.ventas[0].totalUnidades}x ${modalFacturar.ventas[0].item}` : `${modalFacturar.ventas.length} ventas seleccionadas`}</p>
             
             <div className="flex flex-col gap-4 mb-6">
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Monto de Productos *</label>
                 <div className="relative mt-1">
                   <span className="absolute left-4 top-3 -translate-y-1/2 text-zinc-400 font-black text-base">₡</span>
-                  <input 
-                    type="number" 
-                    value={modalFacturar.precio} 
-                    onChange={(e) => setModalFacturar({ ...modalFacturar, precio: e.target.value })}
-                    className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-base font-black text-emerald-700 outline-none focus:border-black" 
-                  />
+                  <input type="number" value={modalFacturar.precio} onChange={(e) => setModalFacturar({ ...modalFacturar, precio: e.target.value })} className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-base font-black text-emerald-700 outline-none focus:border-black" />
                 </div>
               </div>
 
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 transition-all">
                 <label className="flex items-center justify-between cursor-pointer select-none">
                   <div className="flex items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={modalFacturar.incluyeEnvio}
-                      onChange={(e) => setModalFacturar({ ...modalFacturar, incluyeEnvio: e.target.checked })}
-                      className="w-4 h-4 rounded accent-black cursor-pointer"
-                    />
-                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
-                      <FaTruck className="text-zinc-500" size={13} /> Agregar Envío
-                    </span>
+                    <input type="checkbox" checked={modalFacturar.incluyeEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, incluyeEnvio: e.target.checked })} className="w-4 h-4 rounded accent-black cursor-pointer" />
+                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5"><FaTruck className="text-zinc-500" size={13} /> Agregar Envío</span>
                   </div>
-                  {modalFacturar.incluyeEnvio && (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                      + ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}
-                    </span>
-                  )}
+                  {modalFacturar.incluyeEnvio && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">+ ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}</span>}
                 </label>
-
                 {modalFacturar.incluyeEnvio && (
                   <div className="mt-3 pt-3 border-t border-zinc-200/80">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Costo del Envío (Personalizable) *</label>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Costo del Envío *</label>
                     <div className="relative mt-1">
                       <span className="absolute left-3.5 top-2 -translate-y-1/2 text-zinc-400 font-black text-sm">₡</span>
-                      <input
-                        type="number"
-                        value={modalFacturar.precioEnvio}
-                        onChange={(e) => setModalFacturar({ ...modalFacturar, precioEnvio: e.target.value })}
-                        placeholder="2500"
-                        className="w-full pl-8 pr-4 py-2 bg-white border border-zinc-300 rounded-xl text-sm font-black text-black outline-none focus:border-black"
-                      />
+                      <input type="number" value={modalFacturar.precioEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, precioEnvio: e.target.value })} className="w-full pl-8 pr-4 py-2 bg-white border border-zinc-300 rounded-xl text-sm font-black text-black outline-none focus:border-black" />
                     </div>
-                  </div>
-                )}
-
-                {modalFacturar.incluyeEnvio && (
-                  <div className="mt-2.5 flex items-center justify-between text-xs font-black text-zinc-900 pt-1">
-                    <span>TOTAL A FACTURAR:</span>
-                    <span className="text-sm text-emerald-700">
-                      ₡{((Number(modalFacturar.precio) || 0) + (Number(modalFacturar.precioEnvio) || 0)).toLocaleString("es-CR")}
-                    </span>
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Tipo de Comprobante *</label>
-                <select 
-                  value={modalFacturar.tipoEmision} 
-                  onChange={(e) => setModalFacturar({ ...modalFacturar, tipoEmision: e.target.value })}
-                  disabled={!esSuperAdmin}
-                  className={`w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-black outline-none focus:border-black ${!esSuperAdmin ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
+                <select value={modalFacturar.tipoEmision} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoEmision: e.target.value })} disabled={!esSuperAdmin} className={`w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-black outline-none focus:border-black ${!esSuperAdmin ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}>
                   <option value="interno">Ticket Normal (Uso Interno)</option>
-                  {esSuperAdmin && (
-                    <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
-                  )}
+                  {esSuperAdmin && <option value="hacienda">Tiquete Electrónico (Hacienda)</option>}
                 </select>
               </div>
 
               <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMostrarListaContactos((prev) => !prev)}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-300 rounded-xl text-xs font-black text-zinc-900 transition-all cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <FaStar className="text-amber-500" size={13} />
-                    <span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span>
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">
-                    {mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}
-                  </span>
+                <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-300 rounded-xl text-xs font-black text-zinc-900 transition-all cursor-pointer">
+                  <span className="flex items-center gap-2"><FaStar className="text-amber-500" size={13} /><span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span></span>
+                  <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
                 </button>
-
                 {mostrarListaContactos && (
                   <div className="mt-1.5 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-xl divide-y divide-zinc-100 z-30">
                     {contactosOrdenadosYFiltrados.length === 0 ? (
-                      <p className="p-3 text-center text-[11px] text-zinc-400 font-bold">
-                        No se encontraron contactos guardados en Alegra.
-                      </p>
+                      <p className="p-3 text-center text-[11px] text-zinc-400 font-bold">No se encontraron contactos en Alegra.</p>
                     ) : (
                       contactosOrdenadosYFiltrados.map((c) => {
                         const esFav = favoritosIds.includes(String(c.id));
                         return (
-                          <div
-                            key={c.id}
-                            onClick={() => seleccionarContactoAlegra(c)}
-                            className="flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50/70 cursor-pointer transition-colors"
-                          >
+                          <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50/70 cursor-pointer transition-colors">
                             <div className="min-w-0 flex-1 pr-2">
-                              <p className="text-xs font-black text-black truncate flex items-center gap-1.5">
-                                <FaUserCheck className="text-emerald-600 shrink-0" size={11} />
-                                <span className="truncate">{c.nombre}</span>
-                              </p>
-                              <p className="text-[10px] text-zinc-500 font-mono truncate">
-                                {c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""} {c.email ? `· ${c.email}` : ""}
-                              </p>
+                              <p className="text-xs font-black text-black truncate flex items-center gap-1.5"><FaUserCheck className="text-emerald-600 shrink-0" size={11} /><span className="truncate">{c.nombre}</span></p>
+                              <p className="text-[10px] text-zinc-500 font-mono truncate">{c.cedula ? `ID: ${c.cedula}` : ""} {c.telefono ? `· Tel: ${c.telefono}` : ""}</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(e) => toggleFavoritoContacto(c.id, e)}
-                              className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer shrink-0"
-                              title={esFav ? "Quitar de favoritos" : "Fijar en favoritos"}
-                            >
-                              <FaStar size={13} className={esFav ? "text-amber-400" : "text-zinc-300"} />
-                            </button>
+                            <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer shrink-0"><FaStar size={13} className={esFav ? "text-amber-400" : "text-zinc-300"} /></button>
                           </div>
                         );
                       })
@@ -1584,111 +1716,47 @@ const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, dat
 
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                    Tipo ID *
-                  </label>
-                  <select 
-                    value={modalFacturar.tipoIdentificacion} 
-                    onChange={(e) => setModalFacturar({ ...modalFacturar, tipoIdentificacion: e.target.value })}
-                    className="w-full mt-1 px-2.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-black"
-                  >
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Tipo ID *</label>
+                  <select value={modalFacturar.tipoIdentificacion} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoIdentificacion: e.target.value })} className="w-full mt-1 px-2.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-black">
                     <option value="01">Física</option>
                     <option value="02">Jurídica</option>
                     <option value="03">DIMEX</option>
                     <option value="04">NITE</option>
-                    <option value="05">Extranjero</option>
-                    <option value="06">No Contrib.</option>
                   </select>
                 </div>
-
                 <div className="sm:col-span-3">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                    Número de Cédula *
-                  </label>
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Cédula *</label>
                   <div className="flex gap-1.5 mt-1">
-                    <input 
-                      type="text" 
-                      value={modalFacturar.cedula} 
-                      onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })}
-                      onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }}
-                      placeholder="Ej. 101110222"
-                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
-                    />
-                    <button 
-                      type="button"
-                      onClick={buscarCedulaHacienda} 
-                      className="bg-zinc-800 text-white px-3.5 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" 
-                      title="Buscar en Alegra / Hacienda"
-                    >
-                      <FaSearch size={13} />
-                    </button>
+                    <input type="text" value={modalFacturar.cedula} onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
+                    <button type="button" onClick={buscarCedulaHacienda} className="bg-zinc-800 text-white px-3.5 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar"><FaSearch size={13} /></button>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">
-                  Nombre del Cliente *
-                </label>
-                <input 
-                  type="text" 
-                  value={modalFacturar.nombre} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setModalFacturar({ ...modalFacturar, nombre: val });
-                    if (val.trim().length >= 2) {
-                      setMostrarListaContactos(true);
-                    }
-                  }}
-                  placeholder="Automático al buscar o escriba..." 
-                  className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" 
-                />
+                <label className="text-[10px] font-bold text-zinc-500 uppercase">Nombre del Cliente *</label>
+                <input type="text" value={modalFacturar.nombre} onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })} placeholder="Escriba nombre..." className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono *</label>
-                  <input 
-                    type="tel" 
-                    value={modalFacturar.telefono} 
-                    onChange={(e) => setModalFacturar({ ...modalFacturar, telefono: e.target.value })}
-                    placeholder="Ej. 8888-8888" 
-                    className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
-                  />
+                  <input type="tel" value={modalFacturar.telefono} onChange={(e) => setModalFacturar({ ...modalFacturar, telefono: e.target.value })} placeholder="Ej. 8888-8888" className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
                 </div>
-
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo *</label>
-                  <input 
-                    type="email" 
-                    value={modalFacturar.correo} 
-                    onChange={(e) => setModalFacturar({ ...modalFacturar, correo: e.target.value })}
-                    placeholder="cliente@correo.com" 
-                    className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" 
-                  />
+                  <input type="email" value={modalFacturar.correo} onChange={(e) => setModalFacturar({ ...modalFacturar, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
                 </div>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <button 
-                onClick={() => setModalFacturar({ ...modalFacturar, isOpen: false })} 
-                className="flex-1 bg-zinc-100 text-zinc-600 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmarYEmitirFactura} 
-                disabled={generandoTiquete}
-                className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md cursor-pointer transition-colors"
-              >
-                Emitir Comprobante
-              </button>
+              <button onClick={() => setModalFacturar({ ...modalFacturar, isOpen: false })} className="flex-1 bg-zinc-100 text-zinc-600 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer">Cancelar</button>
+              <button onClick={confirmarYEmitirFactura} disabled={generandoTiquete} className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md cursor-pointer transition-colors">Emitir Comprobante</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
