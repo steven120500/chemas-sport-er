@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaUser, FaMapMarkerAlt, FaBoxOpen, FaPlus, FaStickyNote, FaPhone, FaIdCard, FaBuilding, FaSearch } from "react-icons/fa";
+import { FaUser, FaBoxOpen, FaSearch, FaPrint, FaMapMarkerAlt, FaCheckCircle } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -8,10 +8,15 @@ export default function GuiasCorreos() {
   const [provincias, setProvincias] = useState([]);
   const [cantones, setCantones] = useState([]);
   const [distritos, setDistritos] = useState([]);
+  const [sucursales, setSucursales] = useState([]);
   
   const [loadingGeos, setLoadingGeos] = useState(false);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingCedula, setIsSearchingCedula] = useState(false);
+
+  // Historial de guías generadas en la sesión (para la tabla inferior)
+  const [historialGuias, setHistorialGuias] = useState([]);
 
   const [form, setForm] = useState({
     detalleEnvio: "",
@@ -25,6 +30,7 @@ export default function GuiasCorreos() {
     distrito: "",  
     codigoPostal: "",
     direccion: "",
+    codigoSucursal: "", // Código de sucursal seleccionada
   });
 
   // 1. Cargar Provincias
@@ -50,8 +56,9 @@ export default function GuiasCorreos() {
         const res = await fetch(`${API_BASE}/api/correos/cantones/${form.provincia}`);
         const data = await res.json();
         if (data.exito && data.datos) setCantones(data.datos);
-        setForm(prev => ({ ...prev, canton: "", distrito: "", codigoPostal: "" }));
+        setForm(prev => ({ ...prev, canton: "", distrito: "", codigoPostal: "", codigoSucursal: "" }));
         setDistritos([]);
+        setSucursales([]);
       } catch (error) {
         console.error("Error al cargar cantones", error);
       } finally {
@@ -61,23 +68,36 @@ export default function GuiasCorreos() {
     fetchCantones();
   }, [form.provincia]);
 
-  // 3. Cargar Distritos al elegir Cantón
+  // 3. Cargar Distritos y Sucursales al elegir Cantón
   useEffect(() => {
     if (!form.provincia || !form.canton) return;
-    const fetchDistritos = async () => {
+    const fetchGeosYSucursales = async () => {
       setLoadingGeos(true);
+      setLoadingSucursales(true);
       try {
-        const res = await fetch(`${API_BASE}/api/correos/distritos/${form.provincia}/${form.canton}`);
-        const data = await res.json();
-        if (data.exito && data.datos) setDistritos(data.datos);
-        setForm(prev => ({ ...prev, distrito: "", codigoPostal: "" }));
+        // Distritos
+        const resDist = await fetch(`${API_BASE}/api/correos/distritos/${form.provincia}/${form.canton}`);
+        const dataDist = await resDist.json();
+        if (dataDist.exito && dataDist.datos) setDistritos(dataDist.datos);
+
+        // Sucursales (Endpoint oficial de Correos CR)
+        const resSuc = await fetch(`${API_BASE}/api/correos/sucursales/${form.provincia}/${form.canton}`);
+        const dataSuc = await resSuc.json();
+        if (dataSuc.exito && dataSuc.datos) {
+          setSucursales(dataSuc.datos);
+        } else {
+          setSucursales([]);
+        }
+
+        setForm(prev => ({ ...prev, distrito: "", codigoPostal: "", codigoSucursal: "" }));
       } catch (error) {
-        console.error("Error al cargar distritos", error);
+        console.error("Error al cargar datos geográficos o sucursales", error);
       } finally {
         setLoadingGeos(false);
+        setLoadingSucursales(false);
       }
     };
-    fetchDistritos();
+    fetchGeosYSucursales();
   }, [form.canton, form.provincia]);
 
   // 4. Actualizar Código Postal automáticamente
@@ -89,11 +109,21 @@ export default function GuiasCorreos() {
       }
   }, [form.distrito, distritos]);
 
+  // Manejador de cambios con validación de teléfono (estricto 8 números, sin letras/espacios/guiones)
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    if (name === "telefono") {
+      // Filtrar únicamente dígitos y limitar a máximo 8 caracteres
+      const soloDigitos = value.replace(/\D/g, "").slice(0, 8);
+      setForm({ ...form, [name]: soloDigitos });
+      return;
+    }
+
+    setForm({ ...form, [name]: value });
   };
 
-  // 🔥 NUEVO: Función para buscar nombre en Hacienda por número de Cédula
+  // Buscar nombre en Hacienda por Cédula
   const buscarNombrePorCedula = async () => {
     if (!form.numeroIdentificacion || form.numeroIdentificacion.length < 9) {
       toastHOT.error("Ingresa una cédula válida (9 o 10 dígitos) sin guiones.");
@@ -101,14 +131,11 @@ export default function GuiasCorreos() {
     }
 
     setIsSearchingCedula(true);
-    const toastId = toastHOT.loading("Buscando cédula...");
+    const toastId = toastHOT.loading("Buscando cédula en Hacienda...");
 
     try {
-      // API pública del Ministerio de Hacienda CR
       const res = await fetch(`https://api.hacienda.go.cr/fe/ae?identificacion=${form.numeroIdentificacion}`);
-      
       if (!res.ok) throw new Error("Cédula no encontrada en Hacienda");
-      
       const data = await res.json();
       
       if (data && data.nombre) {
@@ -125,27 +152,43 @@ export default function GuiasCorreos() {
     }
   };
 
+  // Enviar formulario para registrar guía
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.detalleEnvio || !form.nombre || !form.telefono || !form.provincia || !form.canton || !form.distrito || !form.direccion) {
+    
+    if (!form.detalleEnvio || !form.nombre || !form.telefono || !form.provincia || !form.canton || !form.distrito) {
       toastHOT.error("Por favor completa todos los campos obligatorios (*).");
       return;
     }
 
+    if (form.telefono.length !== 8) {
+      toastHOT.error("El teléfono del destinatario debe tener exactamente 8 dígitos.");
+      return;
+    }
+
+    if (form.tipoEnvio === "SUC" && !form.codigoSucursal) {
+      toastHOT.error("Por favor selecciona una sucursal de destino.");
+      return;
+    }
+
+    if (form.tipoEnvio === "DOM" && !form.direccion) {
+      toastHOT.error("Por favor ingresa la dirección exacta para la entrega a domicilio.");
+      return;
+    }
+
     setIsSubmitting(true);
-    const toastId = toastHOT.loading("Generando guía de Correos CR...");
+    const toastId = toastHOT.loading("Generando guía oficial en Correos CR...");
 
     try {
-      const telefonoLimpio = form.telefono.replace(/\D/g, "").slice(-8);
-
       const payload = {
         destNombre: form.nombre.trim(),
-        destDireccion: form.direccion.trim(),
-        destTelefono: telefonoLimpio,
+        destDireccion: form.tipoEnvio === "DOM" ? form.direccion.trim() : "Retiro en sucursal",
+        destTelefono: form.telefono,
         destZip: form.codigoPostal || "10101",
-        peso: 500, // Valor interno requerido por la API de Correos
+        peso: 500, 
         observaciones: form.detalleEnvio.trim(),
         tipoDestino: form.tipoEnvio,
+        codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : ""
       };
 
       const res = await fetch(`${API_BASE}/api/correos/generar-guia`, {
@@ -159,22 +202,36 @@ export default function GuiasCorreos() {
       if (res.ok && data.exito) {
         toastHOT.success("¡Guía generada con éxito!", { id: toastId });
         
+        const numeroGuia = data.datos?.enviold || "Guia_Envio";
+        
         if (data.datos && data.datos.pdfBase64) {
           const linkSource = `data:application/pdf;base64,${data.datos.pdfBase64}`;
           const downloadLink = document.createElement("a");
           downloadLink.href = linkSource;
-          downloadLink.download = `Guia_CCR_${data.datos.enviold || "Envio"}.pdf`;
+          downloadLink.download = `${numeroGuia}.pdf`; // PDF nombrado con el número de guía exacto
           downloadLink.click();
         }
+
+        // Agregar al historial local para la tabla inferior
+        const nuevaGuiaItem = {
+          enviold: numeroGuia,
+          nombre: form.nombre,
+          telefono: form.telefono,
+          tipoEnvio: form.tipoEnvio === "DOM" ? "Domicilio" : "Sucursal",
+          fecha: new Date().toLocaleDateString(),
+          pdfBase64: data.datos?.pdfBase64
+        };
+        setHistorialGuias(prev => [nuevaGuiaItem, ...prev]);
         
-        // Reset parcial del formulario
+        // Reset parcial del formulario de destinatario
         setForm(prev => ({ 
             ...prev, 
             detalleEnvio: "", 
             nombre: "", 
             telefono: "", 
             direccion: "",
-            numeroIdentificacion: "" 
+            numeroIdentificacion: "",
+            codigoSucursal: "" 
         }));
       } else {
         throw new Error(data.mensaje || "Error al generar la guía");
@@ -187,236 +244,361 @@ export default function GuiasCorreos() {
     }
   };
 
+  // Función para reimprimir guía desde la tabla histórica
+  const handleReimprimir = (guiaItem) => {
+    if (!guiaItem.pdfBase64) {
+      toastHOT.error("El archivo PDF no está disponible para reimpresión.");
+      return;
+    }
+    const linkSource = `data:application/pdf;base64,${guiaItem.pdfBase64}`;
+    const downloadLink = document.createElement("a");
+    downloadLink.href = linkSource;
+    downloadLink.download = `${guiaItem.enviold}.pdf`;
+    downloadLink.click();
+    toastHOT.success(`Reimprimiendo guía ${guiaItem.enviold}`);
+  };
+
   return (
-    <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl mb-10">
-      
-      {/* HEADER DATOS DEL PAQUETE */}
-      <div className="flex items-center gap-2 mb-4">
-          <FaBoxOpen className="text-[#0f2d5c]" />
-          <h3 className="text-[#0f2d5c] font-bold text-lg">Datos del paquete</h3>
-      </div>
-      
-      <form onSubmit={handleSubmit} className="space-y-8">
+    <div className="space-y-10 mb-10">
+      <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl">
         
-        {/* DETALLE DEL ENVIO */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Detalle del envío *
-          </label>
-          <textarea
-            name="detalleEnvio"
-            value={form.detalleEnvio}
-            onChange={handleChange}
-            required
-            rows={3}
-            className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] focus:ring-1 focus:ring-[#0f2d5c] outline-none text-sm resize-none"
-          />
+        {/* HEADER DATOS DEL PAQUETE */}
+        <div className="flex items-center gap-2 mb-4">
+            <FaBoxOpen className="text-[#0f2d5c]" />
+            <h3 className="text-[#0f2d5c] font-bold text-lg">Datos del paquete</h3>
         </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* DETALLE DEL ENVIO */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Detalle del envío *
+            </label>
+            <textarea
+              name="detalleEnvio"
+              value={form.detalleEnvio}
+              onChange={handleChange}
+              required
+              rows={3}
+              placeholder="Ej. Camisa deportiva, tacos, etc."
+              className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] focus:ring-1 focus:ring-[#0f2d5c] outline-none text-sm resize-none"
+            />
+          </div>
 
-        {/* HEADER DATOS DEL DESTINATARIO */}
-        <div className="flex items-center justify-between border-t border-gray-200 pt-6">
-             <div className="flex items-center gap-2">
-                <FaUser className="text-[#0f2d5c]" />
-                <h3 className="text-[#0f2d5c] font-bold text-lg">Datos del destinatario</h3>
-             </div>
-             <button type="button" className="text-xs text-green-600 border border-green-600 rounded px-3 py-1 hover:bg-green-50">
-                 Ocultar información del destinatario
-             </button>
-        </div>
-
-        {/* IDENTIFICACION Y TELEFONO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tipo de identificación
-                </label>
-                <select
-                    name="tipoIdentificacion"
-                    value={form.tipoIdentificacion}
-                    onChange={handleChange}
-                    className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
-                >
-                    <option value="">Seleccione tipo de identificación</option>
-                    <option value="Fisica">Cédula Física</option>
-                    <option value="Juridica">Cédula Jurídica</option>
-                    <option value="Dimex">DIMEX</option>
-                    <option value="Nite">NITE</option>
-                </select>
+          {/* SECCIÓN REMITENTE FIJO (CHEMASPORT ER) */}
+          <div className="border border-blue-100 bg-blue-50/40 p-5 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0f2d5c] bg-blue-100 px-3 py-1 rounded-full">
+                Remitente Fijo Oficial
+              </span>
+              <span className="text-xs text-gray-500">Configurado automáticamente</span>
             </div>
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Número de identificación
-                </label>
-                <div className="relative flex">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-700">
+              <div><strong>Empresa:</strong> CHEMASPORT ER S.R.L.</div>
+              <div><strong>Cédula Jurídica:</strong> 3102916554</div>
+              <div><strong>Teléfono:</strong> 71103209</div>
+              <div><strong>Código Postal:</strong> 20307</div>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              <strong>Dirección:</strong> Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque
+            </div>
+          </div>
+
+          {/* HEADER DATOS DEL DESTINATARIO */}
+          <div className="flex items-center justify-between border-t border-gray-200 pt-6">
+               <div className="flex items-center gap-2">
+                  <FaUser className="text-[#0f2d5c]" />
+                  <h3 className="text-[#0f2d5c] font-bold text-lg">Datos del destinatario</h3>
+               </div>
+          </div>
+
+          {/* IDENTIFICACION Y TELEFONO */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Tipo de identificación
+                  </label>
+                  <select
+                      name="tipoIdentificacion"
+                      value={form.tipoIdentificacion}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
+                  >
+                      <option value="">Seleccione tipo de identificación</option>
+                      <option value="Fisica">Cédula Física</option>
+                      <option value="Juridica">Cédula Jurídica</option>
+                      <option value="Dimex">DIMEX</option>
+                      <option value="Nite">NITE</option>
+                  </select>
+              </div>
+              <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Número de identificación
+                  </label>
+                  <div className="relative flex">
+                    <input
+                        type="text"
+                        name="numeroIdentificacion"
+                        value={form.numeroIdentificacion}
+                        onChange={handleChange}
+                        placeholder="Sin guiones"
+                        className="w-full p-3 border border-gray-300 rounded-l-md focus:border-[#0f2d5c] outline-none text-sm"
+                    />
+                    <button
+                        type="button"
+                        onClick={buscarNombrePorCedula}
+                        disabled={isSearchingCedula}
+                        className="bg-[#0f2d5c] text-white px-4 rounded-r-md hover:bg-blue-900 transition-colors disabled:opacity-70 flex items-center justify-center cursor-pointer"
+                        title="Buscar nombre en Hacienda"
+                    >
+                        <FaSearch />
+                    </button>
+                  </div>
+              </div>
+
+              <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Nombre completo *
+                  </label>
                   <input
                       type="text"
-                      name="numeroIdentificacion"
-                      value={form.numeroIdentificacion}
+                      name="nombre"
+                      value={form.nombre}
                       onChange={handleChange}
-                      placeholder="Sin guiones"
-                      className="w-full p-3 border border-gray-300 rounded-l-md focus:border-[#0f2d5c] outline-none text-sm"
+                      required
+                      className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm font-semibold text-[#0f2d5c]"
                   />
-                  <button
-                      type="button"
-                      onClick={buscarNombrePorCedula}
-                      disabled={isSearchingCedula}
-                      className="bg-[#0f2d5c] text-white px-4 rounded-r-md hover:bg-blue-900 transition-colors disabled:opacity-70 flex items-center justify-center cursor-pointer"
-                      title="Buscar nombre en Hacienda"
+              </div>
+               <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Teléfono * <span className="text-xs text-gray-500 font-normal">(Exactamente 8 dígitos, sin guiones)</span>
+                  </label>
+                  <input
+                      type="text"
+                      name="telefono"
+                      value={form.telefono}
+                      onChange={handleChange}
+                      required
+                      maxLength="8"
+                      placeholder="Ej. 88888888"
+                      className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
+                  />
+              </div>
+          </div>
+
+          {/* TIPO DE ENVIO Y GEOGRAFIA */}
+          <div className="border-t border-gray-200 pt-6">
+              <div className="w-full md:w-1/2 mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Tipo de Envío *
+                  </label>
+                  <select
+                      name="tipoEnvio"
+                      value={form.tipoEnvio}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
                   >
-                      <FaSearch />
-                  </button>
+                      <option value="DOM">A domicilio</option>
+                      <option value="SUC">A sucursal</option>
+                  </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Provincia *
+                      </label>
+                      <select
+                          name="provincia"
+                          value={form.provincia}
+                          onChange={handleChange}
+                          required
+                          className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
+                      >
+                          <option value="" disabled>Seleccione...</option>
+                          {provincias.map(p => (
+                              <option key={p.codigo} value={p.codigo}>{p.nombre}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Cantón * {loadingGeos && "..."}
+                      </label>
+                      <select
+                          name="canton"
+                          value={form.canton}
+                          onChange={handleChange}
+                          required
+                          disabled={!form.provincia || cantones.length === 0}
+                          className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm disabled:bg-gray-100"
+                      >
+                          <option value="" disabled>Seleccione...</option>
+                          {cantones.map(c => (
+                              <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Distrito * {loadingGeos && "..."}
+                      </label>
+                      <select
+                          name="distrito"
+                          value={form.distrito}
+                          onChange={handleChange}
+                          required
+                          disabled={!form.canton || distritos.length === 0}
+                          className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm disabled:bg-gray-100"
+                      >
+                          <option value="" disabled>Seleccione...</option>
+                          {distritos.map(d => (
+                              <option key={d.codigo} value={d.codigo}>{d.nombre}</option>
+                          ))}
+                      </select>
+                  </div>
+              </div>
+
+              {/* SUCURSALES (Si el tipo de envío es SUC) */}
+              {form.tipoEnvio === "SUC" && (
+                <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <label className="block text-sm font-bold text-[#0f2d5c] mb-3 flex items-center gap-2">
+                    <FaMapMarkerAlt /> Seleccione la sucursal de destino * {loadingSucursales && "Cargando sucursales..."}
+                  </label>
+                  
+                  {sucursales.length === 0 && !loadingSucursales && (
+                    <p className="text-sm text-gray-500 italic">No hay sucursales disponibles para este cantón. Seleccione otro cantón.</p>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {sucursales.map(suc => (
+                      <label 
+                        key={suc.codigo} 
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer bg-white ${
+                          form.codigoSucursal === suc.codigo ? "border-[#0f2d5c] bg-blue-50/30 shadow-md" : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="codigoSucursal"
+                          value={suc.codigo}
+                          checked={form.codigoSucursal === suc.codigo}
+                          onChange={(e) => setForm(prev => ({ ...prev, codigoSucursal: e.target.value }))}
+                          className="mt-1 text-[#0f2d5c]"
+                        />
+                        <div className="text-xs text-gray-700 space-y-1">
+                          <p className="font-bold text-[#0f2d5c] text-sm">{suc.nombre}</p>
+                          <p><strong>Dirección:</strong> {suc.direccion}</p>
+                          <p><strong>Horario:</strong> {suc.horario}</p>
+                          <p className="text-blue-600 font-semibold">Código de sucursal: {suc.codigo}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-            </div>
+              )}
 
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nombre completo *
-                </label>
-                <input
-                    type="text"
-                    name="nombre"
-                    value={form.nombre}
-                    onChange={handleChange}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm font-semibold text-[#0f2d5c]"
-                />
-            </div>
-             <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Teléfono *
-                </label>
-                <input
-                    type="tel"
-                    name="telefono"
-                    value={form.telefono}
-                    onChange={handleChange}
-                    required
-                    maxLength="9"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
-                />
-            </div>
-        </div>
+              {/* CODIGO POSTAL */}
+              <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Código postal
+                  </label>
+                  <input
+                      type="text"
+                      name="codigoPostal"
+                      value={form.codigoPostal}
+                      readOnly
+                      className="w-full p-3 bg-gray-100 border border-gray-300 rounded-md outline-none text-sm text-gray-500 cursor-not-allowed"
+                  />
+              </div>
 
-        {/* TIPO DE ENVIO Y GEOGRAFIA */}
-        <div className="border-t border-gray-200 pt-6">
-            <div className="w-full md:w-1/2 mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tipo de Envío
-                </label>
-                <select
-                    name="tipoEnvio"
-                    value={form.tipoEnvio}
-                    onChange={handleChange}
-                    className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
-                >
-                    <option value="DOM">A domicilio</option>
-                    <option value="SUC">A sucursal</option>
-                </select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* DIRECCION EXACTA (Solo si es a Domicilio) */}
+              {form.tipoEnvio === "DOM" && (
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Provincia *
+                        Señas exactas de dirección del destinatario *
                     </label>
-                    <select
-                        name="provincia"
-                        value={form.provincia}
+                    <textarea
+                        name="direccion"
+                        value={form.direccion}
                         onChange={handleChange}
-                        required
-                        className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm"
-                    >
-                        <option value="" disabled>Seleccione...</option>
-                        {provincias.map(p => (
-                            <option key={p.codigo} value={p.codigo}>{p.nombre}</option>
-                        ))}
-                    </select>
+                        required={form.tipoEnvio === "DOM"}
+                        rows={4}
+                        placeholder="De la esquina 100 metros norte..."
+                        className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm resize-none"
+                    />
                 </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Cantón * {loadingGeos && "..."}
-                    </label>
-                    <select
-                        name="canton"
-                        value={form.canton}
-                        onChange={handleChange}
-                        required
-                        disabled={!form.provincia || cantones.length === 0}
-                        className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm disabled:bg-gray-100"
-                    >
-                        <option value="" disabled>Seleccione...</option>
-                        {cantones.map(c => (
-                            <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Distrito * {loadingGeos && "..."}
-                    </label>
-                    <select
-                        name="distrito"
-                        value={form.distrito}
-                        onChange={handleChange}
-                        required
-                        disabled={!form.canton || distritos.length === 0}
-                        className="w-full p-3 bg-white border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm disabled:bg-gray-100"
-                    >
-                        <option value="" disabled>Seleccione...</option>
-                        {distritos.map(d => (
-                            <option key={d.codigo} value={d.codigo}>{d.nombre}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
+              )}
+          </div>
 
-            {/* CODIGO POSTAL */}
-            <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Código postal
-                </label>
-                <input
-                    type="text"
-                    name="codigoPostal"
-                    value={form.codigoPostal}
-                    readOnly
-                    className="w-full p-3 bg-gray-100 border border-gray-300 rounded-md outline-none text-sm text-gray-500 cursor-not-allowed"
-                />
-            </div>
+          {/* BOTON DE CREAR GUIA */}
+          <div className="flex justify-end pt-4">
+              <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-[#2ecc71] hover:bg-[#27ae60] text-white px-8 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-70 cursor-pointer shadow-lg"
+              >
+                  {isSubmitting ? "Procesando guía..." : "Crear guía oficial"}
+              </button>
+          </div>
+        </form>
+      </div>
 
-            {/* DIRECCION EXACTA */}
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Señas exactas de dirección del destinatario *
-                </label>
-                <textarea
-                    name="direccion"
-                    value={form.direccion}
-                    onChange={handleChange}
-                    required
-                    rows={4}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:border-[#0f2d5c] outline-none text-sm resize-none"
-                />
-            </div>
+      {/* TABLA HISTÓRICA DE GUÍAS GENERADAS (REIMPRESIÓN) */}
+      <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-[#0f2d5c] font-bold text-lg flex items-center gap-2">
+            <FaPrint /> Historial de guías generadas en esta sesión
+          </h3>
+          <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">
+            {historialGuias.length} guías generadas
+          </span>
         </div>
 
-        {/* BOTONES FINALES */}
-        <div className="flex justify-between items-center pt-4">
-            <button
-                type="button"
-                className="bg-[#0f2d5c] text-white px-6 py-2 rounded text-sm font-semibold hover:bg-blue-900 transition-colors cursor-pointer"
-            >
-                Ver mis guías
-            </button>
-            <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-[#2ecc71] hover:bg-[#27ae60] text-white px-8 py-2 rounded text-sm font-semibold transition-colors disabled:opacity-70 cursor-pointer"
-            >
-                {isSubmitting ? "Procesando..." : "Crear guía"}
-            </button>
-        </div>
-      </form>
+        {historialGuias.length === 0 ? (
+          <p className="text-gray-500 text-sm italic text-center py-6">Aún no has generado guías en esta sesión.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-600 bg-gray-50">
+                  <th className="p-3">N° de Guía</th>
+                  <th className="p-3">Destinatario</th>
+                  <th className="p-3">Teléfono</th>
+                  <th className="p-3">Tipo</th>
+                  <th className="p-3">Fecha</th>
+                  <th className="p-3 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historialGuias.map((item, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/60">
+                    <td className="p-3 font-bold text-[#0f2d5c]">{item.enviold}</td>
+                    <td className="p-3 font-semibold">{item.nombre}</td>
+                    <td className="p-3 text-gray-600">{item.telefono}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${item.tipoEnvio === 'Domicilio' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {item.tipoEnvio}
+                      </span>
+                    </td>
+                    <td className="p-3 text-gray-500">{item.fecha}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleReimprimir(item)}
+                        className="bg-[#0f2d5c] hover:bg-blue-900 text-white px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 mx-auto transition-colors cursor-pointer"
+                      >
+                        <FaPrint /> Reimprimir PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

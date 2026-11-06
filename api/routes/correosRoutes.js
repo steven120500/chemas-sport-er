@@ -69,7 +69,7 @@ router.get('/test-auth', async (req, res) => {
 });
 
 // ==========================================
-// 3. CATÁLOGOS GEOGRÁFICOS
+// 3. CATÁLOGOS GEOGRÁFICOS Y SUCURSALES
 // ==========================================
 
 router.get('/provincias', async (req, res) => {
@@ -113,6 +113,26 @@ router.get('/distritos/:idProvincia/:idCanton', async (req, res) => {
   } catch (error) {
     console.error("Error obteniendo distritos:", error?.response?.data || error.message);
     res.status(500).json({ exito: false, mensaje: "Error al obtener distritos" });
+  }
+});
+
+// NUEVO: Endpoint para consultar sucursales por Provincia y Cantón (Manual pág. 27)[cite: 37]
+router.get('/sucursales/:idProvincia/:idCanton', async (req, res) => {
+  try {
+    const baseUrl = getBaseUrl();
+    const { idProvincia, idCanton } = req.params;
+    const token = await obtenerTokenCCR();
+    
+    console.log(`[CCR-SUCURSALES] -> Consultando sucursales para Provincia: ${idProvincia}, Cantón: ${idCanton}`);
+    
+    const response = await axios.get(`${baseUrl}/ubicaciones/sucursales?provincia=${idProvincia}&canton=${idCanton}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error obteniendo sucursales:", error?.response?.data || error.message);
+    res.status(500).json({ exito: false, mensaje: "Error al obtener sucursales", detalle: error?.response?.data || error.message });
   }
 });
 
