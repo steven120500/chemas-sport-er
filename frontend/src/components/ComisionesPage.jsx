@@ -205,7 +205,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   });
 
-  // Estado para controlar qué bloque de contrapedido se está editando (tanto en podio como en posiciones generales)
+  // Estado para controlar qué bloque de contrapedido se está editando
   const [editandoContrapVendedor, setEditandoContrapVendedor] = useState(null);
   const [tempContrapValor, setTempContrapValor] = useState("");
 
@@ -271,6 +271,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       ""
     ).trim();
   }, [user, storedUser]);
+
+  // 🔑 AQUÍ PUEDES AGREGAR EL NOMBRE EXACTO DEL USUARIO AUTORIZADO ADEMÁS DEL SUPER ADMIN
+  const puedeEditarContrapedidos = useMemo(() => {
+    if (esSuperAdmin) return true;
+    const usuarioAutorizadoExtra = "Johanna"; // Cambia esto por el nombre real del usuario
+    return normText(nombreUsuarioActual) === normText(usuarioAutorizadoExtra);
+  }, [esSuperAdmin, nombreUsuarioActual]);
 
   const puedeAnularVenta = (venta) => {
     if (esSuperAdmin) return true;
@@ -468,10 +475,10 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   }, [logs]);
 
-  // Guardar el número exacto digitado en el input de contrapedido (Solo Super Admin)
+  // Guardar el número exacto digitado en el input de contrapedido (Permitido para el usuario autorizado)
   const guardarContrapedidoDirecto = (vendedor) => {
-    if (!esSuperAdmin) {
-      toastHOT.error("Solo el Super Admin puede modificar los contrapedidos.");
+    if (!puedeEditarContrapedidos) {
+      toastHOT.error("No tienes permisos para modificar los contrapedidos.");
       return;
     }
     const num = Math.max(0, Number(tempContrapValor) || 0);
@@ -1256,7 +1263,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 </div>
                 <div className="border-r border-zinc-200 h-6"></div>
                 <div>
-                  {esSuperAdmin && top2?.vendedor ? (
+                  {puedeEditarContrapedidos && top2?.vendedor ? (
                     editandoContrapVendedor === top2.vendedor ? (
                       <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
                         <input 
@@ -1284,7 +1291,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top2?.contrapedidoUds || 0} 
+                        +{top2?.contrapedidoUds || 0} ✏️
                       </button>
                     )
                   ) : (
@@ -1311,7 +1318,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 </div>
                 <div className="border-r border-amber-300 h-8"></div>
                 <div>
-                  {esSuperAdmin && top1?.vendedor ? (
+                  {puedeEditarContrapedidos && top1?.vendedor ? (
                     editandoContrapVendedor === top1.vendedor ? (
                       <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
                         <input 
@@ -1339,7 +1346,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top1?.contrapedidoUds || 0} 
+                        +{top1?.contrapedidoUds || 0} ✏️
                       </button>
                     )
                   ) : (
@@ -1366,7 +1373,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 </div>
                 <div className="border-r border-zinc-200 h-6"></div>
                 <div>
-                  {esSuperAdmin && top3?.vendedor ? (
+                  {puedeEditarContrapedidos && top3?.vendedor ? (
                     editandoContrapVendedor === top3.vendedor ? (
                       <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
                         <input 
@@ -1394,7 +1401,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top3?.contrapedidoUds || 0} 
+                        +{top3?.contrapedidoUds || 0} ✏️
                       </button>
                     )
                   ) : (
@@ -1434,7 +1441,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         {/* Contrapedido: Bloque clickeable o Input directo */}
                         <div className="flex items-center gap-1.5">
                           <span className="text-emerald-700">Contrap:</span>
-                          {esSuperAdmin ? (
+                          {puedeEditarContrapedidos ? (
                             estaEditandoEste ? (
                               <div className="inline-flex items-center bg-white border-2 border-black rounded-lg shadow-sm overflow-hidden">
                                 <input 
@@ -1476,7 +1483,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                                 className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 font-black text-xs transition-all cursor-pointer shadow-sm"
                                 title="Hacer clic para editar número exacto"
                               >
-                                +{item.contrapedidoUds} 
+                                +{item.contrapedidoUds} ✏️
                               </button>
                             )
                           ) : (
