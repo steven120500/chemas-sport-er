@@ -459,8 +459,10 @@ export default function GuiasCorreos() {
     // Bloque Destinatario
     let yDestinatario = y;
     doc.setFont("helvetica", "bold");
-    const lblDest = "Nombre del destinatario: ";
-    doc.text(lblDest, colDerecha, yDestinatario);
+    doc.text("Nombre del destinatario:", colDerecha, yDestinatario);
+    yDestinatario += 4;
+
+  
     doc.setFont("helvetica", "normal");
     const lineasNombreDest = doc.splitTextToSize(`${lblDest}${guiaData.nombre || ""}`, maxColWidth);
     // Imprimimos la primera línea respetando la etiqueta en negrita
