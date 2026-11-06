@@ -12,9 +12,10 @@ import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
 import historyRoutes from './routes/historyroutes.js';
 import saleRoutes from './routes/saleRoutes.js';
-import alegraRoutes from './routes/alegraRoutes.js'; // 👈 1. IMPORTAR RUTA DE ALEGRA
-import guiasRoutes from './routes/guiasRoutes.js';   // 👈 IMPORTAR RUTA DE GUÍAS
-import tiendaRoutes from './routes/tiendaRoutes.js'; // 👈 IMPORTAR RUTA DE TIENDA
+import alegraRoutes from './routes/alegraRoutes.js'; 
+import guiasRoutes from './routes/guiasRoutes.js';   
+import tiendaRoutes from './routes/tiendaRoutes.js'; 
+import correosRoutes from './routes/correosRoutes.js'; // 👈 1. IMPORTAR RUTA DE CORREOS CR
 
 dotenv.config();
 
@@ -91,9 +92,10 @@ app.use('/api', pdfRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
-app.use('/api/alegra', alegraRoutes); // 👈 2. MONTAR LA RUTA DE ALEGRA
-app.use('/api/guias', guiasRoutes);   // 👈 MONTAR LA RUTA DE GUÍAS
-app.use('/api/tienda', tiendaRoutes); // 👈 MONTAR LA RUTA DE TIENDA
+app.use('/api/alegra', alegraRoutes); 
+app.use('/api/guias', guiasRoutes);   
+app.use('/api/tienda', tiendaRoutes); 
+app.use('/api/correos', correosRoutes); // 👈 2. MONTAR LA RUTA DE CORREOS CR
 
 app.get('/', (_req, res) => res.send('Chema Sport ER API con WebSockets'));
 
