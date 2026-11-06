@@ -116,7 +116,6 @@ router.get('/distritos/:idProvincia/:idCanton', async (req, res) => {
   }
 });
 
-// NUEVO: Endpoint para consultar sucursales por Provincia y Cantón (Manual pág. 27)[cite: 37]
 router.get('/sucursales/:idProvincia/:idCanton', async (req, res) => {
   try {
     const baseUrl = getBaseUrl();
@@ -161,10 +160,11 @@ router.post('/generar-guia', async (req, res) => {
       destTelefono: destTelefono,
       destZip: destZip || "",
       
-      sendNombre: "Chema Sport ER",
-      sendDireccion: "San José", 
-      sendTelefono: "88888888",  
-      sendZip: "10101",          
+      // Datos oficiales del remitente corporativo Chema Sport ER
+      sendNombre: "CHEMASPORT ER SOCIEDAD DE RESPONSABILIDAD LIMITADA",
+      sendDireccion: "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque", 
+      sendTelefono: "71103209",  
+      sendZip: "20307",          
       
       observaciones: observaciones || "Paquete",
       usuarioId: CCR_CODIGO_CLIENTE.toString(), 

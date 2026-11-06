@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaUser, FaBoxOpen, FaSearch, FaPrint, FaMapMarkerAlt, FaCheckCircle } from "react-icons/fa";
+import { FaUser, FaBoxOpen, FaSearch, FaPrint, FaMapMarkerAlt, FaCalendarAlt } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -15,8 +15,17 @@ export default function GuiasCorreos() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingCedula, setIsSearchingCedula] = useState(false);
 
-  // Historial de guías generadas en la sesión (para la tabla inferior)
-  const [historialGuias, setHistorialGuias] = useState([]);
+  // Historial persistente en localStorage para que no se borre al refrescar
+  const [historialGuias, setHistorialGuias] = useState(() => {
+    try {
+      const saved = localStorage.getItem("chema_historial_guias");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [fechaFiltro, setFechaFiltro] = useState(new Date().toISOString().split('T')[0]);
 
   const [form, setForm] = useState({
     detalleEnvio: "",
@@ -30,8 +39,17 @@ export default function GuiasCorreos() {
     distrito: "",  
     codigoPostal: "",
     direccion: "",
-    codigoSucursal: "", // Código de sucursal seleccionada
+    codigoSucursal: "", 
   });
+
+  // Guardar en localStorage cada vez que cambie el historial
+  useEffect(() => {
+    try {
+      localStorage.setItem("chema_historial_guias", JSON.stringify(historialGuias));
+    } catch (e) {
+      console.error("Error al guardar en localStorage", e);
+    }
+  }, [historialGuias]);
 
   // 1. Cargar Provincias
   useEffect(() => {
@@ -75,12 +93,10 @@ export default function GuiasCorreos() {
       setLoadingGeos(true);
       setLoadingSucursales(true);
       try {
-        // Distritos
         const resDist = await fetch(`${API_BASE}/api/correos/distritos/${form.provincia}/${form.canton}`);
         const dataDist = await resDist.json();
         if (dataDist.exito && dataDist.datos) setDistritos(dataDist.datos);
 
-        // Sucursales (Endpoint oficial de Correos CR)
         const resSuc = await fetch(`${API_BASE}/api/correos/sucursales/${form.provincia}/${form.canton}`);
         const dataSuc = await resSuc.json();
         if (dataSuc.exito && dataSuc.datos) {
@@ -109,17 +125,14 @@ export default function GuiasCorreos() {
       }
   }, [form.distrito, distritos]);
 
-  // Manejador de cambios con validación de teléfono (estricto 8 números, sin letras/espacios/guiones)
+  // Manejador de cambios con validación estricta de teléfono a 8 dígitos
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
     if (name === "telefono") {
-      // Filtrar únicamente dígitos y limitar a máximo 8 caracteres
       const soloDigitos = value.replace(/\D/g, "").slice(0, 8);
       setForm({ ...form, [name]: soloDigitos });
       return;
     }
-
     setForm({ ...form, [name]: value });
   };
 
@@ -202,28 +215,30 @@ export default function GuiasCorreos() {
       if (res.ok && data.exito) {
         toastHOT.success("¡Guía generada con éxito!", { id: toastId });
         
-        const numeroGuia = data.datos?.enviold || "Guia_Envio";
+        const numeroGuia = data.datos?.enviold || data.datos?.envioId || "Guia_Envio";
         
         if (data.datos && data.datos.pdfBase64) {
           const linkSource = `data:application/pdf;base64,${data.datos.pdfBase64}`;
           const downloadLink = document.createElement("a");
           downloadLink.href = linkSource;
-          downloadLink.download = `${numeroGuia}.pdf`; // PDF nombrado con el número de guía exacto
+          downloadLink.download = `${numeroGuia}.pdf`;
           downloadLink.click();
         }
 
-        // Agregar al historial local para la tabla inferior
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
         const nuevaGuiaItem = {
           enviold: numeroGuia,
           nombre: form.nombre,
           telefono: form.telefono,
           tipoEnvio: form.tipoEnvio === "DOM" ? "Domicilio" : "Sucursal",
-          fecha: new Date().toLocaleDateString(),
+          fechaYyyyMmDd: fechaHoy,
+          fechaFormateada: new Date().toLocaleDateString(),
           pdfBase64: data.datos?.pdfBase64
         };
         setHistorialGuias(prev => [nuevaGuiaItem, ...prev]);
+        setFechaFiltro(fechaHoy);
         
-        // Reset parcial del formulario de destinatario
         setForm(prev => ({ 
             ...prev, 
             detalleEnvio: "", 
@@ -244,7 +259,6 @@ export default function GuiasCorreos() {
     }
   };
 
-  // Función para reimprimir guía desde la tabla histórica
   const handleReimprimir = (guiaItem) => {
     if (!guiaItem.pdfBase64) {
       toastHOT.error("El archivo PDF no está disponible para reimpresión.");
@@ -257,6 +271,8 @@ export default function GuiasCorreos() {
     downloadLink.click();
     toastHOT.success(`Reimprimiendo guía ${guiaItem.enviold}`);
   };
+
+  const guiasFiltradasPorDia = historialGuias.filter(item => item.fechaYyyyMmDd === fechaFiltro);
 
   return (
     <div className="space-y-10 mb-10">
@@ -545,19 +561,29 @@ export default function GuiasCorreos() {
         </form>
       </div>
 
-      {/* TABLA HISTÓRICA DE GUÍAS GENERADAS (REIMPRESIÓN) */}
+      {/* TABLA HISTÓRICA DE GUÍAS CON FILTRO POR DÍA */}
       <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <h3 className="text-[#0f2d5c] font-bold text-lg flex items-center gap-2">
-            <FaPrint /> Historial de guías generadas en esta sesión
+            <FaPrint /> Historial de guías por día
           </h3>
-          <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">
-            {historialGuias.length} guías generadas
-          </span>
+          
+          <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+            <FaCalendarAlt className="text-[#0f2d5c]" />
+            <span className="text-xs font-semibold text-gray-600">Filtrar fecha:</span>
+            <input
+              type="date"
+              value={fechaFiltro}
+              onChange={(e) => setFechaFiltro(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-[#0f2d5c] outline-none cursor-pointer"
+            />
+          </div>
         </div>
 
-        {historialGuias.length === 0 ? (
-          <p className="text-gray-500 text-sm italic text-center py-6">Aún no has generado guías en esta sesión.</p>
+        {guiasFiltradasPorDia.length === 0 ? (
+          <p className="text-gray-500 text-sm italic text-center py-6">
+            No hay guías registradas para la fecha seleccionada ({fechaFiltro}).
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
@@ -572,7 +598,7 @@ export default function GuiasCorreos() {
                 </tr>
               </thead>
               <tbody>
-                {historialGuias.map((item, index) => (
+                {guiasFiltradasPorDia.map((item, index) => (
                   <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/60">
                     <td className="p-3 font-bold text-[#0f2d5c]">{item.enviold}</td>
                     <td className="p-3 font-semibold">{item.nombre}</td>
@@ -582,7 +608,7 @@ export default function GuiasCorreos() {
                         {item.tipoEnvio}
                       </span>
                     </td>
-                    <td className="p-3 text-gray-500">{item.fecha}</td>
+                    <td className="p-3 text-gray-500">{item.fechaFormateada}</td>
                     <td className="p-3 text-center">
                       <button
                         type="button"
