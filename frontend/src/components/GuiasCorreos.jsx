@@ -137,14 +137,27 @@ export default function GuiasCorreos() {
     setPaginaActual(1);
   }, [fechaFiltro]);
 
-  // 1. Cargar Provincias
+  // 1. Cargar Provincias (Con caché instantáneo en sessionStorage)
   useEffect(() => {
     const fetchProvincias = async () => {
+      try {
+        const cached = sessionStorage.getItem("ccr_provincias");
+        if (cached) {
+          setProvincias(JSON.parse(cached));
+          return;
+        }
+      } catch (e) {}
+
       setLoadingProvincias(true);
       try {
         const res = await fetch(`${API_BASE}/api/correos/provincias`);
         const data = await res.json();
-        if (data.exito && data.datos) setProvincias(data.datos);
+        if (data.exito && data.datos) {
+          setProvincias(data.datos);
+          try {
+            sessionStorage.setItem("ccr_provincias", JSON.stringify(data.datos));
+          } catch (e) {}
+        }
       } catch (error) {
         console.error("Error al cargar provincias", error);
       } finally {
@@ -154,18 +167,33 @@ export default function GuiasCorreos() {
     fetchProvincias();
   }, []);
 
-  // 2. Cargar Cantones al elegir Provincia
+  // 2. Cargar Cantones al elegir Provincia (Con caché instantáneo)
   useEffect(() => {
     if (!form.provincia) return;
     const fetchCantones = async () => {
+      setForm(prev => ({ ...prev, canton: "", distrito: "", codigoPostal: "", codigoSucursal: "" }));
+      setDistritos([]);
+      setSucursales([]);
+
+      const cacheKey = `ccr_cantones_${form.provincia}`;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          setCantones(JSON.parse(cached));
+          return;
+        }
+      } catch (e) {}
+
       setLoadingCantones(true);
       try {
         const res = await fetch(`${API_BASE}/api/correos/cantones/${form.provincia}`);
         const data = await res.json();
-        if (data.exito && data.datos) setCantones(data.datos);
-        setForm(prev => ({ ...prev, canton: "", distrito: "", codigoPostal: "", codigoSucursal: "" }));
-        setDistritos([]);
-        setSucursales([]);
+        if (data.exito && data.datos) {
+          setCantones(data.datos);
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify(data.datos));
+          } catch (e) {}
+        }
       } catch (error) {
         console.error("Error al cargar cantones", error);
       } finally {
@@ -175,18 +203,32 @@ export default function GuiasCorreos() {
     fetchCantones();
   }, [form.provincia]);
 
-  // 3. Cargar SOLO Distritos al elegir Cantón (sin recargar el backend con sucursales aún)
+  // 3. Cargar SOLO Distritos al elegir Cantón (Con caché instantáneo + Pre-calentamiento de sucursales si es SUC)
   useEffect(() => {
     if (!form.provincia || !form.canton) return;
     const fetchDistritos = async () => {
+      setForm(prev => ({ ...prev, distrito: "", codigoPostal: "", codigoSucursal: "" }));
+      setSucursales([]);
+
+      const cacheKey = `ccr_distritos_${form.provincia}_${form.canton}`;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          setDistritos(JSON.parse(cached));
+          return;
+        }
+      } catch (e) {}
+
       setLoadingDistritos(true);
       try {
         const resDist = await fetch(`${API_BASE}/api/correos/distritos/${form.provincia}/${form.canton}`);
         const dataDist = await resDist.json();
-        if (dataDist.exito && dataDist.datos) setDistritos(dataDist.datos);
-
-        setForm(prev => ({ ...prev, distrito: "", codigoPostal: "", codigoSucursal: "" }));
-        setSucursales([]);
+        if (dataDist.exito && dataDist.datos) {
+          setDistritos(dataDist.datos);
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify(dataDist.datos));
+          } catch (e) {}
+        }
       } catch (error) {
         console.error("Error al cargar distritos", error);
       } finally {
@@ -211,12 +253,24 @@ export default function GuiasCorreos() {
     // Solo cargamos sucursales del backend cuando ya eligió Provincia, Cantón, Distrito y es envío a Sucursal
     if (form.tipoEnvio === "SUC" && form.provincia && form.canton && form.distrito) {
       const fetchSucursales = async () => {
+        const cacheKey = `ccr_sucursales_${form.provincia}_${form.canton}`;
+        try {
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            setSucursales(JSON.parse(cached));
+            return;
+          }
+        } catch (e) {}
+
         setLoadingSucursales(true);
         try {
           const resSuc = await fetch(`${API_BASE}/api/correos/sucursales/${form.provincia}/${form.canton}`);
           const dataSuc = await resSuc.json();
           if (dataSuc.exito && dataSuc.datos) {
             setSucursales(dataSuc.datos);
+            try {
+              sessionStorage.setItem(cacheKey, JSON.stringify(dataSuc.datos));
+            } catch (e) {}
           } else {
             setSucursales([]);
           }
