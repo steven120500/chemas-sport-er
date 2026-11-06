@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaUser, FaBoxOpen, FaSearch, FaPrint, FaMapMarkerAlt, FaCalendarAlt } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
+import jsPDF from "jspdf";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -165,6 +166,132 @@ export default function GuiasCorreos() {
     }
   };
 
+  // Función para generar el PDF idéntico al formato oficial de Correos con jsPDF
+  const generarPdfOficialCorreos = (guiaData) => {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Encabezado / Código de barras simulado (Número de Guía)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(guiaData.enviold || "PY086032498CR", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Creado : ${guiaData.fechaFormateada || "05-11-2026"}`, pageWidth - 20, y, { align: "right" });
+    y += 5;
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text("Guía de envío del servicio EMS Nacional de Correos de Costa Rica", 15, y);
+    y += 6;
+
+    doc.setLineWidth(0.5);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 8;
+
+    // Secciones Remitente y Destinatario
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Datos del Remitente", 15, y);
+    doc.text("Datos del Destinatario", 110, y);
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+
+    // Bloque Remitente Fijo Chema Sport ER
+    let yRemitente = y;
+    doc.text("Nombre del remitente: CHEMASPORT ER SOCIEDAD DE", 15, yRemitente, { maxWidth: 85 });
+    yRemitente += 8;
+    doc.text("RESPONSABILIDAD LIMITADA", 15, yRemitente);
+    yRemitente += 5;
+    doc.text("Código postal: 20307", 15, yRemitente);
+    yRemitente += 5;
+    doc.text("Teléfono: 71103209", 15, yRemitente);
+    yRemitente += 5;
+    doc.text("Correo electrónico: chemasport_er@outlook.com", 15, yRemitente);
+    yRemitente += 5;
+    doc.text("Dirección:", 15, yRemitente);
+    yRemitente += 5;
+    doc.text("Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque", 15, yRemitente, { maxWidth: 85 });
+
+    // Bloque Destinatario
+    let yDestinatario = y;
+    doc.text(`Nombre del destinatario: ${guiaData.nombre || ""}`, 110, yDestinatario, { maxWidth: 85 });
+    yDestinatario += 8;
+    doc.text(`Código postal: ${guiaData.codigoPostal || "20301"}`, 110, yDestinatario);
+    yDestinatario += 5;
+    doc.text(`Teléfono: ${guiaData.telefono || ""}`, 110, yDestinatario);
+    yDestinatario += 5;
+    doc.text(`Tipo de envio: ${guiaData.tipoEnvio || "Domicilio"}`, 110, yDestinatario);
+    yDestinatario += 5;
+    doc.text("Sucursal:", 110, yDestinatario);
+    yDestinatario += 5;
+    doc.text("Dirección:", 110, yDestinatario);
+    yDestinatario += 5;
+    doc.text(guiaData.direccion || "Dirección...", 110, yDestinatario, { maxWidth: 85 });
+
+    y = Math.max(yRemitente, yDestinatario) + 10;
+
+    doc.line(15, y, pageWidth - 15, y);
+    y += 8;
+
+    // Detalle del paquete
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Detalle del paquete", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Detalle: ${guiaData.detalleEnvio || "Paquete"}`, 15, y);
+    y += 8;
+
+    doc.line(15, y, pageWidth - 15, y);
+    y += 8;
+
+    // Rastrear Envío y notas legales
+    doc.setTextColor(50, 150, 0);
+    doc.setFont("helvetica", "bold");
+    doc.text("Rastrear Envío", 15, y);
+    doc.setTextColor(0, 0, 0);
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Esta guía no tiene validez si no ha sido entregada a Correos de Costa Rica. Escaneá el código QR para conocer el estado de tu paquete.", 15, y);
+    y += 25;
+
+    doc.setFontSize(7);
+    doc.text(
+      "AUTORIZO de forma expresa a la empresa CORREOS DE COSTA RICA S.A., para que en caso de que el paquete impuesto por el suscrito, presente alguna alerta por motivos de seguridad, de aduanas o por motivos de regulación, esta podrá abrir e inspeccionar mi envío, sin notificación previa de forma tal que gestione el riesgo de envío ilícitos.",
+      15,
+      y,
+      { maxWidth: pageWidth - 30, align: "justify" }
+    );
+    y += 20;
+
+    doc.text("CONDICIONES GENERALES DEL SERVICIO EMS: Disponibles en el sitio web https://correos.go.cr", 15, y);
+    y += 4;
+    doc.text("Contáctenos al Teléfono (506) 2257-8888 o al correo electrónico: srvcliente@correos.go.cr", 15, y);
+    y += 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("CORREOS", 15, y);
+    doc.text("EMS", pageWidth - 45, y);
+
+    doc.save(`${guiaData.enviold}.pdf`);
+  };
+
   // Enviar formulario para registrar guía
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -215,29 +342,26 @@ export default function GuiasCorreos() {
       if (res.ok && data.exito) {
         toastHOT.success("¡Guía generada con éxito!", { id: toastId });
         
-        const numeroGuia = data.datos?.enviold || data.datos?.envioId || "Guia_Envio";
-        
-        if (data.datos && data.datos.pdfBase64) {
-          const linkSource = `data:application/pdf;base64,${data.datos.pdfBase64}`;
-          const downloadLink = document.createElement("a");
-          downloadLink.href = linkSource;
-          downloadLink.download = `${numeroGuia}.pdf`;
-          downloadLink.click();
-        }
-
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const numeroGuia = data.datos?.enviold || data.datos?.envioId || "PY086032498CR";
+        const fechaActualStr = new Date().toLocaleDateString();
 
         const nuevaGuiaItem = {
           enviold: numeroGuia,
           nombre: form.nombre,
           telefono: form.telefono,
           tipoEnvio: form.tipoEnvio === "DOM" ? "Domicilio" : "Sucursal",
-          fechaYyyyMmDd: fechaHoy,
-          fechaFormateada: new Date().toLocaleDateString(),
-          pdfBase64: data.datos?.pdfBase64
+          direccion: form.tipoEnvio === "DOM" ? form.direccion : "Retiro en sucursal",
+          detalleEnvio: form.detalleEnvio,
+          codigoPostal: form.codigoPostal,
+          fechaYyyyMmDd: new Date().toISOString().split('T')[0],
+          fechaFormateada: fechaActualStr
         };
+
+        // Generar y descargar el PDF con formato oficial idéntico
+        generarPdfOficialCorreos(nuevaGuiaItem);
+
         setHistorialGuias(prev => [nuevaGuiaItem, ...prev]);
-        setFechaFiltro(fechaHoy);
+        setFechaFiltro(nuevaGuiaItem.fechaYyyyMmDd);
         
         setForm(prev => ({ 
             ...prev, 
@@ -260,15 +384,7 @@ export default function GuiasCorreos() {
   };
 
   const handleReimprimir = (guiaItem) => {
-    if (!guiaItem.pdfBase64) {
-      toastHOT.error("El archivo PDF no está disponible para reimpresión.");
-      return;
-    }
-    const linkSource = `data:application/pdf;base64,${guiaItem.pdfBase64}`;
-    const downloadLink = document.createElement("a");
-    downloadLink.href = linkSource;
-    downloadLink.download = `${guiaItem.enviold}.pdf`;
-    downloadLink.click();
+    generarPdfOficialCorreos(guiaItem);
     toastHOT.success(`Reimprimiendo guía ${guiaItem.enviold}`);
   };
 
