@@ -456,25 +456,16 @@ export default function GuiasCorreos() {
     doc.text(lineasDirRem, colIzquierda, yRemitente);
     yRemitente += lineasDirRem.length * 3.5;
 
-    // Bloque Destinatario
-    let yDestinatario = y;
-    doc.setFont("helvetica", "bold");
-    doc.text("Nombre del destinatario:", colDerecha, yDestinatario);
-    yDestinatario += 4;
+   // Bloque Destinatario
+   let yDestinatario = y;
+   doc.setFont("helvetica", "bold");
+   doc.text("Nombre del destinatario:", colDerecha, yDestinatario);
+   yDestinatario += 4.5;
 
-  
-    doc.setFont("helvetica", "normal");
-    const lineasNombreDest = doc.splitTextToSize(`${lblDest}${guiaData.nombre || ""}`, maxColWidth);
-    // Imprimimos la primera línea respetando la etiqueta en negrita
-    const primeraLineaSinLabel = String(lineasNombreDest[0] || "").replace(lblDest, "");
-    doc.text(primeraLineaSinLabel, colDerecha + doc.getTextWidth(lblDest), yDestinatario);
-    if (lineasNombreDest.length > 1) {
-      yDestinatario += 3.5;
-      doc.text(lineasNombreDest.slice(1), colDerecha, yDestinatario);
-      yDestinatario += (lineasNombreDest.length - 1) * 3.5 + 1;
-    } else {
-      yDestinatario += 4.5;
-    }
+   doc.setFont("helvetica", "normal");
+   const lineasNombreDest = doc.splitTextToSize(guiaData.nombre || "", maxColWidth);
+   doc.text(lineasNombreDest, colDerecha, yDestinatario);
+   yDestinatario += lineasNombreDest.length * 3.5 + 2;
 
     drawBoldLabelLine(doc, "Código postal:", guiaData.codigoPostal || "20301", colDerecha, yDestinatario);
     yDestinatario += 4;
