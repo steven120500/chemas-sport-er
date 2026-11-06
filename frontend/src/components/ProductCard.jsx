@@ -211,7 +211,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                   <span className="sm:hidden bg-black text-white p-1.5 rounded-full flex items-center justify-center shadow-sm">
                     <FaStar size={9} />
                   </span>
-                  <span className="hidden sm:inline-flex bg-black text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                  <span className="hidden sm:inline-flex bg-yellow-500 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     POPULAR
                   </span>
                 </>
@@ -221,7 +221,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
                   <span className="sm:hidden bg-zinc-800 text-white p-1.5 rounded-full flex items-center justify-center shadow-sm">
                     <FaTag size={9} />
                   </span>
-                  <span className="hidden sm:inline-flex bg-zinc-800 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                  <span className="hidden sm:inline-flex bg-green-500 text-white text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
                     OFERTA
                   </span>
                 </>

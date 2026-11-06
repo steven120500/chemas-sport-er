@@ -92,7 +92,7 @@ export default function GuiasCorreos() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingCedula, setIsSearchingCedula] = useState(false);
 
-  // Historial persistente en localStorage
+  // Historial sincronizado con Backend + respaldo en localStorage
   const [historialGuias, setHistorialGuias] = useState(() => {
     try {
       const saved = localStorage.getItem("chema_historial_guias");
@@ -122,6 +122,34 @@ export default function GuiasCorreos() {
     direccion: "",
     codigoSucursal: "", 
   });
+
+  // Cargar historial compartido desde el Backend para que todos vean las guías de todos
+  const cargarHistorialGlobal = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/correos/historial`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.exito && Array.isArray(data.datos)) {
+        setHistorialGuias(prevLocal => {
+          // Combinamos las del backend con cualquier guía previa local que no se haya subido aún
+          const mapa = new Map();
+          data.datos.forEach(g => mapa.set(g.enviold, g));
+          prevLocal.forEach(g => {
+            if (g.enviold && !mapa.has(g.enviold)) {
+              mapa.set(g.enviold, g);
+            }
+          });
+          return Array.from(mapa.values());
+        });
+      }
+    } catch (error) {
+      console.error("Error cargando historial global de Correos:", error);
+    }
+  };
+
+  useEffect(() => {
+    cargarHistorialGlobal();
+  }, []);
 
   // Guardar en localStorage cada vez que cambie el historial
   useEffect(() => {
@@ -203,7 +231,7 @@ export default function GuiasCorreos() {
     fetchCantones();
   }, [form.provincia]);
 
-  // 3. Cargar SOLO Distritos al elegir Cantón (Con caché instantáneo + Pre-calentamiento de sucursales si es SUC)
+  // 3. Cargar SOLO Distritos al elegir Cantón (Con caché instantáneo)
   useEffect(() => {
     if (!form.provincia || !form.canton) return;
     const fetchDistritos = async () => {
@@ -245,7 +273,7 @@ export default function GuiasCorreos() {
       return;
     }
 
-    const distritoSeleccionado = distritos.find(d => d.codigo === form.distrito);
+    const distritoSeleccionado = distritos.find(d => String(d.codigo) === String(form.distrito));
     if (distritoSeleccionado) {
       setForm(prev => ({ ...prev, codigoPostal: distritoSeleccionado.codigoPostal || "" }));
     }
@@ -325,6 +353,15 @@ export default function GuiasCorreos() {
     }
   };
 
+  // Función auxiliar para dibujar etiqueta en negrita seguida de valor normal en jsPDF
+  const drawBoldLabelLine = (doc, label, value, x, y) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, x, y);
+    const labelWidth = doc.getTextWidth(label);
+    doc.setFont("helvetica", "normal");
+    doc.text(` ${value || ""}`, x + labelWidth, y);
+  };
+
   // Función optimizada para generar el PDF compacto en 1 sola hoja con Código de Barras real arriba
   const generarPdfOficialCorreos = (guiaData) => {
     const doc = new jsPDF({
@@ -334,7 +371,7 @@ export default function GuiasCorreos() {
     });
 
     const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
-    const margin = 18; // Buen margen a los lados para que nunca se corte en la impresión
+    const margin = 18;
     let y = 12;
 
     const codigoGuia = guiaData.enviold || "PY086032498CR";
@@ -378,7 +415,7 @@ export default function GuiasCorreos() {
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
-    // 2. SECCIONES REMITENTE Y DESTINATARIO (Letra pequeña y compacta)
+    // 2. SECCIONES REMITENTE Y DESTINATARIO (Con etiquetas en Negrita exactas al PDF oficial)
     const colIzquierda = margin;
     const colDerecha = pageWidth / 2 + 4;
     const maxColWidth = (pageWidth - margin * 2) / 2 - 6;
@@ -389,23 +426,29 @@ export default function GuiasCorreos() {
     doc.text("Datos del Destinatario", colDerecha, y);
     y += 4.5;
 
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
 
     // Bloque Remitente Fijo Chema Sport ER
     let yRemitente = y;
-    doc.text("Nombre del remitente: CHEMASPORT ER SOCIEDAD DE", colIzquierda, yRemitente, { maxWidth: maxColWidth });
-    yRemitente += 6.5;
+    doc.setFont("helvetica", "bold");
+    doc.text("Nombre del remitente:", colIzquierda, yRemitente);
+    doc.setFont("helvetica", "normal");
+    doc.text(" CHEMASPORT ER SOCIEDAD DE", colIzquierda + doc.getTextWidth("Nombre del remitente:"), yRemitente);
+    yRemitente += 3.5;
     doc.text("RESPONSABILIDAD LIMITADA", colIzquierda, yRemitente);
+    yRemitente += 4.5;
+
+    drawBoldLabelLine(doc, "Código postal:", "20307", colIzquierda, yRemitente);
     yRemitente += 4;
-    doc.text("Código postal: 20307", colIzquierda, yRemitente);
+    drawBoldLabelLine(doc, "Teléfono:", "71103209", colIzquierda, yRemitente);
     yRemitente += 4;
-    doc.text("Teléfono: 71103209", colIzquierda, yRemitente);
+    drawBoldLabelLine(doc, "Correo electrónico:", "chemasport_er@outlook.com", colIzquierda, yRemitente);
     yRemitente += 4;
-    doc.text("Correo electrónico: chemasport_er@outlook.com", colIzquierda, yRemitente);
-    yRemitente += 4;
+
+    doc.setFont("helvetica", "bold");
     doc.text("Dirección:", colIzquierda, yRemitente);
     yRemitente += 3.5;
+    doc.setFont("helvetica", "normal");
     const lineasDirRem = doc.splitTextToSize(
       "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque",
       maxColWidth
@@ -415,21 +458,36 @@ export default function GuiasCorreos() {
 
     // Bloque Destinatario
     let yDestinatario = y;
-    const lineasNombreDest = doc.splitTextToSize(`Nombre del destinatario: ${guiaData.nombre || ""}`, maxColWidth);
-    doc.text(lineasNombreDest, colDerecha, yDestinatario);
-    yDestinatario += Math.max(lineasNombreDest.length * 3.5, 6.5);
+    doc.setFont("helvetica", "bold");
+    const lblDest = "Nombre del destinatario: ";
+    doc.text(lblDest, colDerecha, yDestinatario);
+    doc.setFont("helvetica", "normal");
+    const lineasNombreDest = doc.splitTextToSize(`${lblDest}${guiaData.nombre || ""}`, maxColWidth);
+    // Imprimimos la primera línea respetando la etiqueta en negrita
+    const primeraLineaSinLabel = String(lineasNombreDest[0] || "").replace(lblDest, "");
+    doc.text(primeraLineaSinLabel, colDerecha + doc.getTextWidth(lblDest), yDestinatario);
+    if (lineasNombreDest.length > 1) {
+      yDestinatario += 3.5;
+      doc.text(lineasNombreDest.slice(1), colDerecha, yDestinatario);
+      yDestinatario += (lineasNombreDest.length - 1) * 3.5 + 1;
+    } else {
+      yDestinatario += 4.5;
+    }
 
-    doc.text(`Código postal: ${guiaData.codigoPostal || "20301"}`, colDerecha, yDestinatario);
+    drawBoldLabelLine(doc, "Código postal:", guiaData.codigoPostal || "20301", colDerecha, yDestinatario);
     yDestinatario += 4;
-    doc.text(`Teléfono: ${guiaData.telefono || ""}`, colDerecha, yDestinatario);
+    drawBoldLabelLine(doc, "Teléfono:", guiaData.telefono || "", colDerecha, yDestinatario);
     yDestinatario += 4;
-    doc.text(`Tipo de envio: ${guiaData.tipoEnvio || "Domicilio"}`, colDerecha, yDestinatario);
+    drawBoldLabelLine(doc, "Tipo de envio:", guiaData.tipoEnvio || "Domicilio", colDerecha, yDestinatario);
     yDestinatario += 4;
-    doc.text(`Sucursal: ${guiaData.codigoSucursal || ""}`, colDerecha, yDestinatario);
+    drawBoldLabelLine(doc, "Sucursal:", guiaData.codigoSucursal || "", colDerecha, yDestinatario);
     yDestinatario += 4;
+
+    doc.setFont("helvetica", "bold");
     doc.text("Dirección:", colDerecha, yDestinatario);
     yDestinatario += 3.5;
-    const lineasDirDest = doc.splitTextToSize(guiaData.direccion || "Dirección...", maxColWidth);
+    doc.setFont("helvetica", "normal");
+    const lineasDirDest = doc.splitTextToSize(guiaData.direccion || "", maxColWidth);
     doc.text(lineasDirDest, colDerecha, yDestinatario);
     yDestinatario += lineasDirDest.length * 3.5;
 
@@ -444,10 +502,13 @@ export default function GuiasCorreos() {
     doc.text("Detalle del paquete", pageWidth / 2, y, { align: "center" });
     y += 4.5;
 
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
-    const lineasDetalle = doc.splitTextToSize(`Detalle: ${guiaData.detalleEnvio || "Paquete"}`, pageWidth - margin * 2);
-    doc.text(lineasDetalle, margin, y);
+    doc.setFont("helvetica", "bold");
+    doc.text("Detalle: ", margin, y);
+    const anchoLblDetalle = doc.getTextWidth("Detalle: ");
+    doc.setFont("helvetica", "normal");
+    const lineasDetalle = doc.splitTextToSize(guiaData.detalleEnvio || "Paquete", pageWidth - margin * 2 - anchoLblDetalle);
+    doc.text(lineasDetalle, margin + anchoLblDetalle, y);
     y += lineasDetalle.length * 3.5 + 3;
 
     doc.line(margin, y, pageWidth - margin, y);
@@ -521,15 +582,38 @@ export default function GuiasCorreos() {
     const toastId = toastHOT.loading("Generando guía oficial en Correos CR...");
 
     try {
+      // Obtener los nombres reales de Provincia, Cantón, Distrito y Sucursal para armar la dirección idéntica a Correos CR
+      const provObj = provincias.find(p => String(p.codigo) === String(form.provincia));
+      const cantObj = cantones.find(c => String(c.codigo) === String(form.canton));
+      const distObj = distritos.find(d => String(d.codigo) === String(form.distrito));
+      const sucObj = sucursales.find(s => String(s.codigo) === String(form.codigoSucursal));
+
+      const provNombre = provObj ? provObj.nombre.trim() : "";
+      const cantNombre = cantObj ? cantObj.nombre.trim() : "";
+      const distNombre = distObj ? distObj.nombre.trim() : "";
+      const sucNombre = sucObj ? sucObj.nombre.trim() : "";
+
+      const prefijoGeografico = [provNombre, cantNombre, distNombre].filter(Boolean).join(", ");
+
+      // Formato exacto: "Alajuela, Grecia, Grecia, Sucursal 4100: Grecia" o "Alajuela, Grecia, Grecia, Señas..."
+      const direccionCompletaOficial = form.tipoEnvio === "SUC"
+        ? `${prefijoGeografico}, Sucursal ${form.codigoSucursal}: ${sucNombre}`
+        : `${prefijoGeografico}, ${form.direccion.trim()}`;
+
+      const fechaYyyyMmDd = new Date().toISOString().split('T')[0];
+      const fechaActualStr = new Date().toLocaleDateString('es-CR');
+
       const payload = {
         destNombre: form.nombre.trim(),
-        destDireccion: form.tipoEnvio === "DOM" ? form.direccion.trim() : "Retiro en sucursal",
+        destDireccion: direccionCompletaOficial,
         destTelefono: form.telefono,
         destZip: form.codigoPostal || "10101",
         peso: 500, 
         observaciones: form.detalleEnvio.trim(),
         tipoDestino: form.tipoEnvio,
-        codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : ""
+        codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : "",
+        fechaYyyyMmDd,
+        fechaFormateada: fechaActualStr
       };
 
       const res = await fetch(`${API_BASE}/api/correos/generar-guia`, {
@@ -544,26 +628,25 @@ export default function GuiasCorreos() {
         toastHOT.success("¡Guía generada con éxito!", { id: toastId });
         
         const numeroGuia = data.datos?.enviold || data.datos?.envioId || "PY086032498CR";
-        const fechaActualStr = new Date().toLocaleDateString();
 
-        const nuevaGuiaItem = {
+        const nuevaGuiaItem = data.guiaGuardada || {
           idUnico: Date.now() + Math.random(),
           enviold: numeroGuia,
-          nombre: form.nombre,
+          nombre: form.nombre.trim(),
           telefono: form.telefono,
           tipoEnvio: form.tipoEnvio === "DOM" ? "Domicilio" : "Sucursal",
-          direccion: form.tipoEnvio === "DOM" ? form.direccion : "Retiro en sucursal",
-          detalleEnvio: form.detalleEnvio,
+          direccion: direccionCompletaOficial,
+          detalleEnvio: form.detalleEnvio.trim(),
           codigoPostal: form.codigoPostal,
           codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : "",
-          fechaYyyyMmDd: new Date().toISOString().split('T')[0],
+          fechaYyyyMmDd,
           fechaFormateada: fechaActualStr
         };
 
         // Generar y descargar el PDF con formato oficial y código de barras
         generarPdfOficialCorreos(nuevaGuiaItem);
 
-        setHistorialGuias(prev => [nuevaGuiaItem, ...prev]);
+        setHistorialGuias(prev => [nuevaGuiaItem, ...prev.filter(g => g.enviold !== nuevaGuiaItem.enviold)]);
         setFechaFiltro(nuevaGuiaItem.fechaYyyyMmDd);
         setPaginaActual(1);
         
@@ -592,21 +675,36 @@ export default function GuiasCorreos() {
     toastHOT.success(`Reimprimiendo guía ${guiaItem.enviold}`);
   };
 
-  // Eliminar una guía individual
-  const handleEliminarGuia = (guiaEliminar) => {
+  // Eliminar una guía individual (en Backend + Estado local)
+  const handleEliminarGuia = async (guiaEliminar) => {
+    const idBorrar = guiaEliminar._id || guiaEliminar.enviold;
     setHistorialGuias(prev => prev.filter(item => 
-      (item.idUnico && guiaEliminar.idUnico) 
-        ? item.idUnico !== guiaEliminar.idUnico 
+      (item._id && guiaEliminar._id) 
+        ? item._id !== guiaEliminar._id 
         : item.enviold !== guiaEliminar.enviold
     ));
+    try {
+      await fetch(`${API_BASE}/api/correos/historial/${encodeURIComponent(idBorrar)}`, {
+        method: "DELETE"
+      });
+    } catch (e) {
+      console.error("Error eliminando guía en servidor:", e);
+    }
     toastHOT.success(`Guía ${guiaEliminar.enviold} eliminada del historial`);
   };
 
-  // Vaciar todas las guías de la fecha seleccionada
-  const handleVaciarDia = () => {
+  // Vaciar todas las guías de la fecha seleccionada (en Backend + Estado local)
+  const handleVaciarDia = async () => {
     if (!window.confirm(`¿Estás seguro de borrar todas las guías del día ${fechaFiltro}?`)) return;
     setHistorialGuias(prev => prev.filter(item => item.fechaYyyyMmDd !== fechaFiltro));
     setPaginaActual(1);
+    try {
+      await fetch(`${API_BASE}/api/correos/historial/dia/${encodeURIComponent(fechaFiltro)}`, {
+        method: "DELETE"
+      });
+    } catch (e) {
+      console.error("Error vaciando día en servidor:", e);
+    }
     toastHOT.success("Se vaciaron las guías del día seleccionado.");
   };
 
@@ -993,7 +1091,7 @@ export default function GuiasCorreos() {
                 </thead>
                 <tbody>
                   {guiasPaginadas.map((item, index) => (
-                    <tr key={item.idUnico || index} className="border-b border-gray-100 hover:bg-gray-50/60">
+                    <tr key={item._id || item.idUnico || index} className="border-b border-gray-100 hover:bg-gray-50/60">
                       <td className="p-3 font-bold text-[#0f2d5c]">{item.enviold}</td>
                       <td className="p-3 font-semibold">{item.nombre}</td>
                       <td className="p-3 text-gray-600">{item.telefono}</td>

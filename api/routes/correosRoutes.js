@@ -1,10 +1,29 @@
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
 const router = express.Router();
+
+// ==========================================
+// 📦 MODELO MONGODB PARA HISTORIAL GLOBAL DE GUÍAS CORREOS
+// ==========================================
+const GuiaCorreosSchema = new mongoose.Schema({
+  enviold: { type: String, required: true },
+  nombre: { type: String, required: true },
+  telefono: { type: String, required: true },
+  tipoEnvio: { type: String, default: "Domicilio" },
+  direccion: { type: String, default: "" },
+  detalleEnvio: { type: String, default: "" },
+  codigoPostal: { type: String, default: "" },
+  codigoSucursal: { type: String, default: "" },
+  fechaYyyyMmDd: { type: String, required: true },
+  fechaFormateada: { type: String, required: true }
+}, { timestamps: true });
+
+const GuiaCorreos = mongoose.models.GuiaCorreos || mongoose.model('GuiaCorreos', GuiaCorreosSchema);
 
 // Variables de entorno de Correos CR (Producción)
 const CCR_API_URL = process.env.CCR_API_URL;
@@ -19,15 +38,13 @@ const CCR_CODIGO_SERVICIO = process.env.CCR_CODIGO_SERVICIO;
 let cachedToken = null;
 let tokenExpirationTime = 0;
 
-// Guardamos provincias, cantones, distritos y sucursales en memoria RAM
 const catalogosCache = {
   provincias: null,
-  cantones: new Map(),   // llave: idProvincia
-  distritos: new Map(),  // llave: `${idProvincia}-${idCanton}`
-  sucursales: new Map()  // llave: `${idProvincia}-${idCanton}`
+  cantones: new Map(),
+  distritos: new Map(),
+  sucursales: new Map()
 };
 
-// Función auxiliar para limpiar la URL base y evitar dobles barras
 function getBaseUrl() {
   if (!CCR_API_URL) return '';
   return CCR_API_URL.endsWith('/') ? CCR_API_URL.slice(0, -1) : CCR_API_URL;
@@ -39,7 +56,6 @@ function getBaseUrl() {
 async function obtenerTokenCCR(forzarNuevo = false) {
   const ahora = Date.now();
 
-  // Si ya tenemos un token válido en memoria, lo devolvemos en 0ms sin ir a Correos CR
   if (!forzarNuevo && cachedToken && ahora < tokenExpirationTime) {
     return cachedToken;
   }
@@ -69,7 +85,6 @@ async function obtenerTokenCCR(forzarNuevo = false) {
 
     if (token) {
       cachedToken = token;
-      // Guardamos el token por 12 minutos (720,000 ms)
       tokenExpirationTime = ahora + 12 * 60 * 1000;
       return cachedToken;
     }
@@ -85,7 +100,6 @@ async function obtenerTokenCCR(forzarNuevo = false) {
   }
 }
 
-// Función auxiliar que reintenta automáticamente si el token de Correos expiró antes de tiempo
 async function peticionConTokenCCR(configFn) {
   try {
     const token = await obtenerTokenCCR(false);
@@ -115,10 +129,8 @@ router.get('/test-auth', async (req, res) => {
 // ==========================================
 // 3. CATÁLOGOS GEOGRÁFICOS Y SUCURSALES (CON CACHÉ)
 // ==========================================
-
 router.get('/provincias', async (req, res) => {
   try {
-    // Si ya están en memoria, responde instantáneamente (0ms)
     if (catalogosCache.provincias) {
       return res.json(catalogosCache.provincias);
     }
@@ -220,14 +232,15 @@ router.get('/sucursales/:idProvincia/:idCanton', async (req, res) => {
 });
 
 // ==========================================
-// 4. GENERAR GUÍA DE ENVÍO
+// 4. GENERAR GUÍA DE ENVÍO Y GUARDAR EN MONGODB
 // ==========================================
 router.post('/generar-guia', async (req, res) => {
   try {
     const baseUrl = getBaseUrl();
     const { 
       destNombre, destDireccion, destTelefono, destZip, 
-      peso, observaciones, montoFlete = 1800, tipoDestino = "DOM", codigoSucursal = "" 
+      peso, observaciones, montoFlete = 1800, tipoDestino = "DOM", codigoSucursal = "",
+      fechaYyyyMmDd, fechaFormateada
     } = req.body;
 
     const fechaActual = new Date().toISOString();
@@ -265,7 +278,30 @@ router.post('/generar-guia', async (req, res) => {
     );
 
     if (response.data && response.data.exito) {
-      res.json(response.data);
+      const numeroGuia = response.data.datos?.enviold || response.data.datos?.envioId || "PY086032498CR";
+      
+      let guiaGuardada = null;
+      try {
+        guiaGuardada = await GuiaCorreos.create({
+          enviold: numeroGuia,
+          nombre: destNombre,
+          telefono: destTelefono,
+          tipoEnvio: tipoDestino === "DOM" ? "Domicilio" : "Sucursal",
+          direccion: destDireccion || "",
+          detalleEnvio: observaciones || "Paquete",
+          codigoPostal: destZip || "",
+          codigoSucursal: tipoDestino === "SUC" ? codigoSucursal : "",
+          fechaYyyyMmDd: fechaYyyyMmDd || new Date().toISOString().split('T')[0],
+          fechaFormateada: fechaFormateada || new Date().toLocaleDateString('es-CR')
+        });
+      } catch (dbErr) {
+        console.error("Aviso: Guía creada en Correos pero error al guardar en Mongo:", dbErr.message);
+      }
+
+      res.json({
+        ...response.data,
+        guiaGuardada
+      });
     } else {
       res.status(400).json(response.data);
     }
@@ -277,6 +313,43 @@ router.post('/generar-guia', async (req, res) => {
       mensaje: "Error al generar guía en Correos CR",
       detalle: error?.response?.data || error.message 
     });
+  }
+});
+
+// ==========================================
+// 5. ENDPOINTS DE HISTORIAL GLOBAL EN MONGODB
+// ==========================================
+router.get('/historial', async (req, res) => {
+  try {
+    const guias = await GuiaCorreos.find().sort({ createdAt: -1 }).limit(1000);
+    res.json({ exito: true, datos: guias });
+  } catch (error) {
+    console.error("Error obteniendo historial:", error.message);
+    res.status(500).json({ exito: false, mensaje: "Error al obtener historial" });
+  }
+});
+
+router.delete('/historial/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      await GuiaCorreos.findByIdAndDelete(id);
+    } else {
+      await GuiaCorreos.deleteOne({ enviold: id });
+    }
+    res.json({ exito: true, mensaje: "Guía eliminada" });
+  } catch (error) {
+    res.status(500).json({ exito: false, mensaje: "Error al eliminar guía" });
+  }
+});
+
+router.delete('/historial/dia/:fecha', async (req, res) => {
+  try {
+    const { fecha } = req.params;
+    await GuiaCorreos.deleteMany({ fechaYyyyMmDd: fecha });
+    res.json({ exito: true, mensaje: "Guías del día eliminadas" });
+  } catch (error) {
+    res.status(500).json({ exito: false, mensaje: "Error al vaciar el día" });
   }
 });
 
