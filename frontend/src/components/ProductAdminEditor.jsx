@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes, FaStore, FaWarehouse, FaBoxOpen } from "react-icons/fa";
+import { FaTimes, FaStore, FaWarehouse, FaBoxOpen, FaPlus } from "react-icons/fa";
 
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
@@ -52,22 +52,24 @@ export default function ProductAdminEditor({
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
   const [editedIsTemporada2627, setEditedIsTemporada2627] = useState(product?.isTemporada2627 || false);
   
-  // 🔥 ESTADOS DE DORSALES, CANTIDAD Y TIPOGRAFÍA 🔥
+  // 🔥 ESTADOS DE DORSALES DINÁMICOS 🔥
   const [editedIsNumerable, setEditedIsNumerable] = useState(product?.isNumerable || false);
   const [editedTeamFont, setEditedTeamFont] = useState(product?.teamFont || "barca");
-  const [editedDorsalOptions, setEditedDorsalOptions] = useState(
-    Array.isArray(product?.dorsalOptions) && product.dorsalOptions.length > 0
-      ? [
-          product.dorsalOptions[0] || { name: "", number: "", quantity: "", imageUrl: "" },
-          product.dorsalOptions[1] || { name: "", number: "", quantity: "", imageUrl: "" },
-          product.dorsalOptions[2] || { name: "", number: "", quantity: "", imageUrl: "" }
-        ]
-      : [
-          { name: "", number: "", quantity: "", imageUrl: "" },
-          { name: "", number: "", quantity: "", imageUrl: "" },
-          { name: "", number: "", quantity: "", imageUrl: "" }
-        ]
-  );
+  const [editedDorsalOptions, setEditedDorsalOptions] = useState(() => {
+    if (Array.isArray(product?.dorsalOptions) && product.dorsalOptions.length > 0) {
+      return product.dorsalOptions.map((opt) => ({
+        name: opt?.name || "",
+        number: opt?.number || "",
+        quantity: opt?.quantity ?? "",
+        imageUrl: opt?.imageUrl || "",
+      }));
+    }
+    return [
+      { name: "", number: "", quantity: "", imageUrl: "" },
+      { name: "", number: "", quantity: "", imageUrl: "" },
+      { name: "", number: "", quantity: "", imageUrl: "" },
+    ];
+  });
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
@@ -127,6 +129,22 @@ export default function ProductAdminEditor({
       const newOpts = [...prev];
       newOpts[index] = { ...newOpts[index], [field]: value };
       return newOpts;
+    });
+  };
+
+  const handleAddDorsalRow = () => {
+    setEditedDorsalOptions(prev => [
+      ...prev,
+      { name: "", number: "", quantity: "", imageUrl: "" }
+    ]);
+  };
+
+  const handleRemoveDorsalRow = (index) => {
+    setEditedDorsalOptions(prev => {
+      if (prev.length <= 1) {
+        return [{ name: "", number: "", quantity: "", imageUrl: "" }];
+      }
+      return prev.filter((_, i) => i !== index);
     });
   };
 
@@ -200,7 +218,6 @@ export default function ProductAdminEditor({
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
         
-        // 🔥 ENVIAR DATOS DE DORSALES Y TIPOGRAFÍA 🔥
         isNumerable: editedIsNumerable,
         teamFont: editedIsNumerable ? editedTeamFont : 'barca',
         dorsalOptions: editedIsNumerable ? editedDorsalOptions : [],
@@ -249,7 +266,6 @@ export default function ProductAdminEditor({
       setLoading(false);
     }
   };
-
 
   const handleDelete = async () => {
     if (loading) return;
@@ -413,7 +429,6 @@ export default function ProductAdminEditor({
             <p className="text-xs text-black font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
             <div className="flex flex-col gap-4">
               
-              {/* 🔒 SOLO EL SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
               {Boolean(user?.isSuperUser) && (
                 <label className="flex items-center gap-4 cursor-pointer group">
                   <div className="relative flex items-center">
@@ -452,7 +467,6 @@ export default function ProductAdminEditor({
                 </div>
               </label>
 
-              {/* 🔥 CHECK INTERRUPTOR PARA PERSONALIZAR DORSALES (SOLO SUPER ADMIN) 🔥 */}
               {Boolean(user?.isSuperUser) && (
                 <label className="flex items-center gap-4 cursor-pointer group border-t border-gray-200 pt-4 mt-2">
                   <div className="relative flex items-center">
@@ -467,7 +481,6 @@ export default function ProductAdminEditor({
                 </label>
               )}
 
-              {/* 🔥 SELECTOR DE TIPOGRAFÍA (SOLO VISIBLE SI SE ACTIVA DORSALES) 🔥 */}
               {Boolean(user?.isSuperUser) && editedIsNumerable && (
                 <div className="animate-fade-in-up mt-2">
                   <label className="block text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">Tipografía Oficial</label>
@@ -484,41 +497,63 @@ export default function ProductAdminEditor({
             </div>
           </div>
 
-          {/* 🔥 CAJITAS BLANCAS DE DORSALES (CON CANTIDAD AÑADIDA) 🔥 */}
+          {/* 🔥 CONTENEDOR CON SCROLL HORIZONTAL CON FLECHAS Y UN SOLO BOTÓN ARRIBA 🔥 */}
           {Boolean(user?.isSuperUser) && editedIsNumerable && (
             <div className="bg-white border-2 border-blue-100 p-5 rounded-3xl mb-8 shadow-sm">
-               <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 text-center">
-                 Dorsales Disponibles en Imprenta
-               </label>
-               <div className="space-y-3">
-                 {editedDorsalOptions.map((opt, i) => (
-                    <div key={`dorsal-${i}`} className="flex gap-2">
-                       <input
-                         type="text"
-                         placeholder="Jugador (Ej. RODRI)"
-                         value={opt.name}
-                         onChange={(e) => handleDorsalChange(i, 'name', e.target.value)}
-                         className="w-1/2 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 uppercase focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                       <input
-                         type="text"
-                         placeholder="N°"
-                         value={opt.number}
-                         onChange={(e) => handleDorsalChange(i, 'number', e.target.value)}
-                         className="w-1/4 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                       <input
-                         type="number"
-                         min="0"
-                         placeholder="Cant."
-                         value={opt.quantity}
-                         onChange={(e) => handleDorsalChange(i, 'quantity', e.target.value)}
-                         title="Cantidad de este dorsal disponible"
-                         className="w-1/4 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                    </div>
-                 ))}
+               <div className="flex items-center justify-between mb-4">
+                 <label className="text-xs font-bold text-blue-600 uppercase tracking-widest">
+                   Dorsales Disponibles ({editedDorsalOptions.length})
+                 </label>
+                 <button
+                   type="button"
+                   onClick={handleAddDorsalRow}
+                   className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer"
+                 >
+                   <FaPlus size={10} /> Agregar Nombre
+                 </button>
                </div>
+
+               {/* Contenedor con scroll horizontal garantizado */}
+               <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1 pb-2 scrollbar-thin scrollbar-thumb-blue-200" tabIndex={0}>
+                 <div className="min-w-[340px] space-y-3">
+                   {editedDorsalOptions.map((opt, i) => (
+                      <div key={`dorsal-${i}`} className="flex items-center gap-2">
+                         <input
+                           type="text"
+                           placeholder="Jugador (Ej. PEDRI)"
+                           value={opt.name}
+                           onChange={(e) => handleDorsalChange(i, 'name', e.target.value)}
+                           className="w-[46%] min-w-[140px] bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 uppercase focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                         />
+                         <input
+                           type="text"
+                           placeholder="N°"
+                           value={opt.number}
+                           onChange={(e) => handleDorsalChange(i, 'number', e.target.value)}
+                           className="w-[22%] min-w-[65px] bg-gray-50 border border-blue-100 rounded-xl px-2 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                         />
+                         <input
+                           type="number"
+                           min="0"
+                           placeholder="Cant."
+                           value={opt.quantity}
+                           onChange={(e) => handleDorsalChange(i, 'quantity', e.target.value)}
+                           title="Cantidad de este dorsal disponible"
+                           className="w-[22%] min-w-[65px] bg-gray-50 border border-blue-100 rounded-xl px-2 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                         />
+                         <button
+                           type="button"
+                           onClick={() => handleRemoveDorsalRow(i)}
+                           title="Quitar fila"
+                           className="w-[10%] min-w-[36px] h-11 flex items-center justify-center rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                         >
+                           <FaTimes size={12} />
+                         </button>
+                      </div>
+                   ))}
+                 </div>
+               </div>
+
                <p className="text-[10px] text-blue-400 font-medium leading-tight mt-3 text-center">
                  Controla el inventario de las impresiones. Si la cantidad llega a 0, dejará de ofrecerse a los clientes.
                </p>
