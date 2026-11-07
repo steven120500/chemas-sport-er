@@ -15,7 +15,8 @@ const upload = multer({ storage });
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
-const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
+const KEYCHAIN_SIZES = ['U'];
+const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES, ...KEYCHAIN_SIZES]);
 
 function whoDidIt(req) {
   return req.user?.name ||
@@ -58,6 +59,13 @@ function diffProduct(prev, next) {
     changes.push(`Temporada 26-27: ${prevTemp ? 'Sí' : 'No'} → ${nextTemp ? 'Sí' : 'No'}`);
   }
 
+  const prevNum = Boolean(prev.isNumerable);
+  const nextNum = Boolean(next.isNumerable);
+
+  if (prevNum !== nextNum) {
+    changes.push(`Numerable: ${prevNum ? 'Sí' : 'No'} → ${nextNum ? 'Sí' : 'No'}`);
+  }
+
   // Los 3 espacios con sus nuevos nombres para el historial
   changes.push(...diffInv('Tienda', prev.tienda, next.tienda));
   changes.push(...diffInv('Bodega 1', prev.stock, next.stock));
@@ -84,6 +92,40 @@ function sanitizeInv(obj) {
     clean[String(size).trim()] = n;
   }
   return clean;
+}
+
+// Helper para procesar y limpiar las opciones de dorsal (y subir imagen a Cloudinary si viene en base64)
+async function processDorsalOptions(rawOptions) {
+  let list = rawOptions;
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list); } catch { list = []; }
+  }
+  if (!Array.isArray(list)) return [];
+
+  const processed = await Promise.all(
+    list.map(async (item) => {
+      if (!item || typeof item !== 'object') return null;
+      const name = String(item.name || '').trim();
+      const number = String(item.number || '').trim();
+      let imageUrl = String(item.imageUrl || '').trim();
+
+      // Si no tiene ni nombre ni número, ignoramos la cajita vacía
+      if (!name && !number) return null;
+
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        try {
+          const up = await cloudinary.uploader.upload(imageUrl, { folder: 'products/dorsales', resource_type: 'image' });
+          imageUrl = up.secure_url;
+        } catch (err) {
+          console.error("Error subiendo imagen de dorsal a Cloudinary:", err);
+        }
+      }
+
+      return { name, number, imageUrl };
+    })
+  );
+
+  return processed.filter(Boolean);
 }
 
 /* ========================= Crear Producto ========================= */
@@ -124,6 +166,9 @@ router.post('/', upload.any(), async (req, res) => {
     } catch { bodega = {}; }
     const cleanBodega = sanitizeInv(bodega);
 
+    const isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
+    const dorsalOptions = isNumerable ? await processDorsalOptions(req.body.dorsalOptions) : [];
+
     const product = await Product.create({
       name: String(req.body.name || '').trim(),
       price: Number(req.body.price),
@@ -137,7 +182,9 @@ router.post('/', upload.any(), async (req, res) => {
       imageSrc2,
       hidden: req.body.hidden === 'true' || req.body.hidden === true,
       isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
-      isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true
+      isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true,
+      isNumerable,
+      dorsalOptions
     });
 
     await History.create({
@@ -275,6 +322,14 @@ router.put('/:id', async (req, res) => {
     if (req.body.hidden !== undefined) update.hidden = req.body.hidden === 'true' || req.body.hidden === true;
     if (req.body.isMundial2026 !== undefined) update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     if (req.body.isTemporada2627 !== undefined) update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
+
+    // Actualizar campos de numeración/dorsales si se envían en la petición
+    if (req.body.isNumerable !== undefined) {
+      update.isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
+    }
+    if (req.body.dorsalOptions !== undefined) {
+      update.dorsalOptions = await processDorsalOptions(req.body.dorsalOptions);
+    }
 
     let incomingImages = req.body.images;
     if (typeof incomingImages === 'string') {
@@ -500,17 +555,17 @@ router.get('/', async (req, res) => {
 
     if (!canSeeHidden) find.hidden = { $ne: true };
 
-    if (q) find.name = { $regex: q,$options: 'i' };
+    if (q) find.name = { $regex: q, $options: 'i' };
 
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
-      find.$expr = {$lt: ['$discountPrice', '$price'] };
+      find.$expr = { $lt: ['$discountPrice', '$price'] };
     } else if (type === 'Populares') {
       find.isPopular = true;
     } else if (type === 'Mundial 2026') {
       find.isMundial2026 = true;
     } else if (type === 'Temp 26-27' || type === 'Temporada 26-27') {
-      find.$or = [{ isTemporada2627: true }, { type: { $regex: '26-27',$options: 'i' } }];
+      find.$or = [{ isTemporada2627: true }, { type: { $regex: '26-27', $options: 'i' } }];
     } else if (type) {
       find.type = type;
     }
@@ -535,7 +590,7 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 lockedBy';
+    const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 isNumerable dorsalOptions lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([

@@ -6,8 +6,8 @@ import mongoose from "mongoose";
 const ADULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 const KID_SIZES   = ['16', '18', '20', '22', '24', '26', '28'];
 const BALL_SIZES  = ['3', '4', '5']; 
-const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES]);
-Llaveros: ["U"]
+const KEYCHAIN_SIZES = ['U'];
+const ALL_SIZES   = new Set([...ADULT_SIZES, ...KID_SIZES, ...BALL_SIZES, ...KEYCHAIN_SIZES]);
 
 /* =========================
    VALIDADORES
@@ -15,7 +15,7 @@ Llaveros: ["U"]
 
 const imageAnyValidator = {
   validator(v) {
-    if (v == null) return true;
+    if (v == null || v === '') return true;
     if (typeof v !== 'string') return false;
 
     const isData = /^data:image\/(png|jpe?g|webp|heic|heif);base64,/i.test(v);
@@ -50,6 +50,18 @@ const ImageSchema = new mongoose.Schema(
 );
 
 /* =========================
+   SUB-ESQUEMA DE OPCIONES DE DORSAL (NUMERACIÓN)
+   ========================= */
+const DorsalOptionSchema = new mongoose.Schema(
+  {
+    name:     { type: String, trim: true, default: "" },
+    number:   { type: String, trim: true, default: "" },
+    imageUrl: { type: String, trim: true, default: "" }
+  },
+  { _id: false }
+);
+
+/* =========================
    SCHEMA PRINCIPAL
    ========================= */
 const productSchema = new mongoose.Schema(
@@ -63,7 +75,7 @@ const productSchema = new mongoose.Schema(
     images: { type: [ImageSchema], default: [] },
 
     // 🔥 LAS 3 UBICACIONES DE INVENTARIO 🔥
-    tienda: { type: Object, default: {}, validate: stockValidator }, // <-- NUEVO ESPACIO AÑADIDO
+    tienda: { type: Object, default: {}, validate: stockValidator },
     stock: { type: Object, required: true, default: {}, validate: stockValidator },
     bodega: { type: Object, default: {}, validate: stockValidator },
 
@@ -111,6 +123,19 @@ const productSchema = new mongoose.Schema(
     isTemporada2627: {
       type: Boolean,
       default: false
+    },
+
+    /* =========================
+       🔥 NUEVOS CAMPOS PARA PERSONALIZACIÓN DE DORSALES (NUMERABLE) 🔥
+       ========================= */
+    isNumerable: {
+      type: Boolean,
+      default: false
+    },
+
+    dorsalOptions: {
+      type: [DorsalOptionSchema],
+      default: []
     },
 
     /* =========================
