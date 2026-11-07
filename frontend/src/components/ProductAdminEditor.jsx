@@ -47,9 +47,26 @@ export default function ProductAdminEditor({
   const [editedPrice, setEditedPrice] = useState(product?.price ?? 0);
   const [editedDiscountPrice, setEditedDiscountPrice] = useState(product?.discountPrice ?? 0);
   const [editedType, setEditedType] = useState(product?.type || "Player");
+  
   const [editedHidden, setEditedHidden] = useState(product?.hidden || false);
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
   const [editedIsTemporada2627, setEditedIsTemporada2627] = useState(product?.isTemporada2627 || false);
+  
+  // 🔥 ESTADOS DE DORSALES CON LA CANTIDAD AÑADIDA 🔥
+  const [editedIsNumerable, setEditedIsNumerable] = useState(product?.isNumerable || false);
+  const [editedDorsalOptions, setEditedDorsalOptions] = useState(
+    Array.isArray(product?.dorsalOptions) && product.dorsalOptions.length > 0
+      ? [
+          product.dorsalOptions[0] || { name: "", number: "", quantity: "", imageUrl: "" },
+          product.dorsalOptions[1] || { name: "", number: "", quantity: "", imageUrl: "" },
+          product.dorsalOptions[2] || { name: "", number: "", quantity: "", imageUrl: "" }
+        ]
+      : [
+          { name: "", number: "", quantity: "", imageUrl: "" },
+          { name: "", number: "", quantity: "", imageUrl: "" },
+          { name: "", number: "", quantity: "", imageUrl: "" }
+        ]
+  );
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
@@ -101,6 +118,15 @@ export default function ProductAdminEditor({
       const copy = prev.slice();
       copy.splice(index, 1);
       return copy;
+    });
+  };
+
+  // 🔥 Manejador de las cajitas de dorsales
+  const handleDorsalChange = (index, field, value) => {
+    setEditedDorsalOptions(prev => {
+      const newOpts = [...prev];
+      newOpts[index] = { ...newOpts[index], [field]: value };
+      return newOpts;
     });
   };
 
@@ -173,6 +199,11 @@ export default function ProductAdminEditor({
         hidden: Boolean(user?.isSuperUser) ? editedHidden : (product?.hidden || false), 
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
+        
+        // 🔥 ENVIAR DATOS DE DORSALES
+        isNumerable: editedIsNumerable,
+        dorsalOptions: editedIsNumerable ? editedDorsalOptions : [],
+
         customerName: finalCustomer,
         sellerName: displayName,
         user: displayName,
@@ -217,7 +248,6 @@ export default function ProductAdminEditor({
       setLoading(false);
     }
   };
-
 
   const handleDelete = async () => {
     if (loading) return;
@@ -377,11 +407,10 @@ export default function ProductAdminEditor({
             </div>
           </div>
 
-          <div className="mb-8 p-5 rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="mb-8 p-5 rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
             <p className="text-xs text-black font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
             <div className="flex flex-col gap-4">
               
-              {/* 🔒 SOLO EL SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
               {Boolean(user?.isSuperUser) && (
                 <label className="flex items-center gap-4 cursor-pointer group">
                   <div className="relative flex items-center">
@@ -419,8 +448,64 @@ export default function ProductAdminEditor({
                   <span className="text-xs text-gray-500 font-medium">Muestra el sello circular vintage en la chema.</span>
                 </div>
               </label>
+
+              {/* 🔥 CHECK INTERRUPTOR PARA PERSONALIZAR DORSALES (SOLO SUPER ADMIN) 🔥 */}
+              {Boolean(user?.isSuperUser) && (
+                <label className="flex items-center gap-4 cursor-pointer group border-t border-gray-200 pt-4 mt-2">
+                  <div className="relative flex items-center">
+                    <input type="checkbox" checked={editedIsNumerable} onChange={(e) => setEditedIsNumerable(e.target.checked)} className="sr-only" />
+                    <div className={`w-11 h-6 rounded-full transition-colors ${editedIsNumerable ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${editedIsNumerable ? 'transform translate-x-5' : ''}`}></div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-black text-blue-700">Habilitar Dorsales</span>
+                    <span className="text-xs text-gray-500 font-medium">Permite elegir nombres y números (Rodri 16).</span>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
+
+          {/* 🔥 CAJITAS BLANCAS DE DORSALES (CON CANTIDAD AÑADIDA) 🔥 */}
+          {Boolean(user?.isSuperUser) && editedIsNumerable && (
+            <div className="bg-white border-2 border-blue-100 p-5 rounded-3xl mb-8 shadow-sm">
+               <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 text-center">
+                 Dorsales Disponibles en Imprenta
+               </label>
+               <div className="space-y-3">
+                 {editedDorsalOptions.map((opt, i) => (
+                    <div key={`dorsal-${i}`} className="flex gap-2">
+                       <input
+                         type="text"
+                         placeholder="Jugador (Ej. RODRI)"
+                         value={opt.name}
+                         onChange={(e) => handleDorsalChange(i, 'name', e.target.value)}
+                         className="w-1/2 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 uppercase focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                       <input
+                         type="text"
+                         placeholder="N°"
+                         value={opt.number}
+                         onChange={(e) => handleDorsalChange(i, 'number', e.target.value)}
+                         className="w-1/4 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                       <input
+                         type="number"
+                         min="0"
+                         placeholder="Cant."
+                         value={opt.quantity}
+                         onChange={(e) => handleDorsalChange(i, 'quantity', e.target.value)}
+                         title="Cantidad de este dorsal disponible"
+                         className="w-1/4 bg-gray-50 border border-blue-100 rounded-xl px-3 py-3 text-sm font-black text-blue-900 text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                    </div>
+                 ))}
+               </div>
+               <p className="text-[10px] text-blue-400 font-medium leading-tight mt-3 text-center">
+                 Controla el inventario de las impresiones. Si la cantidad llega a 0, dejará de ofrecerse a los clientes.
+               </p>
+            </div>
+          )}
 
           <div className="mt-auto flex flex-col gap-3">
             <button
@@ -483,7 +568,6 @@ export default function ProductAdminEditor({
             
             {!confirmCommission ? (
               <>
-                {/* PASO 1: OBTENER EL NOMBRE */}
                 <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-md text-2xl">👤</div>
                 <h3 className="text-xl font-black text-black mb-1">¿Quién compró esta camiseta?</h3>
                 <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
@@ -530,7 +614,6 @@ export default function ProductAdminEditor({
               </>
             ) : (
               <>
-                {/* PASO 2: CONFIRMAR LA COMISIÓN */}
                 <h3 className="text-xl font-black text-black mb-2">Confirmar Comisión</h3>
                 <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">¿Seguro que hiciste una venta o un cambio?</p>
                 

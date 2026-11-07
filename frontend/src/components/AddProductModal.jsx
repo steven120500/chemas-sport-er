@@ -89,6 +89,14 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [isMundial2026, setIsMundial2026] = useState(false); 
   const [isTemporada2627, setIsTemporada2627] = useState(false);
 
+  // 🔥 NUEVO: ESTADOS DE PERSONALIZACIÓN Y DORSALES (AHORA CON QUANTITY) 🔥
+  const [isNumerable, setIsNumerable] = useState(false);
+  const [dorsalOptions, setDorsalOptions] = useState([
+    { name: "", number: "", quantity: "", imageUrl: "" },
+    { name: "", number: "", quantity: "", imageUrl: "" },
+    { name: "", number: "", quantity: "", imageUrl: "" }
+  ]);
+
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -169,6 +177,15 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     setVisibleInv((prev) => ({ ...prev, [size]: n }));
   };
 
+  // 🔥 Manejador de las cajitas de los Dorsales
+  const handleDorsalChange = (index, field, value) => {
+    setDorsalOptions(prev => {
+      const newOpts = [...prev];
+      newOpts[index] = { ...newOpts[index], [field]: value };
+      return newOpts;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -200,6 +217,12 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("hidden", isSuperAdmin && hidden ? "true" : "false"); 
       formData.append("isMundial2026", isMundial2026 ? "true" : "false");
       formData.append("isTemporada2627", isTemporada2627 ? "true" : "false");
+
+      // 🔥 ENVIAR LOS DATOS DE PERSONALIZACIÓN Y DORSALES AL BACKEND 🔥
+      formData.append("isNumerable", isNumerable ? "true" : "false");
+      if (isNumerable) {
+        formData.append("dorsalOptions", JSON.stringify(dorsalOptions));
+      }
 
       // 🔥 ENVIAMOS LAS 3 UBICACIONES AL BACKEND 🔥
       formData.append("tienda", JSON.stringify(tienda));
@@ -321,7 +344,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
               <input
                 type="text"
-                placeholder="Ej. Llavero Real Madrid"
+                placeholder="Ej. Camiseta Deportiva Lisa"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
@@ -358,7 +381,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                 onChange={(e) => setType(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
               >
-                {/* 🔥 AGREGADO "Llaveros" EN EL SELECT 🔥 */}
                 {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"] }).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -432,7 +454,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             </div>
           </div>
 
-          {/* OPCIONES EXTRAS */}
+          {/* OPCIONES EXTRAS DEL SISTEMA */}
           <div className="bg-gray-50/80 p-5 rounded-2xl border border-gray-100 mb-6">
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
               Opciones del Sistema
@@ -467,8 +489,61 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                   <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
                 </div>
               </label>
+
+              {/* 🔥 CHECK INTERRUPTOR PARA PERSONALIZAR DORSALES (SOLO SUPER ADMIN) 🔥 */}
+              {isSuperAdmin && (
+                <label className="flex items-center justify-between cursor-pointer group border-t border-gray-200 pt-4 mt-2">
+                  <span className="text-sm font-bold text-blue-800 select-none">Habilitar Dorsales (Nombres / Números)</span>
+                  <div className="relative flex items-center">
+                    <input type="checkbox" checked={isNumerable} onChange={(e) => setIsNumerable(e.target.checked)} className="sr-only" />
+                    <div className={`w-11 h-6 rounded-full transition-colors ${isNumerable ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isNumerable ? 'transform translate-x-5' : ''}`}></div>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
+
+          {/* 🔥 CAJITAS BLANCAS DE DORSALES (CON CANTIDAD AÑADIDA) 🔥 */}
+          {isSuperAdmin && isNumerable && (
+            <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl mb-6 shadow-sm">
+               <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 text-center">
+                 Dorsales Disponibles en Imprenta
+               </label>
+               <div className="space-y-3">
+                 {dorsalOptions.map((opt, i) => (
+                    <div key={`dorsal-${i}`} className="flex gap-2">
+                       <input
+                         type="text"
+                         placeholder="Jugador (Ej. RODRI)"
+                         value={opt.name}
+                         onChange={(e) => handleDorsalChange(i, 'name', e.target.value)}
+                         className="w-1/2 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 uppercase focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                       <input
+                         type="text"
+                         placeholder="N°"
+                         value={opt.number}
+                         onChange={(e) => handleDorsalChange(i, 'number', e.target.value)}
+                         className="w-1/4 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 text-center focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                       <input
+                         type="number"
+                         min="0"
+                         placeholder="Cant."
+                         value={opt.quantity}
+                         onChange={(e) => handleDorsalChange(i, 'quantity', e.target.value)}
+                         title="Cantidad de este dorsal disponible"
+                         className="w-1/4 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 text-center focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
+                       />
+                    </div>
+                 ))}
+               </div>
+               <p className="text-[10px] text-blue-500 font-medium leading-tight mt-3 text-center">
+                 Dejá los espacios vacíos si no los usás. En la tienda aparecerán solo los llenos. Si la cantidad llega a 0, dejará de ofrecerse.
+               </p>
+            </div>
+          )}
 
           {/* BOTÓN SUBMIT */}
           <button

@@ -56,6 +56,7 @@ const DorsalOptionSchema = new mongoose.Schema(
   {
     name:     { type: String, trim: true, default: "" },
     number:   { type: String, trim: true, default: "" },
+    quantity: { type: Number, default: 0 }, 
     imageUrl: { type: String, trim: true, default: "" }
   },
   { _id: false }

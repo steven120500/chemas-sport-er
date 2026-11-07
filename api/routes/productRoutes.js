@@ -107,6 +107,10 @@ async function processDorsalOptions(rawOptions) {
       if (!item || typeof item !== 'object') return null;
       const name = String(item.name || '').trim();
       const number = String(item.number || '').trim();
+      
+      // 🔥 AHORA SÍ CAPTURAMOS LA CANTIDAD 🔥
+      const quantity = Math.max(0, parseInt(item.quantity, 10) || 0);
+      
       let imageUrl = String(item.imageUrl || '').trim();
 
       // Si no tiene ni nombre ni número, ignoramos la cajita vacía
@@ -121,7 +125,7 @@ async function processDorsalOptions(rawOptions) {
         }
       }
 
-      return { name, number, imageUrl };
+      return { name, number, quantity, imageUrl };
     })
   );
 
