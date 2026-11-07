@@ -283,3 +283,31 @@ button:focus-visible {
   animation: spin-slow 10s linear infinite;
 }
 
+/* =========================================
+   FUENTES OFICIALES DE CLUBES (DORSALES)
+   ========================================= */
+
+   @font-face {
+    font-family: 'FontBarca';
+    src: url('/fonts/Barcelona Tipografia .ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  
+  @font-face {
+    font-family: 'FontMadrid';
+    src: url('/fonts/Real Madrid Tipografia.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  
+  /* Clases de utilidad listas para usar cuando las necesitemus */
+  .font-barca {
+    font-family: 'FontBarca', sans-serif;
+  }
+  
+  .font-madrid {
+    font-family: 'FontMadrid', sans-serif;
+  }

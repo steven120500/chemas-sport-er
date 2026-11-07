@@ -133,6 +133,13 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    
+    // 🔥 NUEVO CAMPO PARA SABER QUÉ TIPOGRAFÍA USAR 🔥
+    teamFont: {
+      type: String,
+      enum: ['barca', 'madrid', 'none'],
+      default: 'barca'
+    },
 
     dorsalOptions: {
       type: [DorsalOptionSchema],

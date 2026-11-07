@@ -52,8 +52,9 @@ export default function ProductAdminEditor({
   const [editedIsMundial2026, setEditedIsMundial2026] = useState(product?.isMundial2026 || false);
   const [editedIsTemporada2627, setEditedIsTemporada2627] = useState(product?.isTemporada2627 || false);
   
-  // 🔥 ESTADOS DE DORSALES CON LA CANTIDAD AÑADIDA 🔥
+  // 🔥 ESTADOS DE DORSALES, CANTIDAD Y TIPOGRAFÍA 🔥
   const [editedIsNumerable, setEditedIsNumerable] = useState(product?.isNumerable || false);
+  const [editedTeamFont, setEditedTeamFont] = useState(product?.teamFont || "barca");
   const [editedDorsalOptions, setEditedDorsalOptions] = useState(
     Array.isArray(product?.dorsalOptions) && product.dorsalOptions.length > 0
       ? [
@@ -121,7 +122,6 @@ export default function ProductAdminEditor({
     });
   };
 
-  // 🔥 Manejador de las cajitas de dorsales
   const handleDorsalChange = (index, field, value) => {
     setEditedDorsalOptions(prev => {
       const newOpts = [...prev];
@@ -200,8 +200,9 @@ export default function ProductAdminEditor({
         isMundial2026: editedIsMundial2026,
         isTemporada2627: editedIsTemporada2627, 
         
-        // 🔥 ENVIAR DATOS DE DORSALES
+        // 🔥 ENVIAR DATOS DE DORSALES Y TIPOGRAFÍA 🔥
         isNumerable: editedIsNumerable,
+        teamFont: editedIsNumerable ? editedTeamFont : 'barca',
         dorsalOptions: editedIsNumerable ? editedDorsalOptions : [],
 
         customerName: finalCustomer,
@@ -248,6 +249,7 @@ export default function ProductAdminEditor({
       setLoading(false);
     }
   };
+
 
   const handleDelete = async () => {
     if (loading) return;
@@ -411,6 +413,7 @@ export default function ProductAdminEditor({
             <p className="text-xs text-black font-bold uppercase tracking-widest mb-4">Opciones del Sistema</p>
             <div className="flex flex-col gap-4">
               
+              {/* 🔒 SOLO EL SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
               {Boolean(user?.isSuperUser) && (
                 <label className="flex items-center gap-4 cursor-pointer group">
                   <div className="relative flex items-center">
@@ -462,6 +465,21 @@ export default function ProductAdminEditor({
                     <span className="text-xs text-gray-500 font-medium">Permite elegir nombres y números (Rodri 16).</span>
                   </div>
                 </label>
+              )}
+
+              {/* 🔥 SELECTOR DE TIPOGRAFÍA (SOLO VISIBLE SI SE ACTIVA DORSALES) 🔥 */}
+              {Boolean(user?.isSuperUser) && editedIsNumerable && (
+                <div className="animate-fade-in-up mt-2">
+                  <label className="block text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">Tipografía Oficial</label>
+                  <select
+                    value={editedTeamFont}
+                    onChange={(e) => setEditedTeamFont(e.target.value)}
+                    className="w-full bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm font-bold text-blue-900 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none transition-all cursor-pointer"
+                  >
+                    <option value="barca">F.C. Barcelona (26/27)</option>
+                    <option value="madrid">Real Madrid</option>
+                  </select>
+                </div>
               )}
             </div>
           </div>

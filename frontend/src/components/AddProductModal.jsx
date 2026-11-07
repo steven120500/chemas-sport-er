@@ -89,8 +89,9 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const [isMundial2026, setIsMundial2026] = useState(false); 
   const [isTemporada2627, setIsTemporada2627] = useState(false);
 
-  // 🔥 NUEVO: ESTADOS DE PERSONALIZACIÓN Y DORSALES (AHORA CON QUANTITY) 🔥
+  // 🔥 NUEVO: ESTADOS DE PERSONALIZACIÓN Y DORSALES 🔥
   const [isNumerable, setIsNumerable] = useState(false);
+  const [teamFont, setTeamFont] = useState("barca"); // Valor por defecto
   const [dorsalOptions, setDorsalOptions] = useState([
     { name: "", number: "", quantity: "", imageUrl: "" },
     { name: "", number: "", quantity: "", imageUrl: "" },
@@ -117,7 +118,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       ...tallaPorTipo, 
       Balón: ["3", "4", "5"], 
       Balones: ["3", "4", "5"],
-      Llaveros: ["U"] // 🔥 TALLA ÚNICA PARA LLAVEROS 🔥
+      Llaveros: ["U"] 
     };
     return tipos[type] || [];
   }, [type]);
@@ -168,7 +169,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     });
   };
 
-  // Lógica para asignar cantidades dependiendo de la pestaña activa
   const visibleInv = mode === "tienda" ? tienda : mode === "stock" ? stock : bodega;
   const setVisibleInv = mode === "tienda" ? setTienda : mode === "stock" ? setStock : setBodega;
 
@@ -177,7 +177,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     setVisibleInv((prev) => ({ ...prev, [size]: n }));
   };
 
-  // 🔥 Manejador de las cajitas de los Dorsales
   const handleDorsalChange = (index, field, value) => {
     setDorsalOptions(prev => {
       const newOpts = [...prev];
@@ -218,9 +217,10 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       formData.append("isMundial2026", isMundial2026 ? "true" : "false");
       formData.append("isTemporada2627", isTemporada2627 ? "true" : "false");
 
-      // 🔥 ENVIAR LOS DATOS DE PERSONALIZACIÓN Y DORSALES AL BACKEND 🔥
+      // 🔥 ENVIAR LOS DATOS DE PERSONALIZACIÓN, TIPOGRAFÍA Y DORSALES AL BACKEND 🔥
       formData.append("isNumerable", isNumerable ? "true" : "false");
       if (isNumerable) {
+        formData.append("teamFont", teamFont);
         formData.append("dorsalOptions", JSON.stringify(dorsalOptions));
       }
 
@@ -388,7 +388,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             </div>
           </div>
 
-          {/* INVENTARIO (Botones reordenados: Bodega 1, Bodega 2, Tienda) */}
+          {/* INVENTARIO */}
           <div className="mb-6">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 text-center">
               Gestionar Inventario Inicial
@@ -501,10 +501,25 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
                   </div>
                 </label>
               )}
+
+              {/* 🔥 SELECTOR DE TIPOGRAFÍA (SOLO VISIBLE SI SE ACTIVA DORSALES) 🔥 */}
+              {isSuperAdmin && isNumerable && (
+                <div className="animate-fade-in-up mt-2">
+                  <label className="block text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">Tipografía Oficial</label>
+                  <select
+                    value={teamFont}
+                    onChange={(e) => setTeamFont(e.target.value)}
+                    className="w-full bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm font-bold text-blue-900 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none transition-all cursor-pointer"
+                  >
+                    <option value="barca">F.C. Barcelona (26/27)</option>
+                    <option value="madrid">Real Madrid</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* 🔥 CAJITAS BLANCAS DE DORSALES (CON CANTIDAD AÑADIDA) 🔥 */}
+          {/* 🔥 CAJITAS BLANCAS DE DORSALES 🔥 */}
           {isSuperAdmin && isNumerable && (
             <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl mb-6 shadow-sm">
                <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 text-center">
@@ -558,7 +573,6 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
         </div>
       </div>
 
-      {/* 🔥 ANIMACIÓN DE ENTRADA 🔥 */}
       <style>{`
         @keyframes fadeInUpModal {
           from { opacity: 0; transform: translateY(20px) scale(0.95); }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import ProductAdminEditor from "./ProductAdminEditor"; 
 import Medidas from "./Medidas";
@@ -44,6 +44,10 @@ export default function ProductScreen({
   const [selectedSize, setSelectedSize] = useState("");
   const [openMedidas, setOpenMedidas] = useState(false);
 
+  // 🔥 ESTADOS PARA LA PERSONALIZACIÓN DE DORSAL 🔥
+  const [selectedDorsalIndex, setSelectedDorsalIndex] = useState("");
+  const [dorsalAnimKey, setDorsalAnimKey] = useState(0);
+
   const displayName = user?.username || user?.email || "ChemaSportER";
 
   const galleryFromProduct = useMemo(() => {
@@ -53,10 +57,26 @@ export default function ProductScreen({
     return [viewProduct?.imageSrc, viewProduct?.imageSrc2].filter(Boolean);
   }, [viewProduct]);
 
+  // 🔥 FILTRAR SOLO DORSALES CON CANTIDAD DISPONIBLE (> 0) 🔥
+  const availableDorsals = useMemo(() => {
+    if (!viewProduct?.isNumerable || !Array.isArray(viewProduct?.dorsalOptions)) return [];
+    return viewProduct.dorsalOptions.filter((opt) => {
+      const hasInfo = (opt.name && opt.name.trim() !== "") || (opt.number && opt.number.trim() !== "");
+      const qty = parseInt(opt.quantity, 10);
+      return hasInfo && !isNaN(qty) && qty > 0;
+    });
+  }, [viewProduct]);
+
+  const selectedDorsal = useMemo(() => {
+    if (selectedDorsalIndex === "" || selectedDorsalIndex === null) return null;
+    return availableDorsals[Number(selectedDorsalIndex)] || null;
+  }, [selectedDorsalIndex, availableDorsals]);
+
   useEffect(() => {
     setViewProduct(product);
     setIdx(0);
     setSelectedSize(""); 
+    setSelectedDorsalIndex("");
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product]);
 
@@ -148,6 +168,16 @@ export default function ProductScreen({
     onClose();
   };
 
+  const handleDorsalSelectChange = (e) => {
+    const val = e.target.value;
+    setSelectedDorsalIndex(val);
+    setDorsalAnimKey((prev) => prev + 1);
+
+    if (val !== "" && galleryFromProduct.length > 1) {
+      setIdx(1);
+    }
+  };
+
   const isNino = viewProduct?.type === "Niño";
   const isBalon = viewProduct?.type === "Balón" || viewProduct?.type === "Balones";
   const isLlavero = viewProduct?.type === "Llaveros";
@@ -187,14 +217,51 @@ export default function ProductScreen({
   const currentProductId = viewProduct?._id || viewProduct?.id || product?._id || product?.id || "";
   const productLink = currentProductId ? `https://chemasporter.com/producto/${currentProductId}` : "https://chemasporter.com";
 
-  const whatsappMsg = `¡Hola! Me interesa realizar este pedido:\n\n*Artículo:* ${viewProduct?.name || 'Producto'}\n\n*Talla/Unidad:* ${selectedSize || ''}\n\n*Precio:* ${formattedPrice}\n\n*Enlace del producto:* ${productLink}`;
+  const dorsalTextForWhatsapp = selectedDorsal
+    ? `\n*Dorsal:* ${selectedDorsal.name ? selectedDorsal.name.toUpperCase() : ""} #${selectedDorsal.number || ""}`
+    : `\n*Dorsal:* Sin dorsal (Lisa)`;
+
+  const whatsappMsg = `¡Hola! Me interesa realizar este pedido:\n\n*Artículo:* ${viewProduct?.name || 'Producto'}\n\n*Talla/Unidad:* ${selectedSize || ''}${viewProduct?.isNumerable ? dorsalTextForWhatsapp : ''}\n\n*Precio:* ${formattedPrice}\n\n*Enlace del producto:* ${productLink}`;
 
   const whatsappUrl = `https://wa.me/50660369857?text=${encodeURIComponent(whatsappMsg)}`;
+
+  const numStr = String(selectedDorsal?.number || "").trim();
+
+  // 🔥 DETERMINAMOS QUÉ CLASE DE FUENTE USAR SEGÚN LO GUARDADO EN EL PRODUCTO 🔥
+  const getFontClass = () => {
+    if (viewProduct?.teamFont === 'madrid') return "font-madrid-oficial";
+    return "font-barca-oficial";
+  };
+  const currentFontClass = getFontClass();
 
   return (
     <div 
       className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-black bg-white"
     >
+      <style>{`
+        @keyframes heatPressStamp {
+          0% {
+            opacity: 0;
+            transform: scale(1.08) translateY(-6px);
+            filter: brightness(1.35) blur(3px);
+          }
+          50% {
+            opacity: 0.96;
+            transform: scale(0.99) translateY(0px);
+            filter: brightness(1.05) blur(0px);
+          }
+          100% {
+            opacity: 0.94;
+            transform: scale(1) translateY(0px);
+            filter: brightness(1) blur(0px);
+          }
+        }
+
+        .animate-heat-press {
+          animation: heatPressStamp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+      `}</style>
+
       <div className="max-w-6xl mx-auto">
         <button
           onClick={() => { if (isEditing) unlockProduct(); onClose(); }}
@@ -217,14 +284,101 @@ export default function ProductScreen({
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
-            {/* LADO IZQUIERDO: GALERÍA DE VISUALIZACIÓN */}
+            {/* LADO IZQUIERDO: GALERÍA DE VISUALIZACIÓN + ESTAMPADO IDÉNTICO AL ORIGINAL */}
             <div className="w-full">
-              <div className="relative flex items-center justify-center bg-gray-50 rounded-3xl p-6 border border-gray-200 shadow-sm">
+              <div className="relative flex items-center justify-center bg-gray-50 rounded-3xl p-6 border border-gray-200 shadow-sm overflow-hidden">
                 {displayUrl ? (
-                  <img src={displayUrl} alt={viewProduct?.name || "Producto"} className="w-full max-h-[600px] object-contain drop-shadow-lg rounded-2xl" loading="lazy" />
+                  <div className="relative inline-flex items-center justify-center w-full">
+                    <img
+                      src={displayUrl}
+                      alt={viewProduct?.name || "Producto"}
+                      className="w-full max-h-[600px] object-contain drop-shadow-lg rounded-2xl select-none"
+                      loading="lazy"
+                    />
+
+                    {/* 🔥 CAPA DE DORSAL (SOLO SE MUESTRA SI ES LA FOTO 2 DE LA ESPALDA) 🔥 */}
+                    {selectedDorsal && idx === 1 && (
+                      <div
+                        key={dorsalAnimKey}
+                        className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center animate-heat-press select-none"
+                        style={{ paddingBottom: "5%" }}
+                      >
+                        <svg
+                          viewBox="0 0 340 420"
+                          className="w-[58%] sm:w-[55%] max-w-[270px] h-auto overflow-visible"
+                        >
+                          <defs>
+                            <path
+                              id="barcaFontArc"
+                              d="M 24,106 Q 170,62 316,106"
+                              fill="transparent"
+                            />
+
+                            <linearGradient id="barcaGoldGrad" x1="0%" y1="0%" x2="20%" y2="100%">
+                              <stop offset="0%" stopColor="#FFF235" />
+                              <stop offset="50%" stopColor="#F9D100" />
+                              <stop offset="100%" stopColor="#D5A000" />
+                            </linearGradient>
+
+                            <filter id="barcaShadow" x="-15%" y="-15%" width="130%" height="130%">
+                              <feDropShadow dx="0" dy="2" stdDeviation="1.4" floodColor="rgba(0,0,0,0.48)" />
+                            </filter>
+                          </defs>
+
+                          {/* 1. NOMBRE EN ARCO CON FUENTE OFICIAL */}
+                          {selectedDorsal.name && (
+                            <g filter="url(#barcaShadow)">
+                              <text
+                                fill="url(#barcaGoldGrad)"
+                                stroke="#C79200"
+                                strokeWidth="0.8"
+                                className={currentFontClass}
+                                style={{
+                                  fontSize: selectedDorsal.name.length > 9 ? "36px" : "42px",
+                                  fontWeight: 700,
+                                  letterSpacing: "3px",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                <textPath href="#barcaFontArc" startOffset="50%" textAnchor="middle">
+                                  {selectedDorsal.name.toUpperCase()}
+                                </textPath>
+                              </text>
+                            </g>
+                          )}
+
+                          {/* 2. NÚMERO GIGANTE CON FUENTE OFICIAL */}
+                          {numStr && (
+                            <g filter="url(#barcaShadow)">
+                              <text
+                                x="170"
+                                y="332"
+                                textAnchor="middle"
+                                fill="url(#barcaGoldGrad)"
+                                stroke="#B88600"
+                                strokeWidth="1.2"
+                                strokeLinejoin="miter"
+                                transform="scale(0.85, 1.25)"
+                                className={currentFontClass}
+                                style={{
+                                  transformOrigin: "170px 235px",
+                                  fontSize: "210px",
+                                  fontWeight: 700,
+                                  letterSpacing: numStr.length > 1 ? "-7px" : "0px",
+                                }}
+                              >
+                                {numStr}
+                              </text>
+                            </g>
+                          )}
+                        </svg>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="h-[400px] w-full grid place-items-center text-gray-400 bg-gray-100 rounded-3xl"><span className="font-semibold">Sin imagen</span></div>
                 )}
+
                 {hasMany && (
                   <>
                     <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-white text-black p-4 rounded-full transition-all hover:scale-105 hover:border-black cursor-pointer shadow-md border border-gray-200"><FaChevronLeft size={20} /></button>
@@ -273,6 +427,38 @@ export default function ProductScreen({
                   </div>
                 )}
               </div>
+
+              {/* 🔥 SELECT DESPLEGABLE DE DORSALES (SOLO SI HAY STOCK > 0) 🔥 */}
+              {availableDorsals.length > 0 && (
+                <div className="mb-8 p-5 rounded-3xl border border-gray-200 bg-gray-50 shadow-sm">
+                  <label className="block text-xs font-black text-black uppercase tracking-widest mb-2.5 flex items-center gap-2">
+                    <FaTshirt className="text-black" size={14} />
+                    Seleccionar Dorsal (Opcional)
+                  </label>
+
+                  <div className="relative">
+                    <select
+                      value={selectedDorsalIndex}
+                      onChange={handleDorsalSelectChange}
+                      className="w-full appearance-none bg-white border-2 border-gray-300 hover:border-black focus:border-black rounded-2xl px-4 py-3.5 pr-10 text-sm font-black text-black uppercase tracking-wider outline-none transition-all cursor-pointer shadow-sm"
+                    >
+                      <option value="">Sin Dorsal (Camiseta Lisa)</option>
+                      {availableDorsals.map((opt, i) => (
+                        <option key={`dorsal-opt-${i}`} value={i}>
+                          {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number}
+                          {canEdit ? ` (${opt.quantity} disp.)` : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-black">
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-8">
                 {/* 🔥 CABECERA DE TALLAS + BOTÓN PREMIUM DE VER MEDIDAS 🔥 */}

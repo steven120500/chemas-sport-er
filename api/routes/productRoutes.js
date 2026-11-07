@@ -66,6 +66,10 @@ function diffProduct(prev, next) {
     changes.push(`Numerable: ${prevNum ? 'Sí' : 'No'} → ${nextNum ? 'Sí' : 'No'}`);
   }
 
+  if (prev.teamFont !== next.teamFont) {
+    changes.push(`Tipografía: ${prev.teamFont} → ${next.teamFont}`);
+  }
+
   // Los 3 espacios con sus nuevos nombres para el historial
   changes.push(...diffInv('Tienda', prev.tienda, next.tienda));
   changes.push(...diffInv('Bodega 1', prev.stock, next.stock));
@@ -108,7 +112,6 @@ async function processDorsalOptions(rawOptions) {
       const name = String(item.name || '').trim();
       const number = String(item.number || '').trim();
       
-      // 🔥 AHORA SÍ CAPTURAMOS LA CANTIDAD 🔥
       const quantity = Math.max(0, parseInt(item.quantity, 10) || 0);
       
       let imageUrl = String(item.imageUrl || '').trim();
@@ -173,6 +176,9 @@ router.post('/', upload.any(), async (req, res) => {
     const isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
     const dorsalOptions = isNumerable ? await processDorsalOptions(req.body.dorsalOptions) : [];
 
+    // 🔥 OBTENEMOS EL TIPO DE LETRA SELECCIONADO 🔥
+    const teamFont = req.body.teamFont || 'barca';
+
     const product = await Product.create({
       name: String(req.body.name || '').trim(),
       price: Number(req.body.price),
@@ -188,7 +194,8 @@ router.post('/', upload.any(), async (req, res) => {
       isMundial2026: req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true,
       isTemporada2627: req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true,
       isNumerable,
-      dorsalOptions
+      dorsalOptions,
+      teamFont 
     });
 
     await History.create({
@@ -327,12 +334,15 @@ router.put('/:id', async (req, res) => {
     if (req.body.isMundial2026 !== undefined) update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     if (req.body.isTemporada2627 !== undefined) update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
 
-    // Actualizar campos de numeración/dorsales si se envían en la petición
+    // Actualizar campos de numeración/dorsales y tipografía si se envían en la petición
     if (req.body.isNumerable !== undefined) {
       update.isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
     }
     if (req.body.dorsalOptions !== undefined) {
       update.dorsalOptions = await processDorsalOptions(req.body.dorsalOptions);
+    }
+    if (req.body.teamFont !== undefined) {
+      update.teamFont = req.body.teamFont;
     }
 
     let incomingImages = req.body.images;
@@ -394,7 +404,6 @@ router.put('/:id', async (req, res) => {
 
     let detalleText = '';
     
-    // Construcción pura sin etiquetas globales (solo extraemos las tiendas individuales)
     if (esVenta && req.body.details) {
       detalleText = req.body.details.replace(/👤 Cliente:\s*[^|]+\|\s*/gi, "").trim();
     } else if (changes.length) {
@@ -405,7 +414,6 @@ router.put('/:id', async (req, res) => {
     if (detalleText || esVenta) {
       let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
       
-      // Agregamos cliente e ID sin ensuciar la cadena para el parseo del frontend
       if (clienteFinal) {
         detalleText = `👤 Cliente: ${clienteFinal} | [ID:${prev._id}] | ${detalleText}`;
       } else {
@@ -594,7 +602,8 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 isNumerable dorsalOptions lockedBy';
+    // AÑADIDO teamFont en la proyección
+    const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 isNumerable teamFont dorsalOptions lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
     const [items, total] = await Promise.all([
