@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaFilter, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,12 @@ const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna
 
 // 🛡 PARSEO INDESTRUCTIBLE DE TALLAS Y DORSALES PARA EL BOTÓN DE COPIAR
 function parseLogDetails(log) {
-  let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
+  let detailsStr = "";
+  if (typeof log?.details === "string") {
+    detailsStr = log.details;
+  } else if (log?.details && typeof log.details === "object") {
+    detailsStr = JSON.stringify(log.details);
+  }
 
   // Limpiamos el ID del texto antes de buscar
   detailsStr = detailsStr.replace(/\[ID:[^\]]+\]\s*\|\s*/g, "");
@@ -20,8 +25,8 @@ function parseLogDetails(log) {
   const matchCliente = detailsStr.match(/Cliente:\s*([^|]+)/i);
   if (matchCliente && matchCliente[1]) cliente = matchCliente[1].trim();
 
-  const vendedor = log.user || log.vendedor || "Sistema";
-  const nombreChema = log.item || "No especificado";
+  const vendedor = log?.user || log?.vendedor || "Sistema";
+  const nombreChema = log?.item || "No especificado";
 
   // 🔥 DETECTAR SI INCLUYE DORSAL IMPRESO EN EL HISTORIAL 🔥
   let dorsalLinea = "";
