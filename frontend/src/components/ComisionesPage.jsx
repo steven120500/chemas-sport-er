@@ -1291,7 +1291,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top2?.contrapedidoUds || 0} ✏️
+                        +{top2?.contrapedidoUds || 0} 
                       </button>
                     )
                   ) : (
@@ -1346,7 +1346,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top1?.contrapedidoUds || 0} ✏️
+                        +{top1?.contrapedidoUds || 0} 
                       </button>
                     )
                   ) : (
@@ -1401,7 +1401,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                         title="Clic para editar contrapedido"
                       >
-                        +{top3?.contrapedidoUds || 0} ✏️
+                        +{top3?.contrapedidoUds || 0} 
                       </button>
                     )
                   ) : (
@@ -1483,7 +1483,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                                 className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 font-black text-xs transition-all cursor-pointer shadow-sm"
                                 title="Hacer clic para editar número exacto"
                               >
-                                +{item.contrapedidoUds} ✏️
+                                +{item.contrapedidoUds} 
                               </button>
                             )
                           ) : (

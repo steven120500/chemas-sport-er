@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes, FaStore, FaWarehouse, FaBoxOpen, FaPlus } from "react-icons/fa";
+import { FaTimes, FaStore, FaWarehouse, FaBoxOpen, FaPlus, FaTshirt } from "react-icons/fa";
 
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
@@ -70,6 +70,9 @@ export default function ProductAdminEditor({
       { name: "", number: "", quantity: "", imageUrl: "" },
     ];
   });
+
+  // 🔥 ESTADO PARA SELECCIONAR QUÉ DORSAL SE VENDIÓ / DESCONTÓ 🔥
+  const [purchasedDorsalIndex, setPurchasedDorsalIndex] = useState("");
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
@@ -186,6 +189,11 @@ export default function ProductAdminEditor({
     return decreased;
   };
 
+  // Filtramos las opciones válidas de dorsal para mostrarlas en el selector de venta
+  const validDorsalsForSelect = editedDorsalOptions
+    .map((opt, originalIdx) => ({ ...opt, originalIdx }))
+    .filter((opt) => (opt.name && opt.name.trim() !== "") || (opt.number && opt.number.trim() !== ""));
+
   const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
     const id = product?._id || product?.id;
@@ -200,6 +208,27 @@ export default function ProductAdminEditor({
 
       const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
       const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
+
+      // 🔥 Si seleccionó un dorsal al rebajar la camiseta, descontamos 1 en este producto y lo enviamos al backend para sincronizar Player/Fan
+      let finalDorsalOptions = editedDorsalOptions.map(opt => ({ ...opt }));
+      let selectedPurchasedDorsal = null;
+
+      if (editedIsNumerable && purchasedDorsalIndex !== "" && finalDorsalOptions[Number(purchasedDorsalIndex)]) {
+        const idxToDiscount = Number(purchasedDorsalIndex);
+        selectedPurchasedDorsal = {
+          name: finalDorsalOptions[idxToDiscount].name,
+          number: finalDorsalOptions[idxToDiscount].number,
+        };
+
+        // Si solo presionó "SOLO ACTUALIZAR" (no es venta con comisión), lo descontamos aquí para que igual baje
+        // Si es venta (isSale === true), el backend (productRoutes.js) se encarga de restar -1 globalmente en Player y Fan
+        if (!isSale) {
+          const currentQty = Math.max(0, parseInt(finalDorsalOptions[idxToDiscount].quantity, 10) || 0);
+          if (currentQty > 0) {
+            finalDorsalOptions[idxToDiscount].quantity = currentQty - 1;
+          }
+        }
+      }
 
       const payload = {
         productId: id,
@@ -220,7 +249,8 @@ export default function ProductAdminEditor({
         
         isNumerable: editedIsNumerable,
         teamFont: editedIsNumerable ? editedTeamFont : 'barca',
-        dorsalOptions: editedIsNumerable ? editedDorsalOptions : [],
+        dorsalOptions: editedIsNumerable ? finalDorsalOptions : [],
+        purchasedDorsal: selectedPurchasedDorsal ? JSON.stringify(selectedPurchasedDorsal) : null,
 
         customerName: finalCustomer,
         sellerName: displayName,
@@ -251,6 +281,7 @@ export default function ProductAdminEditor({
       }
 
       const dbUpdatedProduct = await res.json();
+      setPurchasedDorsalIndex("");
       onSaveSuccess(dbUpdatedProduct);
 
       if (isSale) {
@@ -497,7 +528,7 @@ export default function ProductAdminEditor({
             </div>
           </div>
 
-          {/* 🔥 CONTENEDOR CON SCROLL HORIZONTAL CON FLECHAS Y UN SOLO BOTÓN ARRIBA 🔥 */}
+          {/* 🔥 CONTENEDOR DE DORSALES CON UN SOLO BOTÓN "+" Y SCROLL HORIZONTAL 🔥 */}
           {Boolean(user?.isSuperUser) && editedIsNumerable && (
             <div className="bg-white border-2 border-blue-100 p-5 rounded-3xl mb-8 shadow-sm">
                <div className="flex items-center justify-between mb-4">
@@ -513,7 +544,7 @@ export default function ProductAdminEditor({
                  </button>
                </div>
 
-               {/* Contenedor con scroll horizontal garantizado */}
+               {/* Contenedor con scroll horizontal (con teclado y mouse) */}
                <div className="max-h-80 overflow-y-auto overflow-x-auto pr-1 pb-2 scrollbar-thin scrollbar-thumb-blue-200" tabIndex={0}>
                  <div className="min-w-[340px] space-y-3">
                    {editedDorsalOptions.map((opt, i) => (
@@ -555,7 +586,7 @@ export default function ProductAdminEditor({
                </div>
 
                <p className="text-[10px] text-blue-400 font-medium leading-tight mt-3 text-center">
-                 Controla el inventario de las impresiones. Si la cantidad llega a 0, dejará de ofrecerse a los clientes.
+                 Controla el inventario de las impresiones. Si la cantidad llega a 0, dejará de ofrecerse a los clientes. Usa las flechas del teclado para desplazar si no cabe.
                </p>
             </div>
           )}
@@ -581,6 +612,7 @@ export default function ProductAdminEditor({
                           onClick={() => { 
                             toastHOT.dismiss(t.id); 
                             if (checkHasDeduction()) {
+                              setPurchasedDorsalIndex("");
                               setConfirmCommission(false); 
                               setShowBuyerModal(true);
                             } else {
@@ -614,7 +646,7 @@ export default function ProductAdminEditor({
         </div>
       </div>
 
-      {/* 🔥 MODAL MULTI-PASO DE VENTA */}
+      {/* 🔥 MODAL MULTI-PASO DE VENTA CON SELECTOR DE DORSAL 🔥 */}
       {showBuyerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-200 bg-white flex flex-col items-center text-center relative">
@@ -623,8 +655,9 @@ export default function ProductAdminEditor({
               <>
                 <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-md text-2xl">👤</div>
                 <h3 className="text-xl font-black text-black mb-1">¿Quién compró esta camiseta?</h3>
-                <p className="text-xs text-gray-500 mb-6 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
-                <div className="w-full relative mb-6">
+                <p className="text-xs text-gray-500 mb-5 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
+                
+                <div className="w-full relative mb-4">
                   <input 
                     type="text" 
                     placeholder="Ej: Emanuel Espinoza" 
@@ -634,6 +667,28 @@ export default function ProductAdminEditor({
                     autoFocus 
                   />
                 </div>
+
+                {/* 🔥 SELECT DE DORSAL (SOLO APARECE SI EL PRODUCTO TIENE NUMERABLE ACTIVADO) 🔥 */}
+                {editedIsNumerable && validDorsalsForSelect.length > 0 && (
+                  <div className="w-full mb-6 text-left bg-blue-50/70 border border-blue-200 p-3.5 rounded-2xl">
+                    <label className="block text-[11px] font-black text-blue-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <FaTshirt className="text-blue-700" size={13} />
+                      ¿Con qué dorsal se vendió? (Descuenta Player/Fan)
+                    </label>
+                    <select
+                      value={purchasedDorsalIndex}
+                      onChange={(e) => setPurchasedDorsalIndex(e.target.value)}
+                      className="w-full bg-white border-2 border-blue-200 focus:border-blue-600 rounded-xl px-3 py-2.5 text-xs font-black text-blue-950 uppercase outline-none cursor-pointer shadow-sm transition-colors"
+                    >
+                      <option value="">-- Sin Dorsal (Camiseta Lisa) --</option>
+                      {validDorsalsForSelect.map((opt) => (
+                        <option key={`sale-dorsal-${opt.originalIdx}`} value={opt.originalIdx}>
+                          {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number} (Quedan: {opt.quantity || 0})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 <div className="flex gap-3 w-full">
                   <button 

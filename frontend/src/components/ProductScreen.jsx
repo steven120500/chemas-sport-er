@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt } from "react-icons/fa";
 import { io } from "socket.io-client";
+import { motion, AnimatePresence } from "framer-motion"; 
 import ProductAdminEditor from "./ProductAdminEditor"; 
 import Medidas from "./Medidas";
 
@@ -14,17 +15,71 @@ const TALLAS_BALON = ["3", "4", "5"];
 const MODAL_IMG_MAX_W = 800;
 
 /* =====================================================================
-   🎯 PANEL DE CALIBRACIÓN DEL DORSAL (AJUSTA AQUÍ EL TAMAÑO Y CENTRO)
+   🎯 PANEL DE CALIBRACIÓN DEL DORSAL (BARÇA VS MADRID)
    ===================================================================== */
-const DORSAL_LAYOUT = {
-  boxWidth: "60%",      // Tamaño general del bloque sobre la foto (ej: "34%" más chico, "42%" más grande)
-  offsetY: "-22%",       // Posición vertical general ("-5%" sube todo, "3%" baja todo)
-  offsetX: "-4%",       // Posición horizontal general ("-2%" mueve a la izq, "2%" a la der)
-  nameY: 142,           // Posición vertical del NOMBRE (mayor número = baja más cerca del número)
-  nameCurve: 122,       // Arco del nombre (menor que nameY = arqueado hacia arriba)
-  nameSize: 50,         // Tamaño de la letra del NOMBRE
-  numberY: 272,         // Posición vertical del NÚMERO (menor número = sube el 10 hacia la espalda media)
-  numberSize: 200,      // Tamaño del NÚMERO
+const getDorsalLayout = (teamFont) => {
+  if (teamFont === 'madrid') {
+    return {
+      boxWidth: "56%",      
+      offsetY: "-24%",       
+      offsetX: "-2%",       
+      nameY: 135,           
+      nameCurve: 135,       
+      nameSize: 45,         
+      numberY: 285,         
+      numberSize: 195,      
+      // 🔥 VERDE OSCURO OFICIAL DEL REAL MADRID EXTRAÍDO DEL PÓSTER 🔥
+      colorTop: "#1A362D",    
+      colorMid: "#122A21",    
+      colorBottom: "#0A1712", 
+      stroke: "rgba(255, 255, 255, 0.15)" 
+    };
+  }
+  
+  // Por defecto (Barcelona)
+  return {
+    boxWidth: "60%",      
+    offsetY: "-22%",       
+    offsetX: "-4%",       
+    nameY: 142,           
+    nameCurve: 122,       
+    nameSize: 50,         
+    numberY: 272,         
+    numberSize: 200,      
+    colorTop: "#FFE600",
+    colorMid: "#F5C400",
+    colorBottom: "#D4A000",
+    stroke: "#C79200"
+  };
+};
+
+/* 🔥 VARIANTES DE ANIMACIÓN PREMIUM DE TERMOSELLADO 🔥 */
+const heatPressVariants = {
+  hidden: { 
+    opacity: 0, 
+    scale: 1.15, 
+    y: -15, 
+    filter: "brightness(1.5) blur(4px)" 
+  },
+  visible: { 
+    opacity: 0.95, 
+    scale: 1, 
+    y: 0, 
+    filter: "brightness(1) blur(0px)",
+    transition: { 
+      type: "spring", 
+      stiffness: 140, 
+      damping: 12, 
+      mass: 0.8 
+    }
+  },
+  exit: { 
+    opacity: 0, 
+    scale: 0.92, 
+    y: 10,
+    filter: "brightness(0.5) blur(2px)",
+    transition: { duration: 0.25, ease: "easeInOut" } 
+  }
 };
 
 function transformCloudinary(url, maxW) {
@@ -242,9 +297,10 @@ export default function ProductScreen({
 
   const numStr = String(selectedDorsal?.number || "").trim();
 
-  // 🔥 DETERMINAMOS QUÉ TIPOGRAFÍA DE PUBLIC/FONTS USAR 🔥
+  // 🔥 DETERMINAMOS QUÉ TIPOGRAFÍA Y DISEÑO USAR 🔥
   const isMadrid = viewProduct?.teamFont === "madrid";
   const activeFontFamily = isMadrid ? "'FontMadrid', sans-serif" : "'FontBarca', sans-serif";
+  const currentLayout = getDorsalLayout(viewProduct?.teamFont);
 
   return (
     <div 
@@ -271,34 +327,12 @@ export default function ProductScreen({
           font-display: block;
         }
 
-        .font-barca, .font-barca-oficial {
+        .font-barca {
           font-family: 'FontBarca', sans-serif !important;
         }
 
-        .font-madrid, .font-madrid-oficial {
+        .font-madrid {
           font-family: 'FontMadrid', sans-serif !important;
-        }
-
-        @keyframes heatPressStamp {
-          0% {
-            opacity: 0;
-            transform: scale(1.08) translateY(-6px);
-            filter: brightness(1.35) blur(3px);
-          }
-          50% {
-            opacity: 0.96;
-            transform: scale(0.99) translateY(0px);
-            filter: brightness(1.05) blur(0px);
-          }
-          100% {
-            opacity: 0.95;
-            transform: scale(1) translateY(0px);
-            filter: brightness(1) blur(0px);
-          }
-        }
-
-        .animate-heat-press {
-          animation: heatPressStamp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
       `}</style>
 
@@ -342,99 +376,99 @@ export default function ProductScreen({
                       loading="lazy"
                     />
 
-                    {/* 🔥 CAPA DE DORSAL CENTRADA EN LA ESPALDA (SOLO FOTO 2: idx === 1) 🔥 */}
-                    {selectedDorsal && idx === 1 && (
-                      <div
-                        key={dorsalAnimKey}
-                        className="absolute inset-0 pointer-events-none flex items-center justify-center animate-heat-press select-none"
-                      >
-                        <div
-                          style={{
-                            width: DORSAL_LAYOUT.boxWidth,
-                            transform: `translate(${DORSAL_LAYOUT.offsetX}, ${DORSAL_LAYOUT.offsetY})`,
-                          }}
+                    {/* 🔥 CAPA DE DORSAL CON ANIMACIÓN PREMIUM (ENTRADA Y SALIDA) 🔥 */}
+                    <AnimatePresence mode="wait">
+                      {selectedDorsal && idx === 1 && (
+                        <motion.div
+                          key={dorsalAnimKey}
+                          variants={heatPressVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          className="absolute inset-0 pointer-events-none flex items-center justify-center select-none"
                         >
-                          <svg
-                            viewBox="0 0 300 340"
-                            className="w-full h-auto overflow-visible"
+                          <div
+                            style={{
+                              width: currentLayout.boxWidth,
+                              transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
+                            }}
                           >
-                            <defs>
-                              {/* Curva suave centrada debajo del cuello */}
-                              <path
-                                id="dorsalArcPath"
-                                d={`M 20,${DORSAL_LAYOUT.nameY} Q 150,${DORSAL_LAYOUT.nameCurve} 280,${DORSAL_LAYOUT.nameY}`}
-                                fill="transparent"
-                              />
+                            <svg
+                              viewBox="0 0 300 340"
+                              className="w-full h-auto overflow-visible"
+                            >
+                              <defs>
+                                {/* Curva suave centrada debajo del cuello */}
+                                <path
+                                  id="dorsalArcPath"
+                                  d={`M 20,${currentLayout.nameY} Q 150,${currentLayout.nameCurve} 280,${currentLayout.nameY}`}
+                                  fill="transparent"
+                                />
 
-                              {/* Degradado Amarillo/Oro Oficial Barça */}
-                              <linearGradient id="barcaGoldGrad" x1="0%" y1="0%" x2="15%" y2="100%">
-                                <stop offset="0%" stopColor="#FFE600" />
-                                <stop offset="55%" stopColor="#F5C400" />
-                                <stop offset="100%" stopColor="#D4A000" />
-                              </linearGradient>
+                                {/* Degradado de Color Dinámico */}
+                                <linearGradient id="dorsalColorGrad" x1="0%" y1="0%" x2="15%" y2="100%">
+                                  <stop offset="0%" stopColor={currentLayout.colorTop} />
+                                  <stop offset="55%" stopColor={currentLayout.colorMid} />
+                                  <stop offset="100%" stopColor={currentLayout.colorBottom} />
+                                </linearGradient>
 
-                              {/* Degradado para Real Madrid */}
-                              <linearGradient id="madridPrintGrad" x1="0%" y1="0%" x2="20%" y2="100%">
-                                <stop offset="0%" stopColor="#FFFFFF" />
-                                <stop offset="100%" stopColor="#E5E7EB" />
-                              </linearGradient>
+                                <filter id="dorsalDropShadow" x="-15%" y="-15%" width="130%" height="130%">
+                                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="rgba(0,0,0,0.42)" />
+                                </filter>
+                              </defs>
 
-                              <filter id="dorsalDropShadow" x="-15%" y="-15%" width="130%" height="130%">
-                                <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="rgba(0,0,0,0.42)" />
-                              </filter>
-                            </defs>
+                              {/* 1. NOMBRE DEL JUGADOR CENTRADO EN LA ESPALDA ALTA */}
+                              {selectedDorsal.name && (
+                                <g filter="url(#dorsalDropShadow)">
+                                  <text
+                                    fill="url(#dorsalColorGrad)"
+                                    stroke={currentLayout.stroke}
+                                    strokeWidth="0.5"
+                                    className={isMadrid ? "font-madrid" : "font-barca"}
+                                    style={{
+                                      fontFamily: activeFontFamily,
+                                      fontSize: `${
+                                        selectedDorsal.name.length > 9
+                                          ? currentLayout.nameSize - 5
+                                          : currentLayout.nameSize
+                                      }px`,
+                                      letterSpacing: "2px",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    <textPath href="#dorsalArcPath" startOffset="50%" textAnchor="middle">
+                                      {selectedDorsal.name.toUpperCase()}
+                                    </textPath>
+                                  </text>
+                                </g>
+                              )}
 
-                            {/* 1. NOMBRE DEL JUGADOR CENTRADO EN LA ESPALDA ALTA */}
-                            {selectedDorsal.name && (
-                              <g filter="url(#dorsalDropShadow)">
-                                <text
-                                  fill={isMadrid ? "url(#madridPrintGrad)" : "url(#barcaGoldGrad)"}
-                                  stroke={isMadrid ? "rgba(0,0,0,0.22)" : "#C79200"}
-                                  strokeWidth="0.5"
-                                  className={isMadrid ? "font-madrid" : "font-barca"}
-                                  style={{
-                                    fontFamily: activeFontFamily,
-                                    fontSize: `${
-                                      selectedDorsal.name.length > 9
-                                        ? DORSAL_LAYOUT.nameSize - 5
-                                        : DORSAL_LAYOUT.nameSize
-                                    }px`,
-                                    letterSpacing: "2px",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  <textPath href="#dorsalArcPath" startOffset="50%" textAnchor="middle">
-                                    {selectedDorsal.name.toUpperCase()}
-                                  </textPath>
-                                </text>
-                              </g>
-                            )}
-
-                            {/* 2. NÚMERO CENTRADO EN EL MEDIO DE LA CAMISETA */}
-                            {numStr && (
-                              <g filter="url(#dorsalDropShadow)">
-                                <text
-                                  x="150"
-                                  y={DORSAL_LAYOUT.numberY}
-                                  textAnchor="middle"
-                                  fill={isMadrid ? "url(#madridPrintGrad)" : "url(#barcaGoldGrad)"}
-                                  stroke={isMadrid ? "rgba(0,0,0,0.22)" : "#B88600"}
-                                  strokeWidth="0.8"
-                                  className={isMadrid ? "font-madrid" : "font-barca"}
-                                  style={{
-                                    fontFamily: activeFontFamily,
-                                    fontSize: `${DORSAL_LAYOUT.numberSize}px`,
-                                    letterSpacing: numStr.length > 1 ? "-5px" : "0px",
-                                  }}
-                                >
-                                  {numStr}
-                                </text>
-                              </g>
-                            )}
-                          </svg>
-                        </div>
-                      </div>
-                    )}
+                              {/* 2. NÚMERO CENTRADO EN EL MEDIO DE LA CAMISETA */}
+                              {numStr && (
+                                <g filter="url(#dorsalDropShadow)">
+                                  <text
+                                    x="150"
+                                    y={currentLayout.numberY}
+                                    textAnchor="middle"
+                                    fill="url(#dorsalColorGrad)"
+                                    stroke={currentLayout.stroke}
+                                    strokeWidth="0.8"
+                                    className={isMadrid ? "font-madrid" : "font-barca"}
+                                    style={{
+                                      fontFamily: activeFontFamily,
+                                      fontSize: `${currentLayout.numberSize}px`,
+                                      letterSpacing: numStr.length > 1 ? "-5px" : "0px",
+                                    }}
+                                  >
+                                    {numStr}
+                                  </text>
+                                </g>
+                              )}
+                            </svg>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ) : (
                   <div className="h-[400px] w-full grid place-items-center text-gray-400 bg-gray-100 rounded-3xl"><span className="font-semibold">Sin imagen</span></div>

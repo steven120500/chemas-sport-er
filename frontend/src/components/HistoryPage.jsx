@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaFilter, FaCalendarAlt, FaChevronLeft, FaChevronRight, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -9,11 +9,11 @@ function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
 
 const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Stefanie", "Steven"];
 
-// 🛡 PARSEO INDESTRUCTIBLE DE TALLAS PARA EL BOTÓN DE COPIAR (ACTUALIZADO A 3 UBICACIONES)
+// 🛡 PARSEO INDESTRUCTIBLE DE TALLAS Y DORSALES PARA EL BOTÓN DE COPIAR
 function parseLogDetails(log) {
   let detailsStr = typeof log.details === "string" ? log.details : JSON.stringify(log.details || "");
 
-  // Limpiamos el ID del texto antes de buscar las tallas
+  // Limpiamos el ID del texto antes de buscar
   detailsStr = detailsStr.replace(/\[ID:[^\]]+\]\s*\|\s*/g, "");
 
   let cliente = "No especificado";
@@ -22,6 +22,13 @@ function parseLogDetails(log) {
 
   const vendedor = log.user || log.vendedor || "Sistema";
   const nombreChema = log.item || "No especificado";
+
+  // 🔥 DETECTAR SI INCLUYE DORSAL IMPRESO EN EL HISTORIAL 🔥
+  let dorsalLinea = "";
+  const matchDorsal = detailsStr.match(/Dorsal Impreso:\s*([^|]+)/i);
+  if (matchDorsal && matchDorsal[1]) {
+    dorsalLinea = `Numero: ${matchDorsal[1].trim()}`;
+  }
 
   const items = [];
   let hasMatches = false;
@@ -37,7 +44,6 @@ function parseLogDetails(log) {
       const oldV = parseInt(match[2], 10) || 0;
       const newV = parseInt(match[3], 10) || 0;
 
-      // 🔥 Lógica actualizada para detectar Tienda, Bodega 1 y Bodega 2 (y soporte para historial viejo)
       let tienda = "Tienda";
       if (segmento.includes("Bodega 2") || segmento.includes("Tienda #2")) {
         tienda = "Bodega 2";
@@ -50,7 +56,9 @@ function parseLogDetails(log) {
         const cantidad = oldV - newV;
 
         for (let i = 0; i < cantidad; i++) {
-          items.push(`- CAMISETA: ${nombreChema} talla ${talla}\nUBICACIÓN: ${tienda}`);
+          let bloque = `- CAMISETA: ${nombreChema} talla ${talla}\nUBICACIÓN: ${tienda}`;
+          if (dorsalLinea) bloque += `\n${dorsalLinea}`;
+          items.push(bloque);
         }
       }
     }
@@ -62,7 +70,9 @@ function parseLogDetails(log) {
     else if (detailsStr.includes("Bodega 1") || detailsStr.includes("Tienda #1")) tiendaF = "Bodega 1";
     else if (detailsStr.includes("Tienda")) tiendaF = "Tienda";
     
-    items.push(`- CAMISETA: ${nombreChema}\nUBICACIÓN: ${tiendaF}`);
+    let bloque = `- CAMISETA: ${nombreChema}\nUBICACIÓN: ${tiendaF}`;
+    if (dorsalLinea) bloque += `\n${dorsalLinea}`;
+    items.push(bloque);
   }
 
   return { cliente, vendedor, items };
@@ -132,7 +142,7 @@ export default function HistoryPage({ isSuperUser = false }) {
       const finalQ = overrideQ !== undefined ? overrideQ : q;
 
       const isFiltering = Boolean(finalStart || finalEnd || finalUser || finalStore || finalType || finalQ.trim());
-      const limitVal = isFiltering ? "1000" : "50"; // Ampliado a 50 por defecto para ver más registros recientes
+      const limitVal = isFiltering ? "1000" : "50";
 
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -150,7 +160,7 @@ export default function HistoryPage({ isSuperUser = false }) {
       const res = await fetch(`${API_BASE}/api/history?` + params.toString(), {
         headers: {
           "Content-Type": "application/json",
-          "x-super": "true", // Permitir lectura completa al usuario autenticado (incluyendo tienda)
+          "x-super": "true",
           "x-roles": roles,
         },
       });

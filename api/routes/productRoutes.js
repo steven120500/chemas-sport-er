@@ -367,47 +367,51 @@ router.put('/:id', async (req, res) => {
       update.imageSrc2 = finalImages[1]?.url || ''; 
     }
 
+    const nombreCliente = (req.body.customerName || "").trim();
+    const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
+    const huboRebajaStock = restadas > 0;
+
+    // 🔥 1. PROCESAR DESCUENTO DE DORSAL ANTES DE DEVOLVER EL PRODUCTO AL FRONTEND 🔥
+    let requestedDorsalData = null;
+    if (req.body.purchasedDorsal) {
+      try {
+        requestedDorsalData = typeof req.body.purchasedDorsal === 'string'
+          ? JSON.parse(req.body.purchasedDorsal)
+          : req.body.purchasedDorsal;
+      } catch {
+        requestedDorsalData = null;
+      }
+    }
+
+    const targetDorsalName = String(requestedDorsalData?.name || '').trim().toUpperCase();
+    const targetDorsalNumber = String(requestedDorsalData?.number || '').trim();
+    let selectedDorsalText = "";
+
+    // Si rebajó stock y eligió un dorsal en el modal, descontamos en ESTE producto primero
+    if (huboRebajaStock && (targetDorsalName || targetDorsalNumber)) {
+      selectedDorsalText = ` | 👕 Dorsal Impreso: ${targetDorsalName} #${targetDorsalNumber}`;
+
+      if (Array.isArray(update.dorsalOptions)) {
+        update.dorsalOptions = update.dorsalOptions.map(opt => {
+          const optName = String(opt.name || '').trim().toUpperCase();
+          const optNum = String(opt.number || '').trim();
+          const match = (targetDorsalName && optName === targetDorsalName) ||
+                        (!targetDorsalName && targetDorsalNumber && optNum === targetDorsalNumber);
+          // Solo restamos aquí si es venta (porque cuando no es venta, el frontend ya lo restó en finalDorsalOptions)
+          if (match && esVenta && opt.quantity > 0) {
+            return { ...opt, quantity: opt.quantity - 1 };
+          }
+          return opt;
+        });
+      }
+    }
+
+    // Ahora sí guardamos el producto principal ya con su dorsal rebajado
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
       { $set: update },
       { new: true, runValidators: true }
     );
-    const updatedObj = updated.toObject();
-
-    const nombreCliente = (req.body.customerName || "").trim();
-    const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
-    
-    // 🔥 1. DETECCIÓN DE VENTA DE DORSAL PARA RESTAR INVENTARIO GLOBAL 🔥
-    const requestedDorsalData = typeof req.body.purchasedDorsal === 'string' && req.body.purchasedDorsal ? JSON.parse(req.body.purchasedDorsal) : req.body.purchasedDorsal;
-    let selectedDorsalText = "";
-    
-    if (esVenta && requestedDorsalData?.name) {
-      selectedDorsalText = ` | 👕 Dorsal Impreso: ${requestedDorsalData.name.toUpperCase()} #${requestedDorsalData.number || ""}`;
-      
-      // Sincronizar el descuento del dorsal en todos los productos que lo compartan (Player, Fan, etc.)
-      const relatedProducts = await Product.find({
-        isNumerable: true,
-        teamFont: prev.teamFont, 
-        'dorsalOptions.name': requestedDorsalData.name
-      });
-      
-      for (let prod of relatedProducts) {
-        let changed = false;
-        prod.dorsalOptions = prod.dorsalOptions.map(opt => {
-          if (opt.name === requestedDorsalData.name) {
-            if (opt.quantity > 0) {
-              opt.quantity -= 1;
-              changed = true;
-            }
-          }
-          return opt;
-        });
-        if (changed) {
-          prod.markModified('dorsalOptions');
-          await prod.save();
-        }
-      }
-    }
 
     if (esVenta) {
       updated.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
@@ -421,6 +425,40 @@ router.put('/:id', async (req, res) => {
       await updated.save();
     }
 
+    const io = req.app.get('io');
+
+    // 🔥 2. SINCRONIZAR DESCUENTO EN PRODUCTOS HERMANOS (PLAYER <-> FAN) Y EMITIR EN VIVO 🔥
+    if (huboRebajaStock && (targetDorsalName || targetDorsalNumber)) {
+      const otherProducts = await Product.find({
+        _id: { $ne: updated._id },
+        isNumerable: true
+      });
+
+      for (const prod of otherProducts) {
+        let changed = false;
+        prod.dorsalOptions = (prod.dorsalOptions || []).map(opt => {
+          const optName = String(opt.name || '').trim().toUpperCase();
+          const optNum = String(opt.number || '').trim();
+          const match = (targetDorsalName && optName === targetDorsalName && (!targetDorsalNumber || optNum === targetDorsalNumber)) ||
+                        (!targetDorsalName && targetDorsalNumber && optNum === targetDorsalNumber);
+
+          if (match && opt.quantity > 0) {
+            opt.quantity -= 1;
+            changed = true;
+          }
+          return opt;
+        });
+
+        if (changed) {
+          prod.markModified('dorsalOptions');
+          await prod.save();
+          // Emitimos por socket cada camiseta hermana (ej. la Fan) para que se actualice sin refrescar
+          if (io) io.emit('productoActualizado', prod.toObject());
+        }
+      }
+    }
+
+    const updatedObj = updated.toObject();
     const changes = diffProduct(prev, updatedObj);
     
     const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
@@ -444,7 +482,6 @@ router.put('/:id', async (req, res) => {
         detalleText = `[ID:${prev._id}] | ${detalleText}`;
       }
 
-      // 🔥 2. INCORPORAR LA IMPRESIÓN DEL DORSAL AL TEXTO DEL HISTORIAL PARA LA IMPRENTA 🔥
       detalleText += selectedDorsalText;
 
       await History.create({
@@ -453,8 +490,9 @@ router.put('/:id', async (req, res) => {
         action: accionTexto,
         item: `${updated.name} (${updated.type})`,
         date: new Date(),
-        // Guardamos también un registro oculto para anular el dorsal si es necesario
-        dorsalRefundData: esVenta && requestedDorsalData?.name ? { name: requestedDorsalData.name, teamFont: prev.teamFont } : null,
+        dorsalRefundData: huboRebajaStock && (targetDorsalName || targetDorsalNumber)
+          ? { name: targetDorsalName, number: targetDorsalNumber, teamFont: updated.teamFont }
+          : null,
         details: detalleText
       });
     }
@@ -465,13 +503,11 @@ router.put('/:id', async (req, res) => {
       action: esVenta ? "rebajó stock" : "editó"
     };
 
-    const io = req.app.get('io');
     if (io) {
       io.emit('productoActualizado', updatedObj);
-      // Emitir evento de recarga si se descontó inventario global
-      if (esVenta && requestedDorsalData?.name) io.emit('inventarioDorsalActualizado');
     }
 
+    // Enviamos al frontend el producto YA con el dorsal rebajado para que aparezca de inmediato sin F5
     res.status(200).json(updatedObj);
 
   } catch (err) {
@@ -485,7 +521,6 @@ router.post('/anular/:id', async (req, res) => {
   try {
     const { item, items } = req.body; 
 
-    // Obtener el registro histórico para ver si tenía un dorsal asociado
     const historyEntry = await History.findById(req.params.id);
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -543,35 +578,49 @@ router.post('/anular/:id', async (req, res) => {
     product.markModified('bodega');
     await product.save();
 
-    // 🔥 3. SI LA VENTA TENÍA DORSAL, REVERTIMOS EL INVENTARIO DE LA IMPRENTA 🔥
-    if (historyEntry?.dorsalRefundData?.name) {
-       const relatedProducts = await Product.find({
-          isNumerable: true,
-          teamFont: historyEntry.dorsalRefundData.teamFont, 
-          'dorsalOptions.name': historyEntry.dorsalRefundData.name
-       });
-       for (let prod of relatedProducts) {
-          let changed = false;
-          prod.dorsalOptions = prod.dorsalOptions.map(opt => {
-            if (opt.name === historyEntry.dorsalRefundData.name) {
-              opt.quantity += 1;
-              changed = true;
-            }
-            return opt;
-          });
-          if (changed) {
-            prod.markModified('dorsalOptions');
-            await prod.save();
+    const io = req.app.get('io');
+
+    // 🔥 DEVOLVER EL DORSAL A TODAS LAS CAMISETAS HERMANAS SI SE ANULA LA VENTA 🔥
+    let refundName = historyEntry?.dorsalRefundData?.name || "";
+    let refundNumber = historyEntry?.dorsalRefundData?.number || "";
+
+    // Respaldo: si no tenía dorsalRefundData pero está escrito en el texto de details
+    if (!refundName && historyEntry?.details) {
+      const matchText = historyEntry.details.match(/Dorsal Impreso:\s*([^#|\n]+?)\s*#(\S+)/i);
+      if (matchText) {
+        refundName = matchText[1].trim().toUpperCase();
+        refundNumber = matchText[2].trim();
+      }
+    }
+
+    if (refundName || refundNumber) {
+      const numerableProducts = await Product.find({ isNumerable: true });
+      for (const prod of numerableProducts) {
+        let changed = false;
+        prod.dorsalOptions = (prod.dorsalOptions || []).map(opt => {
+          const optName = String(opt.name || '').trim().toUpperCase();
+          const optNum = String(opt.number || '').trim();
+          const match = (refundName && optName === refundName && (!refundNumber || optNum === refundNumber)) ||
+                        (!refundName && refundNumber && optNum === refundNumber);
+          if (match) {
+            opt.quantity = (Number(opt.quantity) || 0) + 1;
+            changed = true;
           }
-       }
+          return opt;
+        });
+
+        if (changed) {
+          prod.markModified('dorsalOptions');
+          await prod.save();
+          if (io) io.emit('productoActualizado', prod.toObject());
+        }
+      }
     }
 
     if (historyEntry) await History.findByIdAndDelete(req.params.id);
     
-    const io = req.app.get('io');
     if (io) {
       io.emit('productoActualizado', product.toObject());
-      if (historyEntry?.dorsalRefundData?.name) io.emit('inventarioDorsalActualizado');
     }
 
     res.json({ success: true, message: "Venta anulada, stock de camisa y dorsal devueltos correctamente." });
