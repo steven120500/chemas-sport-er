@@ -70,7 +70,6 @@ function diffProduct(prev, next) {
     changes.push(`Tipografía: ${prev.teamFont} → ${next.teamFont}`);
   }
 
-  // Los 3 espacios con sus nuevos nombres para el historial
   changes.push(...diffInv('Tienda', prev.tienda, next.tienda));
   changes.push(...diffInv('Bodega 1', prev.stock, next.stock));
   changes.push(...diffInv('Bodega 2', prev.bodega, next.bodega));
@@ -98,7 +97,6 @@ function sanitizeInv(obj) {
   return clean;
 }
 
-// Helper para procesar y limpiar las opciones de dorsal (y subir imagen a Cloudinary si viene en base64)
 async function processDorsalOptions(rawOptions) {
   let list = rawOptions;
   if (typeof list === 'string') {
@@ -116,7 +114,6 @@ async function processDorsalOptions(rawOptions) {
       
       let imageUrl = String(item.imageUrl || '').trim();
 
-      // Si no tiene ni nombre ni número, ignoramos la cajita vacía
       if (!name && !number) return null;
 
       if (imageUrl && imageUrl.startsWith('data:')) {
@@ -176,7 +173,6 @@ router.post('/', upload.any(), async (req, res) => {
     const isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
     const dorsalOptions = isNumerable ? await processDorsalOptions(req.body.dorsalOptions) : [];
 
-    // 🔥 OBTENEMOS EL TIPO DE LETRA SELECCIONADO 🔥
     const teamFont = req.body.teamFont || 'barca';
 
     const product = await Product.create({
@@ -297,7 +293,6 @@ router.put('/:id', async (req, res) => {
 
     let restadas = 0;
     
-    // Calcular cantidad de prendas restadas para comisiones y etiquetas
     for (const size of new Set([...Object.keys(prev.tienda || {}), ...Object.keys(nextTienda || {})])) {
       const before = Number(prev.tienda?.[size] ?? 0);
       const after  = Number(nextTienda?.[size] ?? 0);
@@ -334,7 +329,6 @@ router.put('/:id', async (req, res) => {
     if (req.body.isMundial2026 !== undefined) update.isMundial2026 = req.body.isMundial2026 === 'true' || req.body.isMundial2026 === true;
     if (req.body.isTemporada2627 !== undefined) update.isTemporada2627 = req.body.isTemporada2627 === 'true' || req.body.isTemporada2627 === true;
 
-    // Actualizar campos de numeración/dorsales y tipografía si se envían en la petición
     if (req.body.isNumerable !== undefined) {
       update.isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
     }
@@ -380,9 +374,40 @@ router.put('/:id', async (req, res) => {
     );
     const updatedObj = updated.toObject();
 
-    // 🚨 REGISTRO SÍNCRONO (SIN SETTIMEOUT) PARA EVITAR PÉRDIDA DE HISTORIAL 🚨
     const nombreCliente = (req.body.customerName || "").trim();
     const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
+    
+    // 🔥 1. DETECCIÓN DE VENTA DE DORSAL PARA RESTAR INVENTARIO GLOBAL 🔥
+    const requestedDorsalData = typeof req.body.purchasedDorsal === 'string' && req.body.purchasedDorsal ? JSON.parse(req.body.purchasedDorsal) : req.body.purchasedDorsal;
+    let selectedDorsalText = "";
+    
+    if (esVenta && requestedDorsalData?.name) {
+      selectedDorsalText = ` | 👕 Dorsal Impreso: ${requestedDorsalData.name.toUpperCase()} #${requestedDorsalData.number || ""}`;
+      
+      // Sincronizar el descuento del dorsal en todos los productos que lo compartan (Player, Fan, etc.)
+      const relatedProducts = await Product.find({
+        isNumerable: true,
+        teamFont: prev.teamFont, 
+        'dorsalOptions.name': requestedDorsalData.name
+      });
+      
+      for (let prod of relatedProducts) {
+        let changed = false;
+        prod.dorsalOptions = prod.dorsalOptions.map(opt => {
+          if (opt.name === requestedDorsalData.name) {
+            if (opt.quantity > 0) {
+              opt.quantity -= 1;
+              changed = true;
+            }
+          }
+          return opt;
+        });
+        if (changed) {
+          prod.markModified('dorsalOptions');
+          await prod.save();
+        }
+      }
+    }
 
     if (esVenta) {
       updated.popularCountHistory.push({ date: new Date().toISOString(), quantity: restadas });
@@ -410,7 +435,6 @@ router.put('/:id', async (req, res) => {
       detalleText = changes.join(' | ');
     }
 
-    // Siempre crear historial si hubo cambios
     if (detalleText || esVenta) {
       let accionTexto = esVenta ? 'vendió / rebajó stock' : (restadas > 0 ? 'ajustó stock' : 'actualizó producto');
       
@@ -420,12 +444,17 @@ router.put('/:id', async (req, res) => {
         detalleText = `[ID:${prev._id}] | ${detalleText}`;
       }
 
+      // 🔥 2. INCORPORAR LA IMPRESIÓN DEL DORSAL AL TEXTO DEL HISTORIAL PARA LA IMPRENTA 🔥
+      detalleText += selectedDorsalText;
+
       await History.create({
         productId: prev._id,
         user: user,
         action: accionTexto,
         item: `${updated.name} (${updated.type})`,
         date: new Date(),
+        // Guardamos también un registro oculto para anular el dorsal si es necesario
+        dorsalRefundData: esVenta && requestedDorsalData?.name ? { name: requestedDorsalData.name, teamFont: prev.teamFont } : null,
         details: detalleText
       });
     }
@@ -437,9 +466,12 @@ router.put('/:id', async (req, res) => {
     };
 
     const io = req.app.get('io');
-    if (io) io.emit('productoActualizado', updatedObj);
+    if (io) {
+      io.emit('productoActualizado', updatedObj);
+      // Emitir evento de recarga si se descontó inventario global
+      if (esVenta && requestedDorsalData?.name) io.emit('inventarioDorsalActualizado');
+    }
 
-    // Mandar respuesta al cliente SOLO DESPUÉS de asegurar la base de datos
     res.status(200).json(updatedObj);
 
   } catch (err) {
@@ -453,8 +485,11 @@ router.post('/anular/:id', async (req, res) => {
   try {
     const { item, items } = req.body; 
 
+    // Obtener el registro histórico para ver si tenía un dorsal asociado
+    const historyEntry = await History.findById(req.params.id);
+
     if (!items || !Array.isArray(items) || items.length === 0) {
-      await History.findByIdAndDelete(req.params.id);
+      if (historyEntry) await History.findByIdAndDelete(req.params.id);
       return res.json({ success: true, message: "Historial borrado (no se detectaron tallas)." });
     }
 
@@ -479,7 +514,7 @@ router.post('/anular/:id', async (req, res) => {
     }
 
     if (!product) {
-       await History.findByIdAndDelete(req.params.id);
+       if (historyEntry) await History.findByIdAndDelete(req.params.id);
        return res.json({ success: true, message: "Historial borrado (El producto original ya no existe)." });
     }
 
@@ -508,11 +543,38 @@ router.post('/anular/:id', async (req, res) => {
     product.markModified('bodega');
     await product.save();
 
-    await History.findByIdAndDelete(req.params.id);
-    const io = req.app.get('io');
-    if (io) io.emit('productoActualizado', product.toObject());
+    // 🔥 3. SI LA VENTA TENÍA DORSAL, REVERTIMOS EL INVENTARIO DE LA IMPRENTA 🔥
+    if (historyEntry?.dorsalRefundData?.name) {
+       const relatedProducts = await Product.find({
+          isNumerable: true,
+          teamFont: historyEntry.dorsalRefundData.teamFont, 
+          'dorsalOptions.name': historyEntry.dorsalRefundData.name
+       });
+       for (let prod of relatedProducts) {
+          let changed = false;
+          prod.dorsalOptions = prod.dorsalOptions.map(opt => {
+            if (opt.name === historyEntry.dorsalRefundData.name) {
+              opt.quantity += 1;
+              changed = true;
+            }
+            return opt;
+          });
+          if (changed) {
+            prod.markModified('dorsalOptions');
+            await prod.save();
+          }
+       }
+    }
 
-    res.json({ success: true, message: "Venta anulada y stock devuelto al producto y tienda correctos." });
+    if (historyEntry) await History.findByIdAndDelete(req.params.id);
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('productoActualizado', product.toObject());
+      if (historyEntry?.dorsalRefundData?.name) io.emit('inventarioDorsalActualizado');
+    }
+
+    res.json({ success: true, message: "Venta anulada, stock de camisa y dorsal devueltos correctamente." });
   } catch (error) {
     console.error("Error al anular venta:", error);
     res.status(500).json({ error: "Error interno al anular la venta" });
@@ -602,7 +664,6 @@ router.get('/', async (req, res) => {
       ]));
     }
 
-    // AÑADIDO teamFont en la proyección
     const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 isNumerable teamFont dorsalOptions lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
