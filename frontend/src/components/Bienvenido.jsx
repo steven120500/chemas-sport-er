@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+
+// ⚠️ Estilos en index.css (sección "BIENVENIDO", clases bv-*).
+// El Tailwind del CDN es 2.2.19: no soporta valores arbitrarios (w-78, p-28, bg-black/90…).
 
 const FILTRO_OBJETIVO = 'Temp 26-27';
 
@@ -13,7 +17,18 @@ const productosNuevos = [
   { id: 8, equipo: 'PSG', busqueda: 'PSG', tipo: 'Visita', img: '/PSG2.png' },
 ];
 
+/* ============ Animaciones del encabezado ============ */
+const headerGroup = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] } },
+};
+
 const Bienvenido = ({ onNavigate }) => {
+  const reduceMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
   const scrollRef = useRef(null);
   const scrollPos = useRef(0);
@@ -30,13 +45,13 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🔄 Auto-scroll continuo garantizado para PC y Celulares
+  // 🔄 Auto-scroll continuo (se desactiva si el usuario pidió reducir movimiento)
   useEffect(() => {
     const scrollContainer = scrollRef.current;
-    if (!scrollContainer) return;
+    if (!scrollContainer || reduceMotion) return;
 
     scrollPos.current = scrollContainer.scrollLeft;
-    const speed = isMobile ? 0.9 : 1.1;
+    const speed = isMobile ? 0.6 : 0.8;
 
     let id;
     const step = () => {
@@ -60,9 +75,9 @@ const Bienvenido = ({ onNavigate }) => {
 
     id = requestAnimationFrame(step);
     return () => cancelAnimationFrame(id);
-  }, [isInteracting, isMobile]);
+  }, [isInteracting, isMobile, reduceMotion]);
 
-  // 🖱️ Control de arrastre con Mouse (Desktop)
+  // 🖱️ Arrastre con mouse (desktop)
   const handleMouseDown = (e) => {
     isDragging.current = true;
     hasMoved.current = false;
@@ -101,7 +116,7 @@ const Bienvenido = ({ onNavigate }) => {
     setTimeout(() => setIsInteracting(false), 1200);
   };
 
-  // 📱 Control táctil para Celular
+  // 📱 Táctil
   const handleTouchStart = () => {
     setIsInteracting(true);
   };
@@ -133,42 +148,43 @@ const Bienvenido = ({ onNavigate }) => {
   const marqueeItems = [...productosNuevos, ...productosNuevos, ...productosNuevos];
 
   return (
-    <section
-      className="relative w-full overflow-hidden flex flex-col justify-center items-center font-sans py-6 md:py-10 gap-4 md:gap-6 bg-black text-white select-none"
-    >
-      {/* 🎄 Animaciones */}
-      <style>{`
-        @keyframes floatItem {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
-        }
-        .anim-float {
-          animation: floatItem 4s ease-in-out infinite;
-        }
-      `}</style>
-
-      {/* 🖼️ FONDO NEGRO ELEGANTE CON TEXTURA */}
+    <section className="bv-section">
+      {/* Fondo: textura muy sutil + luces roja y verde */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0 pointer-events-none transition-all duration-700 scale-105 opacity-15"
-        style={{
-          backgroundImage: `url(${isMobile ? '/FondoMovil.png' : '/FondoDes.png'})`,
-        }}
+        className="bv-texture"
+        style={{ backgroundImage: `url(${isMobile ? '/FondoMovil.png' : '/FondoDes.png'})` }}
+        aria-hidden="true"
       />
-      <div className="absolute inset-0 bg-black/90 z-10 pointer-events-none" />
+      <div className="bv-glow" aria-hidden="true" />
 
       {/* 🏆 ENCABEZADO */}
-      <div className="relative z-20 flex flex-col items-center text-center px-4 max-w-4xl mx-auto mb-1 md:mb-2 pointer-events-none">
-        <h1 className="text-2xl md:text-5xl font-black uppercase tracking-tight text-green-600 drop-shadow-[0_2px_15px_rgba(220,38,38,0.4)] transition-all">
-          NUEVA TEMPORADA 26-27
-        </h1>
-      </div>
+      <motion.div
+        className="bv-header"
+        variants={headerGroup}
+        initial={reduceMotion ? false : 'hidden'}
+        whileInView="show"
+        viewport={{ once: true, amount: 0.4 }}
+      >
+        <motion.span variants={fadeUp} className="bv-eyebrow">
+          <i className="bv-eyebrow-dot" />
+          Recién llegadas
+        </motion.span>
+        <motion.h2 variants={fadeUp} className="bv-title">
+          Nueva temporada <span className="bv-title-accent">26/27</span>
+        </motion.h2>
+        <motion.p variants={fadeUp} className="bv-subtitle">
+          Las camisetas de los grandes de Europa ya están en tienda.
+        </motion.p>
+      </motion.div>
 
-      {/* 🚀 CINTA DESLIZABLE */}
-      <div className="relative z-20 w-full overflow-hidden py-2 md:py-4">
-        {/* Degradados laterales oscuros para fundirse con el fondo negro */}
-        <div className="absolute top-0 left-0 bottom-0 w-12 md:w-36 bg-gradient-to-r from-black via-black/80 to-transparent z-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 bottom-0 w-12 md:w-36 bg-gradient-to-l from-black via-black/80 to-transparent z-30 pointer-events-none" />
-
+      {/* 🚀 CARRUSEL */}
+      <motion.div
+        className="bv-track-wrap"
+        initial={reduceMotion ? false : { opacity: 0, x: 60 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+      >
         <div
           ref={scrollRef}
           onMouseDown={handleMouseDown}
@@ -178,91 +194,75 @@ const Bienvenido = ({ onNavigate }) => {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          className="flex gap-6 md:gap-8 px-6 overflow-x-auto cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-2"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          className="bv-track"
         >
-          {marqueeItems.map((item, index) => {
-            const isPSG = item.equipo === 'PSG';
-            // 🎄 Intercalado: una caja Roja (red-600) y una caja Verde (green-700) 🎄
-            const isRedCard = index % 2 === 0;
-
-            return (
-              <div
-                key={`${item.id}-${index}`}
-                className={`group relative ${
-                  isRedCard
-                    ? "bg-red-600 shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:shadow-[0_15px_40px_rgba(220,38,38,0.5)]"
-                    : "bg-green-700 shadow-[0_10px_30px_rgba(21,128,61,0.3)] hover:shadow-[0_15px_40px_rgba(21,128,61,0.5)]"
-                } border-2 border-white/20 rounded-3xl flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1.5 shrink-0 select-none ${
-                  isPSG
-                    ? "w-100 sm:w-80 md:w-80 lg:w-96 p-10 md:p-36"
-                    : "w-78 sm:w-50 md:w-50 lg:w-78 p-6 md:p-28"
-                }`}
-              >
-                {/* Tag superior en blanco */}
-                <div className="relative z-10 flex items-center justify-between pointer-events-none">
-                  <span className="text-xs font-extrabold tracking-[0.25em] text-white uppercase whitespace-nowrap">
-                    TEMP 26-27
-                  </span>
-                </div>
-
-                {/* Camiseta */}
-                <div className="relative z-10 flex items-center justify-center my-4 md:my-6 h-48 sm:h-56 md:h-64 pointer-events-none overflow-visible">
-                  <div 
-                    style={{
-                      transform: isPSG
-                        ? (isMobile ? 'scale(1.45)' : 'scale(2.00)')
-                        : (isMobile ? 'scale(1.00)' : 'scale(1.10)')
-                    }}
-                    className="flex items-center justify-center h-full w-full transition-transform duration-300"
-                  >
-                    <img
-                      src={item.img}
-                      alt={`${item.equipo} ${item.tipo}`}
-                      draggable={false}
-                      className="anim-float max-h-full w-auto object-contain drop-shadow-[0_15px_25px_rgba(0,0,0,0.5)] group-hover:drop-shadow-[0_10px_25px_rgba(255,255,255,0.6)] transition-all duration-500 select-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Nombre, tipo y botón */}
-                <div className="relative z-10 mt-2 border-t border-white/30 pt-3 md:pt-4 text-center">
-                  <h3 className="text-base md:text-lg font-black uppercase text-white tracking-wide truncate pointer-events-none">
-                    {item.equipo}
-                  </h3>
-                  <p className="text-xs font-bold uppercase tracking-widest text-white/90 mt-0.5 pointer-events-none">
-                    {item.tipo}
-                  </p>
-
-                  <button
-                    onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
-                    className="mt-3.5 w-full py-2.5 px-4 rounded-full bg-white text-black font-black text-xs uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border-2 border-white shadow-md hover:scale-105 cursor-pointer active:scale-95 whitespace-nowrap hover:bg-black hover:text-white"
-                  >
-                    <span>Ver {item.equipo}</span>
-                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </button>
-                </div>
+          {marqueeItems.map((item, index) => (
+            <div
+              key={`${item.id}-${index}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Ver camisetas ${item.equipo} ${item.tipo}`}
+              onClick={() => handleIrAProductos(FILTRO_OBJETIVO, item.busqueda)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleIrAProductos(FILTRO_OBJETIVO, item.busqueda);
+                }
+              }}
+              className={`bv-card ${index % 2 === 0 ? 'bv-card--red' : 'bv-card--green'}`}
+            >
+              <div className="bv-card-top">
+                <span className="bv-tag">Temp 26/27</span>
+                <span className="bv-kit">{item.tipo}</span>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* ⚡ BOTÓN INFERIOR GENERAL */}
-      <div className="relative z-20 flex flex-col items-center w-full mt-2 md:mt-3">
-        <button
-          onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')}
-          className="group px-8 py-3.5 md:px-12 md:py-4 rounded-full bg-red-600 hover:bg-green-700 text-white border-2 border-white font-black text-xs md:text-sm uppercase tracking-widest transition-all duration-300 hover:scale-105 shadow-[0_5px_20px_rgba(220,38,38,0.4)] flex items-center gap-3 cursor-pointer active:scale-95 whitespace-nowrap"
-        >
-          <span>VER TODA LA COLECCIÓN</span>
-          <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <div className="bv-jersey">
+                <span className="bv-watermark" aria-hidden="true">26</span>
+                <span className="bv-spot" aria-hidden="true" />
+                <img
+                  src={item.img}
+                  alt={`Camiseta ${item.equipo} ${item.tipo} 26-27`}
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                  className="bv-img"
+                  style={{ animationDelay: `${(index % 4) * -1}s` }}
+                />
+              </div>
+
+              <div className="bv-card-bottom">
+                <div className="bv-team">
+                  <h3>{item.equipo}</h3>
+                  <span>Ver colección</span>
+                </div>
+                <span className="bv-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" />
+                    <path d="m13 6 6 6-6 6" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* ⚡ CTA GENERAL */}
+      <motion.div
+        className="bv-cta-wrap"
+        initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+      >
+        <button type="button" onClick={() => handleIrAProductos(FILTRO_OBJETIVO, '')} className="bv-cta">
+          <span>Ver toda la colección</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
           </svg>
         </button>
-      </div>
-
+      </motion.div>
     </section>
   );
 };
