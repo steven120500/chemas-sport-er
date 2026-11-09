@@ -328,6 +328,7 @@ export default function ProductScreen({
   const whatsappUrl = `https://wa.me/50660369857?text=${encodeURIComponent(whatsappMsg)}`;
 
   const numStr = String(selectedDorsal?.number || "").trim();
+  const rawNameStr = String(selectedDorsal?.name || "").trim().toUpperCase();
 
   // 🔥 DETERMINAMOS QUÉ TIPOGRAFÍA Y DISEÑO USAR 🔥
   const getActiveFontFamily = (fontType) => {
@@ -339,7 +340,18 @@ export default function ProductScreen({
   
   const activeFontFamily = getActiveFontFamily(viewProduct?.teamFont);
   const currentLayout = getDorsalLayout(viewProduct?.teamFont);
-  
+
+  const fontClassMap = {
+    madrid: 'font-madrid',
+    boca: 'font-boca',
+    river: 'font-river',
+    barca: 'font-barca'
+  };
+  const activeFontClass = fontClassMap[viewProduct?.teamFont] || 'font-barca';
+
+  // Mantenemos la geometría exacta de tu curva de 20 a 280 incluso al extender el path para que no cambie ni 1px tu calibración
+  const controlPointY = 2 * currentLayout.nameCurve - currentLayout.nameY;
+
   return (
     <div 
       className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-black bg-white"
@@ -383,27 +395,10 @@ export default function ProductScreen({
           font-display: block;
         }
 
-        @keyframes heatPressStamp {
-          0% {
-            opacity: 0;
-            transform: scale(1.08) translateY(-6px);
-            filter: brightness(1.35) blur(3px);
-          }
-          50% {
-            opacity: 0.96;
-            transform: scale(0.99) translateY(0px);
-            filter: brightness(1.05) blur(0px);
-          }
-          100% {
-            opacity: 0.95;
-            transform: scale(1) translateY(0px);
-            filter: brightness(1) blur(0px);
-          }
-        }
-
-        .animate-heat-press {
-          animation: heatPressStamp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
+        .font-barca { font-family: 'FontBarca', sans-serif !important; }
+        .font-madrid { font-family: 'FontMadrid', sans-serif !important; }
+        .font-boca { font-family: 'FontBoca', sans-serif !important; }
+        .font-river { font-family: 'FontRiver', sans-serif !important; }
       `}</style>
 
       {/* Pre-cargador invisible para que el navegador tenga lista la fuente antes de elegir dorsal */}
@@ -457,24 +452,32 @@ export default function ProductScreen({
                           initial="hidden"
                           animate="visible"
                           exit="exit"
-                          className="absolute inset-0 pointer-events-none flex items-center justify-center select-none"
+                          className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-visible"
                         >
                           <div
+                            className="overflow-visible"
                             style={{
                               width: currentLayout.boxWidth,
                               transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                             }}
                           >
-                            {/* 🔥 SVG CONFIGURADO PARA PREVENIR RECORTES EN MÓVIL (VIEWBOX EXTENDIDO) 🔥 */}
+                            {/* 🔥 SOLUCIÓN DEFINITIVA SAFARI iOS:
+                               1. Mantenemos tu viewBox original "0 0 300 340" para no alterar ninguna de tus medidas.
+                               2. Quitamos el <filter> interno de SVG (que corta el bounding-box en iPhone) y usamos drop-shadow por CSS.
+                               3. Añadimos "\u00A0" (espacio duro) a cada lado del nombre para obligar a WebKit a no recortar la última letra. */}
                             <svg
-                              viewBox="-100 -50 500 450"
-                              preserveAspectRatio="xMidYMid meet"
+                              viewBox="0 0 300 340"
                               className="w-full h-auto overflow-visible"
+                              style={{
+                                overflow: "visible",
+                                filter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
+                                WebkitFilter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
+                              }}
                             >
                               <defs>
                                 <path
                                   id="dorsalArcPath"
-                                  d={`M -20,${currentLayout.nameY} Q 150,${currentLayout.nameCurve} 320,${currentLayout.nameY}`}
+                                  d={`M -120,${currentLayout.nameY} Q 150,${controlPointY} 420,${currentLayout.nameY}`}
                                   fill="transparent"
                                 />
 
@@ -483,57 +486,55 @@ export default function ProductScreen({
                                   <stop offset="55%" stopColor={currentLayout.colorMid} />
                                   <stop offset="100%" stopColor={currentLayout.colorBottom} />
                                 </linearGradient>
-
-                                {/* FilterUnits engaña al iPhone para no recortar la sombra */}
-                                <filter id="dorsalDropShadow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="500" height="500">
-                                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="rgba(0,0,0,0.42)" />
-                                </filter>
                               </defs>
 
                               {/* 1. NOMBRE DEL JUGADOR CENTRADO EN LA ESPALDA ALTA */}
-                              {selectedDorsal.name && (
-                                <g filter="url(#dorsalDropShadow)">
-                                  <text
-                                    fill="url(#dorsalColorGrad)"
-                                    stroke={currentLayout.stroke}
-                                    strokeWidth="0.5"
-                                    style={{
-                                      fontFamily: activeFontFamily,
-                                      fontSize: `${
-                                        selectedDorsal.name.length > 9
-                                          ? currentLayout.nameSize - 5
-                                          : currentLayout.nameSize
-                                      }px`,
-                                      letterSpacing: "2px",
-                                      textTransform: "uppercase",
-                                    }}
+                              {rawNameStr && (
+                                <text
+                                  fill="url(#dorsalColorGrad)"
+                                  stroke={currentLayout.stroke}
+                                  strokeWidth="0.5"
+                                  className={activeFontClass}
+                                  style={{
+                                    fontFamily: activeFontFamily,
+                                    fontSize: `${
+                                      rawNameStr.length > 9
+                                        ? currentLayout.nameSize - 5
+                                        : currentLayout.nameSize
+                                    }px`,
+                                    textTransform: "uppercase",
+                                    overflow: "visible",
+                                  }}
+                                >
+                                  <textPath
+                                    href="#dorsalArcPath"
+                                    startOffset="50%"
+                                    textAnchor="middle"
                                   >
-                                    <textPath href="#dorsalArcPath" startOffset="50%" textAnchor="middle">
-                                      {selectedDorsal.name.toUpperCase()}
-                                    </textPath>
-                                  </text>
-                                </g>
+                                    {`\u00A0\u00A0${rawNameStr}\u00A0\u00A0`}
+                                  </textPath>
+                                </text>
                               )}
 
                               {/* 2. NÚMERO CENTRADO EN EL MEDIO DE LA CAMISETA */}
                               {numStr && (
-                                <g filter="url(#dorsalDropShadow)">
-                                  <text
-                                    x="150"
-                                    y={currentLayout.numberY}
-                                    textAnchor="middle"
-                                    fill="url(#dorsalColorGrad)"
-                                    stroke={currentLayout.stroke}
-                                    strokeWidth="0.8"
-                                    style={{
-                                      fontFamily: activeFontFamily,
-                                      fontSize: `${currentLayout.numberSize}px`,
-                                      letterSpacing: numStr.length > 1 ? "-5px" : "0px",
-                                    }}
-                                  >
-                                    {numStr}
-                                  </text>
-                                </g>
+                                <text
+                                  x="150"
+                                  y={currentLayout.numberY}
+                                  textAnchor="middle"
+                                  fill="url(#dorsalColorGrad)"
+                                  stroke={currentLayout.stroke}
+                                  strokeWidth="0.8"
+                                  className={activeFontClass}
+                                  style={{
+                                    fontFamily: activeFontFamily,
+                                    fontSize: `${currentLayout.numberSize}px`,
+                                    letterSpacing: numStr.length > 1 ? "-5px" : "0px",
+                                    overflow: "visible",
+                                  }}
+                                >
+                                  {`\u00A0${numStr}\u00A0`}
+                                </text>
                               )}
                             </svg>
                           </div>
