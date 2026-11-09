@@ -15,9 +15,11 @@ const TALLAS_BALON = ["3", "4", "5"];
 const MODAL_IMG_MAX_W = 800;
 
 /* =====================================================================
-   🎯 PANEL DE CALIBRACIÓN DEL DORSAL (BARÇA, MADRID, BOCA, RIVER)
+   🎯 PANEL DE CALIBRACIÓN INDEPENDIENTE (PLAYER VS FAN)
    ===================================================================== */
-const getDorsalLayout = (teamFont) => {
+const getDorsalLayout = (teamFont, productType = "") => {
+  const isPlayer = productType.toLowerCase().includes("player");
+
   if (teamFont === 'madrid') {
     return {
       boxWidth: "60%",      
@@ -37,9 +39,10 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "56%",       
-      offsetY: "-25%",       
-      offsetX: "-6%",       
+      // 🔥 CONFIGURACIÓN SEPARADA PARA BOCA (PLAYER / FAN) 🔥
+      boxWidth: isPlayer ? "56%": "54%",       
+      offsetY: isPlayer ? "-25%": "-26%",       
+      offsetX: isPlayer ? "-6%": "2%",       
       nameY: 125,           
       nameCurve: 120,       
       nameSize: 38,         
@@ -54,9 +57,10 @@ const getDorsalLayout = (teamFont) => {
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "56%",      
-      offsetY: "-25%",       
-      offsetX: "-3%",       
+      // 🔥 CONFIGURACIÓN SEPARADA PARA RIVER (PLAYER / FAN) 🔥
+      boxWidth: isPlayer ? "56%": "54%",      
+      offsetY: isPlayer ? "-25%": "-22%",       
+      offsetX: isPlayer ? "-3%": "-2%",       
       nameY: 120,           
       nameCurve: 128,       
       nameSize: 38,         
@@ -330,7 +334,7 @@ export default function ProductScreen({
   const numStr = String(selectedDorsal?.number || "").trim();
   const rawNameStr = String(selectedDorsal?.name || "").trim().toUpperCase();
 
-  // 🔥 DETERMINAMOS QUÉ TIPOGRAFÍA Y DISEÑO USAR 🔥
+  // 🔥 PASAMOS EL TIPO DE PRODUCTO (Player / Fan) PARA QUE SE CALIBRE AUTOMÁTICAMENTE 🔥
   const getActiveFontFamily = (fontType) => {
     if (fontType === 'madrid') return "'FontMadrid', sans-serif";
     if (fontType === 'boca') return "'FontBoca', sans-serif";
@@ -339,7 +343,7 @@ export default function ProductScreen({
   };
   
   const activeFontFamily = getActiveFontFamily(viewProduct?.teamFont);
-  const currentLayout = getDorsalLayout(viewProduct?.teamFont);
+  const currentLayout = getDorsalLayout(viewProduct?.teamFont, viewProduct?.type);
 
   const fontClassMap = {
     madrid: 'font-madrid',
@@ -349,14 +353,12 @@ export default function ProductScreen({
   };
   const activeFontClass = fontClassMap[viewProduct?.teamFont] || 'font-barca';
 
-  // Mantenemos la geometría exacta de tu curva de 20 a 280 incluso al extender el path para que no cambie ni 1px tu calibración
   const controlPointY = 2 * currentLayout.nameCurve - currentLayout.nameY;
 
   return (
     <div 
       className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-black bg-white"
     >
-      {/* 🔥 CARGA DIRECTA DESDE /public/fonts/ CON LOS NOMBRES EXACTOS DE TUS ARCHIVOS 🔥 */}
       <style>{`
         @font-face {
           font-family: 'FontBarca';
@@ -401,7 +403,6 @@ export default function ProductScreen({
         .font-river { font-family: 'FontRiver', sans-serif !important; }
       `}</style>
 
-      {/* Pre-cargador invisible para que el navegador tenga lista la fuente antes de elegir dorsal */}
       <div aria-hidden="true" className="opacity-0 pointer-events-none fixed -top-96 -left-96 select-none">
         <span style={{ fontFamily: "'FontBarca'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
         <span style={{ fontFamily: "'FontMadrid'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
@@ -431,7 +432,6 @@ export default function ProductScreen({
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
-            {/* LADO IZQUIERDO: GALERÍA DE VISUALIZACIÓN + ESTAMPADO CENTRADO */}
             <div className="w-full">
               <div className="relative flex items-center justify-center bg-gray-50 rounded-3xl p-6 border border-gray-200 shadow-sm overflow-hidden">
                 {displayUrl ? (
@@ -443,7 +443,6 @@ export default function ProductScreen({
                       loading="lazy"
                     />
 
-                    {/* 🔥 CAPA DE DORSAL CON ANIMACIÓN PREMIUM (ENTRADA Y SALIDA) 🔥 */}
                     <AnimatePresence mode="wait">
                       {selectedDorsal && idx === 1 && (
                         <motion.div
@@ -461,10 +460,6 @@ export default function ProductScreen({
                               transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                             }}
                           >
-                            {/* 🔥 SOLUCIÓN DEFINITIVA SAFARI iOS:
-                               1. Mantenemos tu viewBox original "0 0 300 340" para no alterar ninguna de tus medidas.
-                               2. Quitamos el <filter> interno de SVG (que corta el bounding-box en iPhone) y usamos drop-shadow por CSS.
-                               3. Añadimos "\u00A0" (espacio duro) a cada lado del nombre para obligar a WebKit a no recortar la última letra. */}
                             <svg
                               viewBox="0 0 300 340"
                               className="w-full h-auto overflow-visible"
@@ -488,7 +483,6 @@ export default function ProductScreen({
                                 </linearGradient>
                               </defs>
 
-                              {/* 1. NOMBRE DEL JUGADOR CENTRADO EN LA ESPALDA ALTA */}
                               {rawNameStr && (
                                 <text
                                   fill="url(#dorsalColorGrad)"
@@ -516,7 +510,6 @@ export default function ProductScreen({
                                 </text>
                               )}
 
-                              {/* 2. NÚMERO CENTRADO EN EL MEDIO DE LA CAMISETA */}
                               {numStr && (
                                 <text
                                   x="150"
@@ -556,7 +549,6 @@ export default function ProductScreen({
               </div>
             </div>
 
-            {/* LADO DERECHO: INFO Y TALLAS / UNIDADES */}
             <div className="w-full flex flex-col">
               <div className="mb-8">
                 <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm border border-black">{viewProduct?.type}</span>
@@ -573,7 +565,6 @@ export default function ProductScreen({
                   <p className="text-5xl font-black text-black tracking-tight mb-6">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
                 )}
 
-                {/* 🔥 AVISO PREMIUM DE CORTE AJUSTADO (Solo en Player y Mujer) 🔥 */}
                 {isCorteAjustado && (
                   <div className="relative overflow-hidden rounded-2xl bg-gray-50 border border-gray-200 p-4 shadow-sm">
                     <div className="flex items-start sm:items-center gap-3.5">
@@ -595,7 +586,6 @@ export default function ProductScreen({
                 )}
               </div>
 
-              {/* 🔥 SELECT DESPLEGABLE DE DORSALES (SOLO SI HAY STOCK > 0) 🔥 */}
               {availableDorsals.length > 0 && (
                 <div className="mb-8 p-5 rounded-3xl border border-gray-200 bg-gray-50 shadow-sm">
                   <label className="block text-xs font-black text-black uppercase tracking-widest mb-2.5 flex items-center gap-2">
@@ -628,7 +618,6 @@ export default function ProductScreen({
               )}
 
               <div className="mb-8">
-                {/* 🔥 CABECERA DE TALLAS + BOTÓN PREMIUM DE VER MEDIDAS 🔥 */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                     {isLlavero ? 'Selecciona la Unidad' : 'Selecciona una Talla'} {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
