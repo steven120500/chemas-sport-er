@@ -41,11 +41,11 @@ const getDorsalLayout = (teamFont) => {
       offsetY: "-20%",       
       offsetX: "-0%",       
       nameY: 125,           
-      nameCurve: 120,       // Boca usa texto recto (nameCurve = nameY)
+      nameCurve: 120,       
       nameSize: 38,         
       numberY: 295,         
       numberSize: 200,      
-      colorTop: "#FFFFFF",  // Letras y números blancos
+      colorTop: "#FFFFFF",  
       colorMid: "#F3F4F6",  
       colorBottom: "#E5E7EB", 
       stroke: "rgba(0,0,0,0.1)" 
@@ -275,7 +275,6 @@ export default function ProductScreen({
     setSelectedDorsalIndex(val);
     setDorsalAnimKey((prev) => prev + 1);
 
-    // Si selecciona un dorsal y hay segunda foto (espalda), salta directo a la foto 2
     if (val !== "" && galleryFromProduct.length > 1) {
       setIdx(1);
     }
@@ -341,16 +340,6 @@ export default function ProductScreen({
   const activeFontFamily = getActiveFontFamily(viewProduct?.teamFont);
   const currentLayout = getDorsalLayout(viewProduct?.teamFont);
   
-  // Clases utilitarias para aplicar la fuente
-  const fontClassMap = {
-    madrid: 'font-madrid',
-    boca: 'font-boca',
-    river: 'font-river',
-    barca: 'font-barca'
-  };
-  const activeFontClass = fontClassMap[viewProduct?.teamFont] || 'font-barca';
-
-
   return (
     <div 
       className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-black bg-white"
@@ -393,11 +382,6 @@ export default function ProductScreen({
           font-style: normal;
           font-display: block;
         }
-
-        .font-barca { font-family: 'FontBarca', sans-serif !important; }
-        .font-madrid { font-family: 'FontMadrid', sans-serif !important; }
-        .font-boca { font-family: 'FontBoca', sans-serif !important; }
-        .font-river { font-family: 'FontRiver', sans-serif !important; }
 
         @keyframes heatPressStamp {
           0% {
@@ -484,25 +468,24 @@ export default function ProductScreen({
                             {/* 🔥 SVG CONFIGURADO PARA PREVENIR RECORTES EN MÓVIL (VIEWBOX EXTENDIDO) 🔥 */}
                             <svg
                               viewBox="-100 -50 500 450"
+                              preserveAspectRatio="xMidYMid meet"
                               className="w-full h-auto overflow-visible"
                             >
                               <defs>
-                                {/* Curva extendida (de -20 a 320) para evitar que nombres largos topen con el borde */}
                                 <path
                                   id="dorsalArcPath"
                                   d={`M -20,${currentLayout.nameY} Q 150,${currentLayout.nameCurve} 320,${currentLayout.nameY}`}
                                   fill="transparent"
                                 />
 
-                                {/* Degradado de Color Dinámico */}
                                 <linearGradient id="dorsalColorGrad" x1="0%" y1="0%" x2="15%" y2="100%">
                                   <stop offset="0%" stopColor={currentLayout.colorTop} />
                                   <stop offset="55%" stopColor={currentLayout.colorMid} />
                                   <stop offset="100%" stopColor={currentLayout.colorBottom} />
                                 </linearGradient>
 
-                                {/* Filtro extendido (-50% a 200%) para que la sombra no rebane los bordes de la letra */}
-                                <filter id="dorsalDropShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                {/* FilterUnits engaña al iPhone para no recortar la sombra */}
+                                <filter id="dorsalDropShadow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="500" height="500">
                                   <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="rgba(0,0,0,0.42)" />
                                 </filter>
                               </defs>
@@ -514,7 +497,6 @@ export default function ProductScreen({
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.5"
-                                    className={activeFontClass}
                                     style={{
                                       fontFamily: activeFontFamily,
                                       fontSize: `${
@@ -543,7 +525,6 @@ export default function ProductScreen({
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.8"
-                                    className={activeFontClass}
                                     style={{
                                       fontFamily: activeFontFamily,
                                       fontSize: `${currentLayout.numberSize}px`,
