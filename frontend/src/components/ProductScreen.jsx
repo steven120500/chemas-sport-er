@@ -25,7 +25,7 @@ const getDorsalLayout = (teamFont) => {
       offsetX: "-1%",       
       nameY: 123,           
       nameCurve: 120,       
-      nameSize: 45,         
+      nameSize: 38,         
       numberY: 285,         
       numberSize: 195,      
       colorTop: "#1A362D",    
@@ -42,7 +42,7 @@ const getDorsalLayout = (teamFont) => {
       offsetX: "-0%",       
       nameY: 125,           
       nameCurve: 120,       // Boca usa texto recto (nameCurve = nameY)
-      nameSize: 45,         
+      nameSize: 38,         
       numberY: 295,         
       numberSize: 200,      
       colorTop: "#FFFFFF",  // Letras y números blancos
@@ -59,7 +59,7 @@ const getDorsalLayout = (teamFont) => {
       offsetX: "0%",       
       nameY: 120,           
       nameCurve: 128,       
-      nameSize: 46,         
+      nameSize: 38,         
       numberY: 290,         
       numberSize: 198,      
       colorTop: "#333333",  
