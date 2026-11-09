@@ -32,7 +32,7 @@ function parseLogDetails(log) {
   let dorsalLinea = "";
   const matchDorsal = detailsStr.match(/Dorsal Impreso:\s*([^|]+)/i);
   if (matchDorsal && matchDorsal[1]) {
-    dorsalLinea = `Numero: ${matchDorsal[1].trim()}`;
+    dorsalLinea = `Numero: ${matchDorsal[1].trim()} (impresion)`;
   }
 
   const items = [];
@@ -61,7 +61,7 @@ function parseLogDetails(log) {
         const cantidad = oldV - newV;
 
         for (let i = 0; i < cantidad; i++) {
-          let bloque = `- CAMISETA: ${nombreChema} talla ${talla}\nUBICACIÓN: ${tienda}`;
+          let bloque = `•⁠  ⁠CAMISETA: ${nombreChema} talla ${talla}\nUBICACIÓN: ${tienda}`;
           if (dorsalLinea) bloque += `\n${dorsalLinea}`;
           items.push(bloque);
         }
@@ -75,7 +75,7 @@ function parseLogDetails(log) {
     else if (detailsStr.includes("Bodega 1") || detailsStr.includes("Tienda #1")) tiendaF = "Bodega 1";
     else if (detailsStr.includes("Tienda")) tiendaF = "Tienda";
     
-    let bloque = `- CAMISETA: ${nombreChema}\nUBICACIÓN: ${tiendaF}`;
+    let bloque = `•⁠  ⁠CAMISETA: ${nombreChema}\nUBICACIÓN: ${tiendaF}`;
     if (dorsalLinea) bloque += `\n${dorsalLinea}`;
     items.push(bloque);
   }

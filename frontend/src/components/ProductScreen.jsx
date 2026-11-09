@@ -20,14 +20,14 @@ const MODAL_IMG_MAX_W = 800;
 const getDorsalLayout = (teamFont) => {
   if (teamFont === 'madrid') {
     return {
-      boxWidth: "80%",      
+      boxWidth: "60%",      
       offsetY: "-15%",       
       offsetX: "-1%",       
       nameY: 123,           
       nameCurve: 120,       
       nameSize: 38,         
       numberY: 285,         
-      numberSize: 195,      
+      numberSize: 180,      
       colorTop: "#1A362D",    
       colorMid: "#122A21",    
       colorBottom: "#0A1712", 
@@ -37,8 +37,8 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "80%",       
-      offsetY: "-20%",       
+      boxWidth: "60%",       
+      offsetY: "-25%",       
       offsetX: "-0%",       
       nameY: 125,           
       nameCurve: 120,       
@@ -54,8 +54,8 @@ const getDorsalLayout = (teamFont) => {
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "85%",      
-      offsetY: "-12%",       
+      boxWidth: "60%",      
+      offsetY: "-15%",       
       offsetX: "0%",       
       nameY: 120,           
       nameCurve: 128,       
@@ -71,13 +71,13 @@ const getDorsalLayout = (teamFont) => {
 
   // Por defecto (Barcelona)
   return {
-    boxWidth: "90%",      
-    offsetY: "-20%",       
+    boxWidth: "60%",      
+    offsetY: "-0%",       
     offsetX: "-3%",       
-    nameY: 170,           
-    nameCurve: 70,       
+    nameY: 160,           
+    nameCurve: 30,       
     nameSize: 50,         
-    numberY: 272,         
+    numberY: 190,         
     numberSize: 210,      
     colorTop: "#FFE600",
     colorMid: "#F5C400",

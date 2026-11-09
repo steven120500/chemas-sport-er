@@ -82,7 +82,9 @@ function buildPages(page, pages) {
   return pageNumbers;
 }
 
-const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Ema", "Johan", "Johanna", "Jose", "JuanPa", "Stef", "Melissa", "Ashly"];
+// 🔥 LISTA DE VENDEDORES BASE (Sin Ema, Johan ni Melissa) 🔥
+const BASE_USERS = ["Alisson", "Angie", "ChemaSportER", "Johanna", "Jose", "JuanPa", "Stef", "Ashly"];
+const EXCLUDED_USERS = new Set(["ema", "johan", "melissa"]);
 
 function extractClienteSeguro(detailsStr) {
   if (typeof detailsStr !== "string") return "Cliente General";
@@ -103,6 +105,15 @@ function parseSaleDetails(log) {
   const rawIdSearch = `${log?.productId || ''} ${log?.itemId || ''} ${detailsStr}`;
   const [, idHex] = rawIdSearch.match(/([a-f0-9]{24})/i) || [];
   const productId = idHex || null;
+
+  // 🔥 DETECTAR SI LA VENTA INCLUYE DORSAL IMPRESO 🔥
+  let dorsalTexto = "";
+  const matchDorsal = detailsStr.match(/Dorsal Impreso:\s*([^|]+)/i);
+  if (matchDorsal && matchDorsal[1]) {
+    dorsalTexto = matchDorsal[1].trim();
+  } else if (log?.dorsalRefundData?.name || log?.dorsalRefundData?.number) {
+    dorsalTexto = `${log.dorsalRefundData.name || ""} #${log.dorsalRefundData.number || ""}`.trim();
+  }
 
   const cleanDetails = detailsStr.replace(/\[ID:[^\]]+\]\s*\|?\s*/gi, "").trim();
 
@@ -174,6 +185,7 @@ function parseSaleDetails(log) {
     items, 
     totalUnidades: unidadesFinales, 
     tallasTexto, 
+    dorsalTexto,
     productId, 
     rawDetails: detailsStr,
     precioEnLog
@@ -620,6 +632,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     BASE_USERS.forEach((u) => (conteo[u] = { ventas: 0, unidades: 0 }));
     ventasFiltradas.forEach((v) => {
       const vend = v.vendedor || "Otros";
+      if (EXCLUDED_USERS.has(normText(vend))) return;
       if (!conteo[vend]) conteo[vend] = { ventas: 0, unidades: 0 };
       conteo[vend].ventas += 1;
       conteo[vend].unidades += v.totalUnidades;
@@ -628,6 +641,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     const mesContrapedidos = contrapedidosMes[selectedMonth] || {};
 
     return Object.entries(conteo)
+      .filter(([vendedor]) => !EXCLUDED_USERS.has(normText(vendedor)))
       .map(([vendedor, stats]) => {
         const contrapedidoUds = Number(mesContrapedidos[vendedor]) || 0;
         const stockUds = stats.unidades;
@@ -652,7 +666,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const tablaVentas = useMemo(() => {
     if (!searchFilter.trim()) return ventasFiltradas;
     const q = searchFilter.toLowerCase();
-    return ventasFiltradas.filter((v) => v.vendedor.toLowerCase().includes(q) || v.cliente.toLowerCase().includes(q) || String(v.item || "").toLowerCase().includes(q));
+    return ventasFiltradas.filter((v) => v.vendedor.toLowerCase().includes(q) || v.cliente.toLowerCase().includes(q) || String(v.item || "").toLowerCase().includes(q) || String(v.dorsalTexto || "").toLowerCase().includes(q));
   }, [ventasFiltradas, searchFilter]);
 
   const totalPages = Math.max(1, Math.ceil(tablaVentas.length / itemsPerPage));
@@ -669,7 +683,9 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const restoRanking = ranking.slice(3);
   
   const totalPrendasStockMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
-  const totalPrendasContrapedidoMes = Object.values(contrapedidosMes[selectedMonth] || {}).reduce((a, b) => a + Number(b), 0);
+  const totalPrendasContrapedidoMes = Object.entries(contrapedidosMes[selectedMonth] || {})
+    .filter(([vend]) => !EXCLUDED_USERS.has(normText(vend)))
+    .reduce((a, [, b]) => a + Number(b), 0);
   const totalPrendasMes = totalPrendasStockMes + totalPrendasContrapedidoMes;
   const totalComisionesMes = ranking.reduce((acc, r) => acc + r.totalComision, 0);
 
@@ -768,7 +784,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       return `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; font-weight: 900; color: #000; margin-bottom: 6px;">
           <span style="flex: 1; padding-right: 8px;">
-            ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''}
+            ${cant}x ${v.item} ${v.tallasTexto ? `(Talla: ${v.tallasTexto})` : ''} ${v.dorsalTexto ? `[Impresión: ${v.dorsalTexto}]` : ''}
           </span>
           <span style="font-weight: 900; white-space: nowrap;">
             ₡${subtotalLinea.toLocaleString("es-CR")}
@@ -1174,7 +1190,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <td class="font-bold">${v.vendedor}</td>
                     <td>${v.cliente}</td>
                     <td class="font-bold">₡${precioFila.toLocaleString("es-CR")}</td>
-                    <td>${v.item}${v.tallasTexto ? ` (${v.tallasTexto})` : ""}</td>
+                    <td>${v.item}${v.tallasTexto ? ` (${v.tallasTexto})` : ""}${v.dorsalTexto ? ` [Impresión: ${v.dorsalTexto}]` : ""}</td>
                     <td class="text-right font-bold">${v.totalUnidades}</td>
                   </tr>
                 `;
@@ -1604,7 +1620,18 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
                           <td className="py-3.5 px-3 text-zinc-700">
                             <span className="font-bold text-black block">{venta.item}</span>
-                            {venta.tallasTexto && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">Tallas: {venta.tallasTexto}</span>}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              {venta.tallasTexto && (
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 font-mono text-[10px] font-bold">
+                                  Tallas: {venta.tallasTexto}
+                                </span>
+                              )}
+                              {venta.dorsalTexto && (
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 font-mono text-[10px] font-black uppercase">
+                                  Impresión: {venta.dorsalTexto}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5 px-3 font-black text-right text-sm text-black">{venta.totalUnidades}</td>
                           <td className="py-3.5 px-3 text-center">
