@@ -15,7 +15,7 @@ const TALLAS_BALON = ["3", "4", "5"];
 const MODAL_IMG_MAX_W = 800;
 
 /* =====================================================================
-   🎯 PANEL DE CALIBRACIÓN DEL DORSAL (BARÇA VS MADRID)
+   🎯 PANEL DE CALIBRACIÓN DEL DORSAL (BARÇA, MADRID, BOCA, RIVER)
    ===================================================================== */
 const getDorsalLayout = (teamFont) => {
   if (teamFont === 'madrid') {
@@ -28,7 +28,6 @@ const getDorsalLayout = (teamFont) => {
       nameSize: 45,         
       numberY: 285,         
       numberSize: 195,      
-      // 🔥 VERDE OSCURO OFICIAL DEL REAL MADRID EXTRAÍDO DEL PÓSTER 🔥
       colorTop: "#1A362D",    
       colorMid: "#122A21",    
       colorBottom: "#0A1712", 
@@ -36,6 +35,40 @@ const getDorsalLayout = (teamFont) => {
     };
   }
   
+  if (teamFont === 'boca') {
+    return {
+      boxWidth: "62%",      
+      offsetY: "-22%",       
+      offsetX: "-2%",       
+      nameY: 140,           
+      nameCurve: 140,       // Letra recta
+      nameSize: 48,         
+      numberY: 280,         
+      numberSize: 195,      
+      colorTop: "#FFD700",  // Amarillo Boca
+      colorMid: "#E5C100",  
+      colorBottom: "#CCA100", 
+      stroke: "#1D3261"     // Borde Azul
+    };
+  }
+
+  if (teamFont === 'river') {
+    return {
+      boxWidth: "58%",      
+      offsetY: "-22%",       
+      offsetX: "-2%",       
+      nameY: 138,           
+      nameCurve: 138,       // Letra recta
+      nameSize: 46,         
+      numberY: 282,         
+      numberSize: 198,      
+      colorTop: "#D32F2F",  // Rojo River
+      colorMid: "#B71C1C",  
+      colorBottom: "#7F0000", 
+      stroke: "#FFFFFF"     // Borde Blanco
+    };
+  }
+
   // Por defecto (Barcelona)
   return {
     boxWidth: "60%",      
@@ -298,9 +331,25 @@ export default function ProductScreen({
   const numStr = String(selectedDorsal?.number || "").trim();
 
   // 🔥 DETERMINAMOS QUÉ TIPOGRAFÍA Y DISEÑO USAR 🔥
-  const isMadrid = viewProduct?.teamFont === "madrid";
-  const activeFontFamily = isMadrid ? "'FontMadrid', sans-serif" : "'FontBarca', sans-serif";
+  const getActiveFontFamily = (fontType) => {
+    if (fontType === 'madrid') return "'FontMadrid', sans-serif";
+    if (fontType === 'boca') return "'FontBoca', sans-serif";
+    if (fontType === 'river') return "'FontRiver', sans-serif";
+    return "'FontBarca', sans-serif";
+  };
+  
+  const activeFontFamily = getActiveFontFamily(viewProduct?.teamFont);
   const currentLayout = getDorsalLayout(viewProduct?.teamFont);
+  
+  // Clases utilitarias para aplicar la fuente
+  const fontClassMap = {
+    madrid: 'font-madrid',
+    boca: 'font-boca',
+    river: 'font-river',
+    barca: 'font-barca'
+  };
+  const activeFontClass = fontClassMap[viewProduct?.teamFont] || 'font-barca';
+
 
   return (
     <div 
@@ -327,12 +376,49 @@ export default function ProductScreen({
           font-display: block;
         }
 
-        .font-barca {
-          font-family: 'FontBarca', sans-serif !important;
+        @font-face {
+          font-family: 'FontBoca';
+          src: url('/fonts/Boca%20Tipografia.ttf') format('truetype'),
+               url('/fonts/Boca Tipografia.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
         }
 
-        .font-madrid {
-          font-family: 'FontMadrid', sans-serif !important;
+        @font-face {
+          font-family: 'FontRiver';
+          src: url('/fonts/River%20Tipografia.ttf') format('truetype'),
+               url('/fonts/River Tipografia.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
+        }
+
+        .font-barca { font-family: 'FontBarca', sans-serif !important; }
+        .font-madrid { font-family: 'FontMadrid', sans-serif !important; }
+        .font-boca { font-family: 'FontBoca', sans-serif !important; }
+        .font-river { font-family: 'FontRiver', sans-serif !important; }
+
+        @keyframes heatPressStamp {
+          0% {
+            opacity: 0;
+            transform: scale(1.08) translateY(-6px);
+            filter: brightness(1.35) blur(3px);
+          }
+          50% {
+            opacity: 0.96;
+            transform: scale(0.99) translateY(0px);
+            filter: brightness(1.05) blur(0px);
+          }
+          100% {
+            opacity: 0.95;
+            transform: scale(1) translateY(0px);
+            filter: brightness(1) blur(0px);
+          }
+        }
+
+        .animate-heat-press {
+          animation: heatPressStamp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
       `}</style>
 
@@ -340,6 +426,8 @@ export default function ProductScreen({
       <div aria-hidden="true" className="opacity-0 pointer-events-none fixed -top-96 -left-96 select-none">
         <span style={{ fontFamily: "'FontBarca'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
         <span style={{ fontFamily: "'FontMadrid'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
+        <span style={{ fontFamily: "'FontBoca'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
+        <span style={{ fontFamily: "'FontRiver'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
       </div>
 
       <div className="max-w-6xl mx-auto">
@@ -393,15 +481,16 @@ export default function ProductScreen({
                               transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                             }}
                           >
+                            {/* SVG CONFIGURADO PARA PREVENIR RECORTES EN MÓVIL */}
                             <svg
                               viewBox="0 0 300 340"
                               className="w-full h-auto overflow-visible"
                             >
                               <defs>
-                                {/* Curva suave centrada debajo del cuello */}
+                                {/* Curva extendida (de -20 a 320) para evitar que nombres largos topen con el borde */}
                                 <path
                                   id="dorsalArcPath"
-                                  d={`M 20,${currentLayout.nameY} Q 150,${currentLayout.nameCurve} 280,${currentLayout.nameY}`}
+                                  d={`M -20,${currentLayout.nameY} Q 150,${currentLayout.nameCurve} 320,${currentLayout.nameY}`}
                                   fill="transparent"
                                 />
 
@@ -412,7 +501,8 @@ export default function ProductScreen({
                                   <stop offset="100%" stopColor={currentLayout.colorBottom} />
                                 </linearGradient>
 
-                                <filter id="dorsalDropShadow" x="-15%" y="-15%" width="130%" height="130%">
+                                {/* Filtro extendido (-50% a 200%) para que la sombra no rebane los bordes de la letra */}
+                                <filter id="dorsalDropShadow" x="-50%" y="-50%" width="200%" height="200%">
                                   <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="rgba(0,0,0,0.42)" />
                                 </filter>
                               </defs>
@@ -424,7 +514,7 @@ export default function ProductScreen({
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.5"
-                                    className={isMadrid ? "font-madrid" : "font-barca"}
+                                    className={activeFontClass}
                                     style={{
                                       fontFamily: activeFontFamily,
                                       fontSize: `${
@@ -453,7 +543,7 @@ export default function ProductScreen({
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.8"
-                                    className={isMadrid ? "font-madrid" : "font-barca"}
+                                    className={activeFontClass}
                                     style={{
                                       fontFamily: activeFontFamily,
                                       fontSize: `${currentLayout.numberSize}px`,

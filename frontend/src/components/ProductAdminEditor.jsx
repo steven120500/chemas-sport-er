@@ -522,6 +522,8 @@ export default function ProductAdminEditor({
                   >
                     <option value="barca">F.C. Barcelona (26/27)</option>
                     <option value="madrid">Real Madrid</option>
+                    <option value="boca">Boca Juniors</option>
+                    <option value="river">River Plate</option>
                   </select>
                 </div>
               )}
@@ -596,40 +598,83 @@ export default function ProductAdminEditor({
               className="w-full bg-black hover:bg-zinc-800 text-white py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-md transition-transform cursor-pointer"
               onClick={() => {
                 const changes = getInventoryChanges();
-                toastHOT(
-                  (t) => (
-                    <div className="text-center p-4 rounded-xl border border-gray-200 bg-white shadow-xl">
-                      <p className="font-black text-black mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
-                      {changes.length > 0 ? (
-                        <div className="text-left border border-gray-200 bg-gray-50 p-3 rounded-xl mb-4 text-xs font-mono text-gray-600 max-h-32 overflow-y-auto shadow-inner">
-                          {changes.map((change, i) => (<div key={i} className="py-1">{change}</div>))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales.</p>
-                      )}
-                      <div className="flex gap-3 justify-center mt-2">
-                        <button 
-                          onClick={() => { 
-                            toastHOT.dismiss(t.id); 
-                            if (checkHasDeduction()) {
-                              setPurchasedDorsalIndex("");
+                
+                // Si redujo stock y el producto es numerable, abrimos el modal pidiendo el dorsal afectado
+                if (checkHasDeduction() && editedIsNumerable && editedDorsalOptions.length > 0) {
+                  toastHOT(
+                    (t) => (
+                      <div className="text-center p-4 rounded-xl border border-gray-200 bg-white shadow-xl max-w-sm w-full">
+                        <p className="font-black text-black mb-1 text-sm">¿Qué dorsal se utilizó en esta venta?</p>
+                        <p className="text-[11px] text-gray-500 mb-4">Selecciona el jugador para descontar su impresión de la imprenta.</p>
+                        
+                        <select
+                          id="select-dorsal-venta"
+                          className="w-full bg-gray-50 border-2 border-black rounded-xl px-3 py-3 text-xs font-black text-black uppercase mb-4 outline-none cursor-pointer"
+                        >
+                          <option value="">-- Sin Dorsal / Camiseta Lisa --</option>
+                          {editedDorsalOptions.filter(o => o.name || o.number).map((opt, idx) => (
+                            <option key={idx} value={idx}>
+                              {opt.name.toUpperCase()} (#{opt.number}) — Disp: {opt.quantity}
+                            </option>
+                          ))}
+                        </select>
+
+                        <div className="flex gap-2 justify-center">
+                          <button 
+                            onClick={() => { 
+                              const sel = document.getElementById("select-dorsal-venta")?.value;
+                              setPurchasedDorsalIndex(sel !== undefined ? sel : "");
+                              toastHOT.dismiss(t.id); 
                               setConfirmCommission(false); 
                               setShowBuyerModal(true);
-                            } else {
-                              handleSave("", false); 
-                            }
-                          }} 
-                          className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-zinc-800 cursor-pointer shadow-sm transition-colors"
-                        >
-                          SÍ, GUARDAR
-                        </button>
-                        <button onClick={() => toastHOT.dismiss(t.id)} className="text-black bg-gray-100 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200 transition-colors">
-                          CANCELAR
-                        </button>
+                            }} 
+                            className="bg-black text-white px-4 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-zinc-800 cursor-pointer shadow-sm"
+                          >
+                            CONTINUAR
+                          </button>
+                          <button onClick={() => toastHOT.dismiss(t.id)} className="text-black bg-gray-100 px-4 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200">
+                            CANCELAR
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ), { duration: 8000, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
-                );
+                    ), { duration: Infinity, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
+                  );
+                } else {
+                  toastHOT(
+                    (t) => (
+                      <div className="text-center p-4 rounded-xl border border-gray-200 bg-white shadow-xl">
+                        <p className="font-black text-black mb-2 text-base">¿Seguro que quieres guardar estos cambios?</p>
+                        {changes.length > 0 ? (
+                          <div className="text-left border border-gray-200 bg-gray-50 p-3 rounded-xl mb-4 text-xs font-mono text-gray-600 max-h-32 overflow-y-auto shadow-inner">
+                            {changes.map((change, i) => (<div key={i} className="py-1">{change}</div>))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 mb-4 font-medium">Se actualizarán los datos generales.</p>
+                        )}
+                        <div className="flex gap-3 justify-center mt-2">
+                          <button 
+                            onClick={() => { 
+                              toastHOT.dismiss(t.id); 
+                              if (checkHasDeduction()) {
+                                setPurchasedDorsalIndex("");
+                                setConfirmCommission(false); 
+                                setShowBuyerModal(true);
+                              } else {
+                                handleSave("", false); 
+                              }
+                            }} 
+                            className="bg-black text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-zinc-800 cursor-pointer shadow-sm transition-colors"
+                          >
+                            SÍ, GUARDAR
+                          </button>
+                          <button onClick={() => toastHOT.dismiss(t.id)} className="text-black bg-gray-100 px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200 transition-colors">
+                            CANCELAR
+                          </button>
+                        </div>
+                      </div>
+                    ), { duration: 8000, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
+                  );
+                }
               }}
               disabled={loading}
             >
