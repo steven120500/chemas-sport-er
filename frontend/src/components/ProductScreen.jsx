@@ -20,7 +20,7 @@ const MODAL_IMG_MAX_W = 800;
 const getDorsalLayout = (teamFont) => {
   if (teamFont === 'madrid') {
     return {
-      boxWidth: "90%",      
+      boxWidth: "80%",      
       offsetY: "-15%",       
       offsetX: "-1%",       
       nameY: 123,           
@@ -37,7 +37,7 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "92%",       
+      boxWidth: "80%",       
       offsetY: "-20%",       
       offsetX: "-0%",       
       nameY: 125,           
@@ -54,9 +54,9 @@ const getDorsalLayout = (teamFont) => {
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "94%",      
+      boxWidth: "85%",      
       offsetY: "-12%",       
-      offsetX: "-0%",       
+      offsetX: "0%",       
       nameY: 120,           
       nameCurve: 128,       
       nameSize: 46,         
