@@ -37,14 +37,14 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "60%",       
+      boxWidth: "56%",       
       offsetY: "-25%",       
-      offsetX: "-0%",       
+      offsetX: "-6%",       
       nameY: 125,           
       nameCurve: 120,       
       nameSize: 38,         
-      numberY: 295,         
-      numberSize: 200,      
+      numberY: 270,         
+      numberSize: 190,      
       colorTop: "#FFFFFF",  
       colorMid: "#F3F4F6",  
       colorBottom: "#E5E7EB", 
@@ -54,14 +54,14 @@ const getDorsalLayout = (teamFont) => {
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "60%",      
-      offsetY: "-15%",       
-      offsetX: "0%",       
+      boxWidth: "56%",      
+      offsetY: "-25%",       
+      offsetX: "-3%",       
       nameY: 120,           
       nameCurve: 128,       
       nameSize: 38,         
-      numberY: 290,         
-      numberSize: 198,      
+      numberY: 280,         
+      numberSize: 188,      
       colorTop: "#333333",  
       colorMid: "#111111",  
       colorBottom: "#000000", 
