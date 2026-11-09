@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FaTag, FaStar, FaBan } from "react-icons/fa";
+import { FaTag, FaStar, FaBan, FaTshirt } from "react-icons/fa";
 
 const cldUrl = (url, w, h) => {
   if (!url || typeof url !== "string") return url;
@@ -233,6 +233,14 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             <h3 className="linea-hover text-[11px] sm:text-lg font-extrabold text-black uppercase tracking-tight leading-snug line-clamp-3 w-fit">
               {product.name}
             </h3>
+
+            {/* 🔥 ETIQUETA DE PERSONALIZABLE VISIBLE DESDE AFUERA 🔥 */}
+            {product.isNumerable && Array.isArray(product.dorsalOptions) && product.dorsalOptions.length > 0 && !isTotalAgotado && (
+              <div className="mt-2 inline-flex items-center gap-1.5 bg-black text-white px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-sm w-fit">
+                <FaTshirt size={10} className="text-amber-400" />
+                <span>Personalizable</span>
+              </div>
+            )}
 
             <div className="w-6 sm:w-10 border-t-2 border-gray-200 my-2 sm:my-4"></div>
 
