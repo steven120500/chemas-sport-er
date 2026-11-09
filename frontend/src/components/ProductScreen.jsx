@@ -37,35 +37,37 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "62%",      
-      offsetY: "-22%",       
+      boxWidth: "52%",       // Ajustado para que encaje mejor sobre las franjas
+      offsetY: "-26%",       // Subido ligeramente
       offsetX: "-2%",       
-      nameY: 140,           
-      nameCurve: 140,       // Letra recta
+      nameY: 125,           
+      nameCurve: 110,       
       nameSize: 48,         
-      numberY: 280,         
-      numberSize: 195,      
-      colorTop: "#FFD700",  // Amarillo Boca
-      colorMid: "#E5C100",  
-      colorBottom: "#CCA100", 
-      stroke: "#1D3261"     // Borde Azul
+      numberY: 285,         
+      numberSize: 200,      
+      // 🔥 BLANCO PURO PARA BOCA 🔥
+      colorTop: "#FFFFFF",  
+      colorMid: "#F3F4F6",  
+      colorBottom: "#E5E7EB", 
+      stroke: "rgba(0,0,0,0.15)" // Borde oscuro ultra sutil para contraste
     };
   }
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "58%",      
-      offsetY: "-22%",       
-      offsetX: "-2%",       
-      nameY: 138,           
-      nameCurve: 138,       // Letra recta
+      boxWidth: "54%",      
+      offsetY: "-20%",       
+      offsetX: "-0%",       
+      nameY: 118,           
+      nameCurve: 120,       
       nameSize: 46,         
       numberY: 282,         
       numberSize: 198,      
-      colorTop: "#D32F2F",  // Rojo River
-      colorMid: "#B71C1C",  
-      colorBottom: "#7F0000", 
-      stroke: "#FFFFFF"     // Borde Blanco
+      // 🔥 NEGRO PROFUNDO CON BORDE BLANCO PARA RIVER 🔥
+      colorTop: "#333333",  
+      colorMid: "#111111",  
+      colorBottom: "#000000", 
+      stroke: "#FFFFFF"     // Borde blanco característico
     };
   }
 
@@ -73,9 +75,10 @@ const getDorsalLayout = (teamFont) => {
   return {
     boxWidth: "60%",      
     offsetY: "-22%",       
-    offsetX: "-4%",       
-    nameY: 142,           
-    nameCurve: 122,       
+    offsetX: "-5%",       
+    nameY: 170,           
+    // 🔥 ARCO MÁS PRONUNCIADO PARA BARÇA 🔥 (De 122 a 100)
+    nameCurve: 70,       
     nameSize: 50,         
     numberY: 272,         
     numberSize: 200,      
