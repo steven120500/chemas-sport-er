@@ -149,7 +149,7 @@ function MainApp() {
   const [showMedidas, setShowMedidas] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(21);
+  const [limit] = useState(20); // múltiplo de 2 y 4 columnas: filas completas
   const [total, setTotal] = useState(0);
 
   const navigate = useNavigate();
@@ -724,12 +724,13 @@ function MainApp() {
 
                 <div ref={pageTopRef} />
 
-                <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-                  <div id="products-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                {/* max-w-7xl (1280px): el CDN de Tailwind 2.x no soporta max-w-[1400px] */}
+                <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div id="products-section" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                   {loading && !usingFullCatalog ? (
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
-                        <div className="w-full h-[350px] bg-gray-200 rounded-2xl"></div>
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-3 rounded-2xl border border-gray-200 shadow-sm">
+                        <div className="w-full bg-gray-200 rounded-xl" style={{ paddingTop: '115%' }}></div>
                         <div className="w-3/4 h-5 bg-gray-200 rounded-full mt-2"></div>
                         <div className="w-1/2 h-5 bg-gray-200 rounded-full"></div>
                       </div>

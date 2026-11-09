@@ -311,3 +311,357 @@ button:focus-visible {
   .font-madrid {
     font-family: 'FontMadrid', sans-serif;
   }
+
+/* =================================================================
+   PRODUCT CARD (ProductCard.jsx) — clases pc-*
+   CSS propio porque el Tailwind del CDN (2.2.19) no soporta valores
+   arbitrarios ni group-hover/card.
+   ================================================================= */
+.pc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  cursor: pointer;
+  border-radius: 16px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pc-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.3s ease, box-shadow 0.35s ease;
+}
+.pc-card:hover .pc-frame {
+  border-color: #000;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.35);
+}
+.pc-frame--admin {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* 🎀 Cinta + moño navideño */
+.pc-ribbon {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  z-index: 35;
+  pointer-events: none;
+  background: linear-gradient(90deg, #991b1b, #ef4444 50%, #991b1b);
+  border-top: 1px solid #F5C400;
+  border-bottom: 1px solid #F5C400;
+  border-radius: 4px;
+}
+.pc-bow {
+  position: absolute;
+  top: -16px;
+  left: -10px;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  z-index: 40;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+}
+
+/* --- Foto --- */
+.pc-media {
+  position: relative;
+  width: 100%;
+  padding-top: 115%; /* proporción ~ 1 : 1.15 */
+  overflow: hidden;
+  background: #f3f4f6;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+}
+.pc-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 10;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pc-img--alt { opacity: 0; z-index: 20; }
+.pc-card:not(.pc-soldout):hover .pc-img { transform: scale(1.06); }
+.pc-card:hover .pc-img--alt { animation: swapContinuo 1.5s infinite; }
+.pc-soldout .pc-img { filter: grayscale(1) blur(1px); opacity: 0.5; }
+
+.pc-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pc-overlay--hidden { background: rgba(255, 255, 255, 0.4); }
+.pc-stamp {
+  transform: rotate(-6deg);
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #000;
+  border-radius: 12px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #000;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+.pc-stamp--muted { border-color: #d1d5db; background: #f3f4f6; transform: rotate(-3deg); }
+
+/* --- Badges sobre la foto --- */
+.pc-badges {
+  position: absolute;
+  top: 20px;
+  left: 6px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+  pointer-events: none;
+}
+.pc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 9999px;
+  background: rgba(10, 10, 10, 0.78);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.pc-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.2);
+}
+.pc-badge-icon { width: 8px; height: 8px; flex: none; }
+.pc-badge--popular { background: #F5C400; color: #111; border-color: rgba(0, 0, 0, 0.08); }
+.pc-badge--sale { background: #dc2626; border-color: rgba(255, 255, 255, 0.2); }
+/* En móvil Popular es solo ícono; la oferta mantiene el % */
+.pc-badge--popular .pc-badge-label { display: none; }
+.pc-badge--popular { width: 18px; padding: 0; justify-content: center; }
+
+/* --- Sello TEMPORADA 26-27 --- */
+.pc-seal {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 30;
+  width: 46px;
+  height: 46px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+.pc-seal-svg {
+  width: 100%;
+  height: 100%;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pc-card:hover .pc-seal-svg { transform: scale(1.12) rotate(10deg); }
+.pc-seal-ring {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: spin-slow 14s linear infinite;
+}
+
+/* --- Sticker NEW --- */
+.pc-new {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 40;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  pointer-events: none;
+}
+.pc-new svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pc-new span {
+  position: relative;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+/* --- Información --- */
+.pc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  padding: 10px;
+}
+.pc-name {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #000;
+  min-height: 2.5em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pc-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #000;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pc-custom-icon { width: 9px; height: 9px; color: #F5C400; flex: none; }
+
+.pc-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: auto;
+}
+.pc-prices { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; min-width: 0; }
+.pc-price { font-size: 14px; font-weight: 900; letter-spacing: -0.02em; color: #000; }
+.pc-price-old { font-size: 10px; font-weight: 700; color: #9ca3af; text-decoration: line-through; }
+
+.pc-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.pc-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  background: #000;
+  color: #fff;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pc-arrow svg { width: 13px; height: 13px; }
+.pc-card:hover .pc-arrow { transform: rotate(45deg) scale(1.08); }
+
+.pc-dots { display: none; align-items: center; gap: 5px; opacity: 0; transition: opacity 0.3s; }
+.pc-dots i { display: block; height: 6px; border-radius: 9999px; }
+.pc-dots-1 { width: 14px; background: #000; }
+.pc-dots-2 { width: 6px; background: #9ca3af; opacity: 0.4; }
+.pc-card:hover .pc-dots { opacity: 1; }
+.pc-card:hover .pc-dots-1 { animation: dot1Sync 1.5s infinite; }
+.pc-card:hover .pc-dots-2 { animation: dot2Sync 1.5s infinite; }
+
+/* Línea animada bajo el nombre */
+.linea-hover { position: relative; }
+.linea-hover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 100%;
+  height: 2px;
+  background: #000;
+  transform: scaleX(0);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease-out;
+}
+.pc-card:hover .linea-hover::after { transform: scaleX(1); transform-origin: bottom left; }
+
+/* --- Bloque admin --- */
+.pc-admin {
+  padding: 8px 12px 12px;
+  margin-top: -2px;
+  background: #f9fafb;
+  border: 2px dashed #e5e7eb;
+  border-top: 0;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  font-size: 11px;
+  transition: border-color 0.3s;
+}
+.pc-card:hover .pc-admin { border-color: #000; }
+
+@keyframes swapContinuo {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+@keyframes dot1Sync {
+  0%, 45% { opacity: 0.3; width: 6px; background-color: #9ca3af; }
+  55%, 100% { opacity: 1; width: 14px; background-color: #000; }
+}
+@keyframes dot2Sync {
+  0%, 45% { opacity: 1; width: 14px; background-color: #000; }
+  55%, 100% { opacity: 0.3; width: 6px; background-color: #9ca3af; }
+}
+@keyframes minimalShine {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.1)); }
+  50% { filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)); }
+}
+.shine-sutil { animation: minimalShine 2.5s infinite ease-in-out; }
+
+/* Tablet / desktop */
+@media (min-width: 640px) {
+  .pc-badges { top: 26px; left: 10px; gap: 5px; }
+  .pc-badge { height: 22px; padding: 0 9px; font-size: 10px; gap: 5px; }
+  .pc-dot { width: 6px; height: 6px; }
+  .pc-badge-icon { width: 9px; height: 9px; }
+  .pc-badge--popular { width: auto; padding: 0 9px; }
+  .pc-badge--popular .pc-badge-label { display: inline; }
+  .pc-bow { top: -20px; left: -12px; width: 48px; height: 48px; }
+  .pc-seal { right: 10px; bottom: 10px; width: 68px; height: 68px; }
+  .pc-new { top: -12px; right: -12px; width: 54px; height: 54px; }
+  .pc-new span { font-size: 11px; }
+  .pc-info { padding: 12px 14px 14px; gap: 8px; }
+  .pc-name { font-size: 12.5px; }
+  .pc-custom { font-size: 9.5px; padding: 4px 8px; }
+  .pc-price { font-size: 17px; }
+  .pc-price-old { font-size: 12px; }
+  .pc-arrow { width: 32px; height: 32px; }
+  .pc-arrow svg { width: 15px; height: 15px; }
+  .pc-dots { display: flex; }
+  .pc-admin { font-size: 12px; padding: 8px 16px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-seal-ring, .shine-sutil, .pc-card:hover .pc-img--alt { animation: none; }
+  .pc-img, .pc-seal-svg, .pc-arrow { transition: none; }
+}
