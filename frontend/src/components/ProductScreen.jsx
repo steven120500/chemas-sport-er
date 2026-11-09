@@ -37,37 +37,35 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "52%",       // Ajustado para que encaje mejor sobre las franjas
-      offsetY: "-26%",       // Subido ligeramente
+      boxWidth: "52%",       
+      offsetY: "-25%",       
       offsetX: "-2%",       
-      nameY: 125,           
-      nameCurve: 110,       
-      nameSize: 48,         
+      nameY: 140,           
+      nameCurve: 140,       // Boca usa texto recto (nameCurve = nameY)
+      nameSize: 45,         
       numberY: 285,         
       numberSize: 200,      
-      // 🔥 BLANCO PURO PARA BOCA 🔥
-      colorTop: "#FFFFFF",  
+      colorTop: "#FFFFFF",  // Letras y números blancos
       colorMid: "#F3F4F6",  
       colorBottom: "#E5E7EB", 
-      stroke: "rgba(0,0,0,0.15)" // Borde oscuro ultra sutil para contraste
+      stroke: "rgba(0,0,0,0.1)" 
     };
   }
 
   if (teamFont === 'river') {
     return {
       boxWidth: "54%",      
-      offsetY: "-20%",       
-      offsetX: "-0%",       
-      nameY: 118,           
-      nameCurve: 120,       
+      offsetY: "-23%",       
+      offsetX: "-2%",       
+      nameY: 138,           
+      nameCurve: 138,       
       nameSize: 46,         
       numberY: 282,         
       numberSize: 198,      
-      // 🔥 NEGRO PROFUNDO CON BORDE BLANCO PARA RIVER 🔥
       colorTop: "#333333",  
       colorMid: "#111111",  
       colorBottom: "#000000", 
-      stroke: "#FFFFFF"     // Borde blanco característico
+      stroke: "#FFFFFF"     
     };
   }
 
@@ -77,7 +75,6 @@ const getDorsalLayout = (teamFont) => {
     offsetY: "-22%",       
     offsetX: "-5%",       
     nameY: 170,           
-    // 🔥 ARCO MÁS PRONUNCIADO PARA BARÇA 🔥 (De 122 a 100)
     nameCurve: 70,       
     nameSize: 50,         
     numberY: 272,         
@@ -484,9 +481,9 @@ export default function ProductScreen({
                               transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                             }}
                           >
-                            {/* SVG CONFIGURADO PARA PREVENIR RECORTES EN MÓVIL */}
+                            {/* 🔥 SVG CONFIGURADO PARA PREVENIR RECORTES EN MÓVIL (VIEWBOX EXTENDIDO) 🔥 */}
                             <svg
-                              viewBox="0 0 300 340"
+                              viewBox="-100 -50 500 450"
                               className="w-full h-auto overflow-visible"
                             >
                               <defs>
