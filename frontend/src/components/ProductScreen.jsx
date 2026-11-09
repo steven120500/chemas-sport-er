@@ -20,11 +20,11 @@ const MODAL_IMG_MAX_W = 800;
 const getDorsalLayout = (teamFont) => {
   if (teamFont === 'madrid') {
     return {
-      boxWidth: "56%",      
-      offsetY: "-24%",       
-      offsetX: "-2%",       
-      nameY: 135,           
-      nameCurve: 135,       
+      boxWidth: "90%",      
+      offsetY: "-15%",       
+      offsetX: "-1%",       
+      nameY: 123,           
+      nameCurve: 120,       
       nameSize: 45,         
       numberY: 285,         
       numberSize: 195,      
@@ -37,13 +37,13 @@ const getDorsalLayout = (teamFont) => {
   
   if (teamFont === 'boca') {
     return {
-      boxWidth: "52%",       
-      offsetY: "-25%",       
-      offsetX: "-2%",       
-      nameY: 140,           
-      nameCurve: 140,       // Boca usa texto recto (nameCurve = nameY)
+      boxWidth: "92%",       
+      offsetY: "-20%",       
+      offsetX: "-0%",       
+      nameY: 125,           
+      nameCurve: 120,       // Boca usa texto recto (nameCurve = nameY)
       nameSize: 45,         
-      numberY: 285,         
+      numberY: 295,         
       numberSize: 200,      
       colorTop: "#FFFFFF",  // Letras y números blancos
       colorMid: "#F3F4F6",  
@@ -54,13 +54,13 @@ const getDorsalLayout = (teamFont) => {
 
   if (teamFont === 'river') {
     return {
-      boxWidth: "54%",      
-      offsetY: "-23%",       
-      offsetX: "-2%",       
-      nameY: 138,           
-      nameCurve: 138,       
+      boxWidth: "94%",      
+      offsetY: "-12%",       
+      offsetX: "-0%",       
+      nameY: 120,           
+      nameCurve: 128,       
       nameSize: 46,         
-      numberY: 282,         
+      numberY: 290,         
       numberSize: 198,      
       colorTop: "#333333",  
       colorMid: "#111111",  
@@ -71,14 +71,14 @@ const getDorsalLayout = (teamFont) => {
 
   // Por defecto (Barcelona)
   return {
-    boxWidth: "60%",      
-    offsetY: "-22%",       
-    offsetX: "-5%",       
+    boxWidth: "90%",      
+    offsetY: "-20%",       
+    offsetX: "-3%",       
     nameY: 170,           
     nameCurve: 70,       
     nameSize: 50,         
     numberY: 272,         
-    numberSize: 200,      
+    numberSize: 210,      
     colorTop: "#FFE600",
     colorMid: "#F5C400",
     colorBottom: "#D4A000",
