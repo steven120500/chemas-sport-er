@@ -30,13 +30,16 @@ const fadeUp = {
 const Bienvenido = ({ onNavigate }) => {
   const reduceMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
-  const scrollRef = useRef(null);
-  const scrollPos = useRef(0);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollLeftStart = useRef(0);
+  const trackRef = useRef(null);
+  const innerRef = useRef(null);
+  // 👈 Todo en refs: el carrusel se mueve con transform (sin scroll nativo, que en iPhone se peleaba con el auto-scroll)
+  const offset = useRef(0);
+  const loopW = useRef(0);
+  const velocity = useRef(0);
+  const pausedUntil = useRef(0);
+  const focusPaused = useRef(false);
+  const drag = useRef({ active: false, moved: false, startX: 0, startOffset: 0, lastX: 0, lastT: 0, id: null });
   const hasMoved = useRef(false);
-  const [isInteracting, setIsInteracting] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -45,87 +48,93 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🔄 Auto-scroll continuo (también con "Reducir movimiento" activado: es lento y se pausa al tocarlo)
+  // 📏 Ancho de una vuelta (la lista va ×3)
   useEffect(() => {
-    const scrollContainer = scrollRef.current;
-    if (!scrollContainer) return;
+    const inner = innerRef.current;
+    if (!inner) return;
+    const medir = () => { loopW.current = inner.scrollWidth / 3; };
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
 
-    scrollPos.current = scrollContainer.scrollLeft;
+  // 🔄 Auto-scroll continuo con transform (también con "Reducir movimiento": es lento y se pausa al tocarlo)
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
     const speed = isMobile ? 0.6 : 0.8;
-
     let id;
-    const step = () => {
-      if (!isInteracting && !isDragging.current && scrollContainer) {
-        scrollPos.current += speed;
+    let last = performance.now();
 
-        const maxScroll = scrollContainer.scrollWidth / 3;
-        if (maxScroll > 0) {
-          if (scrollPos.current >= maxScroll * 2) {
-            scrollPos.current -= maxScroll;
-          } else if (scrollPos.current <= 0) {
-            scrollPos.current += maxScroll;
-          }
+    const step = (t) => {
+      const dt = Math.min(t - last, 50) / 16.67; // normalizado a 60fps
+      last = t;
+      if (!drag.current.active) {
+        if (Math.abs(velocity.current) > 0.05) {
+          // 🧈 inercia propia después de soltar
+          offset.current += velocity.current * dt;
+          velocity.current *= Math.pow(0.94, dt);
+        } else if (!focusPaused.current && t > pausedUntil.current) {
+          offset.current += speed * dt;
         }
-        scrollContainer.scrollLeft = scrollPos.current;
-      } else if (scrollContainer) {
-        scrollPos.current = scrollContainer.scrollLeft;
       }
+      const L = loopW.current;
+      const x = L > 0 ? ((offset.current % L) + L) % L : 0;
+      inner.style.transform = `translate3d(${-x}px,0,0)`;
       id = requestAnimationFrame(step);
     };
 
     id = requestAnimationFrame(step);
     return () => cancelAnimationFrame(id);
-  }, [isInteracting, isMobile]);
+  }, [isMobile]);
 
-  // 🖱️ Arrastre con mouse (desktop)
-  const handleMouseDown = (e) => {
-    isDragging.current = true;
+  // 👆 Arrastre (mouse y táctil) con Pointer Events. touch-action: pan-y deja el scroll vertical de la página al navegador
+  const handlePointerDown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const L = loopW.current;
+    if (L > 0) offset.current = ((offset.current % L) + L) % L;
+    drag.current = {
+      active: true,
+      moved: false,
+      startX: e.clientX,
+      startOffset: offset.current,
+      lastX: e.clientX,
+      lastT: performance.now(),
+      id: e.pointerId,
+    };
+    velocity.current = 0;
     hasMoved.current = false;
-    startX.current = e.pageX - scrollRef.current.offsetLeft;
-    scrollLeftStart.current = scrollRef.current.scrollLeft;
-    setIsInteracting(true);
   };
 
-  const handleMouseMove = (e) => {
-    if (!isDragging.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 1.4;
-    if (Math.abs(x - startX.current) > 5) {
+  const handlePointerMove = (e) => {
+    const d = drag.current;
+    if (!d.active || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.startX;
+    if (!d.moved && Math.abs(dx) > 6) {
+      d.moved = true;
       hasMoved.current = true;
+      // Captura solo al arrastrar, para que un toque simple siga siendo click en la card
+      try { trackRef.current?.setPointerCapture(e.pointerId); } catch { /* noop */ }
     }
-    scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
-    scrollPos.current = scrollRef.current.scrollLeft;
-
-    const maxScroll = scrollRef.current.scrollWidth / 3;
-    if (maxScroll > 0) {
-      if (scrollRef.current.scrollLeft >= maxScroll * 2) {
-        scrollRef.current.scrollLeft -= maxScroll;
-        scrollLeftStart.current -= maxScroll;
-        scrollPos.current -= maxScroll;
-      } else if (scrollRef.current.scrollLeft <= 0) {
-        scrollRef.current.scrollLeft += maxScroll;
-        scrollLeftStart.current += maxScroll;
-        scrollPos.current += maxScroll;
-      }
-    }
+    if (!d.moved) return;
+    const now = performance.now();
+    const dtf = Math.max(now - d.lastT, 1) / 16.67;
+    velocity.current = Math.max(-40, Math.min(40, -(e.clientX - d.lastX) / dtf));
+    d.lastX = e.clientX;
+    d.lastT = now;
+    offset.current = d.startOffset - dx;
   };
 
-  const handleMouseUpOrLeave = () => {
-    isDragging.current = false;
-    setTimeout(() => setIsInteracting(false), 1200);
-  };
-
-  // 📱 Táctil
-  const handleTouchStart = () => {
-    setIsInteracting(true);
-  };
-
-  const handleTouchEnd = () => {
-    if (scrollRef.current) {
-      scrollPos.current = scrollRef.current.scrollLeft;
-    }
-    setTimeout(() => setIsInteracting(false), 1500);
+  const handlePointerUp = (e) => {
+    const d = drag.current;
+    if (!d.active || e.pointerId !== d.id) return;
+    d.active = false;
+    // Si el dedo se quedó quieto antes de soltar, sin inercia
+    if (!d.moved || performance.now() - d.lastT > 80) velocity.current = 0;
+    try { trackRef.current?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    pausedUntil.current = performance.now() + (e.pointerType === 'mouse' ? 1200 : 1500);
   };
 
   const handleIrAProductos = (categoria = FILTRO_OBJETIVO, busqueda = '') => {
@@ -186,16 +195,17 @@ const Bienvenido = ({ onNavigate }) => {
         transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
       >
         <div
-          ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
+          ref={trackRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onFocusCapture={() => { focusPaused.current = true; }}
+          onBlurCapture={() => { focusPaused.current = false; }}
+          onDragStart={(e) => e.preventDefault()}
           className="bv-track"
         >
+          <div ref={innerRef} className="bv-track-inner">
           {marqueeItems.map((item, index) => (
             <div
               key={`${item.id}-${index}`}
@@ -244,6 +254,7 @@ const Bienvenido = ({ onNavigate }) => {
               </div>
             </div>
           ))}
+          </div>
         </div>
       </motion.div>
 
