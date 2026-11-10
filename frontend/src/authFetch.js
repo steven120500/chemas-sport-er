@@ -5,10 +5,11 @@
 //
 // - Si el backend responde 401 a una petición que llevaba token (vencido o usuario borrado),
 //   dispara el evento "auth:expired" y App cierra la sesión.
-// - En desarrollo, VITE_API_URL permite apuntar a un backend local sin tocar el código.
+// - Solo para pruebas: VITE_API_OVERRIDE (ej. http://localhost:5055) redirige las peticiones a otro backend.
+//   OJO: NO usar VITE_API_URL para esto; ese nombre ya existe en .env con otro formato (termina en /api).
 
 export const BACKEND_URL = 'https://chemas-sport-er-backend.onrender.com';
-const API_OVERRIDE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_OVERRIDE = (import.meta.env.VITE_API_OVERRIDE || '').replace(/\/+$/, '').replace(/\/api$/, '');
 
 export function getStoredUser() {
   try {

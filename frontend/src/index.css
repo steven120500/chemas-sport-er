@@ -351,7 +351,7 @@ button:focus-visible {
   box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.35);
 }
 
-/* 🎀 Cinta + moño navideño */
+/* 🎀 Cinta navideña */
 .pc-ribbon {
   position: absolute;
   top: -5px;
@@ -364,17 +364,6 @@ button:focus-visible {
   border-top: 1px solid #F5C400;
   border-bottom: 1px solid #F5C400;
   border-radius: 4px;
-}
-.pc-bow {
-  position: absolute;
-  top: -16px;
-  left: -10px;
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
-  z-index: 40;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
 }
 
 /* ❄️ Capa de nieve sobre el borde superior (debajo de la cinta) */
@@ -680,7 +669,6 @@ button:focus-visible {
   .pc-badge-icon { width: 9px; height: 9px; }
   .pc-badge--popular { width: auto; padding: 0 9px; }
   .pc-badge--popular .pc-badge-label { display: inline; }
-  .pc-bow { top: -20px; left: -12px; width: 48px; height: 48px; }
   .pc-snowcap { height: 12px; }
   .pc-seal { right: 10px; bottom: 10px; width: 68px; height: 68px; }
   .pc-new { top: -12px; right: -12px; width: 54px; height: 54px; }
@@ -804,7 +792,6 @@ button:focus-visible {
   cursor: grab;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
 }
 .bv-track::-webkit-scrollbar { display: none; }
 .bv-track:active { cursor: grabbing; }

@@ -167,17 +167,8 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
           <path d="M0 0 H200 V5 C192 5 190 11 184 11 C178 11 178 6 170 6 C163 6 162 13 154 13 C146 13 147 6 138 6 C130 6 130 10 122 10 C114 10 115 5 106 5 C98 5 97 12 88 12 C80 12 80 6 72 6 C64 6 64 10 56 10 C48 10 49 5 40 5 C32 5 31 11 23 11 C15 11 14 6 7 6 C3 6 1 7 0 8 Z" />
         </svg>
 
-        {/* 🎀 Cinta superior + moño */}
+        {/* 🎀 Cinta superior */}
         <div className="pc-ribbon" aria-hidden="true" />
-        <img
-          src="/mono.png"
-          alt=""
-          aria-hidden="true"
-          className="pc-bow"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
 
         {/* --- FOTO --- */}
         <div className="pc-media">

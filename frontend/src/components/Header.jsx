@@ -76,7 +76,8 @@ export default function Header({
   useEffect(() => {
     const el = navRef.current;
     if (!el) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    // Se mueve aunque el teléfono tenga "Reducir movimiento" (en iPhone viene activado en muchos equipos):
+    // es lento, decorativo y se detiene al tocarlo o pasar el mouse.
 
     const SPEED = 0.5; // px por frame
     let acc = 0;

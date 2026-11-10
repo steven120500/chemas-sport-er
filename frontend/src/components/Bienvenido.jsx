@@ -45,10 +45,10 @@ const Bienvenido = ({ onNavigate }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🔄 Auto-scroll continuo (se desactiva si el usuario pidió reducir movimiento)
+  // 🔄 Auto-scroll continuo (también con "Reducir movimiento" activado: es lento y se pausa al tocarlo)
   useEffect(() => {
     const scrollContainer = scrollRef.current;
-    if (!scrollContainer || reduceMotion) return;
+    if (!scrollContainer) return;
 
     scrollPos.current = scrollContainer.scrollLeft;
     const speed = isMobile ? 0.6 : 0.8;
@@ -75,7 +75,7 @@ const Bienvenido = ({ onNavigate }) => {
 
     id = requestAnimationFrame(step);
     return () => cancelAnimationFrame(id);
-  }, [isInteracting, isMobile, reduceMotion]);
+  }, [isInteracting, isMobile]);
 
   // 🖱️ Arrastre con mouse (desktop)
   const handleMouseDown = (e) => {
