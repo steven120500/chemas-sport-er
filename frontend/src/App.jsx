@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { getToken } from './authFetch';
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -186,11 +187,31 @@ function MainApp() {
   const [user, setUser] = useState(() => {
     try {
       const storedUser = localStorage.getItem('user');
-      return storedUser ? JSON.parse(storedUser) : null;
+      const parsed = storedUser ? JSON.parse(storedUser) : null;
+      // Sesiones guardadas antes de la actualización de seguridad no tienen token: hay que volver a entrar
+      if (parsed && !parsed.token) {
+        localStorage.removeItem('user');
+        setTimeout(() => toast.info('Por seguridad, iniciá sesión de nuevo.'), 800);
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
   });
+
+  // Token vencido o usuario eliminado: el backend responde 401 y cerramos la sesión
+  useEffect(() => {
+    const onExpired = () => {
+      setUser((prev) => {
+        if (prev) toast.info('Tu sesión venció. Iniciá sesión de nuevo.');
+        return null;
+      });
+      localStorage.removeItem('user');
+    };
+    window.addEventListener('auth:expired', onExpired);
+    return () => window.removeEventListener('auth:expired', onExpired);
+  }, []);
 
   const isSuperUser = user?.isSuperUser || false;
 
@@ -310,6 +331,7 @@ function MainApp() {
   useEffect(() => {
     const socket = io(API_BASE, {
       transports: ['websocket', 'polling'],
+      auth: { token: getToken() }, // con token recibe los datos completos; sin token, la versión pública
     });
 
     socket.on('productoActualizado', (updatedProd) => {

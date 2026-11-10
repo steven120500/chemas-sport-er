@@ -1,10 +1,12 @@
 import express from 'express';
 import History from '../models/History.js';
 
+import { requireAuth, requireSuper, escapeRegex } from '../middleware/auth.js';
+
 const router = express.Router();
 
 /* =============================== GET LIST ============================== */
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
     
@@ -27,10 +29,10 @@ router.get('/', async (req, res) => {
     if (q) {
       andConditions.push({
         $or: [
-          { item: { $regex: q,$options: 'i' } },
-          { details: { $regex: q,$options: 'i' } },
-          { action: { $regex: q,$options: 'i' } },
-          { user: { $regex: q,$options: 'i' } }
+          { item: { $regex: escapeRegex(q), $options: 'i' } },
+          { details: { $regex: escapeRegex(q), $options: 'i' } },
+          { action: { $regex: escapeRegex(q), $options: 'i' } },
+          { user: { $regex: escapeRegex(q), $options: 'i' } }
         ]
       });
     }
@@ -42,12 +44,12 @@ router.get('/', async (req, res) => {
 
     /* ⭐ 3. FILTRO POR TIENDA ⭐ */
     if (store) {
-      andConditions.push({ details: { $regex: store,$options: 'i' } });
+      andConditions.push({ details: { $regex: escapeRegex(store), $options: 'i' } });
     }
 
     /* ⭐ 4. FILTRO POR TIPO DE ARTÍCULO ⭐ */
     if (type) {
-      andConditions.push({ item: { $regex: `\\(${type}\\)`, $options: 'i' } });
+      andConditions.push({ item: { $regex: `\\(${escapeRegex(type)}\\)`, $options: 'i' } });
     }
 
     /* ⭐ 5. FILTRO POR FECHAS O MES (CORREGIDO PARA COSTA RICA UTC-6) ⭐ */
@@ -106,13 +108,9 @@ router.get('/', async (req, res) => {
 });
 
 /* ============================ DELETE HISTORY =========================== */
-router.delete('/', async (req, res) => {
+// Solo súper usuario (antes bastaba mandar el header x-super: true)
+router.delete('/', requireSuper, async (req, res) => {
   try {
-    const isSuper = req.headers['x-super'] === 'true';
-    if (!isSuper) {
-      return res.status(403).json({ error: 'No tienes permisos para eliminar el historial' });
-    }
-
     await History.deleteMany({});
     res.json({ message: 'Historial eliminado correctamente' });
   } catch (err) {

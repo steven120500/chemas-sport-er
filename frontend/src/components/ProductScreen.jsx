@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt, FaTruck, FaCreditCard, FaComments, FaEdit, FaTrashAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
+import { getToken } from "../authFetch";
 import { motion, AnimatePresence } from "framer-motion"; 
 import ProductAdminEditor from "./ProductAdminEditor"; 
 import Medidas from "./Medidas";
@@ -197,7 +198,8 @@ export default function ProductScreen({
 
     const socket = io(API_BASE, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 3
+      reconnectionAttempts: 3,
+      auth: { token: getToken() }, // necesario para recibir quién hizo el cambio (_lastEditMeta)
     });
 
     socket.on('productoActualizado', (productoFresco) => {

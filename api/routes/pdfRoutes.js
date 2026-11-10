@@ -2,9 +2,11 @@ import express from 'express';
 import PDFDocument from 'pdfkit';
 import Product from '../models/Product.js'; // Asegúrate del path correcto
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = express.Router();
 
-router.get('/export-products-pdf', async (req, res) => {
+router.get('/export-products-pdf', requireAuth, async (req, res) => {
   try {
     const products = await Product.find();
 

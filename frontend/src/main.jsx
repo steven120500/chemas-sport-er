@@ -6,6 +6,10 @@ import App from './App';
 import './i18n';
 import './index.css';
 import { registerSW } from './registerSW.js'; // 👈 importa tu helper de SW
+import { installAuthFetch } from './authFetch.js';
+
+// Agrega el token de sesión a todas las peticiones al backend (antes de renderizar)
+installAuthFetch();
 
 // Renderizar la aplicación
 ReactDOM.createRoot(document.getElementById('root')).render(

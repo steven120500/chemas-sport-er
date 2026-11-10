@@ -72,12 +72,18 @@ Filtros del catálogo se sincronizan con la URL: `?q=&type=&sizes=S,M`. Si hay f
 - **Facturación**: `TiendaFactura` guarda método de pago (`Efectivo | Datáfono | SINPE | Mixto`), montos desglosados y `historyIds` ya facturados. Emisión `hacienda` (Alegra) o `interno`.
 - **Fechas**: se guardan como strings `fechaYMD` (`YYYY-MM-DD`) para filtrar por día, más una fecha formateada legible. Zona horaria Costa Rica.
 
-## Auth y roles (estado actual)
+## Auth y roles
 
-- `POST /api/auth/login` devuelve `{ username, roles, isSuperUser }` (**sin token**). El frontend lo guarda en `localStorage.user`.
-- Permisos se envían como headers que el cliente controla: `x-admin`, `x-super`, `x-roles`, `x-user`.
-- Roles usados: `add`, `edit`, `delete`, `history`, `ver_ocultos`, `view_users`, `tienda`; `isSuperUser` lo puede todo.
-- El frontend usa la URL del backend **hardcodeada** (`API_BASE` en `App.jsx` y `fetch` directo en cada componente). `src/api.js` (axios + `VITE_API_URL`) existe pero no se usa.
+- **Login** (`POST /api/auth/login`): devuelve `{ token, username, roles, isSuperUser }`. JWT firmado con `JWT_SECRET`, vence a los 30 días. Límite: 10 intentos / 15 min por IP. Mensaje de error único ("Usuario o contraseña incorrectos").
+- **Frontend**: el usuario (con `token`) vive en `localStorage.user`. `src/authFetch.js` intercepta `window.fetch` y agrega `Authorization: Bearer` a toda petición al backend; si responde 401 con token, dispara `auth:expired` y `App` cierra sesión. Sesiones viejas sin token se borran al cargar. Socket.io manda `auth: { token }`. `VITE_API_URL` permite apuntar a un backend local en desarrollo.
+- **Backend**: `middleware/attachUser.js` valida el JWT → `req.user = { id, name, roles, isSuperUser }`. `middleware/auth.js`: `requireAuth`, `requireRole(...)` (súper usuario siempre pasa), `requireSuper`, `canSeeHidden`, `rateLimit`, `escapeRegex`. **Los headers `x-super`/`x-admin`/`x-roles` ya no dan permisos** (el frontend todavía los manda; se ignoran). `x-user`/`sellerName` solo sirven para atribuir nombre en el historial.
+- **Permisos por ruta** (mismos que exige la UI):
+  - Públicas: `GET /api/products`, `GET /api/products/:id` (ocultos → 404 sin permiso), `POST /api/auth/login`, health/ping.
+  - Sesión: historial (GET), comisiones, anular ventas, `/api/tienda/*`, `/api/alegra/*`, `/api/guias/*`, `/api/correos/*`, export PDF.
+  - `edit`: PUT / lock / unlock producto · `add`: crear producto, registrar usuario · `delete`: eliminar producto · `view_users`: listar/borrar usuarios (no a sí mismo ni a súper usuarios) · súper usuario: `DELETE /api/history`.
+- **Socket.io**: con token válido → sala `admins` (objeto completo); público → versión sin `_lastEditMeta`/`lockedBy` (`utils/realtime.js`, usar siempre `emitProductUpdate(io, obj)`).
+- Roles usados: `add`, `edit`, `delete`, `history`, `ver_ocultos`, `view_users`, `tienda`.
+- Para agregar una ruta nueva: **siempre** ponerle `requireAuth`/`requireRole` salvo que sea catálogo público.
 
 ## Estilos — LEER ANTES DE TOCAR CSS
 
@@ -148,7 +154,7 @@ Por componente:
 
 ## Integraciones y variables de entorno
 
-`api/.env` (no versionado): `MONGO_URI`, `PORT`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CCR_API_URL`, `CCR_USUARIO`, `CCR_PASSWORD`, `CCR_CODIGO_CLIENTE`, `CCR_CODIGO_SERVICIO`. `attachUser` usa `JWT_SECRET` (no está definido; hoy no se emiten tokens).
+`api/.env` (no versionado; plantilla en `api/.env.example`): `MONGO_URI`, `PORT`, `JWT_SECRET`, `CLOUDINARY_*`, `ALEGRA_EMAIL`, `ALEGRA_TOKEN`, `CCR_*`. `server.js` carga dotenv con `import 'dotenv/config'` como **primer import** (las rutas leen `process.env` al importarse). Sin `JWT_SECRET` nadie puede iniciar sesión; sin `ALEGRA_*` no funciona la facturación (ambos avisan en el log al arrancar).
 
 - **Cloudinary**: imágenes de productos. **El costo es ~96% ancho de banda** (nov-2026: 248 GB/mes, 2,3 M impresiones; almacenamiento 8 GB, transformaciones despreciables). Reglas para no inflarlo:
   - Nunca mostrar una URL de Cloudinary sin transformar: siempre `f_auto,q_auto:eco` + ancho fijo (cards `w_480,h_552` en `ProductCard.cldUrl`; producto `c_limit,w_1000` y miniaturas `w_160` en `ProductScreen.transformCloudinary`; Tienda `cldThumb` 96px).
@@ -158,7 +164,7 @@ Por componente:
   - Subida: `UPLOAD_LIMIT` (`api/config/cloudinary.js`) achica toda imagen a máx. 1400px / `q_auto:good` antes de guardarla; `AddProductModal` y `ProductAdminEditor` además comprimen en el navegador (WebP 1000px, 0.75).
   - Limpieza: `api/utils/cloudinaryCleanup.js` → al editar se borran las fotos/dorsales reemplazados y al eliminar un producto sus fotos + dorsales, **solo si ningún otro producto ni `TiendaFactura.ventas.imagen` las referencia**. Si un PUT deja al producto sin fotos, no se borra nada.
   - Huérfanas: `npm run cloudinary:orphans` (en `api/`) genera reporte en `api/scripts/output/` (gitignored); borrar requiere `--delete --yes` y solo toca carpetas `products*`. Nov-2026: 1.860 originales (5,3 GB, ~2,8 MB c/u por subidas sin comprimir), 137 huérfanas (261 MB). El panel muestra ~30k "Images" porque cuenta las versiones derivadas.
-- **Alegra**: facturación electrónica. Credenciales actualmente hardcodeadas en `alegraRoutes.js` y `tiendaRoutes.js` (deberían ir a `.env`).
+- **Alegra**: facturación electrónica (`ALEGRA_EMAIL`/`ALEGRA_TOKEN` desde el entorno).
 - **Correos de Costa Rica**: token cacheado en memoria, catálogos geográficos cacheados.
 - **socket.io**: evento único `productoActualizado`.
 - **PWA**: `registerType: autoUpdate`, `injectRegister: null`, `skipWaiting`/`clientsClaim`. Registro único en `src/registerSW.js` vía `virtual:pwa-register` (solo en producción): al haber deploy nuevo la página se recarga sola una vez; busca actualizaciones cada hora y al volver la pestaña a primer plano. En Render, `/*` debe ir con `Cache-Control: no-cache` (si no, `sw.js`/`index.html` quedan cacheados y los deploys tardan en verse). `/api/products` es `NetworkFirst` (timeout 3s, 5 min).
@@ -175,11 +181,11 @@ Por componente:
 
 ## Deuda técnica conocida (para priorizar mejoras)
 
-1. **Seguridad (crítico)**: permisos basados en headers que manda el cliente (`x-super: true` da acceso total); `/api/auth/register`, `/users` y `DELETE /users/:id` sin protección; login sin JWT; credenciales de Alegra en el repo (rotarlas); `seedSuperUser.js` con contraseña en texto plano; `authRoutes` hace `console.log` del password.
+1. ~~Seguridad crítica~~ (corregido nov-2026: JWT + permisos por ruta, secretos a env, helmet, rate limit, regex escapadas, límites de tamaño, `npm audit` en 0). Pendiente operativo: rotar el token de Alegra (estuvo en el historial de git) y las contraseñas débiles de usuarios.
 2. **Tailwind**: configurar compilación real (v4 con `@tailwindcss/vite`) y quitar el CDN 2.2.19; muchas clases hoy no aplican.
 3. ~~Fuente Barcelona con ruta rota~~ (corregido; `index.css` ya declara las 4 fuentes de dorsal).
 4. **API base duplicada** en ~13 archivos; centralizar en `src/api.js` + `VITE_API_URL`.
-5. **Búsqueda**: `q` va directo a `$regex` sin escapar. En `GET /api/products`, `Temp 26-27` usa `$or` y el filtro de tallas/`storeView` lo sobrescribe.
+5. **Búsqueda**: en `GET /api/products`, `Temp 26-27` usa `$or` y el filtro de tallas/`storeView` lo sobrescribe.
 6. **Bundle** JS ~1.25 MB sin code-splitting: lazy-load de `TiendaPage`, `ComisionesPage`, `GuiasPage`, `HistoryPage`, `jspdf`.
 7. Componentes gigantes (`TiendaPage` 2.1k líneas, `ComisionesPage` 1.8k, `GuiasPage`/`GuiasCorreos` 1.2k) y lógica de Alegra duplicada entre `alegraRoutes` y `tiendaRoutes`.
 8. Varios: dos librerías de toasts, `.DS_Store` versionado, i18n con contenido placeholder (`DroppingCR`), componentes sin uso: `ProductModal.jsx` y `UserDropDown.jsx`.

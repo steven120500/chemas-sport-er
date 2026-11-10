@@ -1,12 +1,15 @@
+// Debe ir PRIMERO: carga el .env antes de que se evalúen los módulos de rutas (leen process.env al importarse)
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import compression from 'compression';
+import helmet from 'helmet';
 import connectDB from './config/db.js';
 
 import attachUser from './middleware/attachUser.js';
+import { socketAuth, onSocketConnection } from './utils/realtime.js';
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
@@ -17,8 +20,6 @@ import guiasRoutes from './routes/guiasRoutes.js';
 import tiendaRoutes from './routes/tiendaRoutes.js'; 
 import correosRoutes from './routes/correosRoutes.js'; // 👈 1. IMPORTAR RUTA DE CORREOS CR
 
-dotenv.config();
-
 const app = express();
 
 app.disable('x-powered-by');
@@ -26,6 +27,13 @@ app.set('json spaces', 0);
 app.set('trust proxy', 1);
 
 app.use(compression());
+
+// Headers de seguridad. CORP "cross-origin" porque el frontend vive en otro dominio.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+if (!process.env.JWT_SECRET) {
+  console.error('⚠️  Falta JWT_SECRET en las variables de entorno: nadie va a poder iniciar sesión.');
+}
 
 // Guardamos los dominios permitidos
 const allowedOrigins = [
@@ -36,24 +44,28 @@ const allowedOrigins = [
   "https://www.chemasporter.com"
 ];
 
+// localhost en cualquier puerto (desarrollo). No es un riesgo: los permisos dependen del token, no del origen.
+const isAllowedOrigin = (origin) => !origin || allowedOrigins.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin);
+const corsOrigin = (origin, cb) => cb(null, isAllowedOrigin(origin));
+
 // ⭐ CORS DE EXPRESS
 app.use(cors({
-  origin: allowedOrigins,
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
 }));
 
-// 🚀 LÍMITE AMPLIADO PARA FOTOS EN BASE64
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Límite para fotos en base64 del editor (ya llegan comprimidas; 15 MB cubre el peor caso)
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 /* 👇 CONFIGURACIÓN DE WEBSOCKETS 👇 */
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOrigin,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-user', 'x-admin', 'x-super', 'x-roles']
@@ -65,13 +77,10 @@ const io = new Server(server, {
 
 app.set('io', io);
 
-io.on('connection', (socket) => {
-  console.log('🟢 Nuevo administrador conectado en vivo:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('🔴 Administrador desconectado:', socket.id);
-  });
-});
+// Los clientes con token válido entran a la sala "admins" (reciben datos completos);
+// el catálogo público recibe la versión sin datos internos (ver utils/realtime.js).
+io.use(socketAuth);
+io.on('connection', onSocketConnection);
 /* 👆 FIN DE CONFIGURACIÓN WEBSOCKETS 👆 */
 
 app.get('/api/health', (_req, res) => {

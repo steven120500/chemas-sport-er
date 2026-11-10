@@ -46,6 +46,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       }
 
       const userData = {
+        token: data.token, // JWT: lo agrega authFetch a cada petición al backend
         username: data.username,
         roles: data.roles,
         isSuperUser: data.isSuperUser,

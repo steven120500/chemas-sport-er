@@ -5,11 +5,15 @@ import cloudinary, { UPLOAD_LIMIT } from '../config/cloudinary.js';
 import { productImageIds, destroyIfUnused } from '../utils/cloudinaryCleanup.js';
 import multer from 'multer';
 
+import { requireAuth, requireRole, canSeeHidden, escapeRegex } from '../middleware/auth.js';
+import { emitProductUpdate } from '../utils/realtime.js';
+
 const router = express.Router();
 
 /* ======================= Multer (Memoria) ======================= */
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Límites: evita que una subida gigante o con cientos de archivos tumbe el servidor
+const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024, files: 6 } });
 
 /* =========================== Helpers ============================ */
 
@@ -134,7 +138,7 @@ async function processDorsalOptions(rawOptions) {
 }
 
 /* ========================= Crear Producto ========================= */
-router.post('/', upload.any(), async (req, res) => {
+router.post('/', requireRole('add'), upload.any(), async (req, res) => {
   try {
     const files = (req.files || []).filter(f =>
       f.fieldname === 'images' || f.fieldname === 'image'
@@ -213,7 +217,7 @@ router.post('/', upload.any(), async (req, res) => {
 
 /* ==================== RUTAS DE BLOQUEO (CANDADO) ================== */
 
-router.post('/:id/lock', async (req, res) => {
+router.post('/:id/lock', requireRole('edit'), async (req, res) => {
   try {
       const product = await Product.findById(req.params.id);
       if (!product) return res.status(404).json({ error: "Producto no encontrado" });
@@ -243,7 +247,7 @@ router.post('/:id/lock', async (req, res) => {
   }
 });
 
-router.post('/:id/unlock', async (req, res) => {
+router.post('/:id/unlock', requireRole('edit'), async (req, res) => {
   try {
       const product = await Product.findById(req.params.id);
       const user = whoDidIt(req);
@@ -260,7 +264,7 @@ router.post('/:id/unlock', async (req, res) => {
 });
 
 /* ======================== Actualizar Producto (CONTROL DE VENTAS) ====================== */
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('edit'), async (req, res) => {
   try {
     const prev = await Product.findById(req.params.id).lean();
     if (!prev) return res.status(404).json({ error: 'Producto no encontrado' });
@@ -454,7 +458,7 @@ router.put('/:id', async (req, res) => {
           prod.markModified('dorsalOptions');
           await prod.save();
           // Emitimos por socket cada camiseta hermana (ej. la Fan) para que se actualice sin refrescar
-          if (io) io.emit('productoActualizado', prod.toObject());
+          emitProductUpdate(io, prod.toObject());
         }
       }
     }
@@ -516,7 +520,7 @@ router.put('/:id', async (req, res) => {
     };
 
     if (io) {
-      io.emit('productoActualizado', updatedObj);
+      emitProductUpdate(io, updatedObj);
     }
 
     // Enviamos al frontend el producto YA con el dorsal rebajado para que aparezca de inmediato sin F5
@@ -529,7 +533,7 @@ router.put('/:id', async (req, res) => {
 });
 
 /* ================== 🗑️ ANULAR VENTA Y DEVOLVER STOCK ================== */
-router.post('/anular/:id', async (req, res) => {
+router.post('/anular/:id', requireAuth, async (req, res) => {
   try {
     const { item, items } = req.body; 
 
@@ -624,7 +628,7 @@ router.post('/anular/:id', async (req, res) => {
         if (changed) {
           prod.markModified('dorsalOptions');
           await prod.save();
-          if (io) io.emit('productoActualizado', prod.toObject());
+          emitProductUpdate(io, prod.toObject());
         }
       }
     }
@@ -632,7 +636,7 @@ router.post('/anular/:id', async (req, res) => {
     if (historyEntry) await History.findByIdAndDelete(req.params.id);
     
     if (io) {
-      io.emit('productoActualizado', product.toObject());
+      emitProductUpdate(io, product.toObject());
     }
 
     res.json({ success: true, message: "Venta anulada, stock de camisa y dorsal devueltos correctamente." });
@@ -644,7 +648,7 @@ router.post('/anular/:id', async (req, res) => {
 
 
 /* ========================== Eliminar Producto ========================= */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('delete'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
@@ -681,16 +685,10 @@ router.get('/', async (req, res) => {
     const sortParam = req.query.sort; 
 
     const find = {};
-    const user = req.user || {};
-    let canSeeHidden = false;
+    // Los ocultos solo los ve quien tiene sesión con permiso (antes bastaba el header x-admin)
+    if (!canSeeHidden(req.user)) find.hidden = { $ne: true };
 
-    if (user.isSuperUser || (user.roles || []).includes("edit") || (user.roles || []).includes("ver_ocultos") || req.headers["x-admin"] === "true") {
-      canSeeHidden = true;
-    }
-
-    if (!canSeeHidden) find.hidden = { $ne: true };
-
-    if (q) find.name = { $regex: q, $options: 'i' };
+    if (q) find.name = { $regex: escapeRegex(q), $options: 'i' };
 
     if (type === 'Ofertas') {
       find.discountPrice = { $gt: 0 };
@@ -746,7 +744,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id).lean();
-    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+    if (!product || (product.hidden && !canSeeHidden(req.user))) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener producto' });

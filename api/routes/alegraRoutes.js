@@ -1,9 +1,15 @@
 import express from 'express';
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = express.Router();
 
-const ALEGRA_EMAIL = "chemasport__er@outlook.com";
-const ALEGRA_TOKEN = "134a1c740dd8a0185278";
+// Todas las rutas requieren sesión (facturación, datos de clientes, guías con costo)
+router.use(requireAuth);
+
+const ALEGRA_EMAIL = process.env.ALEGRA_EMAIL || "";
+const ALEGRA_TOKEN = process.env.ALEGRA_TOKEN || "";
+if (!ALEGRA_EMAIL || !ALEGRA_TOKEN) console.error("⚠️  Faltan ALEGRA_EMAIL / ALEGRA_TOKEN en las variables de entorno: la facturación con Alegra no va a funcionar.");
 
 // ID DE LA NUMERACIÓN INTERNA (NO ELECTRÓNICA)
 const ID_NUMERACION_INTERNA = 1; 

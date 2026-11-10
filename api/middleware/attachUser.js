@@ -1,43 +1,35 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-
+/**
+ * Lee el JWT del header Authorization ("Bearer <token>") y, si es válido y el usuario
+ * sigue existiendo, deja en req.user: { id, name, roles, isSuperUser }.
+ * Sin token (o token inválido/expirado) la petición sigue como anónima: cada ruta decide
+ * con requireAuth / requireRole si la acepta.
+ *
+ * ⚠️ Los headers x-super / x-admin / x-roles que manda el frontend viejo YA NO dan permisos.
+ */
 export default async function attachUser(req, _res, next) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
 
-
-  if (token) {
+  if (token && process.env.JWT_SECRET) {
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-
-
-      // Buscar el usuario REAL en la base de datos
       const dbUser = await User.findById(payload.id).lean();
-
-
       if (dbUser) {
         req.user = {
-          id: dbUser._id,
+          id: String(dbUser._id),
           name: dbUser.username,
-          email: dbUser.email,
           roles: dbUser.roles || [],
           isSuperUser: dbUser.isSuperUser || false,
         };
-      } else {
-        req.user = { id: payload.id, name: payload.name, email: payload.email };
       }
     } catch (err) {
-      console.error("JWT inválido:", err);
+      // token vencido o alterado: se trata como anónimo (sin volcar el error completo en los logs)
+      if (err?.name !== "TokenExpiredError") console.warn("JWT inválido:", err?.name || "error");
     }
   }
-
-
-  // respaldo si no hay token pero viene x-user (caso local/test)
-  if (!req.user?.name && req.headers["x-user"]) {
-    req.user = { ...(req.user || {}), name: req.headers["x-user"] };
-  }
-
 
   next();
 }

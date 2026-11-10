@@ -1,12 +1,21 @@
 import express from 'express';
 import Guia from '../models/Guia.js';
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = express.Router();
 
 // Guardar nueva guía
+const CAMPOS_GUIA = ['numeroGuia', 'nombre', 'provincia', 'canton', 'distrito', 'telefono', 'debe', 'monto',
+  'meterRaspa', 'esMayorista', 'nombreMayorista', 'comentarios', 'fechaYMD', 'fecha'];
+const soloCamposGuia = (body = {}) =>
+  Object.fromEntries(CAMPOS_GUIA.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+
+router.use(requireAuth);
+
 router.post('/', async (req, res) => {
   try {
-    const nuevaGuia = new Guia(req.body);
+    const nuevaGuia = new Guia(soloCamposGuia(req.body));
     const saved = await nuevaGuia.save();
     res.status(200).json({ success: true, guia: saved });
   } catch (error) {

@@ -2,12 +2,15 @@ import express from 'express';
 import History from '../models/History.js';
 import Product from '../models/Product.js';
 
+import { requireAuth } from '../middleware/auth.js';
+import { emitProductUpdate } from '../utils/realtime.js';
+
 const router = express.Router();
 
 /* ========================================================
    🗑️ ANULAR VENTA: Devuelve el stock y elimina de comisiones
    ======================================================== */
-router.post('/anular/:id', async (req, res) => {
+router.post('/anular/:id', requireAuth, async (req, res) => {
   try {
     const logId = req.params.id;
     console.log("➡️ [ANULAR] Solicitud para venta ID:", logId);
@@ -150,7 +153,7 @@ router.post('/anular/:id', async (req, res) => {
       // Notificar por WebSockets
       const io = req.app.get('io');
       if (io && updatedProduct) {
-        io.emit('productoActualizado', updatedProduct.toObject());
+        emitProductUpdate(io, updatedProduct.toObject());
       }
     } else {
       console.log("ℹ️ [ANULAR] Registro sin tallas físicas registradas; procediendo a limpiar del historial.");

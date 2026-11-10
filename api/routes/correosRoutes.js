@@ -5,7 +5,12 @@ import mongoose from 'mongoose';
 
 dotenv.config();
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = express.Router();
+
+// Todas las rutas requieren sesión (facturación, datos de clientes, guías con costo)
+router.use(requireAuth);
 
 // ==========================================
 // 📦 MODELO MONGODB PARA HISTORIAL GLOBAL DE GUÍAS CORREOS
@@ -74,7 +79,6 @@ async function obtenerTokenCCR(forzarNuevo = false) {
       headers: { 'Content-Type': 'application/json' }
     });
     
-    console.log("[CCR-AUTH] -> Respuesta de Correos:", response.data);
 
     let token = null;
     if (response.data && response.data.accessToken) {
@@ -95,7 +99,7 @@ async function obtenerTokenCCR(forzarNuevo = false) {
     tokenExpirationTime = 0;
     console.error("\n[CCR-AUTH ERROR] -> Falló la autenticación en Producción");
     console.error("[CCR-AUTH ERROR] -> Status Code:", error.response?.status);
-    console.error("[CCR-AUTH ERROR] -> Response Data:", JSON.stringify(error.response?.data, null, 2));
+    console.error("[CCR-AUTH ERROR] -> Mensaje:", error.response?.data?.mensaje || error.response?.data?.message || error.message);
     throw new Error('Falló la autenticación con Correos CR (Producción)');
   }
 }
