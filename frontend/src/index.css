@@ -2103,7 +2103,9 @@ button:focus-visible {
 }
 .ps-swipe { width: 100%; cursor: grab; touch-action: pan-y; }
 .ps-swipe:active { cursor: grabbing; }
-.ps-img { -webkit-user-drag: none; }
+/* 👈 framer-motion (drag) le pone -webkit-touch-callout: none al contenedor y bloquea
+   "Guardar imagen" al dejar presionado en el celular. Se reactiva solo en la foto. */
+.ps-img { -webkit-user-drag: none; -webkit-touch-callout: default; }
 .ps-noimg { display: grid; place-items: center; width: 100%; height: 360px; color: #a1a1aa; font-weight: 700; }
 .ps-root .ps-nav {
   position: absolute;
