@@ -75,10 +75,13 @@ function SealTemporada({ uid }) {
   );
 }
 
+// 📱 Pantallas táctiles (sin hover real): la 2da foto alterna sola
+const IS_TOUCH = typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches;
+
 export default function ProductCard({ product, onClick, user, index = 0 }) {
   const reduceMotion = useReducedMotion();
-  // 💸 La 2da foto solo se descarga cuando el usuario pasa el mouse (en celular nunca se ve):
-  // ahorra casi la mitad del ancho de banda de Cloudinary en el catálogo.
+  // 💸 La 2da foto solo se descarga cuando hace falta: en desktop al pasar el mouse;
+  // en celular (sin hover) cuando la card entra en pantalla, y ahí alterna sola (CSS `@media (hover: none)`).
   const [wantsAlt, setWantsAlt] = useState(false);
   if (!product) return null;
 
@@ -148,6 +151,9 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick(product)}
       onMouseEnter={() => setWantsAlt(true)}
+      onViewportEnter={() => {
+        if (IS_TOUCH) setWantsAlt(true);
+      }}
       className={`pc-card ${isTotalAgotado ? "pc-soldout" : ""}`}
       style={isAdmin && product.hidden ? { opacity: 0.6, filter: "grayscale(1)" } : undefined}
     >
@@ -185,6 +191,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               alt=""
               aria-hidden="true"
               className="pc-img pc-img--alt"
+              style={{ animationDelay: `${(index % 4) * 0.6}s` }}
               loading="lazy"
               decoding="async"
             />

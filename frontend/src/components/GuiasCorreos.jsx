@@ -9,9 +9,11 @@ import {
   FaTrash, 
   FaChevronLeft, 
   FaChevronRight,
-  FaSpinner 
+  FaSpinner,
+  FaCopy
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
+import ModalShell from "./ModalShell";
 import jsPDF from "jspdf";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
@@ -91,6 +93,11 @@ export default function GuiasCorreos() {
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingCedula, setIsSearchingCedula] = useState(false);
+
+  // 📋 Duplicar guía: misma guía con otro "detalle del envío"
+  const [guiaADuplicar, setGuiaADuplicar] = useState(null);
+  const [detalleDuplicado, setDetalleDuplicado] = useState("");
+  const [isDuplicando, setIsDuplicando] = useState(false);
 
   // Historial sincronizado con Backend + respaldo en localStorage
   const [historialGuias, setHistorialGuias] = useState(() => {
@@ -547,6 +554,86 @@ export default function GuiasCorreos() {
     doc.save(`${codigoGuia}.pdf`);
   };
 
+  // 🔥 Registra la guía en Correos CR, la agrega al historial y descarga el PDF.
+  // La usan el formulario y "Duplicar". Lanza error si Correos no la acepta.
+  const registrarGuiaCorreos = async (payload) => {
+    const fechaYyyyMmDd = new Date().toISOString().split('T')[0];
+    const fechaFormateada = new Date().toLocaleDateString('es-CR');
+
+    const res = await fetch(`${API_BASE}/api/correos/generar-guia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, fechaYyyyMmDd, fechaFormateada })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.exito) {
+      throw new Error(data.mensaje || "Error al generar la guía");
+    }
+
+    const numeroGuia = data.datos?.enviold || data.datos?.envioId || "PY086032498CR";
+    const nuevaGuiaItem = data.guiaGuardada || {
+      idUnico: Date.now() + Math.random(),
+      enviold: numeroGuia,
+      nombre: payload.destNombre,
+      telefono: payload.destTelefono,
+      tipoEnvio: payload.tipoDestino === "SUC" ? "Sucursal" : "Domicilio",
+      direccion: payload.destDireccion,
+      detalleEnvio: payload.observaciones,
+      codigoPostal: payload.destZip,
+      codigoSucursal: payload.tipoDestino === "SUC" ? payload.codigoSucursal : "",
+      fechaYyyyMmDd,
+      fechaFormateada
+    };
+
+    // Generar y descargar el PDF con formato oficial y código de barras
+    generarPdfOficialCorreos(nuevaGuiaItem);
+
+    setHistorialGuias(prev => [nuevaGuiaItem, ...prev.filter(g => g.enviold !== nuevaGuiaItem.enviold)]);
+    setFechaFiltro(nuevaGuiaItem.fechaYyyyMmDd);
+    setPaginaActual(1);
+    return nuevaGuiaItem;
+  };
+
+  // 📋 Duplicar: abre el modal con el detalle vacío
+  const abrirDuplicar = (guiaItem) => {
+    setGuiaADuplicar(guiaItem);
+    setDetalleDuplicado("");
+  };
+
+  // 📋 Genera una guía nueva igual a la original, solo cambia el detalle del envío
+  const handleDuplicarGuia = async (close) => {
+    const g = guiaADuplicar;
+    const detalle = detalleDuplicado.trim();
+    if (!g || isDuplicando) return;
+    if (!detalle) {
+      toastHOT.error("Escribí qué lleva el paquete (ej: Camiseta).");
+      return;
+    }
+
+    const esSucursal = g.tipoEnvio === "Sucursal" || g.tipoEnvio === "SUC";
+    setIsDuplicando(true);
+    const toastId = toastHOT.loading(`Duplicando guía de ${g.nombre}...`);
+    try {
+      await registrarGuiaCorreos({
+        destNombre: g.nombre,
+        destDireccion: g.direccion,
+        destTelefono: g.telefono,
+        destZip: g.codigoPostal || "10101",
+        peso: 500,
+        observaciones: detalle,
+        tipoDestino: esSucursal ? "SUC" : "DOM",
+        codigoSucursal: esSucursal ? g.codigoSucursal : "",
+      });
+      toastHOT.success("¡Guía duplicada con éxito!", { id: toastId });
+      close();
+    } catch (error) {
+      console.error(error);
+      toastHOT.error(`Error: ${error.message}`, { id: toastId });
+    } finally {
+      setIsDuplicando(false);
+    }
+  };
+
   // Enviar formulario para registrar guía
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -593,9 +680,6 @@ export default function GuiasCorreos() {
         ? `${prefijoGeografico}, Sucursal ${form.codigoSucursal}: ${sucNombre}`
         : `${prefijoGeografico}, ${form.direccion.trim()}`;
 
-      const fechaYyyyMmDd = new Date().toISOString().split('T')[0];
-      const fechaActualStr = new Date().toLocaleDateString('es-CR');
-
       const payload = {
         destNombre: form.nombre.trim(),
         destDireccion: direccionCompletaOficial,
@@ -605,56 +689,20 @@ export default function GuiasCorreos() {
         observaciones: form.detalleEnvio.trim(),
         tipoDestino: form.tipoEnvio,
         codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : "",
-        fechaYyyyMmDd,
-        fechaFormateada: fechaActualStr
       };
 
-      const res = await fetch(`${API_BASE}/api/correos/generar-guia`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.exito) {
-        toastHOT.success("¡Guía generada con éxito!", { id: toastId });
-        
-        const numeroGuia = data.datos?.enviold || data.datos?.envioId || "PY086032498CR";
+      await registrarGuiaCorreos(payload);
+      toastHOT.success("¡Guía generada con éxito!", { id: toastId });
 
-        const nuevaGuiaItem = data.guiaGuardada || {
-          idUnico: Date.now() + Math.random(),
-          enviold: numeroGuia,
-          nombre: form.nombre.trim(),
-          telefono: form.telefono,
-          tipoEnvio: form.tipoEnvio === "DOM" ? "Domicilio" : "Sucursal",
-          direccion: direccionCompletaOficial,
-          detalleEnvio: form.detalleEnvio.trim(),
-          codigoPostal: form.codigoPostal,
-          codigoSucursal: form.tipoEnvio === "SUC" ? form.codigoSucursal : "",
-          fechaYyyyMmDd,
-          fechaFormateada: fechaActualStr
-        };
-
-        // Generar y descargar el PDF con formato oficial y código de barras
-        generarPdfOficialCorreos(nuevaGuiaItem);
-
-        setHistorialGuias(prev => [nuevaGuiaItem, ...prev.filter(g => g.enviold !== nuevaGuiaItem.enviold)]);
-        setFechaFiltro(nuevaGuiaItem.fechaYyyyMmDd);
-        setPaginaActual(1);
-        
-        setForm(prev => ({ 
-            ...prev, 
-            detalleEnvio: "", 
-            nombre: "", 
-            telefono: "", 
-            direccion: "",
-            numeroIdentificacion: "",
-            codigoSucursal: "" 
-        }));
-      } else {
-        throw new Error(data.mensaje || "Error al generar la guía");
-      }
+      setForm(prev => ({ 
+          ...prev, 
+          detalleEnvio: "", 
+          nombre: "", 
+          telefono: "", 
+          direccion: "",
+          numeroIdentificacion: "",
+          codigoSucursal: "" 
+      }));
     } catch (error) {
       console.error(error);
       toastHOT.error(`Error: ${error.message}`, { id: toastId });
@@ -1105,6 +1153,14 @@ export default function GuiasCorreos() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => abrirDuplicar(item)}
+                            className="bg-[#0f2d5c] hover:bg-blue-900 text-white p-2 rounded-lg text-xs transition-colors cursor-pointer"
+                            title="Duplicar guía (mismo destinatario, otro contenido)"
+                          >
+                            <FaCopy />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleEliminarGuia(item)}
                             className="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white p-2 rounded-lg text-xs transition-colors cursor-pointer"
                             title="Eliminar guía del historial"
@@ -1152,6 +1208,50 @@ export default function GuiasCorreos() {
           </>
         )}
       </div>
+
+      {/* 📋 MODAL DUPLICAR GUÍA */}
+      {guiaADuplicar && (
+        <ModalShell
+          onClose={() => setGuiaADuplicar(null)}
+          dismissible={!isDuplicando}
+          size="sm"
+          icon={FaCopy}
+          eyebrow="Correos CR"
+          title="Duplicar guía"
+          subtitle={`${guiaADuplicar.nombre} · ${guiaADuplicar.tipoEnvio}`}
+          footer={(close) => (
+            <>
+              <button type="button" className="md-btn is-ghost" onClick={close} disabled={isDuplicando}>
+                Cancelar
+              </button>
+              <button type="button" className="md-btn is-primary" onClick={() => handleDuplicarGuia(close)} disabled={isDuplicando}>
+                {isDuplicando ? "Generando..." : "Generar guía"}
+              </button>
+            </>
+          )}
+        >
+          {(close) => (
+            <form onSubmit={(e) => { e.preventDefault(); handleDuplicarGuia(close); }}>
+              <div className="md-field">
+                <label className="md-label" htmlFor="detalle-duplicado">¿Qué querés poner en el detalle del envío?</label>
+                <input
+                  id="detalle-duplicado"
+                  className="md-input"
+                  value={detalleDuplicado}
+                  onChange={(e) => setDetalleDuplicado(e.target.value)}
+                  placeholder="Ej: Paquete, Camiseta..."
+                  autoFocus
+                  disabled={isDuplicando}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                El resto de la guía (destinatario, teléfono y dirección) queda igual:{" "}
+                <span className="text-gray-700">{guiaADuplicar.direccion}</span>
+              </p>
+            </form>
+          )}
+        </ModalShell>
+      )}
     </div>
   );
 }

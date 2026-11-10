@@ -37,6 +37,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ✏️ Editar una guía (monto, deuda, datos del destinatario, comentarios...)
+router.put('/:id', async (req, res) => {
+  try {
+    const cambios = soloCamposGuia(req.body);
+    delete cambios.fechaYMD; // 👈 la fecha de creación no se cambia al editar
+    delete cambios.fecha;
+    const guia = await Guia.findByIdAndUpdate(req.params.id, cambios, { new: true, runValidators: true });
+    if (!guia) return res.status(404).json({ error: "Guía no encontrada." });
+    res.status(200).json({ success: true, guia });
+  } catch (error) {
+    console.error("Error al editar guía:", error);
+    res.status(500).json({ error: "Error al editar la guía." });
+  }
+});
+
 // Eliminar una guía
 router.delete('/:id', async (req, res) => {
   try {

@@ -60,6 +60,7 @@ export default function GuiasPage() {
   // Estado para saber qué celda específica se está editando: { rowId, field }
   const [editingCell, setEditingCell] = useState(null);
   const [tempValue, setTempValue] = useState("");
+  const [tempMonto, setTempMonto] = useState(""); // 👈 monto aparte (se edita junto con "debe")
 
   const [guias, setGuias] = useState(() => {
     try {
@@ -272,35 +273,53 @@ export default function GuiasPage() {
     const rowId = g._id || g.id;
     setEditingCell({ rowId, field });
     setTempValue(g[field] !== undefined ? String(g[field]) : "");
+    if (field === "debe") {
+      const m = limpiarMontoCR(g.monto);
+      setTempMonto(m > 0 ? String(m) : "");
+    }
   };
 
   const guardarEdicionCelda = async (gTarget, field) => {
     const rowId = gTarget._id || gTarget.id;
-    let valorFinal = tempValue;
+    let cambios;
 
-    if (field === "monto") {
-      valorFinal = String(limpiarMontoCR(tempValue));
-      if (gTarget.debe === "Sí" && Number(valorFinal) <= 0) {
+    if (field === "debe") {
+      // 🔥 Deuda y monto se guardan juntos
+      const debe = tempValue === "Sí" ? "Sí" : "No";
+      const monto = String(limpiarMontoCR(tempMonto));
+      if (debe === "Sí" && Number(monto) <= 0) {
         toastHOT.error("El monto debe ser mayor a 0.");
         return;
       }
+      cambios = { debe, monto };
+    } else if (field === "monto") {
+      const monto = String(limpiarMontoCR(tempValue));
+      if (gTarget.debe === "Sí" && Number(monto) <= 0) {
+        toastHOT.error("El monto debe ser mayor a 0.");
+        return;
+      }
+      cambios = { monto };
+    } else {
+      cambios = { [field]: String(tempValue).trim() };
     }
 
-    const guiaActualizada = {
-      ...gTarget,
-      [field]: typeof valorFinal === "string" ? valorFinal.trim() : valorFinal
-    };
+    let guiaActualizada = { ...gTarget, ...cambios };
 
-    try {
-      if (gTarget._id) {
-        await fetch(`${API_BASE}/api/guias/${gTarget._id}`, {
+    if (gTarget._id) {
+      try {
+        const res = await fetch(`${API_BASE}/api/guias/${gTarget._id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(guiaActualizada)
+          body: JSON.stringify(cambios)
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "No se pudo guardar el cambio.");
+        if (data?.guia) guiaActualizada = data.guia;
+      } catch (e) {
+        console.error("Error actualizando en backend:", e);
+        toastHOT.error(e.message || "No se pudo guardar el cambio.");
+        return; // 👈 no cambiamos la tabla si el servidor no lo guardó
       }
-    } catch (e) {
-      console.error("Error actualizando en backend:", e);
     }
 
     setGuias((prev) => prev.map((item) => {
@@ -308,14 +327,14 @@ export default function GuiasPage() {
       return itemId === rowId ? guiaActualizada : item;
     }));
 
-    setEditingCell(null);
-    setTempValue("");
+    cancelarEdicionCelda();
     toastHOT.success("Campo actualizado.");
   };
 
   const cancelarEdicionCelda = () => {
     setEditingCell(null);
     setTempValue("");
+    setTempMonto("");
   };
 
   const guiasFiltradas = useMemo(() => {
@@ -1043,20 +1062,19 @@ export default function GuiasPage() {
 
                               {/* ¿DEBE? / MONTO (EDITABLE) */}
                               <td className="py-4 px-3 whitespace-nowrap">
-                                {isEditingField("debe") || isEditingField("monto") ? (
+                                {isEditingField("debe") ? (
                                   <div className="p-2 bg-white border border-black rounded-xl space-y-2">
-                                    <select value={isEditingField("debe") ? tempValue : g.debe} onChange={(e) => {
-                                      if (isEditingField("debe")) setTempValue(e.target.value);
-                                    }} className="p-1 bg-zinc-100 rounded text-xs font-bold">
+                                    <select value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-zinc-100 rounded text-xs font-bold">
                                       <option value="No">No</option>
                                       <option value="Sí">Sí</option>
                                     </select>
-                                    <input 
-                                      type="text" 
-                                      value={isEditingField("monto") ? tempValue : g.monto} 
-                                      onChange={(e) => setTempValue(e.target.value.replace(/\D/g, ""))} 
-                                      placeholder="Monto ₡" 
-                                      className="p-1 bg-zinc-100 rounded text-xs font-bold w-24 text-emerald-700" 
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={tempMonto}
+                                      onChange={(e) => setTempMonto(e.target.value.replace(/\D/g, ""))}
+                                      placeholder="Monto ₡"
+                                      className="p-1 bg-zinc-100 rounded text-xs font-bold w-24 text-emerald-700"
                                     />
                                     <div className="flex gap-1">
                                       <button onClick={() => guardarEdicionCelda(g, "debe")} className="p-1 bg-black text-white rounded text-[10px] cursor-pointer">Guardar</button>
@@ -1074,7 +1092,7 @@ export default function GuiasPage() {
                                         No (Pagado)
                                       </span>
                                     )}
-                                    <button onClick={() => iniciarEdicionCelda(g, "debe")} className="opacity-0 group-hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar deuda/monto"><FaPencilAlt size={10} /></button>
+                                    <button onClick={() => iniciarEdicionCelda(g, "debe")} className="opacity-60 hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar deuda/monto"><FaPencilAlt size={10} /></button>
                                   </div>
                                 )}
                               </td>

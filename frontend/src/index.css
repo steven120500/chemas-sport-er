@@ -688,6 +688,20 @@ button:focus-visible {
   .pc-img, .pc-seal-svg, .pc-arrow { transition: none; }
 }
 
+/* 📱 Celular / táctil: no hay hover, así que la 2da foto alterna sola (empieza mostrando la principal).
+   Va después del bloque de reduce-motion a propósito: es un fundido, no movimiento, y el dueño
+   prueba en iPhone con "Reducir movimiento" activado. */
+@media (hover: none) {
+  .pc-card:not(.pc-soldout) .pc-img--alt,
+  .pc-card:not(.pc-soldout):hover .pc-img--alt { animation: swapMovil 5s ease-in-out infinite; }
+  .pc-card:not(.pc-soldout):hover .pc-img { transform: none; }
+}
+@keyframes swapMovil {
+  0%, 42% { opacity: 0; }
+  50%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 
 /* =================================================================
    BIENVENIDO (Bienvenido.jsx) — clases bv-*
