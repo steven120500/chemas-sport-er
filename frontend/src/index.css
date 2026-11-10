@@ -2367,29 +2367,42 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  height: 34px;
-  padding: 0 16px;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
   background: #000;
   color: #fff;
   overflow: hidden;
 }
-.tb-track { position: relative; height: 34px; display: flex; align-items: center; min-width: 0; }
+/* 📱 Móvil: el mensaje puede usar 2 líneas (altura fija para que no brinque al rotar) */
+.tb-track {
+  position: relative;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  flex: 0 1 auto;
+}
 .tb-msg {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  line-height: 1.35;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .tb-star { color: #F5C400; font-size: 9px; flex: none; }
 @media (min-width: 640px) {
-  .tb { height: 38px; }
+  .tb { height: 38px; gap: 12px; padding: 0 16px; }
   .tb-track { height: 38px; }
-  .tb-msg { font-size: 11px; letter-spacing: 0.22em; }
+  .tb-msg { font-size: 11px; letter-spacing: 0.22em; -webkit-line-clamp: 1; }
 }
 
 /* =================================================================
