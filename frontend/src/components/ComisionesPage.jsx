@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaChevronRight, FaTrophy, FaCalendarAlt, FaSearch, 
   FaFilePdf, FaTrash, FaLock, FaExclamationTriangle, FaReceipt,
-  FaEdit, FaCheck, FaTimes, FaTruck, FaStar, FaUserCheck
+  FaEdit, FaCheck, FaTimes, FaTruck, FaStar, FaUserCheck, FaPlus
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
@@ -11,6 +11,20 @@ import ModalShell from "./ModalShell";
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
+// 🗓️ Contrapedido por semanas. Formato guardado: { semanas: [s1, s2, s3, s4] } (o 5 si el mes tuvo semana extra).
+// Compatibilidad: si viene un número (formato viejo) se toma como el acumulado de la semana 1.
+function semanasContrapedido(valor) {
+  if (valor && Array.isArray(valor.semanas)) {
+    const n = Math.min(5, Math.max(4, valor.semanas.length));
+    return Array.from({ length: n }, (_, i) => Math.max(0, Number(valor.semanas[i]) || 0));
+  }
+  return [Math.max(0, Number(valor) || 0), 0, 0, 0];
+}
+const totalContrapedido = (valor) => semanasContrapedido(valor).reduce((a, b) => a + b, 0);
+
+// Semana del mes (0–4) de una fecha: 1–7 → S1, 8–14 → S2, 15–21 → S3, 22–28 → S4, 29+ → S5
+const semanaDelMes = (d = new Date()) => Math.min(4, Math.floor((d.getDate() - 1) / 7));
+
 function ymLocal(d = new Date()) {
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
@@ -218,9 +232,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
   });
 
-  // Estado para controlar qué bloque de contrapedido se está editando
-  const [editandoContrapVendedor, setEditandoContrapVendedor] = useState(null);
-  const [tempContrapValor, setTempContrapValor] = useState("");
+  // 🗓️ Modal de contrapedido por semanas: { vendedor, semanas: ["", "", "", ""] } (5 con semana extra)
+  const [modalContrap, setModalContrap] = useState(null);
 
   // ✏️ Estados para Precios Personalizados en la Tabla
   const [preciosPersonalizados, setPreciosPersonalizados] = useState(() => {
@@ -488,20 +501,29 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     });
   }, [logs]);
 
-  // Guardar el número exacto digitado en el input de contrapedido (Permitido para el usuario autorizado)
-  const guardarContrapedidoDirecto = (vendedor) => {
-    if (!puedeEditarContrapedidos) {
+  // 🗓️ Abrir el modal de contrapedido con las 4 semanas del vendedor
+  const abrirContrapedido = (vendedor) => {
+    const semanas = semanasContrapedido((contrapedidosMes[selectedMonth] || {})[vendedor]);
+    setModalContrap({
+      vendedor,
+      semanas: semanas.map((n) => (n ? String(n) : "")),
+    });
+  };
+
+  // Guardar las semanas del modal 👈
+  const guardarContrapedidoSemanas = () => {
+    if (!puedeEditarContrapedidos || !modalContrap) {
       toastHOT.error("No tienes permisos para modificar los contrapedidos.");
-      return;
+      return false;
     }
-    const num = Math.max(0, Number(tempContrapValor) || 0);
+    const semanas = modalContrap.semanas.map((v) => Math.max(0, Math.trunc(Number(v) || 0)));
+    const { vendedor } = modalContrap;
     setContrapedidosMes((prev) => {
-      const mesActualObj = prev[selectedMonth] || {};
       const actualizado = {
         ...prev,
         [selectedMonth]: {
-          ...mesActualObj,
-          [vendedor]: num
+          ...(prev[selectedMonth] || {}),
+          [vendedor]: { semanas }
         }
       };
       try {
@@ -511,9 +533,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       }
       return actualizado;
     });
-    setEditandoContrapVendedor(null);
-    setTempContrapValor("");
-    toastHOT.success("Contrapedido actualizado.");
+    toastHOT.success(`Contrapedido de ${vendedor}: ${semanas.reduce((a, b) => a + b, 0)} prendas.`);
+    return true;
   };
 
   useEffect(() => {
@@ -644,7 +665,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     return Object.entries(conteo)
       .filter(([vendedor]) => !EXCLUDED_USERS.has(normText(vendedor)))
       .map(([vendedor, stats]) => {
-        const contrapedidoUds = Number(mesContrapedidos[vendedor]) || 0;
+        const contrapedidoUds = totalContrapedido(mesContrapedidos[vendedor]);
         const stockUds = stats.unidades;
         const totalUdsCombinadas = stockUds + contrapedidoUds;
         
@@ -686,7 +707,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const totalPrendasStockMes = ventasFiltradas.reduce((acc, v) => acc + v.totalUnidades, 0);
   const totalPrendasContrapedidoMes = Object.entries(contrapedidosMes[selectedMonth] || {})
     .filter(([vend]) => !EXCLUDED_USERS.has(normText(vend)))
-    .reduce((a, [, b]) => a + Number(b), 0);
+    .reduce((a, [, b]) => a + totalContrapedido(b), 0);
   const totalPrendasMes = totalPrendasStockMes + totalPrendasContrapedidoMes;
   const totalComisionesMes = ranking.reduce((acc, r) => acc + r.totalComision, 0);
 
@@ -1281,36 +1302,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <div className="border-r border-zinc-200 h-6"></div>
                 <div>
                   {puedeEditarContrapedidos && top2?.vendedor ? (
-                    editandoContrapVendedor === top2.vendedor ? (
-                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={tempContrapValor} 
-                          onChange={(e) => setTempContrapValor(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") guardarContrapedidoDirecto(top2.vendedor);
-                            if (e.key === "Escape") setEditandoContrapVendedor(null);
-                          }}
-                          autoFocus
-                          className="w-12 text-center text-sm font-black text-emerald-800 bg-transparent outline-none py-0.5"
-                        />
-                        <button type="button" onClick={() => guardarContrapedidoDirecto(top2.vendedor)} className="bg-emerald-600 text-white px-1.5 py-1 cursor-pointer"><FaCheck size={9} /></button>
-                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-1.5 py-1 cursor-pointer"><FaTimes size={9} /></button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditandoContrapVendedor(top2.vendedor);
-                          setTempContrapValor(String(top2.contrapedidoUds));
-                        }}
-                        className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
-                        title="Clic para editar contrapedido"
-                      >
-                        +{top2?.contrapedidoUds || 0} 
-                      </button>
-                    )
+                    <button
+                      type="button"
+                      onClick={() => abrirContrapedido(top2.vendedor)}
+                      className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
+                      title="Clic para ver / editar contrapedido por semana"
+                    >
+                      +{top2?.contrapedidoUds || 0}
+                    </button>
                   ) : (
                     <p className="text-xl font-black text-emerald-700">+{top2?.contrapedidoUds || 0}</p>
                   )}
@@ -1336,36 +1335,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <div className="border-r border-amber-300 h-8"></div>
                 <div>
                   {puedeEditarContrapedidos && top1?.vendedor ? (
-                    editandoContrapVendedor === top1.vendedor ? (
-                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={tempContrapValor} 
-                          onChange={(e) => setTempContrapValor(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") guardarContrapedidoDirecto(top1.vendedor);
-                            if (e.key === "Escape") setEditandoContrapVendedor(null);
-                          }}
-                          autoFocus
-                          className="w-14 text-center text-base font-black text-emerald-800 bg-transparent outline-none py-0.5"
-                        />
-                        <button type="button" onClick={() => guardarContrapedidoDirecto(top1.vendedor)} className="bg-emerald-600 text-white px-2 py-1 cursor-pointer"><FaCheck size={10} /></button>
-                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-2 py-1 cursor-pointer"><FaTimes size={10} /></button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditandoContrapVendedor(top1.vendedor);
-                          setTempContrapValor(String(top1.contrapedidoUds));
-                        }}
-                        className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
-                        title="Clic para editar contrapedido"
-                      >
-                        +{top1?.contrapedidoUds || 0} 
-                      </button>
-                    )
+                    <button
+                      type="button"
+                      onClick={() => abrirContrapedido(top1.vendedor)}
+                      className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
+                      title="Clic para ver / editar contrapedido por semana"
+                    >
+                      +{top1?.contrapedidoUds || 0}
+                    </button>
                   ) : (
                     <p className="text-2xl font-black text-emerald-700">+{top1?.contrapedidoUds || 0}</p>
                   )}
@@ -1391,36 +1368,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                 <div className="border-r border-zinc-200 h-6"></div>
                 <div>
                   {puedeEditarContrapedidos && top3?.vendedor ? (
-                    editandoContrapVendedor === top3.vendedor ? (
-                      <div className="inline-flex items-center bg-white border border-black rounded-lg overflow-hidden shadow-sm">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={tempContrapValor} 
-                          onChange={(e) => setTempContrapValor(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") guardarContrapedidoDirecto(top3.vendedor);
-                            if (e.key === "Escape") setEditandoContrapVendedor(null);
-                          }}
-                          autoFocus
-                          className="w-12 text-center text-sm font-black text-emerald-800 bg-transparent outline-none py-0.5"
-                        />
-                        <button type="button" onClick={() => guardarContrapedidoDirecto(top3.vendedor)} className="bg-emerald-600 text-white px-1.5 py-1 cursor-pointer"><FaCheck size={9} /></button>
-                        <button type="button" onClick={() => setEditandoContrapVendedor(null)} className="bg-zinc-200 text-zinc-700 px-1.5 py-1 cursor-pointer"><FaTimes size={9} /></button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditandoContrapVendedor(top3.vendedor);
-                          setTempContrapValor(String(top3.contrapedidoUds));
-                        }}
-                        className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
-                        title="Clic para editar contrapedido"
-                      >
-                        +{top3?.contrapedidoUds || 0} 
-                      </button>
-                    )
+                    <button
+                      type="button"
+                      onClick={() => abrirContrapedido(top3.vendedor)}
+                      className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
+                      title="Clic para ver / editar contrapedido por semana"
+                    >
+                      +{top3?.contrapedidoUds || 0}
+                    </button>
                   ) : (
                     <p className="text-xl font-black text-emerald-700">+{top3?.contrapedidoUds || 0}</p>
                   )}
@@ -1439,8 +1394,6 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-4 ml-1">Posiciones Generales</h3>
             <div className="space-y-3 sm:space-y-2">
               {restoRanking.map((item, idx) => {
-                const estaEditandoEste = editandoContrapVendedor === item.vendedor;
-
                 return (
                   <div key={item.vendedor} className="py-3 px-3.5 bg-zinc-50/60 sm:bg-transparent border border-zinc-100 sm:border-0 rounded-2xl sm:rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50 transition-colors">
                     
@@ -1459,50 +1412,14 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                         <div className="flex items-center gap-1.5">
                           <span className="text-emerald-700">Contrap:</span>
                           {puedeEditarContrapedidos ? (
-                            estaEditandoEste ? (
-                              <div className="inline-flex items-center bg-white border-2 border-black rounded-lg shadow-sm overflow-hidden">
-                                <input 
-                                  type="number" 
-                                  min="0"
-                                  value={tempContrapValor} 
-                                  onChange={(e) => setTempContrapValor(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") guardarContrapedidoDirecto(item.vendedor);
-                                    if (e.key === "Escape") setEditandoContrapVendedor(null);
-                                  }}
-                                  autoFocus
-                                  className="w-14 text-center text-xs font-black text-emerald-800 bg-transparent outline-none py-1"
-                                />
-                                <button 
-                                  type="button" 
-                                  onClick={() => guardarContrapedidoDirecto(item.vendedor)}
-                                  className="bg-emerald-600 text-white px-2 py-1 hover:bg-emerald-700 cursor-pointer"
-                                  title="Guardar"
-                                >
-                                  <FaCheck size={10} />
-                                </button>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setEditandoContrapVendedor(null)}
-                                  className="bg-zinc-200 text-zinc-700 px-2 py-1 hover:bg-zinc-300 cursor-pointer"
-                                  title="Cancelar"
-                                >
-                                  <FaTimes size={10} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditandoContrapVendedor(item.vendedor);
-                                  setTempContrapValor(String(item.contrapedidoUds));
-                                }}
-                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 font-black text-xs transition-all cursor-pointer shadow-sm"
-                                title="Hacer clic para editar número exacto"
-                              >
-                                +{item.contrapedidoUds} 
-                              </button>
-                            )
+                            <button
+                              type="button"
+                              onClick={() => abrirContrapedido(item.vendedor)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 font-black text-xs transition-all cursor-pointer shadow-sm"
+                              title="Clic para ver / editar contrapedido por semana"
+                            >
+                              +{item.contrapedidoUds}
+                            </button>
                           ) : (
                             <strong className="text-emerald-800">+{item.contrapedidoUds}</strong>
                           )}
@@ -1680,6 +1597,86 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       </div>
 
       {/* MODAL DE FACTURACIÓN */}
+      {/* 🗓️ Modal: contrapedido por semanas (una casilla por semana, S5 opcional) */}
+      {modalContrap && (() => {
+        const esMesActual = selectedMonth === ymLocal();
+        const semanaHoy = esMesActual ? semanaDelMes() : -1;
+        const total = modalContrap.semanas.reduce((a, v) => a + Math.max(0, Math.trunc(Number(v) || 0)), 0);
+        const setSemana = (i, valor) =>
+          setModalContrap((m) => {
+            const semanas = [...m.semanas];
+            semanas[i] = valor;
+            return { ...m, semanas };
+          });
+        const agregarSemanaExtra = () =>
+          setModalContrap((m) => (m.semanas.length >= 5 ? m : { ...m, semanas: [...m.semanas, ""] }));
+        const quitarSemanaExtra = () =>
+          setModalContrap((m) => ({ ...m, semanas: m.semanas.slice(0, 4) }));
+        return (
+          <ModalShell
+            onClose={() => setModalContrap(null)}
+            size="sm"
+            icon={FaCalendarAlt}
+            eyebrow="Contrapedido"
+            title={modalContrap.vendedor}
+            subtitle="Prendas de contrapedido por semana del mes."
+            footer={(close) => (
+              <>
+                <button type="button" onClick={close} className="md-btn is-flat">Cancelar</button>
+                <button
+                  type="button"
+                  onClick={() => { if (guardarContrapedidoSemanas()) close(); }}
+                  className="md-btn is-success"
+                >
+                  <FaCheck /> Guardar ({total})
+                </button>
+              </>
+            )}
+          >
+            <div className="cp-semanas">
+              {modalContrap.semanas.map((valor, i) => (
+                <div key={i} className={`cp-row ${i === semanaHoy ? "is-hoy" : ""}`}>
+                  <div className="cp-sem">
+                    <b>Semana {i + 1}</b>
+                    {i === semanaHoy && <small>Esta semana</small>}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="0"
+                    value={valor}
+                    onChange={(e) => setSemana(i, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && guardarContrapedidoSemanas()) setModalContrap(null); }}
+                    className="md-input is-sm is-center"
+                    aria-label={`Prendas semana ${i + 1}`}
+                  />
+                  {i === 4 ? (
+                    <button type="button" onClick={quitarSemanaExtra} className="cp-quitar" title="Quitar semana extra" aria-label="Quitar semana extra">
+                      <FaTimes />
+                    </button>
+                  ) : (
+                    <span className="cp-quitar-sp" aria-hidden="true" />
+                  )}
+                </div>
+              ))}
+
+              {modalContrap.semanas.length < 5 && (
+                <button type="button" onClick={agregarSemanaExtra} className="cp-add">
+                  <FaPlus /> Semana extra
+                </button>
+              )}
+
+              <div className="cp-total">
+                <span>Total del mes</span>
+                <b>{total} prendas</b>
+                <small>₡{(total * comisionContrapedido).toLocaleString("es-CR")} en comisión</small>
+              </div>
+            </div>
+          </ModalShell>
+        );
+      })()}
+
       {modalFacturar.isOpen && (
         <ModalShell
           onClose={() => setModalFacturar((m) => ({ ...m, isOpen: false }))}
