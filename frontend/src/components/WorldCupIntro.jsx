@@ -1,351 +1,443 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import SantaHat from './SantaHat';
 
+// 🎄 INTRO NAVIDEÑA "GOL NAVIDEÑO" (motion graphics con framer-motion)
+// Estilos en index.css (sección "INTRO NAVIDEÑA", clases xi-*).
+// Se muestra una vez por sesión (sessionStorage.chemasport_intro_shown).
+
+const SESSION_KEY = 'chemasport_intro_shown';
+
+// Línea de tiempo (ms)
+const T = {
+  kick: 1500,   // remate: el balón sale hacia la cámara
+  logo: 1950,   // explosión + aparece CHEMA SPORT
+  er: 2600,     // badge ER
+  greet: 2850,  // Feliz Navidad
+  exit: 4300,   // empieza la salida
+};
+const EXIT_MS = 600;
+const TOTAL_MS = T.exit + EXIT_MS;
+
+const COLORS = ['#dc2626', '#16a34a', '#F5C400', '#ffffff'];
+
+// Random determinístico para que la nieve no "salte" entre renders
+const seeded = (seed) => {
+  let s = seed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+};
+
+/* ---------- Piezas SVG ---------- */
+const PENTA = (cx, cy, r, rot = -90) =>
+  Array.from({ length: 5 }, (_, k) => {
+    const a = ((rot + k * 72) * Math.PI) / 180;
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
+
+function SoccerBall() {
+  const outer = Array.from({ length: 5 }, (_, k) => {
+    const a = ((-90 + k * 72) * Math.PI) / 180;
+    return { x: 50 + 46 * Math.cos(a), y: 50 + 46 * Math.sin(a), vx: 50 + 17 * Math.cos(a), vy: 50 + 17 * Math.sin(a), ox: 50 + 33 * Math.cos(a), oy: 50 + 33 * Math.sin(a), rot: -90 + k * 72 + 180 };
+  });
+  return (
+    <svg viewBox="0 0 100 100" className="xi-ball-svg" aria-hidden="true">
+      <defs>
+        <clipPath id="xi-ball-clip"><circle cx="50" cy="50" r="47" /></clipPath>
+        <radialGradient id="xi-ball-shade" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="70%" stopColor="#e5e7eb" />
+          <stop offset="100%" stopColor="#9ca3af" />
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="47" fill="url(#xi-ball-shade)" />
+      <g clipPath="url(#xi-ball-clip)" fill="#111" stroke="#111" strokeWidth="2" strokeLinejoin="round">
+        <polygon points={PENTA(50, 50, 16)} />
+        {outer.map((o, i) => (
+          <g key={i}>
+            <line x1={o.vx} y1={o.vy} x2={o.ox} y2={o.oy} />
+            <polygon points={PENTA(o.x, o.y, 15, o.rot)} />
+          </g>
+        ))}
+      </g>
+      <circle cx="50" cy="50" r="47" fill="none" stroke="#111" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+function Star({ color }) {
+  return (
+    <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true">
+      <path d="M12 0 L14.5 9.5 L24 12 L14.5 14.5 L12 24 L9.5 14.5 L0 12 L9.5 9.5 Z" fill={color} />
+    </svg>
+  );
+}
+
+/* ---------- Guirnalda de luces ---------- */
+function Garland() {
+  const SWAGS = 4;
+  const BULBS_PER_SWAG = 6;
+  const SAG = 46; // px de caída de cada curva
+
+  const wire = Array.from({ length: SWAGS }, (_, s) => {
+    const x0 = (s / SWAGS) * 1000;
+    const x1 = ((s + 1) / SWAGS) * 1000;
+    return `M${x0},4 Q${(x0 + x1) / 2},${SAG * 2 - 4} ${x1},4`;
+  }).join(' ');
+
+  const bulbs = [];
+  for (let s = 0; s < SWAGS; s++) {
+    for (let b = 1; b < BULBS_PER_SWAG; b++) {
+      const f = b / BULBS_PER_SWAG;
+      // curva cuadrática: y = 4 + 2*(SAG*2-8)*f*(1-f)
+      const y = 4 + 2 * (SAG * 2 - 8) * f * (1 - f);
+      bulbs.push({ left: ((s + f) / SWAGS) * 100, top: y, color: COLORS[(s * BULBS_PER_SWAG + b) % 4], i: bulbs.length });
+    }
+  }
+
+  return (
+    <motion.div
+      className="xi-garland"
+      initial={{ y: -110 }}
+      animate={{ y: 0 }}
+      transition={{ type: 'spring', stiffness: 90, damping: 12, delay: 0.1 }}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="xi-garland-wire">
+        <path d={wire} fill="none" stroke="#1f2937" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {bulbs.map((b) => (
+        <span
+          key={b.i}
+          className="xi-bulb"
+          style={{ left: `${b.left}%`, top: `${b.top}px`, '--bulb': b.color, animationDelay: `${(b.i % 5) * 0.28}s` }}
+        />
+      ))}
+    </motion.div>
+  );
+}
+
+/* ---------- Nieve en 3 capas (parallax) ---------- */
+function Snow() {
+  const flakes = useMemo(() => {
+    const rnd = seeded(7);
+    const layers = [
+      { count: 26, size: [2, 3], dur: [9, 13], blur: 1, opacity: 0.45 },
+      { count: 18, size: [3, 5], dur: [6, 9], blur: 0, opacity: 0.75 },
+      { count: 8, size: [6, 9], dur: [4, 6], blur: 2, opacity: 0.9 },
+    ];
+    return layers.flatMap((l, li) =>
+      Array.from({ length: l.count }, (_, i) => {
+        const size = l.size[0] + rnd() * (l.size[1] - l.size[0]);
+        const dur = l.dur[0] + rnd() * (l.dur[1] - l.dur[0]);
+        return {
+          key: `${li}-${i}`,
+          left: rnd() * 100,
+          size,
+          dur,
+          delay: -rnd() * dur, // negativo: ya está nevando al abrir
+          drift: (rnd() - 0.5) * 80,
+          blur: l.blur,
+          opacity: l.opacity,
+        };
+      })
+    );
+  }, []);
+
+  return (
+    <div className="xi-snow" aria-hidden="true">
+      {flakes.map((f) => (
+        <span
+          key={f.key}
+          className="xi-flake"
+          style={{
+            left: `${f.left}%`,
+            width: f.size,
+            height: f.size,
+            opacity: f.opacity,
+            filter: f.blur ? `blur(${f.blur}px)` : undefined,
+            animationDuration: `${f.dur}s`,
+            animationDelay: `${f.delay}s`,
+            '--drift': `${f.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Explosión de estrellas ---------- */
+function Burst() {
+  const parts = useMemo(() => {
+    const rnd = seeded(42);
+    return Array.from({ length: 30 }, (_, i) => {
+      const angle = (i / 30) * Math.PI * 2 + rnd() * 0.3;
+      const dist = 140 + rnd() * 260;
+      return {
+        i,
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        size: 8 + rnd() * 14,
+        rotate: rnd() * 360,
+        color: COLORS[i % 4],
+        star: i % 3 !== 0,
+        delay: rnd() * 0.08,
+      };
+    });
+  }, []);
+
+  return (
+    <div className="xi-burst" aria-hidden="true">
+      <motion.span
+        className="xi-ring"
+        initial={{ scale: 0.2, opacity: 0.9 }}
+        animate={{ scale: 7, opacity: 0 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+      />
+      {parts.map((p) => (
+        <motion.span
+          key={p.i}
+          className="xi-particle"
+          style={{ width: p.size, height: p.size }}
+          initial={{ x: 0, y: 0, scale: 0, rotate: 0, opacity: 1 }}
+          animate={{ x: p.x, y: p.y, scale: [0, 1.2, 0], rotate: p.rotate, opacity: [1, 1, 0] }}
+          transition={{ duration: 1.1, delay: p.delay, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {p.star ? <Star color={p.color} /> : <i className="xi-dot" style={{ background: p.color }} />}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Texto letra por letra ---------- */
+const lettersParent = { hidden: {}, show: { transition: { staggerChildren: 0.045 } } };
+const letter = {
+  hidden: { y: 70, opacity: 0, rotateX: -90 },
+  show: { y: 0, opacity: 1, rotateX: 0, transition: { type: 'spring', stiffness: 380, damping: 22 } },
+};
+
+function Word({ text, className }) {
+  return (
+    <motion.span className={`xi-word ${className || ''}`} variants={lettersParent} initial="hidden" animate="show" aria-hidden="true">
+      {text.split('').map((ch, i) => (
+        <motion.span key={i} variants={letter} className="xi-letter">
+          {ch}
+        </motion.span>
+      ))}
+    </motion.span>
+  );
+}
+
+/* =================================================================== */
 const IntroLoader = ({ onFinished }) => {
-  const [visible, setVisible] = useState(false);
-  const [fadeIntro, setFadeIntro] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [cinePhase, setCinePhase] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const [visible] = useState(() => {
+    try {
+      return !sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      return true;
+    }
+  });
+  const [phase, setPhase] = useState(0); // 0 caída · 1 remate · 2 logo · 3 ER · 4 saludo · 5 salida
+
+  // Guardamos onFinished en un ref: App lo pasa inline y no queremos reiniciar los timers en cada render
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
+  const finishedRef = useRef(false);
+
+  const finish = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    document.body.style.overflow = '';
+    onFinishedRef.current?.();
+  };
 
   useEffect(() => {
-    // 🔥 VERIFICAR SI YA SE MOSTRÓ EN ESTA SESIÓN (UNA SOLA VEZ) 🔥
-    const hasSeenLoader = sessionStorage.getItem('chemasport_intro_shown');
-    if (hasSeenLoader) {
-      if (onFinished) onFinished();
+    if (!visible || reduceMotion) {
+      finish();
       return;
     }
 
-    setVisible(true);
+    try {
+      sessionStorage.setItem(SESSION_KEY, 'true');
+    } catch {
+      /* modo privado: no pasa nada */
+    }
     document.body.style.overflow = 'hidden';
 
-    let animationFrameId;
-    const startTime = performance.now();
-    const duration = 3500; // Recorrido inicial pausado
-
-    const updateProgress = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const currentProgress = Math.min((elapsed / duration) * 100, 100);
-      
-      setProgress(currentProgress);
-
-      if (currentProgress < 100) {
-        animationFrameId = requestAnimationFrame(updateProgress);
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(updateProgress);
-    
-    // TIMELINE DE LA JUGADA Y LAS LETRAS
-    const t1 = setTimeout(() => setCinePhase(1), 2400); // Remate al arco
-    const t2 = setTimeout(() => setCinePhase(2), 2900); // ¡Gol! Aparece CHEMA SPORT
-    const t3 = setTimeout(() => setCinePhase(3), 3300); // Aparece ER y se consolida
-    
-    // 🔥 EFECTO DE DESVANECIMIENTO GRADUAL (Se empieza a quitar a los 8.5 segundos) 🔥
-    const fadeTimer = setTimeout(() => setFadeIntro(true), 8500); 
-    
-    // Se oculta por completo 1 segundo después
-    const endTimer = setTimeout(() => {
-      setVisible(false);
-      document.body.style.overflow = 'auto';
-      sessionStorage.setItem('chemasport_intro_shown', 'true'); 
-      if (onFinished) onFinished();
-    }, 9500);
+    const timers = [
+      setTimeout(() => setPhase(1), T.kick),
+      setTimeout(() => setPhase(2), T.logo),
+      setTimeout(() => setPhase(3), T.er),
+      setTimeout(() => setPhase(4), T.greet),
+      setTimeout(() => setPhase(5), T.exit),
+      setTimeout(finish, TOTAL_MS + 100), // respaldo por si no dispara onAnimationComplete
+    ];
 
     return () => {
-      document.body.style.overflow = 'auto';
-      cancelAnimationFrame(animationFrameId);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(fadeTimer);
-      clearTimeout(endTimer);
+      timers.forEach(clearTimeout);
+      document.body.style.overflow = '';
     };
-  }, [onFinished]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (!visible) return null;
+  if (!visible || reduceMotion) return null;
 
-  const startX = 10;
-  const playerPosition = Math.min(startX + (progress * 0.4), 50);
+  const skip = () => setPhase(5);
 
   return (
-    <div 
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between px-6 py-8 transition-opacity duration-1000 ease-in-out select-none ${
-        fadeIntro ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      } bg-white text-black overflow-hidden font-sans`} 
+    <motion.div
+      className="xi-root"
+      role="dialog"
+      aria-label="ChemaSport ER te desea feliz Navidad"
+      initial={{ opacity: 0 }}
+      animate={phase === 5 ? { opacity: 0, scale: 1.04, filter: 'blur(6px)' } : { opacity: 1, scale: 1, filter: 'blur(0px)' }}
+      transition={{ duration: phase === 5 ? EXIT_MS / 1000 : 0.4, ease: 'easeInOut' }}
+      onAnimationComplete={() => {
+        if (phase === 5) finish();
+      }}
     >
-      <style>
-        {`
-          @keyframes pulsePitch {
-            0%, 100% { opacity: 0.05; transform: scale(1); }
-            50% { opacity: 0.12; transform: scale(1.02); }
-          }
-          .pitch-lines { animation: pulsePitch 4s infinite ease-in-out; }
+      <div className="xi-bg" aria-hidden="true" />
+      <Snow />
+      <Garland />
 
-          /* ⭐ ANIMACIÓN DE LA NIEVE CAYENDO ⭐ */
-          @keyframes snowfall {
-            0% { transform: translateY(-10px) translateX(0); opacity: 0; }
-            20% { opacity: 0.8; }
-            100% { transform: translateY(105vh) translateX(20px); opacity: 0.2; }
-          }
-          .snowflake {
-            position: absolute;
-            background: #cbd5e1;
-            border-radius: 50%;
-            animation: snowfall linear infinite;
-          }
+      {/* Halo dorado detrás del logo */}
+      <motion.div
+        className="xi-halo"
+        aria-hidden="true"
+        initial={{ opacity: 0, scale: 0.4 }}
+        animate={phase >= 2 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.4 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+      />
 
-          /* ⭐ ANIMACIÓN DE LA RED DE LA PORTERÍA AL RECIBIR EL GOL ⭐ */
-          @keyframes netImpact {
-            0% { transform: scale(1); }
-            30% { transform: scale(1.04) translateY(-4px); filter: drop-shadow(0 15px 15px rgba(220,38,38,0.25)); }
-            60% { transform: scale(0.98); }
-            100% { transform: scale(1); }
-          }
-          .animate-net-goal { animation: netImpact 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-          @keyframes goalSlam {
-            0% { transform: scale(2.8) translateY(10px); opacity: 0; filter: blur(12px); }
-            35% { transform: scale(0.94); opacity: 1; filter: blur(0px); }
-            60% { transform: scale(1.03); }
-            100% { transform: scale(1); opacity: 1; }
-          }
-          .animate-goal-slam { animation: goalSlam 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-          @keyframes shockwave {
-            0% { transform: scale(0.2); opacity: 0.8; border-width: 6px; }
-            100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
-          }
-          .animate-shockwave { animation: shockwave 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-          @keyframes badgeSlide {
-            0% { opacity: 0; transform: translateY(15px) scale(0.9); letter-spacing: 0.8em; }
-            100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.35em; }
-          }
-          .animate-badge { animation: badgeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-          /* Biomecánica de carrera pausada y fluida */
-          @keyframes bodyBounce {
-            0%, 100% { transform: translateY(0px) rotate(8deg); }
-            50% { transform: translateY(-3px) rotate(12deg); }
-          }
-          @keyframes runArmLeft {
-            0%, 100% { transform: rotate(-30deg); }
-            50% { transform: rotate(35deg); }
-          }
-          @keyframes runArmRight {
-            0%, 100% { transform: rotate(35deg); }
-            50% { transform: rotate(-30deg); }
-          }
-          @keyframes runLegLeft {
-            0%, 100% { transform: rotate(-40deg); }
-            50% { transform: rotate(30deg); }
-          }
-          @keyframes runLegRight {
-            0%, 100% { transform: rotate(30deg); }
-            50% { transform: rotate(-40deg); }
-          }
-          @keyframes ballDribbleReal {
-            0%, 100% { transform: translate(-2px, 0px) rotate(0deg) scale(0.95); }
-            25% { transform: translate(2px, -3px) rotate(90deg) scale(1); }
-            50% { transform: translate(-1px, 1px) rotate(180deg) scale(0.95); }
-            75% { transform: translate(4px, -2px) rotate(270deg) scale(1.02); }
-          }
-
-          @keyframes realKickBody {
-            0% { transform: translateY(0) rotate(8deg); }
-            25% { transform: translateY(2px) rotate(20deg); } 
-            60% { transform: translateY(-6px) rotate(-8deg); } 
-            100% { transform: translateY(-3px) rotate(-4deg); }
-          }
-          @keyframes realKickLeg {
-            0% { transform: rotate(15deg); }
-            25% { transform: rotate(65deg); } 
-            55% { transform: rotate(-110deg); } 
-            100% { transform: rotate(-80deg); }
-          }
-          @keyframes supportLegPlant {
-            0% { transform: rotate(-8deg); }
-            30% { transform: rotate(20deg); filter: drop-shadow(2px 0 0 rgba(0,0,0,0.2)); } 
-            100% { transform: rotate(15deg); }
-          }
-          @keyframes armsStrikeBalance {
-            0% { transform: rotate(0deg); }
-            30% { transform: rotate(15deg); } 
-            100% { transform: rotate(-30deg); }
-          }
-          @keyframes ballRocketShot {
-            0% { transform: translate(0px, 0px) scale(1); filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
-            40% { transform: translate(10px, -80px) scale(1.6); filter: blur(0.5px); } 
-            100% { transform: translate(25px, -280px) scale(4.5); opacity: 0; filter: blur(8px); } 
-          }
-
-          .player-rig { position: relative; width: 30px; height: 50px; }
-          
-          /* ⭕ CABEZA SOLO CON BORDE NEGRO (SIN RELLENO) ⭕ */
-          .p-head { 
-            position: absolute; top: -4px; left: 3px; width: 17px; height: 17px; 
-            border: 2.5px solid #000; border-radius: 50%; background: transparent; z-index: 10;
-          }
-          .p-torso { 
-            position: absolute; top: 12px; left: 11px; width: 4px; height: 17px; 
-            background: #000; border-radius: 2px; z-index: 5; transform-origin: top center;
-          }
-          .p-arm-l, .p-arm-r { 
-            position: absolute; top: 13px; left: 11px; width: 3px; height: 13px; 
-            background: #000; border-radius: 2px; transform-origin: top center; 
-          }
-          .p-leg-l, .p-leg-r { 
-            position: absolute; top: 27px; left: 11px; width: 3.5px; height: 17px; 
-            background: #000; border-radius: 2px; transform-origin: top center; 
-          }
-          .p-ball { 
-            position: absolute; bottom: 2px; right: -8px; width: 10px; height: 10px; 
-            background: #000; border: 2px solid #fff; border-radius: 50%; z-index: 15;
-            box-shadow: 0 0 6px rgba(0,0,0,0.3);
-          }
-
-          .state-dribbling { animation: bodyBounce 0.45s infinite ease-in-out; }
-          .state-dribbling .p-arm-l { animation: runArmLeft 0.45s infinite ease-in-out; z-index: 7; }
-          .state-dribbling .p-arm-r { animation: runArmRight 0.45s infinite ease-in-out; z-index: 3; opacity: 0.7; }
-          .state-dribbling .p-leg-l { animation: runLegLeft 0.45s infinite ease-in-out; z-index: 7; }
-          .state-dribbling .p-leg-r { animation: runLegRight 0.45s infinite ease-in-out; z-index: 3; opacity: 0.7; }
-          .state-dribbling .p-ball  { animation: ballDribbleReal 0.45s infinite ease-in-out; }
-
-          .state-shooting { animation: realKickBody 0.6s forwards cubic-bezier(0.2, 0.8, 0.2, 1); }
-          .state-shooting .p-arm-l { animation: armsStrikeBalance 0.6s forwards; }
-          .state-shooting .p-arm-r { transform: rotate(45deg); }
-          .state-shooting .p-leg-l { animation: realKickLeg 0.6s forwards cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 10; }
-          .state-shooting .p-leg-r { animation: supportLegPlant 0.6s forwards; }
-          .state-shooting .p-ball  { animation: ballRocketShot 0.6s forwards cubic-bezier(0.1, 1, 0.2, 1); }
-
-          .state-after-goal { opacity: 0.15; filter: blur(1px); transform: translateY(-4px) rotate(-5deg) scale(0.95); transition: all 0.5s ease; }
-          .state-after-goal .p-leg-l { transform: rotate(-90deg); }
-          .state-after-goal .p-leg-r { transform: rotate(20deg); }
-          .state-after-goal .p-arm-l { transform: rotate(-40deg); }
-          .state-after-goal .p-ball  { opacity: 0; }
-        `}
-      </style>
-
-      {/* --- EFECTO DE NIEVE CAYENDO --- */}
-      <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
-        {[...Array(25)].map((_, i) => {
-          const randomLeft = Math.random() * 100;
-          const randomAnimDuration = 2 + Math.random() * 3;
-          const randomDelay = Math.random() * 3;
-          const randomSize = 4 + Math.random() * 5;
-          return (
-            <div
-              key={i}
-              className="snowflake"
-              style={{
-                left: `${randomLeft}%`,
-                width: `${randomSize}px`,
-                height: `${randomSize}px`,
-                animationDuration: `${randomAnimDuration}s`,
-                animationDelay: `${randomDelay}s`,
-              }}
+      <div className="xi-stage">
+        {/* ⚽ BALÓN CON GORRO: cae, rebota y sale disparado */}
+        {phase < 2 && (
+          <>
+            <motion.span
+              className="xi-shadow"
+              aria-hidden="true"
+              initial={{ scaleX: 0.2, opacity: 0 }}
+              animate={
+                phase === 0
+                  ? { scaleX: [0.2, 1, 0.55, 1, 0.85, 1], opacity: [0, 0.5, 0.25, 0.5, 0.4, 0.5] }
+                  : { scaleX: 0.2, opacity: 0 }
+              }
+              transition={phase === 0 ? { duration: 1.3, delay: 0.15, times: [0, 0.3, 0.5, 0.68, 0.82, 0.92] } : { duration: 0.2 }}
             />
-          );
-        })}
-      </div>
+            {/* Contenedor: caída con rebotes (squash & stretch) */}
+            <motion.div
+              className="xi-ball"
+              initial={{ y: -480, scaleX: 0.92, scaleY: 1.1 }}
+              animate={
+                phase === 0
+                  ? {
+                      y: [-480, 0, -130, 0, -38, 0],
+                      scaleY: [1.1, 0.78, 1.06, 0.88, 1, 1],
+                      scaleX: [0.92, 1.2, 0.96, 1.1, 1, 1],
+                    }
+                  : { y: 0, scaleX: 1, scaleY: 1 }
+              }
+              transition={
+                phase === 0
+                  ? { duration: 1.3, delay: 0.15, times: [0, 0.3, 0.5, 0.68, 0.82, 0.92], ease: ['easeIn', 'easeOut', 'easeIn', 'easeOut', 'easeIn'] }
+                  : { duration: 0 }
+              }
+            >
+              {/* Balón: gira al caer y sale disparado hacia la cámara en el remate */}
+              <motion.div
+                className="xi-ball-core"
+                initial={{ rotate: -40 }}
+                animate={
+                  phase === 0
+                    ? { rotate: [-40, 0, 20, 30, 36, 36] }
+                    : { y: -60, scale: 14, rotate: 400, opacity: [1, 1, 0] }
+                }
+                transition={
+                  phase === 0
+                    ? { duration: 1.3, delay: 0.15, times: [0, 0.3, 0.5, 0.68, 0.82, 0.92] }
+                    : { duration: 0.5, ease: [0.7, 0, 0.84, 0] }
+                }
+              >
+                <SoccerBall />
+              </motion.div>
 
-      {/* --- LÍNEAS DE CANCHA EN EL FONDO --- */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none pitch-lines">
-        <div className="w-[320px] h-[320px] sm:w-[480px] sm:h-[480px] rounded-full border-2 border-green-700/30 flex items-center justify-center relative">
-          <div className="w-3 h-3 bg-red-600 rounded-full shadow-md shadow-red-500/50"></div>
-          <div className="absolute w-[150vw] h-[2px] bg-green-700/30"></div>
-        </div>
-      </div>
-
-      {/* --- BARRA SUPERIOR CON EL MENSAJE NAVIDEÑO FIJO --- */}
-      <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center text-[11px] sm:text-xs tracking-[0.2em] uppercase font-bold text-gray-400 z-10 border-b border-gray-200 pb-3 gap-2">
-        <div className="flex items-center gap-2">
-       
-          
-        </div>
-        
-        {/* Mensaje fijo arriba */}
-        <span className="text-green-600 font-black tracking-widest drop-shadow-sm animate-pulse text-left">
-          ChemaSportER te desea una feliz navidad
-        </span>
-
-        
-      </div>
-
-      {/* --- CENTRO: MARCO DE LA PORTERÍA Y TÍTULO --- */}
-      <div className={`flex flex-col items-center justify-center my-auto w-full text-center relative transition-all duration-300 ${cinePhase >= 2 ? 'animate-net-goal' : ''}`}>
-        
-        <div className={`absolute w-[280px] sm:w-[420px] md:w-[560px] h-[160px] sm:h-[220px] border-[6px] sm:border-[8px] border-red-600 rounded-t-xl bg-white/40 backdrop-blur-[2px] pointer-events-none flex items-center justify-center transition-all duration-500 shadow-2xl shadow-red-600/10 ${
-          cinePhase >= 2 ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
-        }`}>
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#dc2626_1px,transparent_1px)] [background-size:12px_12px]"></div>
-        </div>
-
-        {cinePhase >= 2 && (
-          <div className="absolute w-32 h-32 rounded-full border-2 border-red-500 pointer-events-none animate-shockwave"></div>
+              {/* Gorro de Santa: sale volando con el remate */}
+              <motion.div
+                className="xi-hat"
+                initial={{ rotate: -14 }}
+                animate={phase === 1 ? { x: 160, y: -320, rotate: 260, opacity: 0 } : { x: 0, y: 0, rotate: -14 }}
+                transition={phase === 1 ? { duration: 0.8, ease: 'easeOut' } : { duration: 0 }}
+              >
+                <SantaHat className="xi-hat-svg" />
+              </motion.div>
+            </motion.div>
+          </>
         )}
 
-        {cinePhase >= 2 && (
-          <div className="animate-goal-slam flex flex-col items-center relative z-25">
-            <h1 className="text-red-600 text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter uppercase leading-none drop-shadow-sm">
-              CHEMA
-            </h1>
-            <h1 className="text-transparent bg-clip-text bg-gradient-to-b from-black to-green-700 text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter uppercase leading-none -mt-1 sm:-mt-3 md:-mt-4">
-              SPORT
-            </h1>
-          </div>
+        {/* 💥 Destello + explosión */}
+        {phase >= 2 && (
+          <>
+            <motion.div
+              className="xi-flash"
+              aria-hidden="true"
+              initial={{ opacity: 0.95 }}
+              animate={{ opacity: 0 }}
+              transition={{ duration: 0.45, ease: 'easeOut' }}
+            />
+            <Burst />
+          </>
         )}
 
-        {cinePhase >= 3 && (
-          <div className="animate-badge mt-4 md:mt-5 z-25">
-            <div className="inline-flex items-center justify-center gap-4 bg-green-700 text-white px-6 py-1.5 sm:px-8 sm:py-2 rounded-full shadow-lg border border-green-600">
-              <span className="font-black text-lg sm:text-2xl md:text-3xl tracking-[0.35em] uppercase pl-[0.35em]">
+        {/* 🔤 LOGO */}
+        {phase >= 2 && (
+          <div className="xi-logo">
+            <Word text="CHEMA" className="xi-word--red" />
+            <Word text="SPORT" />
+            <span className="sr-only">ChemaSport ER</span>
+
+            {phase >= 3 && (
+              <motion.span
+                className="xi-er"
+                initial={{ scale: 0, rotate: -25, opacity: 0 }}
+                animate={{ scale: 1, rotate: -4, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 14 }}
+              >
                 ER
-              </span>
-            </div>
+              </motion.span>
+            )}
+
+            {phase >= 4 && (
+              <motion.p
+                className="xi-greet"
+                initial={{ opacity: 0, letterSpacing: '0.9em', y: 10 }}
+                animate={{ opacity: 1, letterSpacing: '0.32em', y: 0 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              >
+                ✦ Feliz Navidad ✦
+              </motion.p>
+            )}
           </div>
         )}
       </div>
 
-      {/* --- INFERIOR: JUGADOR CABEZÓN Y BARRA DE CARGA --- */}
-      <div className="w-full max-w-xl flex flex-col gap-2 relative pb-4 z-20">
-        
-        <div 
-          className="absolute bottom-16 origin-bottom z-10 will-change-[left,transform]"
-          style={{ left: `${playerPosition}%`, transform: 'translateX(-50%) scale(2.2)' }}
-        >
-          <div className={`player-rig ${
-            cinePhase === 0 ? 'state-dribbling' : 
-            cinePhase === 1 ? 'state-shooting' : 'state-after-goal'
-          }`}>
-            <div className="p-head"></div>
-            <div className="p-torso"></div>
-            <div className="p-arm-l"></div>
-            <div className="p-arm-r"></div>
-            <div className="p-leg-l"></div>
-            <div className="p-leg-r"></div>
-            <div className="p-ball"></div>
-          </div>
+      {/* Barra de progreso + saltar */}
+      <div className="xi-footer">
+        <div className="xi-progress" aria-hidden="true">
+          <motion.span
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: T.exit / 1000, ease: 'linear' }}
+          />
         </div>
-
-        <div className="flex justify-between items-end text-[11px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-500 mt-10">
-          <span className="text-green-700 font-bold">
-            {cinePhase === 0 && 'Avanzando con calma...'}
-            {cinePhase === 1 && '¡Zapatazo festivo!'}
-            {cinePhase >= 2 && '¡GOL! ¡Feliz Navidad!'}
-          </span>
-          <span className="font-mono text-red-600 font-black text-sm sm:text-base">
-            {Math.floor(progress)}%
-          </span>
-        </div>
-
-        <div className="w-full h-[4px] bg-gray-100 overflow-hidden relative rounded-full border border-gray-200 shadow-inner">
-          <div 
-            className="absolute top-0 left-0 bottom-0 rounded-full bg-gradient-to-r from-red-600 to-green-700 will-change-[width]"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
+        <button type="button" className="xi-skip" onClick={skip}>
+          Saltar intro
+        </button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

@@ -1,10 +1,43 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import logo from "../assets/logo.png";
-import { 
+import {
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaPercentage, FaTruck, FaStore
+  FaPercentage, FaTruck, FaStore,
 } from "react-icons/fa";
+
+// ⚠️ Estilos en index.css (sección "HEADER", clases hd-*).
+
+const navItems = [
+  { label: "Todo", value: "" },
+  { label: "Temporada 26-27", value: "Temp 26-27", dot: "#F5C400" },
+  { label: "Nuevo", value: "Nuevo", dot: "#16a34a" },
+  { label: "Populares", value: "Populares" },
+  { label: "Mundial 2026", value: "Mundial 2026" },
+  { label: "Ofertas", value: "Ofertas", dot: "#dc2626" },
+  { label: "Nacional", value: "Nacional" },
+  { label: "Player", value: "Player" },
+  { label: "Fan", value: "Fan" },
+  { label: "Retro", value: "Retro" },
+  { label: "Mujer", value: "Mujer" },
+  { label: "Niño", value: "Niño" },
+  { label: "Balón", value: "Balón" },
+  { label: "Abrigos", value: "Abrigos" },
+  { label: "Llaveros", value: "Llaveros" },
+  { label: "NBA", value: "NBA" },
+  { label: "MLB", value: "MLB" },
+  { label: "NFL", value: "NFL" },
+  { label: "F1", value: "F1" },
+];
+
+const getInitials = (name) => {
+  if (!name) return "US";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0].substring(0, 2).toUpperCase();
+};
 
 export default function Header({
   onLoginClick,
@@ -19,429 +52,308 @@ export default function Header({
   filterType,
   setFilterType,
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
-  
-  const scrollRef = useRef(null);
-  const [isDraggingCSS, setIsDraggingCSS] = useState(false);
-  
-  // 🔥 ESTADO PARA LA ANIMACIÓN DEL FONDO Y LETRAS 🔥
-  const [isLightMode, setIsLightMode] = useState(false);
-  
-  const isMouseDown = useRef(false);
-  const startX = useRef(0);
-  const scrollLeftPos = useRef(0);
-  const hasDragged = useRef(false); 
-  
-  const accumulator = useRef(0); 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  // 🔥 Efecto para alternar entre Blanco y Negro cada 4 segundos 🔥
+  const navRef = useRef(null);
+  const drag = useRef({ down: false, startX: 0, startLeft: 0, moved: false });
+  const paused = useRef(false);
+  const resumeTimer = useRef(null);
+
+  const activeTypes = String(filterType || "").split(",").map((t) => t.trim()).filter(Boolean);
+  const isActive = (value) => (value ? activeTypes.includes(value) : activeTypes.length === 0);
+
+  /* ---- Header compacto al hacer scroll ---- */
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsLightMode((prev) => !prev);
-    }, 4000);
-    return () => clearInterval(interval);
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Efecto del auto-scroll de las categorías
+  /* ---- Auto-scroll continuo del menú (lista duplicada = bucle infinito) ---- */
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = navRef.current;
     if (!el) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
-    let animationId;
-    const scrollSpeed = 0.6;
-
-    const autoScroll = () => {
-      if (!isMouseDown.current) {
-        accumulator.current += scrollSpeed;
-        
-        if (accumulator.current >= 1) {
-          const pixelsToMove = Math.floor(accumulator.current);
-          el.scrollLeft += pixelsToMove;
-          accumulator.current -= pixelsToMove;
-        }
-
-        if (el.scrollLeft >= el.scrollWidth / 2) {
-          el.scrollLeft = 0;
+    const SPEED = 0.5; // px por frame
+    let acc = 0;
+    let id;
+    const step = () => {
+      const half = el.scrollWidth / 2;
+      if (!paused.current) {
+        acc += SPEED;
+        if (acc >= 1) {
+          const px = Math.floor(acc);
+          el.scrollLeft += px;
+          acc -= px;
         }
       }
-      animationId = requestAnimationFrame(autoScroll);
+      // Bucle: al pasar la mitad (fin de la primera copia) vuelve al inicio sin salto visible
+      if (half > 0 && el.scrollLeft >= half) el.scrollLeft -= half;
+      id = requestAnimationFrame(step);
     };
+    id = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(id);
+      clearTimeout(resumeTimer.current);
+    };
+  }, []);
 
-    animationId = requestAnimationFrame(autoScroll);
-    return () => cancelAnimationFrame(animationId);
-  }, []); 
-
-  const handleStart = (e) => {
-    isMouseDown.current = true;
-    hasDragged.current = false; 
-    
-    const pageX = e.pageX || (e.touches && e.touches[0].pageX);
-    if (!pageX) return;
-
-    startX.current = pageX - scrollRef.current.offsetLeft;
-    scrollLeftPos.current = scrollRef.current.scrollLeft;
+  const pause = () => {
+    clearTimeout(resumeTimer.current);
+    paused.current = true;
+  };
+  const resumeSoon = (ms = 2000) => {
+    clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => {
+      paused.current = false;
+    }, ms);
   };
 
-  const handleEnd = () => {
-    isMouseDown.current = false;
-    setIsDraggingCSS(false);
+  /* ---- Arrastrar con mouse (desktop) ---- */
+  const onMouseDown = (e) => {
+    drag.current = { down: true, startX: e.pageX, startLeft: navRef.current.scrollLeft, moved: false };
+  };
+  const onMouseMove = (e) => {
+    if (!drag.current.down) return;
+    const dx = e.pageX - drag.current.startX;
+    if (Math.abs(dx) > 4) drag.current.moved = true;
+    navRef.current.scrollLeft = drag.current.startLeft - dx;
+  };
+  const onMouseUp = () => {
+    drag.current.down = false;
+  };
+  const onMouseLeave = () => {
+    drag.current.down = false;
+    resumeSoon(600);
   };
 
-  const handleMove = (e) => {
-    if (!isMouseDown.current) return;
-    
-    const pageX = e.pageX || (e.touches && e.touches[0].pageX);
-    if (!pageX) return;
-
-    const x = pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 1.5;
-    
-    if (Math.abs(walk) > 3) {
-      hasDragged.current = true;
-      setIsDraggingCSS(true);
+  const handleNavClick = (value) => {
+    if (drag.current.moved) {
+      drag.current.moved = false;
+      return;
     }
-    
-    scrollRef.current.scrollLeft = scrollLeftPos.current - walk;
+    if (!setFilterType) return;
+    // Click en la categoría activa (única) la quita; si no, la selecciona sola
+    if (value && activeTypes.length === 1 && activeTypes[0] === value) setFilterType("");
+    else setFilterType(value);
   };
 
-  const getInitials = (name) => {
-    if (!name) return "US";
-    const parts = name.trim().split(" ");
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[0]).toUpperCase();
-    }
-    return parts[0].substring(0, 2).toUpperCase();
-  };
+  /* ---- Menú lateral: bloquear scroll + Escape ---- */
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && setSidebarOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [sidebarOpen]);
 
-  const navItems = [
-    { label: "TEMPORADA 26-27", value: "Temp 26-27" },
-    { label: "NUEVO", value: "Nuevo" },
-    { label: "POPULARES", value: "Populares" },
-    { label: "MUNDIAL 2026", value: "Mundial 2026" },
-    { label: "OFERTAS", value: "Ofertas" },
-    { label: "NACIONAL", value: "Nacional" },
-    { label: "PLAYER", value: "Player" },
-    { label: "FAN", value: "Fan" },
-    { label: "RETRO", value: "Retro" },
-    { label: "MUJER", value: "Mujer" },
-    { label: "NIÑO", value: "Niño" },
-    { label: "BALÓN", value: "Balón" },
-    { label: "ABRIGOS", value: "Abrigos" },
-    { label: "LLAVEROS", value: "Llaveros" }, 
-    { label: "NBA", value: "NBA" },
-    { label: "MLB", value: "MLB" },
-    { label: "NFL", value: "NFL" },
-    { label: "F1", value: "F1" }, 
-  ];
-
-  // IDENTIFICAR SI ES EL USUARIO "TIENDA" O SUPER ADMIN
+  // Usuario "tienda" o super admin
   const usernameLower = String(user?.username || user?.name || user?.firstName || "").trim().toLowerCase();
   const esSoloUsuarioTienda = !isSuperUser && (
-    usernameLower === "tienda" || 
-    usernameLower.includes("tienda") || 
-    user?.role === "tienda" || 
+    usernameLower === "tienda" ||
+    usernameLower.includes("tienda") ||
+    user?.role === "tienda" ||
     user?.rol === "tienda" ||
     user?.roles?.includes("tienda")
   );
   const esAdminTienda = isSuperUser || esSoloUsuarioTienda;
+  const displayName = user?.firstName || user?.username || user?.name;
+
+  const menu = user
+    ? [
+        esAdminTienda && { key: "tienda", icon: FaStore, label: "Tienda física", onClick: () => navigate("/tienda"), featured: true },
+        { key: "comisiones", icon: FaPercentage, label: "Comisiones", onClick: () => navigate("/comisiones") },
+        { key: "guias", icon: FaTruck, label: "Guías", onClick: () => navigate("/guias") },
+        !esSoloUsuarioTienda && (isSuperUser || user?.roles?.includes("add")) && {
+          key: "add-user", icon: FaUserPlus, label: "Agregar usuario", onClick: () => setShowRegisterUserModal(true),
+        },
+        !esSoloUsuarioTienda && (isSuperUser || user?.roles?.includes("view_users")) && {
+          key: "users", icon: FaUsers, label: "Ver usuarios", onClick: () => setShowUserListModal(true),
+        },
+        (isSuperUser || esSoloUsuarioTienda || canSeeHistory || user?.roles?.includes("history")) && {
+          key: "history", icon: FaHistory, label: "Historial", onClick: () => setShowHistoryModal(true),
+        },
+      ].filter(Boolean)
+    : [];
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full shadow-md border-none transition-colors duration-1000 ${
-        isLightMode ? "bg-white" : "bg-black"
-      }`}
-    >
-      <div className="relative px-2 sm:px-6 py-2 sm:py-4 overflow-hidden">
-        
- 
+    <header className={`hd ${scrolled ? "is-scrolled" : ""}`}>
+      {/* ---- Fila principal ---- */}
+      <div className="hd-top">
+        <button type="button" onClick={onLogoClick} className="hd-logo" title="Volver al inicio">
+          {/* El PNG trae ~18% de margen transparente: .hd-logo-mark lo recorta al círculo real */}
+          <span className="hd-logo-mark">
+            <img src={logo} alt="ChemaSport ER" />
+          </span>
+        </button>
 
-       
+        <button type="button" onClick={onLogoClick} className="hd-title" aria-label="ChemaSport ER, volver al inicio">
+          ChemaSport<span className="hd-title-er">ER</span>
+        </button>
 
-        {/* Capa sutil de fondo */}
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{ backgroundSize: "cover", backgroundPosition: "center" }}
-        ></div>
-
-        <div className="relative z-10 flex items-center justify-between w-full">
-          <button onClick={onLogoClick} className="focus:outline-none bg-transparent cursor-pointer" title="Volver al inicio">
-            {/* 🔥 Logo: Se invierte el color cuando el fondo es blanco 🔥 */}
-            <img 
-              src={logo} 
-              alt="Logo Chemas Sport" 
-              className={`h-14 sm:h-16 transition-all duration-1000 hover:scale-105 ${
-                isLightMode ? "invert brightness-0" : ""
-              }`} 
-            />
-          </button>
-
-          {/* 🔥 Letras del título limpias, cambiando solo de color 🔥 */}
-          <h1
-            className={`absolute left-1/2 transform -translate-x-1/2 text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-1000 ${
-              isLightMode ? "text-black" : "text-white"
-            }`}
-          >
-            ChemaSport ER
-          </h1>
-
-          <div className="flex items-center min-w-[44px] justify-end">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                title={user ? "Menú de usuario" : "Iniciar sesión"}
-                className={`rounded-full p-3 shadow-lg transition-all duration-1000 cursor-pointer border ${
-                  isLightMode 
-                    ? "bg-gray-100 border-gray-300 text-black hover:border-black" 
-                    : "bg-black border-zinc-700 text-white hover:border-gray-500"
-                }`}
-              >
-                {user ? (
-                  <div className="w-5 h-5 flex items-center justify-center font-black text-xs">
-                    {getInitials(user.firstName || user.username || user.name)}
-                  </div>
-                ) : (
-                  <FaUser size={18} />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 🔥 Divisor inferior del header animado 🔥 */}
-      <div className={`w-full border-t overflow-hidden transition-colors duration-1000 ${
-        isLightMode ? "border-gray-200" : "border-zinc-800"
-      }`}>
-        <div className="w-full relative">
-          <nav 
-            ref={scrollRef}
-            onMouseDown={handleStart}
-            onMouseLeave={handleEnd}
-            onMouseUp={handleEnd}
-            onMouseMove={handleMove}
-            onTouchStart={handleStart}
-            onTouchEnd={handleEnd}
-            onTouchCancel={handleEnd}
-            onTouchMove={handleMove}
-            className={`flex items-center gap-6 sm:gap-8 py-2.5 sm:py-3.5 px-4 overflow-x-auto whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] select-none ${isDraggingCSS ? "cursor-grabbing" : "cursor-grab"}`}
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            {[...navItems, ...navItems].map((item, index) => {
-              const isActive = filterType === item.value;
-              
-              return (
-                <button
-                  key={index}
-                  onClick={(e) => {
-                     if (!hasDragged.current) {
-                       if (setFilterType) setFilterType(item.value);
-                     }
-                  }}
-                  className={`group relative flex items-center text-[11px] sm:text-xs lg:text-[13px] font-black uppercase tracking-[0.1em] transition-colors duration-1000 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 py-1 z-20 shrink-0 cursor-pointer ${
-                    isActive 
-                      ? (isLightMode ? "text-black" : "text-white") 
-                      : (isLightMode ? "text-gray-500 hover:text-black" : "text-gray-500 hover:text-white")
-                  }`}
-                >
-                  {item.label}
-                  
-                  {/* 🔥 Línea indicadora inferior animada 🔥 */}
-                  <span 
-                    className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-1000 ${
-                      isActive 
-                        ? `w-full ${isLightMode ? "bg-black shadow-[0_0_8px_rgba(0,0,0,0.4)]" : "bg-white shadow-[0_0_8px_#ffffff]"}` 
-                        : `w-0 group-hover:w-full ${isLightMode ? "bg-gray-400" : "bg-white"}`
-                    }`}
-                  />
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity"
-          onClick={() => setSidebarOpen(false)}
+        <motion.button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          title={user ? "Menú de usuario" : "Iniciar sesión"}
+          aria-label={user ? "Abrir menú de usuario" : "Iniciar sesión"}
+          className={`hd-user ${user ? "is-logged" : ""}`}
+          whileTap={{ scale: 0.92 }}
         >
-          <div
-            className="fixed top-0 right-0 h-full w-80 sm:w-88 shadow-[-10px_0_30px_rgba(0,0,0,0.8)] animate-in slide-in-from-right duration-300 border-l border-[#222]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Sidebar en modo oscuro premium (Este se mantiene oscuro por estética) */}
-            <div className="relative h-full flex flex-col justify-between p-6 sm:p-7 text-white font-sans" style={{ backgroundColor: '#0a0a0a' }}>
-              
+          {user ? <span>{getInitials(displayName)}</span> : <FaUser />}
+        </motion.button>
+      </div>
+
+      {/* ---- Menú de categorías ---- */}
+      <div className="hd-nav-wrap">
+        <nav
+          ref={navRef}
+          className="hd-nav"
+          onMouseEnter={pause}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseLeave}
+          onTouchStart={pause}
+          onTouchEnd={() => resumeSoon()}
+          onTouchCancel={() => resumeSoon()}
+          onFocus={pause}
+          onBlur={() => resumeSoon()}
+          aria-label="Categorías"
+        >
+          {[...navItems, ...navItems].map((item, idx) => {
+            const active = isActive(item.value);
+            const isCopy = idx >= navItems.length;
+            return (
               <button
-                onClick={() => setSidebarOpen(false)}
-                className="absolute top-5 right-5 p-2 text-gray-400 hover:text-white hover:bg-[#111] rounded-full transition-colors cursor-pointer z-10 bg-transparent border-0"
-                title="Cerrar"
+                key={`${item.label}-${idx}`}
+                type="button"
+                className={`hd-nav-item ${active ? "is-active" : ""}`}
+                onClick={() => handleNavClick(item.value)}
+                aria-pressed={active}
+                aria-hidden={isCopy || undefined}
+                tabIndex={isCopy ? -1 : undefined}
               >
-                <FaTimes size={20} />
+                {item.dot && <i className="hd-dot" style={{ background: item.dot }} />}
+                {item.label}
+                <motion.span
+                  className="hd-underline"
+                  initial={false}
+                  animate={{ scaleX: active ? 1 : 0, opacity: active ? 1 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              </button>
+            );
+          })}
+        </nav>
+
+      </div>
+
+      {/* ---- Menú lateral (portal: el backdrop-filter del header recortaría el position:fixed) ---- */}
+      {createPortal(
+      <AnimatePresence>
+        {sidebarOpen && (
+          <div className="hd-drawer-layer" role="dialog" aria-modal="true" aria-label="Menú de usuario">
+            <motion.div
+              className="hd-backdrop"
+              onClick={() => setSidebarOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            <motion.aside
+              className="hd-drawer"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 32, stiffness: 320 }}
+            >
+              <button type="button" className="hd-drawer-close" onClick={() => setSidebarOpen(false)} aria-label="Cerrar menú">
+                <FaTimes />
               </button>
 
               {user ? (
-                <div className="mt-8 flex-grow overflow-y-auto pr-1">
-                  
-                  <div className="mb-6 p-4 rounded-2xl bg-[#111] border border-[#222] flex items-center gap-3.5 shadow-sm">
-                    <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                      {getInitials(user.firstName || user.username || user.name)}
-                    </div>
-                    <div className="overflow-hidden min-w-0 flex-1">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-800 text-emerald-400 text-[10px] font-black uppercase tracking-wider mb-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Sesión Activa
-                      </span>
-                      <p className="text-white font-black text-lg leading-tight truncate">
-                        {user.firstName || user.username || user.name}
-                      </p>
+                <div className="hd-drawer-body">
+                  <div className="hd-profile">
+                    <span className="hd-avatar">{getInitials(displayName)}</span>
+                    <div className="hd-profile-info">
+                      <span className="hd-session"><i />Sesión activa</span>
+                      <p>{displayName}</p>
                     </div>
                   </div>
 
-                  <nav className="space-y-2.5">
-                    
-                    {esAdminTienda && (
-                      <button
-                        onClick={() => {
-                          navigate('/tienda');
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full bg-white/5 border border-white/20 hover:border-white/40 hover:bg-white/10 text-white font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FaStore size={15} className="text-white transition-colors" />
-                          <span className="group-hover:text-gray-200 transition-colors">Tienda Física</span>
-                        </div>
-                        <FaChevronRight size={12} className="text-gray-400 group-hover:text-white transition-colors" />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        navigate('/comisiones');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FaPercentage size={15} className="text-white transition-colors" />
-                        <span className="group-hover:text-white transition-colors">Comisiones</span>
-                      </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        navigate('/guias');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FaTruck size={15} className="text-white transition-colors" />
-                        <span className="group-hover:text-white transition-colors">Guías</span>
-                      </div>
-                      <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
-                    </button>
-
-                    {!esSoloUsuarioTienda && (
-                      <>
-                        {(isSuperUser || user?.roles?.includes("add")) && (
-                          <button
-                            onClick={() => {
-                              setShowRegisterUserModal(true);
-                              setSidebarOpen(false);
-                            }}
-                            className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FaUserPlus size={16} className="text-white transition-colors" />
-                              <span className="group-hover:text-white transition-colors">Agregar usuario</span>
-                            </div>
-                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
-                          </button>
-                        )}
-
-                        {(isSuperUser || user?.roles?.includes("view_users")) && (
-                          <button
-                            onClick={() => {
-                              setShowUserListModal(true);
-                              setSidebarOpen(false);
-                            }}
-                            className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FaUsers size={16} className="text-white transition-colors" />
-                              <span className="group-hover:text-white transition-colors">Ver usuarios</span>
-                            </div>
-                            <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
-                          </button>
-                        )}
-                      </>
-                    )}
-
-                    {(isSuperUser || esSoloUsuarioTienda || canSeeHistory || user?.roles?.includes("history")) && (
-                      <button
-                        onClick={() => {
-                          setShowHistoryModal(true);
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full bg-[#111] border border-[#222] hover:border-white hover:bg-[#1a1a1a] text-gray-200 font-bold text-left px-5 py-3.5 rounded-2xl transition-all flex items-center justify-between shadow-sm cursor-pointer text-sm group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FaHistory size={15} className="text-white transition-colors" />
-                          <span className="group-hover:text-white transition-colors">Historial</span>
-                        </div>
-                        <FaChevronRight size={12} className="text-gray-600 group-hover:text-white transition-colors" />
-                      </button>
-                    )}
-
+                  <nav className="hd-menu">
+                    {menu.map((m, i) => {
+                      const Icon = m.icon;
+                      return (
+                        <motion.button
+                          key={m.key}
+                          type="button"
+                          className={`hd-menu-item ${m.featured ? "is-featured" : ""}`}
+                          onClick={() => {
+                            m.onClick();
+                            setSidebarOpen(false);
+                          }}
+                          initial={{ opacity: 0, x: 24 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.08 + i * 0.05, type: "spring", stiffness: 400, damping: 30 }}
+                        >
+                          <Icon className="hd-menu-icon" />
+                          <span>{m.label}</span>
+                          <FaChevronRight className="hd-menu-chevron" />
+                        </motion.button>
+                      );
+                    })}
                   </nav>
 
                   <button
+                    type="button"
+                    className="hd-logout"
                     onClick={() => {
                       onLogout();
                       setSidebarOpen(false);
                     }}
-                    className="w-full text-center mt-6 py-3.5 px-4 rounded-2xl font-black text-red-500 bg-red-950/20 hover:bg-red-900 hover:text-white border border-red-900/50 transition-colors uppercase text-xs tracking-widest cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                   >
-                    <FaSignOutAlt size={14} />
+                    <FaSignOutAlt />
                     <span>Cerrar sesión</span>
                   </button>
                 </div>
               ) : (
-                <div className="my-auto flex flex-col items-center text-center px-4 w-full">
-                  <div className="w-16 h-16 rounded-full bg-[#111] border border-[#333] flex items-center justify-center text-white mb-5 shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                    <FaUser size={24} />
-                  </div>
-                  <h3 className="text-3xl font-black text-white tracking-tight mb-1.5">
-                    ¡Bienvenido!
-                  </h3>
-                  <p className="text-gray-400 text-sm font-medium mb-8">
-                    Inicia sesión para administrar.
-                  </p>
+                <motion.div
+                  className="hd-guest"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <span className="hd-guest-icon"><FaUser /></span>
+                  <h3>¡Bienvenido!</h3>
+                  <p>Iniciá sesión para administrar la tienda.</p>
                   <button
+                    type="button"
+                    className="hd-login"
                     onClick={() => {
                       onLoginClick();
                       setSidebarOpen(false);
                     }}
-                    className="w-full bg-white hover:bg-gray-200 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-colors shadow-[0_5px_15px_rgba(255,255,255,0.2)] active:scale-95 cursor-pointer"
                   >
-                    INICIAR SESIÓN
+                    Iniciar sesión
                   </button>
-                </div>
+                </motion.div>
               )}
 
-              <div className="mt-auto pt-5 border-t border-[#222] text-center">
-                <p className="text-[10px] text-gray-500 font-black tracking-widest uppercase">
-                  CHEMA SPORT ER
-                </p>
-              </div>
-
-            </div>
+              <div className="hd-drawer-foot">ChemaSport ER</div>
+            </motion.aside>
           </div>
-        </div>
+        )}
+      </AnimatePresence>,
+      document.body
       )}
     </header>
   );

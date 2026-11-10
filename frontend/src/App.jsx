@@ -49,6 +49,22 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
+// 🏷️ filterType admite varios tipos separados por coma (ej. "Player,Fan").
+// Se combinan con O. "Nuevo" no filtra: solo ordena por más reciente.
+const parseTypes = (ft = '') =>
+  String(ft || '').split(',').map((t) => t.trim()).filter((t) => t && t !== 'Todos');
+
+const matchesType = (product, t) => {
+  if (t === 'Ofertas') return Number(product.discountPrice) > 0 && Number(product.discountPrice) < Number(product.price);
+  if (t === 'Populares') return product.isPopular === true;
+  if (t === 'Mundial 2026') return product.isMundial2026 === true;
+  if (t === 'Temp 26-27' || t === 'Temporada 26-27') {
+    return product.isTemporada2627 === true || /26-27/i.test(String(product.type || ''));
+  }
+  if (t === 'Balon' || t === 'Balón' || t === 'Balones') return product.type === 'Balón' || product.type === 'Balones';
+  return product.type === t;
+};
+
 function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
   const { id } = useParams();
   const [localProduct, setLocalProduct] = useState(null);
@@ -111,9 +127,10 @@ function MainApp() {
 
   useEffect(() => {
     if (showIntro) {
+      // Respaldo por si la intro falla (la intro dura ~4.9s y se cierra sola)
       const fallbackTimer = setTimeout(() => {
         setShowIntro(false);
-      }, 4500);
+      }, 8000);
       return () => clearTimeout(fallbackTimer);
     }
   }, [showIntro]);
@@ -225,11 +242,12 @@ function MainApp() {
         ...(isSuperUser && storeView !== 'todos' ? { storeView } : {})
       });
 
-      if (tp === 'Nuevo') {
-        params.append('sort', 'desc');
-      } else if (tp) {
-        params.append('type', tp);
-      }
+      // Al backend solo se le manda el tipo si hay uno; con varios, el filtrado fino
+      // lo hace allMatchingProducts sobre el catálogo completo.
+      const tps = parseTypes(tp);
+      const restrictive = tps.filter((t) => t !== 'Nuevo');
+      if (tps.includes('Nuevo')) params.append('sort', 'desc');
+      if (restrictive.length === 1) params.append('type', restrictive[0]);
 
       const res = await fetch(`${API_BASE}/api/products?${params.toString()}`, {
         headers: { "x-admin": isAdmin ? "true" : "false" },
@@ -426,6 +444,8 @@ function MainApp() {
   // Y PARA QUE BUSCAR "real madrid player" BUSQUE EN NOMBRE + CATEGORÍA A LA VEZ
   const usingFullCatalog = allProductsForCounts.length > 0;
 
+  const activeTypes = useMemo(() => parseTypes(filterType), [filterType]);
+
   const allMatchingProducts = useMemo(() => {
     const sourceList = usingFullCatalog ? allProductsForCounts : products;
     const searchWords = removeAccents(searchTerm.toLowerCase())
@@ -461,27 +481,13 @@ function MainApp() {
       // Validar tallas y ubicación
       if (!checkProductStockAndSizes(product)) return false;
 
-      if (!filterType || filterType === 'Todos') return true;
-
-      if (filterType === 'Ofertas') {
-        return Number(product.discountPrice) > 0 && Number(product.discountPrice) < Number(product.price);
-      }
-      if (filterType === 'Populares') return product.isPopular === true;
-      if (filterType === 'Nuevo') return true;
-      if (filterType === 'Mundial 2026') return product.isMundial2026 === true;
-      if (filterType === 'Temp 26-27' || filterType === 'Temporada 26-27') {
-        return product.isTemporada2627 === true || /26-27/i.test(String(product.type || ''));
-      }
-
-      if (filterType === 'Balon' || filterType === 'Balón' || filterType === 'Balones') {
-        return product.type === 'Balón' || product.type === 'Balones';
-      }
-
-      return product.type === filterType;
+      const restrictive = activeTypes.filter((t) => t !== 'Nuevo');
+      if (restrictive.length === 0) return true;
+      return restrictive.some((t) => matchesType(product, t));
     });
 
     if (usingFullCatalog) {
-      if (filterType === 'Nuevo') {
+      if (activeTypes.includes('Nuevo')) {
         filtered.sort((a, b) => String(b._id || '').localeCompare(String(a._id || '')));
       } else {
         filtered.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -489,7 +495,7 @@ function MainApp() {
     }
 
     return filtered;
-  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, filterType, filterSizes, storeView, canEdit, isSuperUser, soloOcultos]);
+  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, activeTypes, filterSizes, storeView, canEdit, isSuperUser, soloOcultos]);
 
   const effectiveTotal = usingFullCatalog ? allMatchingProducts.length : total;
   const pages = Math.max(1, Math.ceil(effectiveTotal / limit));
@@ -516,7 +522,7 @@ function MainApp() {
         {/* ================= MODALES GLOBALES ================= */}
         {showRegisterUserModal && <RegisterUserModal onClose={() => setShowRegisterUserModal(false)} />}
         {showUserListModal && <UserListModal open={showUserListModal} onClose={() => setShowUserListModal(false)} currentUser={user} token={user?.token} />}
-        {showMedidas && <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={filterType || 'Todos'} />}
+        <Medidas open={showMedidas} onClose={() => setShowMedidas(false)} currentType={activeTypes.find((t) => t !== 'Nuevo') || 'Todos'} />
         {showAddModal && (
           <AddProductModal
             user={user}
@@ -705,6 +711,7 @@ function MainApp() {
                     if (!usingFullCatalog) setLoading(true); 
                     setPage(1); 
                   }}
+                  onOpenMedidas={() => setShowMedidas(true)}
                   esSuperAdmin={isSuperUser}
                   soloOcultos={soloOcultos}
                   setSoloOcultos={(val) => {
@@ -713,14 +720,8 @@ function MainApp() {
                   }}
                 />
 
-                <div className="w-full max-w-7xl mx-auto px-4 mt-8 mb-8">
-                  <div className="flex items-center justify-center gap-3 mt-4 mb-8 w-full">
-                      <span className="text-sm sm:text-base text-zinc-600 font-bold">¿Querés saber tu talla?</span>
-                      <button onClick={() => setShowMedidas(true)} className="bg-green-700 text-white px-5 py-2 rounded-full hover:bg-zinc-800 font-bold text-sm tracking-wide shadow-md transition-transform hover:scale-105">
-                      VER MEDIDAS
-                      </button>
-                  </div>
-                </div>
+                {/* La guía de tallas ahora se abre desde el botón "Guía de tallas" del FilterBar */}
+                <div className="mb-6 sm:mb-8" />
 
                 <div ref={pageTopRef} />
 

@@ -1,42 +1,49 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaCheck, FaChevronDown, FaTrashAlt, FaEyeSlash } from "react-icons/fa";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { FaTimes, FaSearch, FaSlidersH, FaRulerHorizontal, FaEyeSlash, FaCheck } from "react-icons/fa";
+
+// ⚠️ Estilos en index.css (sección "FILTER BAR", clases fb-*).
 
 const categories = [
   { label: "Todos", value: "" },
-  { label: "Nuevo", value: "Nuevo" },         
+  { label: "Nuevo", value: "Nuevo" },
   { label: "Nacional", value: "Nacional" },
-  { label: "Mundial 2026", value: "Mundial 2026" }, 
-  { label: "Temp 26-27", value: "Temp 26-27" }, 
-  { label: "Populares", value: "Populares" }, 
-  { label: "Ofertas", value: "Ofertas" },     
+  { label: "Mundial 2026", value: "Mundial 2026" },
+  { label: "Temp 26-27", value: "Temp 26-27" },
+  { label: "Populares", value: "Populares" },
+  { label: "Ofertas", value: "Ofertas" },
   { label: "Player", value: "Player" },
   { label: "Fan", value: "Fan" },
   { label: "Retro", value: "Retro" },
-  { label: "Balón", value: "Balón" }, 
+  { label: "Balón", value: "Balón" },
   { label: "Mujer", value: "Mujer" },
   { label: "Niño", value: "Niño" },
   { label: "Abrigos", value: "Abrigos" },
-  { label: "Llaveros", value: "Llaveros" }, 
+  { label: "Llaveros", value: "Llaveros" },
   { label: "NBA", value: "NBA" },
   { label: "MLB", value: "MLB" },
   { label: "NFL", value: "NFL" },
-  { label: "F1", value: "F1" }, 
+  { label: "F1", value: "F1" },
 ];
 
-const tallasAdulto = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
-const tallasNino = [
-  { size: "16", label: "16 (Talla 2)" },
-  { size: "18", label: "18 (Talla 4)" },
-  { size: "20", label: "20 (Talla 6)" },
-  { size: "22", label: "22 (Talla 8)" },
-  { size: "24", label: "24 (Talla 10)" },
-  { size: "26", label: "26 (Talla 12)" },
-  { size: "28", label: "28 (Talla 14/16)" },
+const sizeGroups = [
+  { title: "Adulto", sizes: ["S", "M", "L", "XL", "XXL", "3XL", "4XL"].map((s) => ({ size: s, label: s })) },
+  {
+    title: "Niño",
+    sizes: [
+      { size: "16", label: "16", hint: "Talla 2" },
+      { size: "18", label: "18", hint: "Talla 4" },
+      { size: "20", label: "20", hint: "Talla 6" },
+      { size: "22", label: "22", hint: "Talla 8" },
+      { size: "24", label: "24", hint: "Talla 10" },
+      { size: "26", label: "26", hint: "Talla 12" },
+      { size: "28", label: "28", hint: "Talla 14/16" },
+    ],
+  },
+  { title: "Accesorios", sizes: [{ size: "U", label: "Única" }] },
 ];
-const tallasAccesorios = [
-  { size: "U", label: "U (Talla Única)" } 
-];
+
+const SEARCH_DEBOUNCE_MS = 350;
 
 export default function FilterBar({
   searchTerm,
@@ -46,337 +53,333 @@ export default function FilterBar({
   filterSizes = [],
   setFilterSizes,
   onToggleTallas,
-  // 🔒 Nuevas props para controlar el filtro de ocultos en Super Admin
+  onOpenMedidas,
+  // 🔒 Filtro de ocultos (solo Super Admin)
   esSuperAdmin = false,
   soloOcultos = false,
   setSoloOcultos,
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeAccordion, setActiveAccordion] = useState(""); 
   const [localSearch, setLocalSearch] = useState(searchTerm || "");
-  const [isScrolled, setIsScrolled] = useState(false);
+  const debounceRef = useRef(null);
+  const inputRef = useRef(null);
+  const dragControls = useDragControls();
 
-  const hasActiveFilters = (filterType !== "") || (filterSizes && filterSizes.length > 0) || soloOcultos;
+  // filterType admite varios tipos separados por coma ("Player,Fan")
+  const activeTypes = String(filterType || "").split(",").map((t) => t.trim()).filter(Boolean);
+  const activeCount = activeTypes.length + (filterSizes?.length || 0) + (soloOcultos ? 1 : 0);
+  const hasAnything = activeCount > 0 || (searchTerm || "").trim() !== "";
+  const labelOf = (v) => categories.find((c) => c.value === v)?.label || v;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const toggleType = (value) => {
+    if (!value) return setFilterType?.(""); // "Todos" limpia
+    const next = activeTypes.includes(value) ? activeTypes.filter((t) => t !== value) : [...activeTypes, value];
+    setFilterType?.(next.join(","));
+  };
 
+  // Sincroniza si el término cambia desde afuera (URL, logo, etc.)
   useEffect(() => {
     setLocalSearch(searchTerm || "");
   }, [searchTerm]);
 
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  // Bloquear scroll + cerrar con Escape mientras el panel está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && setIsOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen]);
+
+  // 🔎 Búsqueda con debounce: no pedimos al backend en cada tecla
   const handleInputChange = (e) => {
     const val = e.target.value;
     setLocalSearch(val);
-    if (setSearchTerm) {
-      setSearchTerm(val);
-    }
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearchTerm?.(val), SEARCH_DEBOUNCE_MS);
   };
 
-  const handleClearFilters = () => {
-    if (setFilterType) setFilterType("");
-    if (setFilterSizes) setFilterSizes([]);
-    if (setSoloOcultos) setSoloOcultos(false);
+  const clearSearch = () => {
+    clearTimeout(debounceRef.current);
     setLocalSearch("");
-    if (setSearchTerm) setSearchTerm("");
+    setSearchTerm?.("");
+    inputRef.current?.focus();
   };
+
+  const toggleSize = (size) => {
+    setFilterSizes?.((prev) => (prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]));
+  };
+
+  const clearFilters = () => {
+    setFilterType?.("");
+    setFilterSizes?.([]);
+    setSoloOcultos?.(false);
+  };
+
+  const clearAll = () => {
+    clearFilters();
+    clearSearch();
+  };
+
+  const openPanel = () => {
+    setIsOpen(true);
+    onToggleTallas?.();
+  };
+
+  // Chips de filtros activos
+  const chips = [
+    searchTerm?.trim() && { key: "q", label: `“${searchTerm.trim()}”`, onRemove: clearSearch },
+    ...activeTypes.map((t) => ({ key: `t-${t}`, label: labelOf(t), onRemove: () => toggleType(t) })),
+    ...(filterSizes || []).map((s) => ({ key: `s-${s}`, label: `Talla ${s === "U" ? "única" : s}`, onRemove: () => toggleSize(s) })),
+    soloOcultos && { key: "o", label: "Solo ocultos", onRemove: () => setSoloOcultos?.(false) },
+  ].filter(Boolean);
 
   return (
     <>
-      <div 
-        className="sticky top-0 z-40 w-full transition-all duration-300 md:static pb-6 -mb-6"
-        style={isScrolled ? { 
-          background: 'linear-gradient(to bottom, rgba(255,255,255,1) 65%, rgba(255,255,255,0.85) 85%, rgba(255,255,255,0) 100%)',
-          pointerEvents: 'none' 
-        } : { 
-          background: 'transparent',
-          pointerEvents: 'none'
-        }}
-      >
-        <div 
-          className={`w-full max-w-4xl mx-auto px-4 flex flex-row gap-3 items-center md:flex-col md:gap-4 transition-all duration-300 pointer-events-auto ${
-            isScrolled ? "py-2 md:pt-6 md:pb-0" : "py-3 md:pt-6 md:pb-0"
-          }`}
+      <div className="fb-wrap" id="filter-bar">
+        <motion.div
+          className="fb-bar"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          
-          <motion.div
-            className="relative w-full max-w-md group flex-1 md:flex-none"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            {/* Buscador minimalista con acento navideño al enfocar */}
+          {/* Buscador */}
+          <label className="fb-search">
+            <FaSearch className="fb-search-icon" aria-hidden="true" />
             <input
-              type="text"
-              placeholder="Buscar artículo..."
+              ref={inputRef}
+              type="search"
+              placeholder="Buscar equipo, jugador…"
               value={localSearch}
               onChange={handleInputChange}
-              className="w-full pl-5 pr-4 py-3 bg-white border border-gray-300 rounded-full text-sm font-medium focus:outline-none focus:bg-white focus:border-red-600 focus:shadow-[0_0_10px_rgba(220,38,38,0.2)] transition-all text-black placeholder-gray-400"
+              aria-label="Buscar productos"
             />
-          </motion.div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* 🔒 BOTÓN EXCLUSIVO SUPER ADMIN: VER OCULTOS */}
-            {esSuperAdmin && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.12 }}
-              >
-                <button
-                  onClick={() => setSoloOcultos?.(!soloOcultos)}
-                  className={`relative z-10 flex items-center gap-2 px-5 py-3 md:py-3.5 rounded-full transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border ${
-                    soloOcultos 
-                      ? "bg-zinc-900 text-white border-zinc-900 ring-2 ring-red-600" 
-                      : "bg-white text-black border-zinc-300 hover:bg-zinc-100"
-                  }`}
-                  title="Ver únicamente productos ocultos del catálogo"
+            <AnimatePresence>
+              {localSearch && (
+                <motion.button
+                  type="button"
+                  className="fb-search-clear"
+                  onClick={clearSearch}
+                  aria-label="Borrar búsqueda"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.6 }}
                 >
-                  <FaEyeSlash size={13} className={soloOcultos ? "text-red-500" : "text-zinc-500"} />
-                  <span>{soloOcultos ? "Viendo Ocultos" : "Ocultos"}</span>
-                </button>
-              </motion.div>
+                  <FaTimes />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </label>
+
+          {/* Acciones */}
+          <div className="fb-actions">
+            <button type="button" className="fb-btn fb-btn--dark" onClick={openPanel} aria-label="Abrir filtros">
+              <FaSlidersH />
+              <span className="fb-btn-label">Filtros</span>
+              <AnimatePresence>
+                {activeCount > 0 && (
+                  <motion.span
+                    key={activeCount}
+                    className="fb-count"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                  >
+                    {activeCount}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+
+            {onOpenMedidas && (
+              <button type="button" className="fb-btn fb-btn--light" onClick={onOpenMedidas} aria-label="Ver guía de tallas">
+                <FaRulerHorizontal />
+                <span className="fb-btn-label">Guía de tallas</span>
+              </button>
             )}
 
-            <motion.div 
-              className="flex justify-center relative"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-            >
+            {esSuperAdmin && (
               <button
-                onClick={() => {
-                  setIsOpen(true);
-                  setActiveAccordion(""); 
-                  onToggleTallas?.();
-                }}
-                // 🎄 Botón Filtrar en Rojo Navideño
-                className="relative z-10 flex items-center justify-center px-6 py-3 md:py-3.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all shadow-md text-xs font-black tracking-wider uppercase active:scale-95 cursor-pointer border border-transparent"
+                type="button"
+                className={`fb-btn fb-btn--light ${soloOcultos ? "fb-btn--on" : ""}`}
+                onClick={() => setSoloOcultos?.(!soloOcultos)}
+                title="Ver únicamente productos ocultos del catálogo"
+                aria-pressed={soloOcultos}
               >
-                Filtrar
+                <FaEyeSlash />
+                <span className="fb-btn-label">Ocultos</span>
               </button>
-            </motion.div>
+            )}
           </div>
+        </motion.div>
 
-        </div>
+        {/* Chips de filtros activos */}
+        <AnimatePresence initial={false}>
+          {chips.length > 0 && (
+            <motion.div
+              className="fb-chips"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <AnimatePresence initial={false}>
+                {chips.map((c) => (
+                  <motion.button
+                    layout
+                    key={c.key}
+                    type="button"
+                    className="fb-chip"
+                    onClick={c.onRemove}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    aria-label={`Quitar filtro ${c.label}`}
+                  >
+                    {c.label}
+                    <FaTimes className="fb-chip-x" />
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+              {hasAnything && chips.length > 1 && (
+                <motion.button layout type="button" className="fb-clear-all" onClick={clearAll}>
+                  Limpiar todo
+                </motion.button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="mb-4 md:mb-6"></div>
-
+      {/* ===== PANEL DE FILTROS (bottom sheet en móvil, modal en desktop) ===== */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-end p-0 sm:pb-8 pointer-events-none">
+          <div className="fb-layer" role="dialog" aria-modal="true" aria-label="Filtros">
             <motion.div
+              className="fb-backdrop"
+              onClick={() => setIsOpen(false)}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
             />
             <motion.div
-              initial={{ y: "100%", opacity: 0, scale: 0.95 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: "100%", opacity: 0, scale: 0.95 }}
-              transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className="relative w-full sm:max-w-4xl border border-gray-200 rounded-t-[32px] sm:rounded-2xl h-[65vh] sm:h-auto sm:max-h-[75vh] shadow-[0_-5px_40px_rgba(0,0,0,0.1)] p-6 z-10 flex flex-col justify-between overflow-y-auto font-sans pointer-events-auto bg-white"
+              className="fb-sheet"
+              initial={{ y: "100%", opacity: 0.6 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0.6 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              drag="y"
+              dragListener={false}
+              dragControls={dragControls}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 600) setIsOpen(false);
+              }}
             >
-              
+              {/* Manija + encabezado: arrastrar hacia abajo cierra (móvil) */}
+              <div className="fb-drag-zone" onPointerDown={(e) => dragControls.start(e)}>
+                <span className="fb-handle" aria-hidden="true" />
+              </div>
 
-              <div className="relative z-10">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
-                  <h3 className="text-lg font-black text-black uppercase tracking-tight">Filtrar y ordenar</h3>
-                  <button
-                    onClick={() => setIsOpen(false)}
-                    className="p-2.5 rounded-full bg-zinc-50 text-gray-500 hover:text-black hover:bg-gray-200 transition-colors cursor-pointer border border-gray-200"
-                  >
-                    <FaTimes size={16} />
-                  </button>
-                </div>
+              <div className="fb-sheet-head" onPointerDown={(e) => dragControls.start(e)}>
+                <h3>Filtros</h3>
+                <button type="button" className="fb-icon-btn" onClick={() => setIsOpen(false)} aria-label="Cerrar filtros">
+                  <FaTimes />
+                </button>
+              </div>
 
-                <div className="flex flex-col divide-y divide-gray-100">
-                  <div className="py-4">
-                    <button
-                      onClick={() => setActiveAccordion(activeAccordion === "categoria" ? "" : "categoria")}
-                      className="w-full flex text-black items-center justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-red-600 transition-colors"
-                    >
-                      <span>Versión / Categoría</span>
-                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "categoria" ? "rotate-180 text-red-600" : ""}`} />
-                    </button>
-                    {activeAccordion === "categoria" && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 pb-2"
+              <div className="fb-sheet-body">
+                {/* Categoría */}
+                <section className="fb-section">
+                  <h4>Versión / categoría</h4>
+                  <p className="fb-hint fb-hint--top">Podés elegir varias.</p>
+                  <div className="fb-cat-grid">
+                    {categories.map((cat, i) => {
+                      const isActive = cat.value ? activeTypes.includes(cat.value) : activeTypes.length === 0;
+                      return (
+                        <motion.button
+                          key={cat.label}
+                          type="button"
+                          className={`fb-cat ${isActive ? "is-active" : ""}`}
+                          onClick={() => toggleType(cat.value)}
+                          aria-pressed={isActive}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.05 + i * 0.015 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          {cat.label}
+                          {isActive && <FaCheck className="fb-cat-check" />}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Tallas */}
+                <section className="fb-section">
+                  <div className="fb-section-head">
+                    <h4>Talla</h4>
+                    {onOpenMedidas && (
+                      <button
+                        type="button"
+                        className="fb-link"
+                        onClick={() => {
+                          setIsOpen(false);
+                          onOpenMedidas();
+                        }}
                       >
-                        {categories.map((cat) => {
-                          const isActive = filterType === cat.value;
+                        <FaRulerHorizontal /> ¿No sabés tu talla?
+                      </button>
+                    )}
+                  </div>
+                  <p className="fb-hint">Podés elegir varias.</p>
+
+                  {sizeGroups.map((g) => (
+                    <div key={g.title} className="fb-size-group">
+                      <span className="fb-size-title">{g.title}</span>
+                      <div className="fb-size-grid">
+                        {g.sizes.map(({ size, label, hint }) => {
+                          const isActive = filterSizes?.includes(size);
                           return (
-                            <button
-                              key={cat.label}
-                              onClick={() => {
-                                setFilterType(cat.value);
-                                setIsOpen(false);
-                              }}
-                              className={`
-                                flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-none cursor-pointer border
-                                ${isActive 
-                                  ? 'bg-red-600 text-white border-red-600 shadow-sm' 
-                                  : 'bg-white text-gray-600 border-gray-200 hover:border-red-600 hover:text-red-600'}
-                              `}
+                            <motion.button
+                              key={size}
+                              type="button"
+                              className={`fb-size ${isActive ? "is-active" : ""} ${hint ? "has-hint" : ""}`}
+                              onClick={() => toggleSize(size)}
+                              aria-pressed={isActive}
+                              whileTap={{ scale: 0.92 }}
                             >
-                              <span>{cat.label}</span>
-                              {isActive && <FaCheck size={10} className="text-white" />}
-                            </button>
+                              <span>{label}</span>
+                              {hint && <small>{hint}</small>}
+                            </motion.button>
                           );
                         })}
-                      </motion.div>
-                    )}
-                  </div>
-
-                  <div className="py-4">
-                    <button
-                      onClick={() => setActiveAccordion(activeAccordion === "talla" ? "" : "talla")}
-                      className="w-full flex items-center text-black justify-between text-sm font-bold uppercase tracking-wide py-2 cursor-pointer bg-transparent border-0 hover:text-red-600 transition-colors"
-                    >
-                      <span>Talla</span>
-                      <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${activeAccordion === "talla" ? "rotate-180 text-red-600" : ""}`} />
-                    </button>
-                    {activeAccordion === "talla" && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex flex-col gap-4 pt-3 pb-2"
-                      >
-                        <div>
-                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Adulto</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {tallasAdulto.map((size) => {
-                              const isActive = filterSizes?.includes(size);
-                              return (
-                                <button
-                                  key={size}
-                                  onClick={() => {
-                                    if (setFilterSizes) {
-                                      setFilterSizes(prev => 
-                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-                                      );
-                                    }
-                                    setIsOpen(false);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
-                                    isActive 
-                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
-                                  }`}
-                                >
-                                  {size}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Niño</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {tallasNino.map(({ size, label }) => {
-                              const isActive = filterSizes?.includes(size);
-                              return (
-                                <button
-                                  key={size}
-                                  onClick={() => {
-                                    if (setFilterSizes) {
-                                      setFilterSizes(prev => 
-                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-                                      );
-                                    }
-                                    setIsOpen(false);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
-                                    isActive 
-                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
-                                  }`}
-                                >
-                                  {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Accesorios</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {tallasAccesorios.map(({ size, label }) => {
-                              const isActive = filterSizes?.includes(size);
-                              return (
-                                <button
-                                  key={size}
-                                  onClick={() => {
-                                    if (setFilterSizes) {
-                                      setFilterSizes(prev => 
-                                        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-                                      );
-                                    }
-                                    setIsOpen(false);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-none border cursor-pointer ${
-                                    isActive 
-                                      ? "bg-green-700 text-white border-green-700 shadow-sm" 
-                                      : "bg-white text-gray-500 border-gray-200 hover:border-green-600 hover:text-green-700"
-                                  }`}
-                                >
-                                  {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
+                      </div>
+                    </div>
+                  ))}
+                </section>
               </div>
-              
-              <div className="pt-4 border-t border-gray-100 mt-4 relative z-10">
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-sm tracking-wider uppercase shadow-md hover:bg-red-700 transition-colors cursor-pointer"
-                >
-                  Cerrar
+
+              <div className="fb-sheet-foot">
+                <button type="button" className="fb-foot-btn fb-foot-btn--ghost" onClick={clearFilters} disabled={activeCount === 0}>
+                  Limpiar
+                </button>
+                <button type="button" className="fb-foot-btn fb-foot-btn--dark" onClick={() => setIsOpen(false)}>
+                  Ver resultados
                 </button>
               </div>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {(hasActiveFilters || localSearch.trim() !== "") && !isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 40, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="fixed sm:bottom-20 bottom-16 left-0 right-0 z-50 flex justify-center items-center pointer-events-none"
-          >
-            <button
-              onClick={handleClearFilters}
-              className="flex items-center gap-2.5 px-6 py-3.5 bg-red-700 hover:bg-red-800 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg border border-red-600 active:scale-95 transition-transform cursor-pointer pointer-events-auto"
-            >
-              <FaTrashAlt size={10} />
-              <span>Borrar filtros</span>
-            </button>
-          </motion.div>
         )}
       </AnimatePresence>
     </>
