@@ -4,7 +4,7 @@ import { toast as toastHOT } from "react-hot-toast";
 import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt, FaTruck, FaCreditCard, FaComments, FaEdit, FaTrashAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { getToken } from "../authFetch";
-import { motion, AnimatePresence } from "framer-motion"; 
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"; 
 import ProductAdminEditor from "./ProductAdminEditor"; 
 import Medidas from "./Medidas";
 
@@ -92,32 +92,74 @@ const getDorsalLayout = (teamFont, productType = "") => {
 };
 
 /* 🔥 VARIANTES DE ANIMACIÓN PREMIUM DE TERMOSELLADO 🔥 */
+// Fase 1: la plancha baja (escala grande + brillo) y "prensa" con un rebote corto.
+// Fase 2 (en el JSX): letras del nombre que se imprimen una a una, número estampado,
+// destello de calor, vapor y un brillo que barre el vinil al final.
 const heatPressVariants = {
-  hidden: { 
-    opacity: 0, 
-    scale: 1.15, 
-    y: -15, 
-    filter: "brightness(1.5) blur(4px)" 
+  hidden: {
+    opacity: 0,
+    scale: 1.28,
+    y: -22,
+    filter: "brightness(2.2) blur(6px)"
   },
-  visible: { 
-    opacity: 0.95, 
-    scale: 1, 
-    y: 0, 
-    filter: "brightness(1) blur(0px)",
-    transition: { 
-      type: "spring", 
-      stiffness: 140, 
-      damping: 12, 
-      mass: 0.8 
+  visible: {
+    opacity: 0.95,
+    scale: [1.28, 0.97, 1.01, 1],
+    y: [-22, 2, 0, 0],
+    filter: ["brightness(2.2) blur(6px)", "brightness(1.35) blur(0px)", "brightness(1.1) blur(0px)", "brightness(1) blur(0px)"],
+    transition: {
+      duration: 0.75,
+      times: [0, 0.45, 0.72, 1],
+      ease: [0.16, 1, 0.3, 1],
+      opacity: { duration: 0.25 }
     }
   },
-  exit: { 
-    opacity: 0, 
-    scale: 0.92, 
-    y: 10,
-    filter: "brightness(0.5) blur(2px)",
-    transition: { duration: 0.25, ease: "easeInOut" } 
+  exit: {
+    opacity: 0,
+    scale: 0.94,
+    y: 8,
+    filter: "brightness(0.6) blur(3px)",
+    transition: { duration: 0.22, ease: "easeIn" }
   }
+};
+
+const heatPressReduced = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 0.95, transition: { duration: 0.25 } },
+  exit: { opacity: 0, transition: { duration: 0.15 } }
+};
+
+/* 💨 Vapor de la plancha al prensar el dorsal (posiciones fijas, sin random) */
+const STEAM_PUFFS = [
+  { x: "18%", size: 26, rise: 46, delay: 0 },
+  { x: "40%", size: 34, rise: 60, delay: 0.08 },
+  { x: "62%", size: 28, rise: 52, delay: 0.04 },
+  { x: "80%", size: 22, rise: 40, delay: 0.12 },
+];
+
+/* 🔥 TRANSICIÓN ENTRE FOTOS (direccional: desliza + escala + desenfoque) 🔥 */
+const photoVariants = {
+  enter: (dir) => ({ x: dir >= 0 ? 70 : -70, opacity: 0, scale: 1.04, filter: "blur(8px)" }),
+  center: {
+    x: 0,
+    opacity: 1,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] }
+  },
+  exit: (dir) => ({
+    x: dir >= 0 ? -70 : 70,
+    opacity: 0,
+    scale: 0.96,
+    filter: "blur(8px)",
+    transition: { duration: 0.32, ease: [0.4, 0, 1, 1] }
+  })
+};
+
+const photoReduced = {
+  enter: { opacity: 0 },
+  center: { opacity: 1, transition: { duration: 0.25 } },
+  exit: { opacity: 0, transition: { duration: 0.2 } }
 };
 
 function transformCloudinary(url, maxW) {
@@ -148,6 +190,8 @@ export default function ProductScreen({
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [idx, setIdx] = useState(0);
+  const [photoDir, setPhotoDir] = useState(1); // 👈 1 = siguiente, -1 = anterior (para la transición)
+  const reduceMotion = useReducedMotion();
   
   const [selectedSize, setSelectedSize] = useState("");
   const [openMedidas, setOpenMedidas] = useState(false);
@@ -284,6 +328,7 @@ export default function ProductScreen({
     setDorsalAnimKey((prev) => prev + 1);
 
     if (val !== "" && galleryFromProduct.length > 1) {
+      setPhotoDir(1);
       setIdx(1);
     }
   };
@@ -359,13 +404,28 @@ export default function ProductScreen({
 
   const controlPointY = 2 * currentLayout.nameCurve - currentLayout.nameY;
 
+  // Estilos de texto del dorsal (compartidos por la capa de color y la de brillo)
+  const nameTextStyle = {
+    fontFamily: activeFontFamily,
+    fontSize: `${rawNameStr.length > 9 ? currentLayout.nameSize - 5 : currentLayout.nameSize}px`,
+    textTransform: "uppercase",
+    overflow: "visible",
+  };
+  const numberTextStyle = {
+    fontFamily: activeFontFamily,
+    fontSize: `${currentLayout.numberSize}px`,
+    letterSpacing: numStr.length > 1 ? "-5px" : "0px",
+    overflow: "visible",
+  };
+
   const savings = hasDiscount && Number(viewProduct?.price) > Number(viewProduct?.discountPrice)
     ? Number(viewProduct.price) - Number(viewProduct.discountPrice)
     : 0;
   const discountPct = savings > 0 ? Math.round((savings / Number(viewProduct.price)) * 100) : 0;
 
-  const goPrev = () => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length);
-  const goNext = () => setIdx((i) => (i + 1) % galleryFromProduct.length);
+  const goPrev = () => { setPhotoDir(-1); setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length); };
+  const goNext = () => { setPhotoDir(1); setIdx((i) => (i + 1) % galleryFromProduct.length); };
+  const goTo = (i) => { if (i === idx) return; setPhotoDir(i > idx ? 1 : -1); setIdx(i); };
 
   const storeLabel = storeView === 'tienda' ? 'Tienda' : storeView === 'bodega1' ? 'Bodega 1' : storeView === 'bodega2' ? 'Bodega 2' : '';
 
@@ -506,38 +566,65 @@ export default function ProductScreen({
                   >
                     {/* ⚠️ No cambiar este contenedor ni el tamaño de la imagen: el dorsal está calibrado sobre él */}
                     <div className="relative inline-flex items-center justify-center w-full">
-                      <motion.img
-                        key={displayUrl}
-                        src={displayUrl}
-                        alt={viewProduct?.name || "Producto"}
-                        className="w-full object-contain rounded-2xl select-none ps-img"
-                        loading="lazy"
-                        draggable={false}
-                        initial={{ opacity: 0.35 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.35 }}
-                      />
+                      {/* popLayout: la foto que sale queda absoluta y la nueva mantiene el tamaño del contenedor */}
+                      <AnimatePresence initial={false} custom={photoDir} mode="popLayout">
+                        <motion.img
+                          key={displayUrl}
+                          src={displayUrl}
+                          alt={viewProduct?.name || "Producto"}
+                          className="w-full object-contain rounded-2xl select-none ps-img"
+                          loading="lazy"
+                          draggable={false}
+                          custom={photoDir}
+                          variants={reduceMotion ? photoReduced : photoVariants}
+                          initial="enter"
+                          animate="center"
+                          exit="exit"
+                        />
+                      </AnimatePresence>
 
                       <AnimatePresence mode="wait">
                         {selectedDorsal && idx === 1 && (
                           <motion.div
                             key={dorsalAnimKey}
-                            variants={heatPressVariants}
+                            variants={reduceMotion ? heatPressReduced : heatPressVariants}
                             initial="hidden"
                             animate="visible"
                             exit="exit"
                             className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-visible"
                           >
                             <div
-                              className="overflow-visible"
+                              className="relative overflow-visible"
                               style={{
                                 width: currentLayout.boxWidth,
                                 transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                               }}
                             >
+                              {/* 🔥 Destello de calor + vapor de la plancha 🔥 */}
+                              {!reduceMotion && (
+                                <>
+                                  <motion.div
+                                    className="ps-heat-glow"
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: [0, 0.8, 0], scale: [0.5, 1.12, 1.35] }}
+                                    transition={{ duration: 1, times: [0, 0.3, 1], ease: "easeOut" }}
+                                  />
+                                  {STEAM_PUFFS.map((p, i) => (
+                                    <motion.span
+                                      key={`steam-${i}`}
+                                      className="ps-steam"
+                                      style={{ left: p.x, width: p.size, height: p.size }}
+                                      initial={{ opacity: 0, y: 0, scale: 0.6 }}
+                                      animate={{ opacity: [0, 0.6, 0], y: -p.rise, scale: 1.5 }}
+                                      transition={{ duration: 1.3, delay: 0.3 + p.delay, ease: "easeOut" }}
+                                    />
+                                  ))}
+                                </>
+                              )}
+
                               <svg
                                 viewBox="0 0 300 340"
-                                className="w-full h-auto overflow-visible"
+                                className="relative w-full h-auto overflow-visible"
                                 style={{
                                   overflow: "visible",
                                   filter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
@@ -556,6 +643,24 @@ export default function ProductScreen({
                                     <stop offset="55%" stopColor={currentLayout.colorMid} />
                                     <stop offset="100%" stopColor={currentLayout.colorBottom} />
                                   </linearGradient>
+
+                                  {/* ✨ Brillo que barre el vinil al terminar de prensar (SMIL: arranca al montar este svg) */}
+                                  <linearGradient id="dorsalShineGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="300" y2="90">
+                                    <stop offset="0.38" stopColor="#fff" stopOpacity="0" />
+                                    <stop offset="0.5" stopColor="#fff" stopOpacity="0.9" />
+                                    <stop offset="0.62" stopColor="#fff" stopOpacity="0" />
+                                    {!reduceMotion && (
+                                      <animateTransform
+                                        attributeName="gradientTransform"
+                                        type="translate"
+                                        from="-340 0"
+                                        to="340 0"
+                                        dur="0.9s"
+                                        begin="0.75s"
+                                        fill="freeze"
+                                      />
+                                    )}
+                                  </linearGradient>
                                 </defs>
 
                                 {rawNameStr && (
@@ -564,29 +669,27 @@ export default function ProductScreen({
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.5"
                                     className={activeFontClass}
-                                    style={{
-                                      fontFamily: activeFontFamily,
-                                      fontSize: `${
-                                        rawNameStr.length > 9
-                                          ? currentLayout.nameSize - 5
-                                          : currentLayout.nameSize
-                                      }px`,
-                                      textTransform: "uppercase",
-                                      overflow: "visible",
-                                    }}
+                                    style={nameTextStyle}
                                   >
-                                    <textPath
-                                      href="#dorsalArcPath"
-                                      startOffset="50%"
-                                      textAnchor="middle"
-                                    >
-                                      {`\u00A0\u00A0${rawNameStr}\u00A0\u00A0`}
+                                    <textPath href="#dorsalArcPath" startOffset="50%" textAnchor="middle">
+                                      {"\u00A0\u00A0"}
+                                      {[...rawNameStr].map((ch, i) => (
+                                        <motion.tspan
+                                          key={`${ch}-${i}`}
+                                          initial={{ opacity: 0 }}
+                                          animate={{ opacity: 1 }}
+                                          transition={{ delay: reduceMotion ? 0 : 0.2 + i * 0.045, duration: 0.18 }}
+                                        >
+                                          {ch === " " ? "\u00A0" : ch}
+                                        </motion.tspan>
+                                      ))}
+                                      {"\u00A0\u00A0"}
                                     </textPath>
                                   </text>
                                 )}
 
                                 {numStr && (
-                                  <text
+                                  <motion.text
                                     x="150"
                                     y={currentLayout.numberY}
                                     textAnchor="middle"
@@ -594,15 +697,31 @@ export default function ProductScreen({
                                     stroke={currentLayout.stroke}
                                     strokeWidth="0.8"
                                     className={activeFontClass}
-                                    style={{
-                                      fontFamily: activeFontFamily,
-                                      fontSize: `${currentLayout.numberSize}px`,
-                                      letterSpacing: numStr.length > 1 ? "-5px" : "0px",
-                                      overflow: "visible",
-                                    }}
+                                    style={{ ...numberTextStyle, transformBox: "fill-box", transformOrigin: "50% 50%" }}
+                                    initial={reduceMotion ? false : { opacity: 0, scale: 1.7 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ type: "spring", stiffness: 420, damping: 20, delay: 0.12 }}
                                   >
                                     {`\u00A0${numStr}\u00A0`}
-                                  </text>
+                                  </motion.text>
+                                )}
+
+                                {/* Capa de brillo encima (mismo texto, sin trazo) */}
+                                {!reduceMotion && (
+                                  <g fill="url(#dorsalShineGrad)" style={{ mixBlendMode: "screen" }}>
+                                    {rawNameStr && (
+                                      <text className={activeFontClass} style={nameTextStyle}>
+                                        <textPath href="#dorsalArcPath" startOffset="50%" textAnchor="middle">
+                                          {`\u00A0\u00A0${rawNameStr}\u00A0\u00A0`}
+                                        </textPath>
+                                      </text>
+                                    )}
+                                    {numStr && (
+                                      <text x="150" y={currentLayout.numberY} textAnchor="middle" className={activeFontClass} style={numberTextStyle}>
+                                        {`\u00A0${numStr}\u00A0`}
+                                      </text>
+                                    )}
+                                  </g>
                                 )}
                               </svg>
                             </div>
@@ -631,7 +750,7 @@ export default function ProductScreen({
                       key={`${url}-${i}`}
                       type="button"
                       className={`ps-thumb ${i === idx ? "is-active" : ""}`}
-                      onClick={() => setIdx(i)}
+                      onClick={() => goTo(i)}
                       aria-label={`Ver imagen ${i + 1}`}
                     >
                       <img src={transformCloudinary(url, 160)} alt="" loading="lazy" draggable={false} />
