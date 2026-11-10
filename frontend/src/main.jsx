@@ -1,3 +1,5 @@
+// Clases de Tailwind v3 que el CDN 2.2.19 no trae (generado). Va primero para que index.css gane en empates.
+import './tailwind-compat.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

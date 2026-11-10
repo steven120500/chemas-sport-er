@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/gen-tailwind-compat.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/gen-tailwind-compat.mjs",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "compat:css": "node scripts/gen-tailwind-compat.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.15",

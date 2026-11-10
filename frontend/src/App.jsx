@@ -123,7 +123,8 @@ function MainApp() {
 
   // 🔥 2. SI HAY UN LINK DIRECTO, SALTAMOS LA ANIMACIÓN DE INICIO
   const hasLinkFilters = !!(searchParams.get('q') || searchParams.get('type') || searchParams.get('sizes'));
-  const [showIntro, setShowIntro] = useState(!hasLinkFilters); 
+  // La intro solo se muestra en la portada: no bloquea enlaces directos a productos ni páginas admin
+  const [showIntro, setShowIntro] = useState(!hasLinkFilters && window.location.pathname === '/');
 
   useEffect(() => {
     if (showIntro) {
@@ -613,9 +614,10 @@ function MainApp() {
 
                 {canAdd && !anyModalOpen && (
                 <button
-                    className="fixed bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-xl hover:bg-zinc-800 transition z-50"
+                    className="fab-add"
                     onClick={() => setShowAddModal(true)}
                     title="Añadir producto"
+                    aria-label="Añadir producto"
                 >
                     <FaPlus />
                 </button>
@@ -747,12 +749,25 @@ function MainApp() {
                       />
                       ))
                   ) : (
-                      <div className="col-span-full text-center text-zinc-500 font-semibold py-10 bg-zinc-50 rounded-2xl border border-zinc-200 shadow-sm">
+                      <div className="col-span-full empty-state">
+                      <span className="empty-state-icon" aria-hidden="true">⚽</span>
+                      <p className="empty-state-title">Sin resultados</p>
+                      <p className="empty-state-text">
                       {filterSizes.length > 0
                           ? `No tenemos disponibles en talla ${filterSizes.join(', ')} por ahora en esta vista.`
                           : storeView !== 'todos'
                           ? `No hay inventario disponible para la tienda seleccionada.`
                           : 'No tenemos productos disponibles en este momento.'}
+                      </p>
+                      {(searchTerm || filterType || filterSizes.length > 0) && (
+                        <button
+                          type="button"
+                          className="empty-state-btn"
+                          onClick={() => { setSearchTerm(''); setFilterType(''); setFilterSizes([]); setPage(1); }}
+                        >
+                          Ver todo el catálogo
+                        </button>
+                      )}
                       </div>
                   )}
                   </div>
@@ -760,36 +775,32 @@ function MainApp() {
 
                 {/* === PAGINACIÓN BLANCO Y NEGRO === */}
                 {pages > 1 && !(loading && !usingFullCatalog) && (
-                  <div className="mt-16 mb-20 flex flex-col items-center gap-3">
-                    <nav className="flex items-center justify-center gap-2 sm:gap-3">
-                      
-                      {/* Botón Anterior */}
+                  <nav className="pg" aria-label="Paginación">
+                    <div className="pg-row">
                       <button
+                        type="button"
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="p-3 text-xs text-white bg-green-700 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="pg-btn pg-btn--arrow"
+                        aria-label="Página anterior"
                       >
-                        <FaChevronLeft size={14} />
+                        <FaChevronLeft />
                       </button>
 
-                      {/* Números de página */}
                       {(() => {
                         const nums = buildPages(page, pages);
                         return nums.map((n, i) => {
                           const prev = nums[i - 1];
                           const showDots = i > 0 && n - prev > 1;
                           const isCurrent = n === page;
-
                           return (
-                            <span key={n} className="flex items-center gap-1.5">
-                              {showDots && <span className="px-2 text-zinc-400 font-bold text-sm tracking-widest">...</span>}
+                            <span key={n} className="pg-group">
+                              {showDots && <span className="pg-dots">…</span>}
                               <button
+                                type="button"
                                 onClick={() => setPage(n)}
-                                className={`min-w-[40px] h-10 px-3 text-sm font-black rounded-xl transition-all cursor-pointer border-2 ${
-                                  isCurrent
-                                    ? 'bg-red-700 text-white border-white shadow-lg scale-[1.05]'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:border-black hover:text-black hover:bg-gray-300'
-                                }`}
+                                className={`pg-btn ${isCurrent ? 'is-current' : ''}`}
+                                aria-current={isCurrent ? 'page' : undefined}
                               >
                                 {n}
                               </button>
@@ -798,21 +809,18 @@ function MainApp() {
                         });
                       })()}
 
-                      {/* Botón Siguiente */}
                       <button
+                        type="button"
                         onClick={() => setPage((p) => Math.min(pages, p + 1))}
                         disabled={page === pages}
-                        className="p-3 text-xs text-white bg-green-700 rounded-xl hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md"
+                        className="pg-btn pg-btn--arrow"
+                        aria-label="Página siguiente"
                       >
-                        <FaChevronRight size={14} />
+                        <FaChevronRight />
                       </button>
-                    </nav>
-                    
-                    {/* Indicador de página actual */}
-                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-2">
-                      Página {page} de {pages}
-                    </span>
-                  </div>
+                    </div>
+                    <span className="pg-info">Página {page} de {pages} · {effectiveTotal} productos</span>
+                  </nav>
                 )}
                 {/* ======================= */}
               </>
@@ -821,7 +829,8 @@ function MainApp() {
         </main>
 
         <Footer />
-        {!anyModalOpen && <FloatingWhatsapp />}
+        {/* El WhatsApp para clientes no se muestra en las páginas de administración */}
+        {!anyModalOpen && !['/tienda', '/comisiones', '/guias', '/history'].includes(location.pathname) && <FloatingWhatsapp />}
 
       </div>
     </>

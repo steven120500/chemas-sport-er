@@ -65,6 +65,13 @@ function getProductPrice(p) {
   return 20000;
 }
 
+// 💸 Miniatura liviana de Cloudinary para mostrar en pantalla (no cambia el dato guardado)
+function cldThumb(url, size = 96) {
+  if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com/") || !url.includes("/upload/")) return url;
+  if (/\/upload\/[^/]*(w_|c_fill)/.test(url)) return url;
+  return url.replace("/upload/", `/upload/f_auto,q_auto:eco,c_fill,w_${size},h_${size}/`);
+}
+
 function getProductThumb(p) {
   if (!p) return "";
   if (typeof p.imageSrc === "string" && p.imageSrc) return p.imageSrc;
@@ -1206,7 +1213,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   }, [facturasFiltradas, safeCurrentPage, itemsPerPage]);
 
   return (
-    <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+    <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
         
         <button 
@@ -1468,7 +1475,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               {thumb ? (
-                                <img src={thumb} alt="" className="w-11 h-11 rounded-xl object-cover border border-zinc-200 bg-zinc-100 shrink-0" />
+                                <img src={cldThumb(thumb)} alt="" className="w-11 h-11 rounded-xl object-cover border border-zinc-200 bg-zinc-100 shrink-0" />
                               ) : (
                                 <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400 shrink-0">
                                   <FaShoppingBag size={14} />
@@ -1504,7 +1511,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {getProductThumb(productoSeleccionado) && (
-                          <img src={getProductThumb(productoSeleccionado)} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-200 bg-white shrink-0" />
+                          <img src={cldThumb(getProductThumb(productoSeleccionado))} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-200 bg-white shrink-0" />
                         )}
                         <div className="min-w-0">
                           <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 block">Prenda Seleccionada</span>
@@ -1706,7 +1713,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   {carritoVentas.map((item) => (
                     <div key={item.uid} className="py-2.5 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {item.imagen && <img src={item.imagen} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-200 shrink-0" />}
+                        {item.imagen && <img src={cldThumb(item.imagen)} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-200 shrink-0" />}
                         <div className="min-w-0">
                           <p className="text-xs font-black text-black truncate">{item.item}</p>
                           <p className="text-[10px] font-bold text-zinc-500">

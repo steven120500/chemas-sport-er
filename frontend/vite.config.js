@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // autoUpdate + registro manual (src/registerSW.js con virtual:pwa-register):
+      // cuando hay versión nueva, el SW se activa y la página se recarga sola una vez.
       registerType: 'autoUpdate',
+      injectRegister: null, // no inyectar un segundo registerSW.js (antes se registraba dos veces)
       // Archivos estáticos que quieras incluir tal cual
       includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
@@ -23,11 +26,15 @@ export default defineConfig({
         ]
       },
       workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
-          // Cache agresivo para Cloudinary (reduce ancho de banda)
+          // Cloudinary: las URLs son versionadas (no cambian de contenido) -> CacheFirst,
+          // así una foto ya vista no se vuelve a pedir (antes StaleWhileRevalidate la re-pedía).
           {
             urlPattern: ({ url }) => url.origin.includes('res.cloudinary.com'),
-            handler: 'StaleWhileRevalidate',
+            handler: 'CacheFirst',
             options: {
               cacheName: 'cloudinary-images',
               cacheableResponse: { statuses: [0, 200] },

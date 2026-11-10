@@ -11,11 +11,8 @@
     <meta name="theme-color" content="#ffffff" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- 🔥 ETIQUETAS ANTI-CACHÉ PARA SAFARI/iOS Y OTROS NAVEGADORES 🔥 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <!-- ========================================================== -->
+    <!-- La caché la controla el service worker (src/registerSW.js) y los headers de Render;
+         las <meta http-equiv> de caché las ignoran los navegadores modernos. -->
 
     <title>ChemaSport ER | Camisetas de Fútbol</title>
 

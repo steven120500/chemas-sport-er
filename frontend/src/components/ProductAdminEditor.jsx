@@ -15,11 +15,41 @@ function transformCloudinary(url, maxW) {
     if (!u.hostname.includes("res.cloudinary.com")) return url;
     const parts = u.pathname.split("/upload/");
     if (parts.length < 2) return url;
-    const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW},dpr_auto`;
+    const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW}`;
     u.pathname = `${parts[0]}/upload/${transforms}/${parts[1]}`;
     return u.toString();
   } catch {
     return url;
+  }
+}
+
+// 💸 Comprime la foto en el navegador antes de subirla (igual que AddProductModal):
+// máx. 1000px de ancho, WebP calidad 0.75. Si el navegador no puede (ej. HEIC en Chrome),
+// devuelve la original y el backend la limita igual al subirla a Cloudinary.
+async function compressToDataUrl(file, maxWidth = 1000, quality = 0.75) {
+  const original = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("Formato no soportado por el navegador"));
+      i.src = original;
+    });
+    const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * ratio);
+    canvas.height = Math.round(img.height * ratio);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    const webp = canvas.toDataURL("image/webp", quality);
+    const out = webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", quality);
+    return out.length < original.length ? out : original;
+  } catch {
+    return original;
   }
 }
 
@@ -104,19 +134,21 @@ export default function ProductAdminEditor({
     else setEditedBodega(prev => ({ ...prev, [size]: val }));
   };
 
-  const handleImageChange = (e, index) => {
+  const handleImageChange = async (e, index) => {
     const file = e.target.files?.[0];
     if (!file || !ACCEPTED_TYPES.includes(file.type)) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLocalImages((prev) => {
-        const copy = prev.slice();
-        if (index >= copy.length) copy.push({ src: reader.result, isNew: true });
-        else copy[index] = { src: reader.result, isNew: true };
-        return copy;
-      });
-    };
-    reader.readAsDataURL(file);
+    let src;
+    try {
+      src = await compressToDataUrl(file);
+    } catch {
+      return;
+    }
+    setLocalImages((prev) => {
+      const copy = prev.slice();
+      if (index >= copy.length) copy.push({ src, isNew: true });
+      else copy[index] = { src, isNew: true };
+      return copy;
+    });
   };
 
   const handleImageRemove = (index) => {

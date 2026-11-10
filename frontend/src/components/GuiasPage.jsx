@@ -539,7 +539,7 @@ export default function GuiasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+    <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-5xl mx-auto">
         
         <button 

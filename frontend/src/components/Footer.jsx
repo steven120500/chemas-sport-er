@@ -1,56 +1,58 @@
-import { FaFacebookF, FaInstagram, FaWhatsapp } from 'react-icons/fa';
+import { FaFacebookF, FaInstagram, FaWhatsapp, FaTruck, FaCreditCard, FaTshirt } from 'react-icons/fa';
+import logo from '../assets/logo.png';
+
+// ⚠️ Estilos en index.css (sección "FOOTER", clases ft-*).
+
+const SOCIALS = [
+  { href: 'https://www.facebook.com/share/1Cjf3GgQmQ/?mibextid=wwXIfr', label: 'Facebook', icon: FaFacebookF },
+  { href: 'https://www.instagram.com/chemasport___er?igsh=aGlsenphMjJlOTcw', label: 'Instagram', icon: FaInstagram },
+  { href: 'https://wa.me/50660369857', label: 'WhatsApp', icon: FaWhatsapp },
+];
+
+const PERKS = [
+  { icon: FaTshirt, title: '+7000 camisetas', text: 'Player, Fan, Retro y más' },
+  { icon: FaTruck, title: 'Envíos', text: 'A todo Costa Rica' },
+  { icon: FaCreditCard, title: 'Pagos', text: 'SINPE, transferencia, efectivo o tarjeta' },
+];
 
 export default function Footer() {
   return (
-    <footer 
-      className="pt-10 mt-10 text-center pb-12 sm:pb-20 border-t border-gray-200 relative z-10 overflow-hidden"
-      // 🔥 Fondo transparente para que herede el fondo blanco limpio de App.jsx sin cortes 🔥
-      style={{ backgroundColor: 'transparent' }}
-    >
-      
-      {/* Íconos sociales minimalistas */}
-      <div className="flex justify-center gap-6 mb-6 relative z-20">
-        <a
-          href="https://www.facebook.com/share/1Cjf3GgQmQ/?mibextid=wwXIfr"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-white border border-gray-300 text-black w-12 h-12 flex items-center justify-center rounded-full hover:bg-black hover:text-white hover:scale-110 hover:shadow-lg hover:border-black transition-all duration-300 text-2xl z-50 pointer-events-auto"
-        >
-          <FaFacebookF />
-        </a>
-
-        <a
-          href="https://www.instagram.com/chemasport___er?igsh=aGlsenphMjJlOTcw"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-white border border-gray-300 text-black w-12 h-12 flex items-center justify-center rounded-full hover:bg-black hover:text-white hover:scale-110 hover:shadow-lg hover:border-black transition-all duration-300 text-2xl z-50 pointer-events-auto"
-        >
-          <FaInstagram />
-        </a>
-
-        <a
-          href="https://wa.me/50660369857"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-white border border-gray-300 text-black w-12 h-12 flex items-center justify-center rounded-full hover:bg-black hover:text-white hover:scale-110 hover:shadow-lg hover:border-black transition-all duration-300 text-2xl z-50 pointer-events-auto"
-        >
-          <FaWhatsapp />
-        </a>
+    <footer className="ft">
+      <div className="ft-perks">
+        {PERKS.map(({ icon: Icon, title, text }) => (
+          <div key={title} className="ft-perk">
+            <span className="ft-perk-icon"><Icon /></span>
+            <div>
+              <strong>{title}</strong>
+              <p>{text}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
-       {/* Texto inferior elegante */}
-       <div className="mt-4 text-sm text-gray-500 space-y-1 relative z-20 font-medium tracking-wide">
-        <p>© 2026 ChemaSport ER. Todos los derechos reservados.</p>
+      <div className="ft-main">
+        <div className="ft-brand">
+          <span className="ft-logo"><img src={logo} alt="" /></span>
+          <div>
+            <strong>ChemaSport ER</strong>
+            <p>Camisetas de fútbol en Costa Rica.</p>
+          </div>
+        </div>
+
+        <div className="ft-socials">
+          {SOCIALS.map(({ href, label, icon: Icon }) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}>
+              <Icon />
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="ft-bottom">
+        <p>© {new Date().getFullYear()} ChemaSport ER. Todos los derechos reservados.</p>
         <p>
-          Diseñado por{" "}
-          <a
-            href="https://wa.me/50688028216"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-black font-black underline decoration-gray-300 hover:decoration-black hover:text-black transition-colors duration-300"
-          >
-            Beesoft
-          </a>
+          Diseñado por{' '}
+          <a href="https://wa.me/50688028216" target="_blank" rel="noopener noreferrer">Beesoft</a>
         </p>
       </div>
     </footer>

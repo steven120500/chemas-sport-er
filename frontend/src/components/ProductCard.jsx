@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaTag, FaStar, FaTshirt } from "react-icons/fa";
 
@@ -76,6 +77,9 @@ function SealTemporada({ uid }) {
 
 export default function ProductCard({ product, onClick, user, index = 0 }) {
   const reduceMotion = useReducedMotion();
+  // 💸 La 2da foto solo se descarga cuando el usuario pasa el mouse (en celular nunca se ve):
+  // ahorra casi la mitad del ancho de banda de Cloudinary en el catálogo.
+  const [wantsAlt, setWantsAlt] = useState(false);
   if (!product) return null;
 
   const uid = String(product._id ?? product.id ?? index).replace(/[^a-zA-Z0-9_-]/g, "");
@@ -97,40 +101,12 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
 
   const sizesToCheck = isLlavero ? ["U"] : isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 
-  const tiendaAgotadas = [];
-  const tiendaQueda1 = [];
-  const bodega1Agotadas = [];
-  const bodega1Queda1 = [];
-  const bodega2Agotadas = [];
-  const bodega2Queda1 = [];
-  const traspasosUrgentes = [];
-  const traspasosSugeridos = [];
-
   let totalInventory = 0;
-
   for (const size of sizesToCheck) {
-    const tiendaQty = Number(product.tienda?.[size] ?? 0);
-    const stockQty = Number(product.stock?.[size] ?? 0);
-    const bodeQty = Number(product.bodega?.[size] ?? 0);
-
-    totalInventory += tiendaQty + stockQty + bodeQty;
-
-    if (user?.isSuperUser) {
-      if (tiendaQty === 0) tiendaAgotadas.push(size);
-      if (tiendaQty === 1) tiendaQueda1.push(size);
-
-      if (stockQty === 0) bodega1Agotadas.push(size);
-      if (stockQty === 1) bodega1Queda1.push(size);
-
-      if (bodeQty === 0) bodega2Agotadas.push(size);
-      if (bodeQty === 1) bodega2Queda1.push(size);
-
-      if (tiendaQty === 0 && (stockQty > 0 || bodeQty > 0)) {
-        traspasosUrgentes.push({ talla: size, tienda: tiendaQty, bodega1: stockQty, bodega2: bodeQty });
-      } else if (tiendaQty === 1 && (stockQty > 0 || bodeQty > 0)) {
-        traspasosSugeridos.push({ talla: size, tienda: tiendaQty, bodega1: stockQty, bodega2: bodeQty });
-      }
-    }
+    totalInventory +=
+      Number(product.tienda?.[size] ?? 0) +
+      Number(product.stock?.[size] ?? 0) +
+      Number(product.bodega?.[size] ?? 0);
   }
 
   const isTotalAgotado = totalInventory === 0;
@@ -171,6 +147,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
       whileHover={reduceMotion ? undefined : { y: -6, transition: { type: "spring", stiffness: 350, damping: 22 } }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick(product)}
+      onMouseEnter={() => setWantsAlt(true)}
       className={`pc-card ${isTotalAgotado ? "pc-soldout" : ""}`}
       style={isAdmin && product.hidden ? { opacity: 0.6, filter: "grayscale(1)" } : undefined}
     >
@@ -184,7 +161,12 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         </motion.div>
       )}
 
-      <div className={`pc-frame ${user?.isSuperUser ? "pc-frame--admin" : ""}`}>
+      <div className="pc-frame">
+        {/* ❄️ Capa de nieve sobre el borde superior */}
+        <svg className="pc-snowcap" viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 0 H200 V5 C192 5 190 11 184 11 C178 11 178 6 170 6 C163 6 162 13 154 13 C146 13 147 6 138 6 C130 6 130 10 122 10 C114 10 115 5 106 5 C98 5 97 12 88 12 C80 12 80 6 72 6 C64 6 64 10 56 10 C48 10 49 5 40 5 C32 5 31 11 23 11 C15 11 14 6 7 6 C3 6 1 7 0 8 Z" />
+        </svg>
+
         {/* 🎀 Cinta superior + moño */}
         <div className="pc-ribbon" aria-hidden="true" />
         <img
@@ -206,7 +188,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
             loading="lazy"
             decoding="async"
           />
-          {sImg && (
+          {sImg && wantsAlt && (
             <img
               src={sImg}
               alt=""
@@ -215,6 +197,13 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
               loading="lazy"
               decoding="async"
             />
+          )}
+
+          {/* ❄️ Copos suaves al pasar el mouse */}
+          {!isTotalAgotado && (
+            <div className="pc-flakes" aria-hidden="true">
+              <i /><i /><i /><i /><i />
+            </div>
           )}
 
           {isTotalAgotado && (
@@ -304,56 +293,6 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
         </div>
       </div>
 
-      {/* --- SECCIÓN ADMINISTRADOR (INVENTARIO Y TRASPASOS) --- */}
-      {user?.isSuperUser && (
-        <div className="pc-admin text-left w-full">
-          {(tiendaAgotadas.length > 0 || tiendaQueda1.length > 0) && (
-            <>
-              <p className="font-bold mt-1 text-gray-700">Tienda</p>
-              {tiendaAgotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {tiendaAgotadas.join(" ")}</p>}
-              {tiendaQueda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {tiendaQueda1.join(" ")}</p>}
-            </>
-          )}
-
-          {(bodega1Agotadas.length > 0 || bodega1Queda1.length > 0) && (
-            <>
-              <p className="font-bold mt-2 text-gray-700">Bodega 1</p>
-              {bodega1Agotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodega1Agotadas.join(" ")}</p>}
-              {bodega1Queda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodega1Queda1.join(" ")}</p>}
-            </>
-          )}
-
-          {(bodega2Agotadas.length > 0 || bodega2Queda1.length > 0) && (
-            <>
-              <p className="font-bold mt-2 text-gray-700">Bodega 2</p>
-              {bodega2Agotadas.length > 0 && <p className="text-red-600 font-semibold">Agotado: {bodega2Agotadas.join(" ")}</p>}
-              {bodega2Queda1.length > 0 && <p className="text-green-600 font-semibold">Queda 1: {bodega2Queda1.join(" ")}</p>}
-            </>
-          )}
-
-          {traspasosUrgentes.length > 0 && (
-            <div className="mt-2 border-l-4 border-black bg-gray-100 text-black p-2 rounded">
-              <p className="font-bold mb-1">🚨 Traspasos a Tienda urgentes:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                {traspasosUrgentes.map((t, i) => (
-                  <li key={i}>Talla <b>{t.talla}</b> (B1: {t.bodega1}, B2: {t.bodega2})</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {traspasosSugeridos.length > 0 && (
-            <div className="mt-2 border-l-4 border-gray-400 bg-gray-50 text-gray-800 p-2 rounded">
-              <p className="font-bold mb-1">📦 Traspasos a Tienda sugeridos:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                {traspasosSugeridos.map((t, i) => (
-                  <li key={i}>Talla <b>{t.talla}</b> (B1: {t.bodega1}, B2: {t.bodega2})</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
     </motion.article>
   );
 }

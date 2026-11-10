@@ -281,7 +281,7 @@ export default function HistoryPage({ isSuperUser = false }) {
   }, [logs]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-8 pb-32 px-4 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 relative">
       <div className="max-w-4xl mx-auto">
         
         <button

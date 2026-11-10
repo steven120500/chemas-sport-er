@@ -1,7 +1,8 @@
 import express from 'express';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
-import cloudinary from '../config/cloudinary.js';
+import cloudinary, { UPLOAD_LIMIT } from '../config/cloudinary.js';
+import { productImageIds, destroyIfUnused } from '../utils/cloudinaryCleanup.js';
 import multer from 'multer';
 
 const router = express.Router();
@@ -80,7 +81,7 @@ function diffProduct(prev, next) {
 function uploadToCloudinary(buffer) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: 'products', resource_type: 'image' },
+      { folder: 'products', resource_type: 'image', ...UPLOAD_LIMIT },
       (err, result) => (err ? reject(err) : resolve(result))
     );
     stream.end(buffer);
@@ -118,7 +119,7 @@ async function processDorsalOptions(rawOptions) {
 
       if (imageUrl && imageUrl.startsWith('data:')) {
         try {
-          const up = await cloudinary.uploader.upload(imageUrl, { folder: 'products/dorsales', resource_type: 'image' });
+          const up = await cloudinary.uploader.upload(imageUrl, { folder: 'products/dorsales', resource_type: 'image', ...UPLOAD_LIMIT });
           imageUrl = up.secure_url;
         } catch (err) {
           console.error("Error subiendo imagen de dorsal a Cloudinary:", err);
@@ -353,7 +354,7 @@ router.put('/:id', async (req, res) => {
           if (!strVal) return null;
 
           if (strVal.startsWith('data:')) {
-            const up = await cloudinary.uploader.upload(strVal, { folder: 'products', resource_type: 'image' });
+            const up = await cloudinary.uploader.upload(strVal, { folder: 'products', resource_type: 'image', ...UPLOAD_LIMIT });
             return { public_id: up.public_id, url: up.secure_url };
           } else {
             const found = prevList.find(i => i.url === strVal);
@@ -459,6 +460,17 @@ router.put('/:id', async (req, res) => {
     }
 
     const updatedObj = updated.toObject();
+
+    // 🧹 Imágenes que tenía antes y ya no usa (foto reemplazada / dorsal cambiado):
+    // se borran de Cloudinary en segundo plano, solo si nadie más las referencia.
+    {
+      const keep = productImageIds(updatedObj);
+      const removed = [...productImageIds(prev)].filter((id) => !keep.has(id));
+      // Seguro: si el producto quedó SIN fotos (casi seguro un error del cliente), no borramos nada:
+      // en Cloudinary el borrado no se puede deshacer.
+      const quedanFotos = (updatedObj.images || []).length > 0;
+      if (removed.length && quedanFotos) destroyIfUnused(removed, { excludeProductId: prev._id }).catch(() => {});
+    }
     const changes = diffProduct(prev, updatedObj);
     
     const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
@@ -637,10 +649,10 @@ router.delete('/:id', async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    for (const img of product.images || []) {
-      if (img.public_id) await cloudinary.uploader.destroy(img.public_id);
-    }
+    const imageIds = [...productImageIds(product.toObject())];
     await product.deleteOne();
+    // 🧹 Fotos + imágenes de dorsales (solo las que ningún otro producto/factura use)
+    await destroyIfUnused(imageIds, { excludeProductId: product._id });
 
     await History.create({
       user: whoDidIt(req),

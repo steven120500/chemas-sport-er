@@ -1217,7 +1217,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-36 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+    <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
       <div className="max-w-6xl mx-auto">
         <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8">
           <FaChevronLeft size={12} /> Volver al catálogo

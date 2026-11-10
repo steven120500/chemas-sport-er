@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt, FaTruck, FaCreditCard, FaComments, FaEdit, FaTrashAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion"; 
 import ProductAdminEditor from "./ProductAdminEditor"; 
@@ -12,7 +12,7 @@ const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
 const TALLAS_BALON = ["3", "4", "5"];
-const MODAL_IMG_MAX_W = 800;
+const MODAL_IMG_MAX_W = 1000; // fijo: nítido en pantallas retina sin descargar 2000px+
 
 /* =====================================================================
    🎯 PANEL DE CALIBRACIÓN INDEPENDIENTE (PLAYER VS FAN)
@@ -125,7 +125,8 @@ function transformCloudinary(url, maxW) {
     if (!u.hostname.includes("res.cloudinary.com")) return url;
     const parts = u.pathname.split("/upload/");
     if (parts.length < 2) return url;
-    const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW},dpr_auto`;
+    // 💸 Sin dpr_auto: generaba versiones de hasta 3x el ancho en celulares (mucho ancho de banda)
+    const transforms = `f_auto,q_auto:eco,c_limit,w_${maxW}`;
     u.pathname = `${parts[0]}/upload/${transforms}/${parts[1]}`;
     return u.toString();
   } catch {
@@ -153,6 +154,7 @@ export default function ProductScreen({
   // 🔥 ESTADOS PARA LA PERSONALIZACIÓN DE DORSAL 🔥
   const [selectedDorsalIndex, setSelectedDorsalIndex] = useState("");
   const [dorsalAnimKey, setDorsalAnimKey] = useState(0);
+  const [ctaShake, setCtaShake] = useState(0);
 
   const displayName = user?.username || user?.email || "ChemaSportER";
 
@@ -275,7 +277,7 @@ export default function ProductScreen({
   };
 
   const handleDorsalSelectChange = (e) => {
-    const val = e.target.value;
+    const val = String(e.target.value);
     setSelectedDorsalIndex(val);
     setDorsalAnimKey((prev) => prev + 1);
 
@@ -355,9 +357,61 @@ export default function ProductScreen({
 
   const controlPointY = 2 * currentLayout.nameCurve - currentLayout.nameY;
 
+  const savings = hasDiscount && Number(viewProduct?.price) > Number(viewProduct?.discountPrice)
+    ? Number(viewProduct.price) - Number(viewProduct.discountPrice)
+    : 0;
+  const discountPct = savings > 0 ? Math.round((savings / Number(viewProduct.price)) * 100) : 0;
+
+  const goPrev = () => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length);
+  const goNext = () => setIdx((i) => (i + 1) % galleryFromProduct.length);
+
+  const storeLabel = storeView === 'tienda' ? 'Tienda' : storeView === 'bodega1' ? 'Bodega 1' : storeView === 'bodega2' ? 'Bodega 2' : '';
+
+  const confirmDelete = () => {
+    toastHOT(
+      (t) => (
+        <div className="text-center p-2 bg-white rounded-xl">
+          <p className="font-black text-black mb-4 text-base">¿Eliminar este producto?</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={async () => {
+                toastHOT.dismiss(t.id);
+                setLoading(true);
+                try {
+                  const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(product._id || product.id)}`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json", "x-user": displayName }
+                  });
+                  if (!res.ok) throw new Error("Error en servidor al eliminar");
+
+                  toastHOT.success("Producto eliminado correctamente.", {
+                    style: { borderRadius: '12px', background: '#000', color: '#fff', border: '1px solid #333' }
+                  });
+                  onUpdate?.(null, product._id || product.id);
+                  onClose?.();
+                } catch (err) {
+                  toastHOT.error("Error al intentar eliminar.");
+                  console.error(err);
+                  setLoading(false);
+                }
+              }}
+              className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer border border-red-500 shadow-sm"
+            >
+              ELIMINAR
+            </button>
+            <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-black px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200">CANCELAR</button>
+          </div>
+        </div>
+      ), { duration: 6000, style: { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', padding: '16px' } }
+    );
+  };
+
   return (
-    <div 
-      className="min-h-screen pt-8 pb-16 px-4 sm:px-6 lg:px-8 animate-fade-in-up text-black bg-white"
+    <motion.div
+      className="ps-root"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     >
       <style>{`
         @font-face {
@@ -410,16 +464,17 @@ export default function ProductScreen({
         <span style={{ fontFamily: "'FontRiver'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
       </div>
 
-      <div className="max-w-6xl mx-auto">
+      <div className="ps-container">
         <button
+          type="button"
           onClick={() => { if (isEditing) unlockProduct(); onClose(); }}
-          className="flex items-center gap-2 text-gray-500 bg-transparent hover:text-black transition-colors mb-8 font-bold uppercase tracking-widest text-xs cursor-pointer"
+          className="ps-back"
         >
-          <FaChevronLeft size={14} /> Volver al catálogo
+          <FaChevronLeft /> Volver al catálogo
         </button>
 
         {isEditing ? (
-          <ProductAdminEditor 
+          <ProductAdminEditor
             product={product}
             viewProduct={viewProduct}
             API_BASE={API_BASE}
@@ -431,327 +486,307 @@ export default function ProductScreen({
             user={user}
           />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
-            <div className="w-full">
-              <div className="relative flex items-center justify-center bg-gray-50 rounded-3xl p-6 border border-gray-200 shadow-sm overflow-hidden">
+          <div className="ps-grid">
+            {/* ================= GALERÍA ================= */}
+            <div className="ps-gallery">
+              <div className="ps-stage">
                 {displayUrl ? (
-                  <div className="relative inline-flex items-center justify-center w-full">
-                    <img
-                      src={displayUrl}
-                      alt={viewProduct?.name || "Producto"}
-                      className="w-full max-h-[600px] object-contain drop-shadow-lg rounded-2xl select-none"
-                      loading="lazy"
-                    />
+                  <motion.div
+                    className="ps-swipe"
+                    drag={hasMany ? "x" : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.25}
+                    dragSnapToOrigin
+                    onDragEnd={(_, info) => {
+                      if (info.offset.x < -60) goNext();
+                      else if (info.offset.x > 60) goPrev();
+                    }}
+                  >
+                    {/* ⚠️ No cambiar este contenedor ni el tamaño de la imagen: el dorsal está calibrado sobre él */}
+                    <div className="relative inline-flex items-center justify-center w-full">
+                      <motion.img
+                        key={displayUrl}
+                        src={displayUrl}
+                        alt={viewProduct?.name || "Producto"}
+                        className="w-full object-contain rounded-2xl select-none ps-img"
+                        loading="lazy"
+                        draggable={false}
+                        initial={{ opacity: 0.35 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.35 }}
+                      />
 
-                    <AnimatePresence mode="wait">
-                      {selectedDorsal && idx === 1 && (
-                        <motion.div
-                          key={dorsalAnimKey}
-                          variants={heatPressVariants}
-                          initial="hidden"
-                          animate="visible"
-                          exit="exit"
-                          className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-visible"
-                        >
-                          <div
-                            className="overflow-visible"
-                            style={{
-                              width: currentLayout.boxWidth,
-                              transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
-                            }}
+                      <AnimatePresence mode="wait">
+                        {selectedDorsal && idx === 1 && (
+                          <motion.div
+                            key={dorsalAnimKey}
+                            variants={heatPressVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-visible"
                           >
-                            <svg
-                              viewBox="0 0 300 340"
-                              className="w-full h-auto overflow-visible"
+                            <div
+                              className="overflow-visible"
                               style={{
-                                overflow: "visible",
-                                filter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
-                                WebkitFilter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
+                                width: currentLayout.boxWidth,
+                                transform: `translate(${currentLayout.offsetX}, ${currentLayout.offsetY})`,
                               }}
                             >
-                              <defs>
-                                <path
-                                  id="dorsalArcPath"
-                                  d={`M -120,${currentLayout.nameY} Q 150,${controlPointY} 420,${currentLayout.nameY}`}
-                                  fill="transparent"
-                                />
+                              <svg
+                                viewBox="0 0 300 340"
+                                className="w-full h-auto overflow-visible"
+                                style={{
+                                  overflow: "visible",
+                                  filter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
+                                  WebkitFilter: "drop-shadow(0px 1.5px 1.5px rgba(0,0,0,0.42))",
+                                }}
+                              >
+                                <defs>
+                                  <path
+                                    id="dorsalArcPath"
+                                    d={`M -120,${currentLayout.nameY} Q 150,${controlPointY} 420,${currentLayout.nameY}`}
+                                    fill="transparent"
+                                  />
 
-                                <linearGradient id="dorsalColorGrad" x1="0%" y1="0%" x2="15%" y2="100%">
-                                  <stop offset="0%" stopColor={currentLayout.colorTop} />
-                                  <stop offset="55%" stopColor={currentLayout.colorMid} />
-                                  <stop offset="100%" stopColor={currentLayout.colorBottom} />
-                                </linearGradient>
-                              </defs>
+                                  <linearGradient id="dorsalColorGrad" x1="0%" y1="0%" x2="15%" y2="100%">
+                                    <stop offset="0%" stopColor={currentLayout.colorTop} />
+                                    <stop offset="55%" stopColor={currentLayout.colorMid} />
+                                    <stop offset="100%" stopColor={currentLayout.colorBottom} />
+                                  </linearGradient>
+                                </defs>
 
-                              {rawNameStr && (
-                                <text
-                                  fill="url(#dorsalColorGrad)"
-                                  stroke={currentLayout.stroke}
-                                  strokeWidth="0.5"
-                                  className={activeFontClass}
-                                  style={{
-                                    fontFamily: activeFontFamily,
-                                    fontSize: `${
-                                      rawNameStr.length > 9
-                                        ? currentLayout.nameSize - 5
-                                        : currentLayout.nameSize
-                                    }px`,
-                                    textTransform: "uppercase",
-                                    overflow: "visible",
-                                  }}
-                                >
-                                  <textPath
-                                    href="#dorsalArcPath"
-                                    startOffset="50%"
-                                    textAnchor="middle"
+                                {rawNameStr && (
+                                  <text
+                                    fill="url(#dorsalColorGrad)"
+                                    stroke={currentLayout.stroke}
+                                    strokeWidth="0.5"
+                                    className={activeFontClass}
+                                    style={{
+                                      fontFamily: activeFontFamily,
+                                      fontSize: `${
+                                        rawNameStr.length > 9
+                                          ? currentLayout.nameSize - 5
+                                          : currentLayout.nameSize
+                                      }px`,
+                                      textTransform: "uppercase",
+                                      overflow: "visible",
+                                    }}
                                   >
-                                    {`\u00A0\u00A0${rawNameStr}\u00A0\u00A0`}
-                                  </textPath>
-                                </text>
-                              )}
+                                    <textPath
+                                      href="#dorsalArcPath"
+                                      startOffset="50%"
+                                      textAnchor="middle"
+                                    >
+                                      {`\u00A0\u00A0${rawNameStr}\u00A0\u00A0`}
+                                    </textPath>
+                                  </text>
+                                )}
 
-                              {numStr && (
-                                <text
-                                  x="150"
-                                  y={currentLayout.numberY}
-                                  textAnchor="middle"
-                                  fill="url(#dorsalColorGrad)"
-                                  stroke={currentLayout.stroke}
-                                  strokeWidth="0.8"
-                                  className={activeFontClass}
-                                  style={{
-                                    fontFamily: activeFontFamily,
-                                    fontSize: `${currentLayout.numberSize}px`,
-                                    letterSpacing: numStr.length > 1 ? "-5px" : "0px",
-                                    overflow: "visible",
-                                  }}
-                                >
-                                  {`\u00A0${numStr}\u00A0`}
-                                </text>
-                              )}
-                            </svg>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                                {numStr && (
+                                  <text
+                                    x="150"
+                                    y={currentLayout.numberY}
+                                    textAnchor="middle"
+                                    fill="url(#dorsalColorGrad)"
+                                    stroke={currentLayout.stroke}
+                                    strokeWidth="0.8"
+                                    className={activeFontClass}
+                                    style={{
+                                      fontFamily: activeFontFamily,
+                                      fontSize: `${currentLayout.numberSize}px`,
+                                      letterSpacing: numStr.length > 1 ? "-5px" : "0px",
+                                      overflow: "visible",
+                                    }}
+                                  >
+                                    {`\u00A0${numStr}\u00A0`}
+                                  </text>
+                                )}
+                              </svg>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
                 ) : (
-                  <div className="h-[400px] w-full grid place-items-center text-gray-400 bg-gray-100 rounded-3xl"><span className="font-semibold">Sin imagen</span></div>
+                  <div className="ps-noimg">Sin imagen</div>
                 )}
 
                 {hasMany && (
                   <>
-                    <button onClick={() => setIdx((i) => (i - 1 + galleryFromProduct.length) % galleryFromProduct.length)} className="absolute left-4 z-10 bg-white text-black p-4 rounded-full transition-all hover:scale-105 hover:border-black cursor-pointer shadow-md border border-gray-200"><FaChevronLeft size={20} /></button>
-                    <button onClick={() => setIdx((i) => (i + 1) % galleryFromProduct.length)} className="absolute right-4 z-10 bg-white text-black p-4 rounded-full transition-all hover:scale-105 hover:border-black cursor-pointer shadow-md border border-gray-200"><FaChevronRight size={20} /></button>
-                    <div className="absolute bottom-6 bg-white border border-gray-200 text-black text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{idx + 1} / {galleryFromProduct.length}</div>
+                    <button type="button" onClick={goPrev} className="ps-nav ps-nav--prev" aria-label="Imagen anterior"><FaChevronLeft /></button>
+                    <button type="button" onClick={goNext} className="ps-nav ps-nav--next" aria-label="Imagen siguiente"><FaChevronRight /></button>
+                    <div className="ps-counter">{idx + 1} / {galleryFromProduct.length}</div>
                   </>
                 )}
               </div>
+
+              {hasMany && (
+                <div className="ps-thumbs">
+                  {galleryFromProduct.map((url, i) => (
+                    <button
+                      key={`${url}-${i}`}
+                      type="button"
+                      className={`ps-thumb ${i === idx ? "is-active" : ""}`}
+                      onClick={() => setIdx(i)}
+                      aria-label={`Ver imagen ${i + 1}`}
+                    >
+                      <img src={transformCloudinary(url, 160)} alt="" loading="lazy" draggable={false} />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="w-full flex flex-col">
-              <div className="mb-8">
-                <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4 shadow-sm border border-black">{viewProduct?.type}</span>
-                <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-black leading-tight tracking-tight mb-6">{viewProduct?.name}</h1>
-                {hasDiscount ? (
-                  <div className="flex flex-col items-start mb-6">
-                      <span className="bg-green-500 border border-green-600 text-white text-[10px] font-black px-3 py-1 rounded-full mb-2 uppercase tracking-widest shadow-sm">Oferta</span>
-                      <div className="flex items-end gap-4">
-                        <p className="line-through text-gray-400 text-2xl font-medium pb-1">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
-                        <p className="text-5xl font-black text-black tracking-tight">₡{Number(viewProduct.discountPrice).toLocaleString("de-DE")}</p>
-                      </div>
-                  </div>
-                ) : (
-                  <p className="text-5xl font-black text-black tracking-tight mb-6">₡{Number(viewProduct.price).toLocaleString("de-DE")}</p>
-                )}
+            {/* ================= INFORMACIÓN ================= */}
+            <div className="ps-info">
+              <div className="ps-tags">
+                {viewProduct?.type && <span className="ps-tag">{viewProduct.type}</span>}
+                {discountPct > 0 && <span className="ps-tag ps-tag--sale">-{discountPct}%</span>}
+                {viewProduct?.isTemporada2627 && <span className="ps-tag ps-tag--gold">Temporada 26/27</span>}
+                {viewProduct?.isPopular && <span className="ps-tag ps-tag--light">Popular</span>}
+              </div>
 
-                {isCorteAjustado && (
-                  <div className="relative overflow-hidden rounded-2xl bg-gray-50 border border-gray-200 p-4 shadow-sm">
-                    <div className="flex items-start sm:items-center gap-3.5">
-                      <div className="flex-shrink-0 bg-black text-white p-2.5 rounded-xl shadow-sm">
-                        <FaInfoCircle size={18} />
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-black uppercase tracking-widest text-black">
-                            Corte Ajustado (Slim Fit)
-                          </span>
-                        </div>
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium mt-0.5 leading-snug">
-                          Esta prenda viene reducida. <span className="text-black font-black underline decoration-gray-300 underline-offset-4">Te recomendamos pedir al menos una talla más</span> de la que usas habitualmente.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+              <h1 className="ps-title">{viewProduct?.name}</h1>
+
+              <div className="ps-price">
+                <span className="ps-price-now">{formattedPrice}</span>
+                {hasDiscount && (
+                  <span className="ps-price-old">₡{Number(viewProduct.price).toLocaleString("de-DE")}</span>
+                )}
+                {savings > 0 && (
+                  <span className="ps-price-save">Ahorrás ₡{savings.toLocaleString("de-DE")}</span>
                 )}
               </div>
 
-              {availableDorsals.length > 0 && (
-                <div className="mb-8 p-5 rounded-3xl border border-gray-200 bg-gray-50 shadow-sm">
-                  <label className="block text-xs font-black text-black uppercase tracking-widest mb-2.5 flex items-center gap-2">
-                    <FaTshirt className="text-black" size={14} />
-                    Seleccionar Dorsal (Opcional)
-                  </label>
-
-                  <div className="relative">
-                    <select
-                      value={selectedDorsalIndex}
-                      onChange={handleDorsalSelectChange}
-                      className="w-full appearance-none bg-white border-2 border-gray-300 hover:border-black focus:border-black rounded-2xl px-4 py-3.5 pr-10 text-sm font-black text-black uppercase tracking-wider outline-none transition-all cursor-pointer shadow-sm"
-                    >
-                      <option value="">Sin Dorsal (Camiseta Lisa)</option>
-                      {availableDorsals.map((opt, i) => (
-                        <option key={`dorsal-opt-${i}`} value={i}>
-                          {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number}
-                          {canEdit ? ` (${opt.quantity} disp.)` : ""}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-black">
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                      </svg>
-                    </div>
-                  </div>
+              {isCorteAjustado && (
+                <div className="ps-fit">
+                  <FaInfoCircle className="ps-fit-icon" />
+                  <p>
+                    <strong>Corte ajustado (slim fit).</strong> Esta prenda viene reducida: te recomendamos pedir al menos una talla más de la que usás habitualmente.
+                  </p>
                 </div>
               )}
 
-              <div className="mb-8">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    {isLlavero ? 'Selecciona la Unidad' : 'Selecciona una Talla'} {storeView === 'tienda' ? '(Tienda)' : storeView === 'bodega1' ? '(Bodega 1)' : storeView === 'bodega2' ? '(Bodega 2)' : ''}
-                  </p>
-
-                  {!isLlavero && !isBalon && (
+              {/* Dorsal */}
+              {availableDorsals.length > 0 && (
+                <div className="ps-block">
+                  <div className="ps-block-head">
+                    <span className="ps-label"><FaTshirt /> Dorsal <em>(opcional)</em></span>
+                  </div>
+                  <div className="ps-dorsals">
                     <button
                       type="button"
-                      onClick={() => setOpenMedidas(true)}
-                      className="flex items-center gap-2 bg-white hover:bg-black text-black hover:text-white border border-gray-300 hover:border-black px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-sm cursor-pointer"
+                      className={`ps-chip ${selectedDorsalIndex === "" ? "is-active" : ""}`}
+                      onClick={() => handleDorsalSelectChange({ target: { value: "" } })}
                     >
-                      <FaRulerCombined size={13} />
-                      Guía de Medidas
+                      Lisa
+                    </button>
+                    {availableDorsals.map((opt, i) => (
+                      <button
+                        key={`dorsal-opt-${i}`}
+                        type="button"
+                        className={`ps-chip ${String(selectedDorsalIndex) === String(i) ? "is-active" : ""}`}
+                        onClick={() => handleDorsalSelectChange({ target: { value: i } })}
+                      >
+                        {opt.name ? opt.name.toUpperCase() : "JUGADOR"} <b>#{opt.number}</b>
+                        {canEdit && <small>{opt.quantity} disp.</small>}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedDorsal && galleryFromProduct.length > 1 && (
+                    <p className="ps-hint">Así se verá en la espalda 👆</p>
+                  )}
+                </div>
+              )}
+
+              {/* Tallas */}
+              <div className="ps-block">
+                <div className="ps-block-head">
+                  <span className="ps-label">
+                    {isLlavero ? 'Unidad' : 'Talla'}
+                    {storeLabel && <em>({storeLabel})</em>}
+                    {selectedSize && <b className="ps-selected">· {selectedSize}</b>}
+                  </span>
+                  {!isLlavero && !isBalon && (
+                    <button type="button" onClick={() => setOpenMedidas(true)} className="ps-link">
+                      <FaRulerCombined /> Guía de tallas
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+                <div className="ps-sizes">
                   {tallasVisibles.map((size) => {
-                      const total = getTotalBySize(size);
-                      const isAgotado = total === 0;
-                      const isBodega2 = storeView === 'bodega2';
-                      const isSelected = selectedSize === size;
-
-                      return (
-                          <div 
-                            key={size} 
-                            onClick={() => {
-                              if (!isAgotado) setSelectedSize(size);
-                            }}
-                            className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 transition-all select-none overflow-hidden 
-                              ${isAgotado 
-                                  ? 'border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed' 
-                                  : isSelected
-                                      ? 'border-black bg-black shadow-md scale-[1.02] cursor-pointer'
-                                      : isBodega2 
-                                          ? 'border-gray-300 bg-gray-50 shadow-sm cursor-pointer hover:border-black' 
-                                          : 'border-gray-300 bg-white shadow-sm cursor-pointer hover:border-black'
-                              }`}
-                          >
-                              <span className={`text-base font-black z-10 ${isAgotado ? 'text-gray-400' : isSelected ? 'text-white' : 'text-black'}`}>
-                                {size}
-                              </span>
-                              {canEdit && (
-                                <span className={`text-[9px] mt-0.5 font-bold uppercase tracking-widest z-10 ${isAgotado ? 'text-gray-400' : isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
-                                  {isAgotado ? 'Agotado' : `${total} disp.`}
-                                </span>
-                              )}
-                              {isAgotado && <svg className="absolute inset-0 w-full h-full text-gray-200" preserveAspectRatio="none" viewBox="0 0 100 100"><line x1="0" y1="100" x2="100" y2="0" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>}
-                          </div>
-                      );
+                    const total = getTotalBySize(size);
+                    const isAgotado = total === 0;
+                    const isSelected = selectedSize === size;
+                    return (
+                      <motion.button
+                        key={size}
+                        type="button"
+                        disabled={isAgotado}
+                        onClick={() => setSelectedSize(size)}
+                        whileTap={isAgotado ? undefined : { scale: 0.94 }}
+                        className={`ps-size ${isAgotado ? "is-out" : ""} ${isSelected ? "is-active" : ""}`}
+                        aria-pressed={isSelected}
+                        title={isAgotado ? "Agotado" : undefined}
+                      >
+                        <span>{size === "U" ? "Única" : size}</span>
+                        {canEdit && <small>{isAgotado ? 'Agotado' : `${total} disp.`}</small>}
+                      </motion.button>
+                    );
                   })}
                 </div>
               </div>
 
-              <div className="mt-auto">
-                <div className="flex flex-col gap-3">
+              {/* Comprar */}
+              <motion.a
+                key={ctaShake}
+                href={selectedSize ? whatsappUrl : '#'}
+                onClick={(e) => {
+                  if (!selectedSize) {
+                    e.preventDefault();
+                    setCtaShake((n) => n + 1);
+                    toastHOT.error(isLlavero ? "Debes seleccionar la unidad antes de comprar." : "Debes seleccionar una talla antes de comprar.", {
+                      style: { borderRadius: '12px', background: '#000', color: '#fff' }
+                    });
+                  }
+                }}
+                target={selectedSize ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                className={`ps-buy ${selectedSize ? "is-ready" : ""}`}
+                animate={ctaShake ? { x: [0, -10, 10, -6, 6, 0] } : undefined}
+                transition={{ duration: 0.4 }}
+              >
+                <FaWhatsapp />
+                <span>{selectedSize ? `Comprar talla ${selectedSize === "U" ? "única" : selectedSize}` : "Comprar por WhatsApp"}</span>
+              </motion.a>
+
+              <ul className="ps-trust">
+                <li><FaTruck /> Envíos a todo el país</li>
+                <li><FaCreditCard /> SINPE, transferencia, efectivo o tarjeta</li>
+                <li><FaComments /> Te atendemos por WhatsApp</li>
+              </ul>
+
+              {/* Admin */}
+              {(canEdit || canDelete) && (
+                <div className="ps-admin">
                   {canEdit && (
-                    <button onClick={handleEditClick} disabled={loading} className="w-full bg-black hover:bg-zinc-800 text-white flex items-center justify-center gap-2 py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-md cursor-pointer disabled:opacity-50 transition-colors">
-                      {loading ? "PROCESANDO..." : "MODIFICAR PRODUCTO"}
+                    <button type="button" onClick={handleEditClick} disabled={loading} className="ps-admin-btn">
+                      <FaEdit /> {loading ? "Procesando..." : "Modificar producto"}
                     </button>
                   )}
                   {canDelete && (
-                    <button
-                      className="w-full bg-transparent border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 py-3 text-xs rounded-2xl font-bold tracking-widest uppercase cursor-pointer transition-colors"
-                      disabled={loading}
-                      onClick={() => {
-                        toastHOT(
-                          (t) => (
-                            <div className="text-center p-2 bg-white rounded-xl">
-                              <p className="font-black text-black mb-4 text-base">¿Eliminar este producto?</p>
-                              <div className="flex gap-3 justify-center">
-                                <button
-                                  onClick={async () => {
-                                    toastHOT.dismiss(t.id);
-                                    setLoading(true);
-                                    try {
-                                      const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(product._id || product.id)}`, { 
-                                        method: "DELETE", 
-                                        headers: { "Content-Type": "application/json", "x-user": displayName }
-                                      });
-                                      if (!res.ok) throw new Error("Error en servidor al eliminar");
-                                      
-                                      toastHOT.success("Producto eliminado correctamente.", {
-                                        style: { borderRadius: '12px', background: '#000', color: '#fff', border: '1px solid #333' }
-                                      });
-                                      onUpdate?.(null, product._id || product.id);
-                                      onClose?.();
-                                    } catch (err) {
-                                      toastHOT.error("Error al intentar eliminar.");
-                                      console.error(err);
-                                      setLoading(false);
-                                    }
-                                  }}
-                                  className="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-red-700 cursor-pointer border border-red-500 shadow-sm"
-                                >
-                                  ELIMINAR
-                                </button>
-                                <button onClick={() => toastHOT.dismiss(t.id)} className="bg-gray-100 text-black px-5 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200">CANCELAR</button>
-                              </div>
-                            </div>
-                          ), { duration: 6000, style: { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', padding: '16px' } }
-                        );
-                      }}
-                    >
-                      ELIMINAR PRODUCTO
+                    <button type="button" className="ps-admin-btn ps-admin-btn--danger" disabled={loading} onClick={confirmDelete}>
+                      <FaTrashAlt /> Eliminar
                     </button>
                   )}
-
-                  <a
-                    href={selectedSize ? whatsappUrl : '#'}
-                    onClick={(e) => {
-                      if (!selectedSize) {
-                        e.preventDefault();
-                        toastHOT.error(isLlavero ? "Debes seleccionar la unidad antes de comprar." : "Debes seleccionar una talla antes de comprar.", { 
-                          style: { borderRadius: '12px', background: '#000', color: '#fff' }
-                        });
-                      }
-                    }}
-                    target={selectedSize ? "_blank" : "_self"}
-                    rel="noopener noreferrer"
-                    className="w-full bg-green-500 hover:bg-green-600 text-white outline-none focus:outline-none border-none py-4 sm:py-5 text-sm rounded-2xl font-black tracking-widest uppercase shadow-md transition-transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-3 mt-2"
-                  >
-                    <FaWhatsapp size={22} />
-                    COMPRAR POR WHATSAPP
-                  </a>
-                  
                 </div>
-              </div>
-
+              )}
             </div>
           </div>
         )}
-
       </div>
 
       <Medidas
@@ -759,6 +794,6 @@ export default function ProductScreen({
         onClose={() => setOpenMedidas(false)}
         currentType={viewProduct?.type || "Todos"}
       />
-    </div>
+    </motion.div>
   );
 }

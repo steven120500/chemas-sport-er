@@ -83,7 +83,8 @@ Filtros del catálogo se sincronizan con la URL: `?q=&type=&sizes=S,M`. Si hay f
 
 **Tailwind que realmente se aplica: v2.2.19 por CDN** (`frontend/index.html`). Tailwind v4 está instalado y hay `tailwind.config.js`, pero **no hay PostCSS ni plugin de Vite**, así que `@tailwind base/components/utilities` de `index.css` salen sin compilar. Consecuencias:
 - Clases de v3+/JIT **no funcionan**: arbitrarias (`text-[#0f2d5c]`, `min-w-[40px]`, `rounded-[24px]`, `tracking-[0.2em]`, `text-[10px]`), paletas `zinc`, `emerald`, `amber`, `slate`, `neutral`, opacidad con barra (`bg-white/95`, `bg-black/80`), `animate-in slide-in-from-right`, `z-48`, `size-*`, etc. Muchas aparecen en el código y se ignoran silenciosamente.
-- Para algo nuevo: usar clases de Tailwind 2.x, `style={{}}` inline, o CSS en `index.css` / `<style>` del componente. Si se migra a Tailwind compilado, revisar visualmente todo (cambiarán estilos que hoy no se aplican).
+- **Capa de compatibilidad** `src/tailwind-compat.css` (GENERADO, no editar): `frontend/scripts/gen-tailwind-compat.mjs` recorre los `.jsx` y genera CSS para las clases v3 que faltan, **solo estéticas**: paletas v3 (`zinc`, `emerald`, `amber`, …), colores con `/NN`, `bg-[#hex]`, `text-[Npx]`, `tracking-[..]`, `leading-[..]`, `rounded-[..]`, `border-[Npx]`, con variantes `sm/md/lg/xl`, `hover/focus/active/disabled/group-hover/placeholder`. No genera anchos/altos/posiciones arbitrarios (siguen sin aplicar). Se regenera solo en `predev`/`prebuild`, o con `npm run compat:css`. Se importa primero en `main.jsx` para que `index.css` gane en empates.
+- Para algo nuevo: preferir CSS propio en `index.css` (prefijo por componente) o clases de Tailwind 2.x; las clases v3 estéticas funcionan vía la capa de compatibilidad (correr `npm run compat:css` si se agregan clases nuevas con el dev server ya abierto). Si se migra a Tailwind compilado, revisar visualmente todo.
 
 `index.css` también define estilos globales para `button` (fondo `#1a1a1a`, texto blanco, `hover: scale(1.05)` + borde verde `#4cc27b`, `outline` verde en focus) — cualquier `<button>` los hereda; hay que sobreescribirlos.
 
@@ -114,7 +115,7 @@ Estética **monocroma blanco/negro "luxury"** con acentos puntuales.
   - `FontMadrid` → `Real Madrid Tipografia.ttf`
   - `FontBoca` → `Boca Tipografia.ttf`
   - `FontRiver` → `River Tipografia.ttf`
-  - Clases `.font-barca`, `.font-madrid`. Los `@font-face` están en `index.css` (solo Barca/Madrid) y repetidos en un `<style>` dentro de `ProductScreen.jsx` (los 4).
+  - Clases `.font-barca`, `.font-madrid`. Los `@font-face` de las 4 están en `index.css` y repetidos (con rutas de respaldo) en un `<style>` dentro de `ProductScreen.jsx`.
 
 ### Animaciones
 Librería: **framer-motion** (`motion`, `AnimatePresence`) para modales, FilterBar y transiciones; el resto son keyframes CSS.
@@ -127,7 +128,7 @@ Globales (`index.css`):
 | `.etiqueta-popular-naranja` | idem en naranja/rojo |
 | `.etiqueta-nuevo` | `pulse-soft` latido 1→1.05, 2s |
 | `.header-shine` / `.logo-shine` | barrido de brillo y glow del logo (2s, una vez) |
-| `.animate-spin-slow` | rotación 10s (definida dos veces; gana la de 10s) |
+| `.animate-spin-slow` | rotación 10s (también la usan el sello TEMP y el spinner del login) |
 | `.scrollbar-hide`, `.scroll-custom` | ocultar / estilizar scrollbar |
 | `animate-sweep` (tailwind.config) | no se compila, no tiene efecto |
 
@@ -135,10 +136,13 @@ Por componente:
 - **`WorldCupIntro.jsx`**: intro navideña "Gol navideño" (~4.9s, estilos `xi-*` en `index.css`). framer-motion: guirnalda de luces que cae con spring y parpadea (`xiTwinkle`), nieve en 3 capas parallax (`xiSnow`, random con semilla), balón SVG con gorro de Santa que cae y rebota con squash & stretch, remate hacia la cámara (scale 14) mientras el gorro sale volando, destello + anillo dorado + explosión de 30 estrellas/puntos, "CHEMA" (rojo) / "SPORT" letra por letra con spring + rotateX, badge "ER" dorado y "✦ Feliz Navidad ✦". Botón "Saltar intro" y barra de progreso. Línea de tiempo en la constante `T`. Una vez por sesión (`sessionStorage.chemasport_intro_shown`, se guarda al empezar); con reduced-motion no se muestra. `onFinished` se guarda en un ref (App lo pasa inline). `App.jsx` tiene un respaldo que la cierra a los 8s.
 - **`Header.jsx`** (estilos `hd-*`): blanco fijo con blur, se compacta al hacer scroll (`is-scrolled`, >40px). Menú de categorías con auto-scroll continuo hacia la derecha (rAF, 0.5px/frame, lista duplicada ×2 para bucle infinito; la copia lleva `aria-hidden`), se pausa con hover/touch/focus y retoma a los 2s; desvanecido en los bordes, arrastre con mouse, subrayado animado (framer `scaleX`) y puntos de color en Temporada 26-27 / Nuevo / Ofertas; click en la activa la quita. Logo en `.hd-logo-mark` (el PNG `assets/logo.png` trae ~18% de margen transparente: se escala a 157.8% y se recorta al círculo; 46/40px móvil, 58/46px desktop). Menú lateral con framer (slide + items escalonados) renderizado con `createPortal` — el `backdrop-filter` del header recorta cualquier `position: fixed` hijo.
 - **`TopBanner.jsx`**: mensajes rotativos cada 4s con fade de 500ms.
-- **`ProductCard.jsx`**: estilos en `index.css` (sección "PRODUCT CARD", clases `pc-*`, mobile-first con breakpoint 640px). framer-motion: entrada `whileInView` escalonada por columna (`(i % 4) * 0.07`), hover `y: -6` con spring, badges con `staggerChildren`, sello y sticker NEW con pop-in spring; respeta `useReducedMotion`. CSS: zoom de imagen, `swapContinuo` + `dot1Sync/dot2Sync` (alternar imágenes), sello SVG "TEMPORADA 26/27" con anillo de texto girando (`spin-slow` 14s), flecha que rota 45°, borde gris→negro. Badges de categoría con punto blanco (igual para todas); la oferta muestra `-X%`. Grid: `max-w-7xl`, 2/3/4 columnas, imagen 1:1.15.
+- **`ProductCard.jsx`**: estilos en `index.css` (sección "PRODUCT CARD", clases `pc-*`, mobile-first con breakpoint 640px). framer-motion: entrada `whileInView` escalonada por columna (`(i % 4) * 0.07`), hover `y: -6` con spring, badges con `staggerChildren`, sello y sticker NEW con pop-in spring; respeta `useReducedMotion`. CSS: zoom de imagen, `swapContinuo` + `dot1Sync/dot2Sync` (alternar imágenes), sello SVG "TEMPORADA 26/27" con anillo de texto girando (`spin-slow` 14s), flecha que rota 45°, borde gris→negro. Badges de categoría con punto blanco (igual para todas); la oferta muestra `-X%`. Grid: `max-w-7xl`, 2/3/4 columnas, imagen 1:1.15. Navidad: moño + cinta, capa de nieve SVG sobre el borde superior (`pc-snowcap`) y 5 copos que caen sobre la foto solo al hover (`pc-flakes`, `pcFlake`). Ya no muestra el bloque de inventario/traspasos del súper admin (el detalle por talla está en la pantalla de producto).
 - **`Bienvenido.jsx`**: hero "Nueva temporada 26/27" (estilos `bv-*` en `index.css`). Fondo `#050505` con luces radiales roja/verde y textura `FondoDes/FondoMovil.png` al 6%. Carrusel infinito (lista ×3, rAF, arrastre/táctil; se apaga con reduced-motion) de cards fijas 200/250px que alternan degradado rojo/verde, con "26" de marca de agua, foco de luz, camiseta flotando (`bvFloat`), brillo diagonal al hover. Toda la card es clickeable y filtra `Temp 26-27` + equipo. Encabezado con framer-motion (stagger fade-up) y "26/27" en degradado dorado.
 - **`FilterBar.jsx`** (estilos `fb-*`): buscador con debounce de 350ms, botón "Filtros" con contador, botón "Guía de tallas" (`onOpenMedidas`) y "Ocultos" (super admin). Chips de filtros activos removibles + "Limpiar todo". Panel: bottom sheet en móvil (se cierra arrastrando la manija, `useDragControls`) y modal en desktop; categorías y tallas multi-selección que aplican en vivo; footer "Limpiar" / "Ver resultados". Escape cierra.
 - **`Medidas.jsx`** (estilos `gt-*`): guía de tallas con tabs (las de la categoría actual primero, pill animada con `layoutId`), una tabla a la vez con transición, botón ampliar, bloque "¿Cómo medir?" en 3 pasos y CTA a WhatsApp. Siempre montado en `App.jsx` (prop `open`) para que la animación de salida funcione.
+- **`ProductScreen.jsx`** (estilos `ps-*`): galería con miniaturas, flechas y swipe (framer `drag="x"`), columna de info sticky en desktop, chips de dorsal (reemplazan el `<select>`, usan el mismo `handleDorsalSelectChange`), tallas como botones, CTA de WhatsApp verde con "shake" si falta talla y pulso cuando está listo, bloque de confianza (envíos/pagos/WhatsApp). ⚠️ El contenedor `relative inline-flex w-full` + `img w-full` no se toca: el dorsal (`getDorsalLayout`) está calibrado sobre él.
+- **Otros (estilos en `index.css`)**: `TopBanner` (`tb-*`, barra negra, mensajes que suben con framer), `Footer` (`ft-*`, oscuro con 3 beneficios, logo, redes), `FloatingWhatsapp` (`fw-btn`, verde con pulso; en desktop muestra "¿Dudas? Escribinos"), botón admin agregar (`fab-add`), paginación (`pg-*`, blanco/negro + total de productos), estado vacío (`empty-state`), `LoginModal` (`lg-*`).
+- **Páginas admin** (`/tienda`, `/comisiones`, `/guias`, `/history`): contenedor raíz con `.adm-page` (fondo `#f4f4f5` con puntos sutiles) para que resalten las tarjetas blancas; sin `FloatingWhatsapp`. La intro solo corre en `/`.
 - Modales: `fadeInUpModal` / `animate-fade-in-up` (definidas localmente en cada modal con `<style>`).
 - Spinners: `animate-spin` con `border-t-black`.
 
@@ -146,11 +150,18 @@ Por componente:
 
 `api/.env` (no versionado): `MONGO_URI`, `PORT`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CCR_API_URL`, `CCR_USUARIO`, `CCR_PASSWORD`, `CCR_CODIGO_CLIENTE`, `CCR_CODIGO_SERVICIO`. `attachUser` usa `JWT_SECRET` (no está definido; hoy no se emiten tokens).
 
-- **Cloudinary**: imágenes de productos (cache agresivo en el service worker, 30 días).
+- **Cloudinary**: imágenes de productos. **El costo es ~96% ancho de banda** (nov-2026: 248 GB/mes, 2,3 M impresiones; almacenamiento 8 GB, transformaciones despreciables). Reglas para no inflarlo:
+  - Nunca mostrar una URL de Cloudinary sin transformar: siempre `f_auto,q_auto:eco` + ancho fijo (cards `w_480,h_552` en `ProductCard.cldUrl`; producto `c_limit,w_1000` y miniaturas `w_160` en `ProductScreen.transformCloudinary`; Tienda `cldThumb` 96px).
+  - **No usar `dpr_auto`** (genera imágenes de 2–3× el ancho en celulares).
+  - La 2da foto de cada card se monta solo tras el primer hover (`wantsAlt`).
+  - El service worker guarda Cloudinary con `CacheFirst` (30 días, 400 entradas).
+  - Subida: `UPLOAD_LIMIT` (`api/config/cloudinary.js`) achica toda imagen a máx. 1400px / `q_auto:good` antes de guardarla; `AddProductModal` y `ProductAdminEditor` además comprimen en el navegador (WebP 1000px, 0.75).
+  - Limpieza: `api/utils/cloudinaryCleanup.js` → al editar se borran las fotos/dorsales reemplazados y al eliminar un producto sus fotos + dorsales, **solo si ningún otro producto ni `TiendaFactura.ventas.imagen` las referencia**. Si un PUT deja al producto sin fotos, no se borra nada.
+  - Huérfanas: `npm run cloudinary:orphans` (en `api/`) genera reporte en `api/scripts/output/` (gitignored); borrar requiere `--delete --yes` y solo toca carpetas `products*`. Nov-2026: 1.860 originales (5,3 GB, ~2,8 MB c/u por subidas sin comprimir), 137 huérfanas (261 MB). El panel muestra ~30k "Images" porque cuenta las versiones derivadas.
 - **Alegra**: facturación electrónica. Credenciales actualmente hardcodeadas en `alegraRoutes.js` y `tiendaRoutes.js` (deberían ir a `.env`).
 - **Correos de Costa Rica**: token cacheado en memoria, catálogos geográficos cacheados.
 - **socket.io**: evento único `productoActualizado`.
-- **PWA**: `registerType: autoUpdate`; `/api/products` es `NetworkFirst` (timeout 3s, 5 min).
+- **PWA**: `registerType: autoUpdate`, `injectRegister: null`, `skipWaiting`/`clientsClaim`. Registro único en `src/registerSW.js` vía `virtual:pwa-register` (solo en producción): al haber deploy nuevo la página se recarga sola una vez; busca actualizaciones cada hora y al volver la pestaña a primer plano. En Render, `/*` debe ir con `Cache-Control: no-cache` (si no, `sw.js`/`index.html` quedan cacheados y los deploys tardan en verse). `/api/products` es `NetworkFirst` (timeout 3s, 5 min).
 - Front: `react-hot-toast` y `react-toastify` (ambos montados), `react-icons` (Fa*) y `lucide-react`, `jspdf`+`html2canvas` en guías.
 - WhatsApp de la tienda: `wa.me/50660369857`.
 
@@ -166,9 +177,9 @@ Por componente:
 
 1. **Seguridad (crítico)**: permisos basados en headers que manda el cliente (`x-super: true` da acceso total); `/api/auth/register`, `/users` y `DELETE /users/:id` sin protección; login sin JWT; credenciales de Alegra en el repo (rotarlas); `seedSuperUser.js` con contraseña en texto plano; `authRoutes` hace `console.log` del password.
 2. **Tailwind**: configurar compilación real (v4 con `@tailwindcss/vite`) y quitar el CDN 2.2.19; muchas clases hoy no aplican.
-3. **Fuente Barcelona**: `index.css` apunta a `Barcelona Tipografia .ttf` (con espacio) pero el archivo es `Barcelona Tipografia.ttf`; solo funciona por el fallback en `ProductScreen.jsx`.
+3. ~~Fuente Barcelona con ruta rota~~ (corregido; `index.css` ya declara las 4 fuentes de dorsal).
 4. **API base duplicada** en ~13 archivos; centralizar en `src/api.js` + `VITE_API_URL`.
 5. **Búsqueda**: `q` va directo a `$regex` sin escapar. En `GET /api/products`, `Temp 26-27` usa `$or` y el filtro de tallas/`storeView` lo sobrescribe.
 6. **Bundle** JS ~1.25 MB sin code-splitting: lazy-load de `TiendaPage`, `ComisionesPage`, `GuiasPage`, `HistoryPage`, `jspdf`.
 7. Componentes gigantes (`TiendaPage` 2.1k líneas, `ComisionesPage` 1.8k, `GuiasPage`/`GuiasCorreos` 1.2k) y lógica de Alegra duplicada entre `alegraRoutes` y `tiendaRoutes`.
-8. Varios: dos librerías de toasts, `.DS_Store` versionado, i18n con contenido placeholder (`DroppingCR`), meta anti-caché en `index.html` que choca con la PWA, `@keyframes spin-slow` duplicado.
+8. Varios: dos librerías de toasts, `.DS_Store` versionado, i18n con contenido placeholder (`DroppingCR`), componentes sin uso: `ProductModal.jsx` y `UserDropDown.jsx`.

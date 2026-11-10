@@ -137,3 +137,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Reportes generados por scripts (pueden contener URLs de imágenes)
+api/scripts/output/
