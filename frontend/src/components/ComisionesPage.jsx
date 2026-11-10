@@ -6,6 +6,7 @@ import {
   FaEdit, FaCheck, FaTimes, FaTruck, FaStar, FaUserCheck
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
+import ModalShell from "./ModalShell";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -1680,116 +1681,129 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
       {/* MODAL DE FACTURACIÓN */}
       {modalFacturar.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl animate-fade-in-up my-8">
-            <h3 className="text-lg font-black text-center text-zinc-900 uppercase tracking-widest mb-1">Emitir Comprobante</h3>
-            <p className="text-xs text-center text-zinc-500 mb-6 font-medium">{modalFacturar.ventas.length === 1 ? `${modalFacturar.ventas[0].totalUnidades}x ${modalFacturar.ventas[0].item}` : `${modalFacturar.ventas.length} ventas seleccionadas`}</p>
-            
-            <div className="flex flex-col gap-4 mb-6">
-              <div>
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Monto de Productos *</label>
-                <div className="relative mt-1">
-                  <span className="absolute left-4 top-3 -translate-y-1/2 text-zinc-400 font-black text-base">₡</span>
-                  <input type="number" value={modalFacturar.precio} onChange={(e) => setModalFacturar({ ...modalFacturar, precio: e.target.value })} className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-base font-black text-emerald-700 outline-none focus:border-black" />
+        <ModalShell
+          onClose={() => setModalFacturar((m) => ({ ...m, isOpen: false }))}
+          size="md"
+          icon={FaReceipt}
+          eyebrow="Facturación"
+          title="Emitir comprobante"
+          subtitle={modalFacturar.ventas.length === 1 ? `${modalFacturar.ventas[0].totalUnidades}x ${modalFacturar.ventas[0].item}` : `${modalFacturar.ventas.length} ventas seleccionadas`}
+          closeOnBackdrop={!generandoTiquete}
+          footer={(close) => (
+            <>
+              <button type="button" onClick={close} className="md-btn is-flat">Cancelar</button>
+              <button type="button" onClick={confirmarYEmitirFactura} disabled={generandoTiquete} className="md-btn is-success">
+                {generandoTiquete && <span className="md-spinner" aria-hidden="true" />}
+                {generandoTiquete ? "Emitiendo…" : `Emitir · ₡${((Number(modalFacturar.precio) || 0) + (modalFacturar.incluyeEnvio ? Number(modalFacturar.precioEnvio) || 0 : 0)).toLocaleString("de-DE")}`}
+              </button>
+            </>
+          )}
+        >
+          {/* 💰 MONTOS */}
+          <label className="md-field">
+            <span className="md-label">Monto de productos *</span>
+            <div className="md-affix">
+              <span className="md-affix-sign">₡</span>
+              <input type="number" inputMode="numeric" value={modalFacturar.precio} onChange={(e) => setModalFacturar({ ...modalFacturar, precio: e.target.value })} className="md-input is-money is-green" />
+            </div>
+          </label>
+
+          <div className="md-section">
+            <label className="md-switch">
+              <span className="md-switch-text">
+                <b className="flex items-center gap-2"><FaTruck className="text-gray-500" size={13} /> Agregar envío</b>
+                <small>{modalFacturar.incluyeEnvio ? `+ ₡${(Number(modalFacturar.precioEnvio) || 0).toLocaleString("de-DE")} al total` : "Se suma como línea aparte"}</small>
+              </span>
+              <input type="checkbox" checked={modalFacturar.incluyeEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, incluyeEnvio: e.target.checked })} />
+              <span className="md-track" style={{ "--on": "#16a34a" }} />
+            </label>
+            {modalFacturar.incluyeEnvio && (
+              <label className="md-field">
+                <span className="md-label">Costo del envío *</span>
+                <div className="md-affix">
+                  <span className="md-affix-sign">₡</span>
+                  <input type="number" inputMode="numeric" value={modalFacturar.precioEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, precioEnvio: e.target.value })} className="md-input is-money" style={{ background: "#fff" }} />
                 </div>
-              </div>
+              </label>
+            )}
+          </div>
 
-              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 transition-all">
-                <label className="flex items-center justify-between cursor-pointer select-none">
-                  <div className="flex items-center gap-2.5">
-                    <input type="checkbox" checked={modalFacturar.incluyeEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, incluyeEnvio: e.target.checked })} className="w-4 h-4 rounded accent-black cursor-pointer" />
-                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5"><FaTruck className="text-zinc-500" size={13} /> Agregar Envío</span>
-                  </div>
-                  {modalFacturar.incluyeEnvio && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">+ ₡{(Number(modalFacturar.precioEnvio) || 0).toLocaleString("es-CR")}</span>}
-                </label>
-                {modalFacturar.incluyeEnvio && (
-                  <div className="mt-3 pt-3 border-t border-zinc-200/80">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase">Costo del Envío *</label>
-                    <div className="relative mt-1">
-                      <span className="absolute left-3.5 top-2 -translate-y-1/2 text-zinc-400 font-black text-sm">₡</span>
-                      <input type="number" value={modalFacturar.precioEnvio} onChange={(e) => setModalFacturar({ ...modalFacturar, precioEnvio: e.target.value })} className="w-full pl-8 pr-4 py-2 bg-white border border-zinc-300 rounded-xl text-sm font-black text-black outline-none focus:border-black" />
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* 🧾 TIPO DE COMPROBANTE */}
+          <label className="md-field">
+            <span className="md-label">Tipo de comprobante *</span>
+            <select value={modalFacturar.tipoEmision} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoEmision: e.target.value })} disabled={!esSuperAdmin} className="md-input">
+              <option value="interno">Ticket normal (uso interno)</option>
+              {esSuperAdmin && <option value="hacienda">Tiquete electrónico (Hacienda)</option>}
+            </select>
+          </label>
 
-              <div>
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Tipo de Comprobante *</label>
-                <select value={modalFacturar.tipoEmision} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoEmision: e.target.value })} disabled={!esSuperAdmin} className={`w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-black outline-none focus:border-black ${!esSuperAdmin ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <option value="interno">Ticket Normal (Uso Interno)</option>
-                  {esSuperAdmin && <option value="hacienda">Tiquete Electrónico (Hacienda)</option>}
-                </select>
-              </div>
+          {/* 👤 CLIENTE */}
+          <div className="md-section">
+            <span className="md-section-title">Cliente</span>
 
-              <div className="relative">
-                <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-300 rounded-xl text-xs font-black text-zinc-900 transition-all cursor-pointer">
-                  <span className="flex items-center gap-2"><FaStar className="text-amber-500" size={13} /><span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span></span>
-                  <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
-                </button>
-                {mostrarListaContactos && (
-                  <div className="mt-1.5 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-xl divide-y divide-zinc-100 z-30">
-                    {contactosOrdenadosYFiltrados.length === 0 ? (
-                      <p className="p-3 text-center text-[11px] text-zinc-400 font-bold">No se encontraron contactos en Alegra.</p>
-                    ) : (
-                      contactosOrdenadosYFiltrados.map((c) => {
-                        const esFav = favoritosIds.includes(String(c.id));
-                        return (
-                          <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50/70 cursor-pointer transition-colors">
-                            <div className="min-w-0 flex-1 pr-2">
-                              <p className="text-xs font-black text-black truncate flex items-center gap-1.5"><FaUserCheck className="text-emerald-600 shrink-0" size={11} /><span className="truncate">{c.nombre}</span></p>
-                              <p className="text-[10px] text-zinc-500 font-mono truncate">{c.cedula ? `ID: ${c.cedula}` : ""} {c.telefono ? `· Tel: ${c.telefono}` : ""}</p>
-                            </div>
-                            <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer shrink-0"><FaStar size={13} className={esFav ? "text-amber-400" : "text-zinc-300"} /></button>
+            <div className="relative">
+              <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-4 py-3 bg-yellow-50 hover:bg-yellow-100 border border-yellow-300 rounded-xl text-xs font-black text-gray-900 transition-colors cursor-pointer">
+                <span className="flex items-center gap-2"><FaStar className="text-yellow-500" size={13} /><span>Favoritos / Alegra ({contactosAlegra.length})</span></span>
+                <span className="text-[10px] uppercase tracking-wider text-yellow-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
+              </button>
+              {mostrarListaContactos && (
+                <div className="mt-2 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl divide-y divide-gray-100">
+                  {contactosOrdenadosYFiltrados.length === 0 ? (
+                    <p className="p-3 text-center text-[11px] text-gray-400 font-bold">No se encontraron contactos en Alegra.</p>
+                  ) : (
+                    contactosOrdenadosYFiltrados.map((c) => {
+                      const esFav = favoritosIds.includes(String(c.id));
+                      return (
+                        <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-3 py-2.5 hover:bg-green-50 cursor-pointer transition-colors">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="text-xs font-black text-black truncate flex items-center gap-1.5"><FaUserCheck className="text-green-600 flex-shrink-0" size={11} /><span className="truncate">{c.nombre}</span></p>
+                            <p className="text-[10px] text-gray-500 font-mono truncate">{c.cedula ? `ID: ${c.cedula}` : ""} {c.telefono ? `· Tel: ${c.telefono}` : ""}</p>
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Tipo ID *</label>
-                  <select value={modalFacturar.tipoIdentificacion} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoIdentificacion: e.target.value })} className="w-full mt-1 px-2.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-black">
-                    <option value="01">Física</option>
-                    <option value="02">Jurídica</option>
-                    <option value="03">DIMEX</option>
-                    <option value="04">NITE</option>
-                  </select>
+                          <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-1.5 rounded-lg bg-transparent hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0" style={{ border: 0 }}><FaStar size={13} className={esFav ? "text-yellow-400" : "text-gray-300"} /></button>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-                <div className="sm:col-span-3">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Cédula *</label>
-                  <div className="flex gap-1.5 mt-1">
-                    <input type="text" value={modalFacturar.cedula} onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
-                    <button type="button" onClick={buscarCedulaHacienda} className="bg-zinc-800 text-white px-3.5 rounded-xl hover:bg-black transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar"><FaSearch size={13} /></button>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase">Nombre del Cliente *</label>
-                <input type="text" value={modalFacturar.nombre} onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })} placeholder="Escriba nombre..." className="w-full mt-1 px-3 py-2.5 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black bg-white font-bold text-zinc-800" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Teléfono *</label>
-                  <input type="tel" value={modalFacturar.telefono} onChange={(e) => setModalFacturar({ ...modalFacturar, telefono: e.target.value })} placeholder="Ej. 8888-8888" className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase">Correo *</label>
-                  <input type="email" value={modalFacturar.correo} onChange={(e) => setModalFacturar({ ...modalFacturar, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full mt-1 px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-black" />
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="flex gap-2">
-              <button onClick={() => setModalFacturar({ ...modalFacturar, isOpen: false })} className="flex-1 bg-zinc-100 text-zinc-600 py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-zinc-200 cursor-pointer">Cancelar</button>
-              <button onClick={confirmarYEmitirFactura} disabled={generandoTiquete} className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 shadow-md cursor-pointer transition-colors">Emitir Comprobante</button>
+            <div className="md-row">
+              <label className="md-field" style={{ flex: 2 }}>
+                <span className="md-label">Tipo ID *</span>
+                <select value={modalFacturar.tipoIdentificacion} onChange={(e) => setModalFacturar({ ...modalFacturar, tipoIdentificacion: e.target.value })} className="md-input is-sm">
+                  <option value="01">Física</option>
+                  <option value="02">Jurídica</option>
+                  <option value="03">DIMEX</option>
+                  <option value="04">NITE</option>
+                </select>
+              </label>
+              <label className="md-field" style={{ flex: 3 }}>
+                <span className="md-label">Cédula *</span>
+                <div className="md-affix">
+                  <input type="text" inputMode="numeric" value={modalFacturar.cedula} onChange={(e) => setModalFacturar({ ...modalFacturar, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="101110222" className="md-input is-sm has-btn" style={{ paddingLeft: 12 }} />
+                  <button type="button" onClick={buscarCedulaHacienda} className="md-affix-btn is-solid" style={{ width: 32, height: 32, marginTop: -16, right: 5 }} title="Buscar en Hacienda" aria-label="Buscar cédula"><FaSearch size={12} /></button>
+                </div>
+              </label>
+            </div>
+
+            <label className="md-field">
+              <span className="md-label">Nombre del cliente *</span>
+              <input type="text" value={modalFacturar.nombre} onChange={(e) => setModalFacturar({ ...modalFacturar, nombre: e.target.value })} placeholder="Escriba nombre…" className="md-input is-sm" />
+            </label>
+
+            <div className="md-row" style={{ flexWrap: "wrap" }}>
+              <label className="md-field" style={{ minWidth: 140 }}>
+                <span className="md-label">Teléfono *</span>
+                <input type="tel" value={modalFacturar.telefono} onChange={(e) => setModalFacturar({ ...modalFacturar, telefono: e.target.value })} placeholder="8888-8888" className="md-input is-sm" />
+              </label>
+              <label className="md-field" style={{ minWidth: 180 }}>
+                <span className="md-label">Correo *</span>
+                <input type="email" value={modalFacturar.correo} onChange={(e) => setModalFacturar({ ...modalFacturar, correo: e.target.value })} placeholder="cliente@correo.com" className="md-input is-sm" />
+              </label>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

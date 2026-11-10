@@ -1,6 +1,9 @@
 // src/components/AddProductModal.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FaTimes, FaImage } from "react-icons/fa";
+import { FaTimes, FaImage, FaPlus } from "react-icons/fa";
+import ModalShell from "./ModalShell";
+
+// ⚠️ Estilos en index.css (sección "MODALES", clases md-*).
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import tallaPorTipo from "../utils/tallaPorTipo";
@@ -67,6 +70,20 @@ async function srcToBlob(src) {
   throw new Error("Formato de imagen no soportado");
 }
 
+// 🔘 Interruptor reutilizable (estilos md-switch)
+function Switch({ label, hint, checked, onChange, color = "#000" }) {
+  return (
+    <label className="md-switch">
+      <span className="md-switch-text">
+        <b>{label}</b>
+        {hint && <small>{hint}</small>}
+      </span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="md-track" style={{ "--on": color }} />
+    </label>
+  );
+}
+
 export default function AddProductModal({ onAdd, onCancel, user }) {
   // 🔒 Verificamos si el usuario actual es Super Admin
   const isSuperAdmin = Boolean(user?.isSuperUser);
@@ -103,9 +120,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "auto";
       setImages((prev) => {
         prev.forEach((it) => it.previewUrl && URL.revokeObjectURL(it.previewUrl));
         return [];
@@ -256,332 +271,226 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
     }
   };
 
+  // 🎨 Color de cada ubicación de inventario
+  const MODES = [
+    { key: "stock", label: "Bodega 1", color: "#2563eb" },
+    { key: "bodega", label: "Bodega 2", color: "#9333ea" },
+    { key: "tienda", label: "Tienda", color: "#000000" },
+  ];
+  const modeColor = MODES.find((m) => m.key === mode)?.color || "#000";
+  const totalUnidades = [tienda, stock, bodega]
+    .flatMap((inv) => Object.values(inv))
+    .reduce((acc, n) => acc + (Number(n) || 0), 0);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-
-      {/* 🔥 FONDO DIFUMINADO PREMIUM 🔥 */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
-        onClick={onCancel}
-      />
-
-      {/* 🔥 CAJA DEL MODAL 🔥 */}
-      <div 
-        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col z-10 animate-fade-in-up"
-        style={{ maxHeight: '85vh' }}
-      >
-        
-        {/* 🔥 BOTÓN DE CERRAR 🔥 */}
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-full p-2.5 z-20 transition-colors"
-          title="Cerrar"
-        >
-          <FaTimes size={16} />
-        </button>
-
-        {/* 🔥 ENCABEZADO ELITE 🔥 */}
-        <div className="flex-none px-6 pt-8 pb-4 text-center">
-          <span className="inline-block bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 shadow-sm">
-            Nuevo Ingreso
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight tracking-tight">
-            Agregar Producto
-          </h2>
-        </div>
-
-        {/* 🔥 BODY CON SCROLL 🔥 */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 px-6 sm:px-8 pb-6 sm:pb-8 min-h-0">
-          
-          {/* IMÁGENES */}
-          <div className="mb-6">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">
-              Imágenes ({images.length}/{MAX_IMAGES})
-            </label>
-            <div className="flex gap-3 flex-wrap">
-              {images.map((img, i) => (
-                <div key={`preview-${i}`} className="relative group">
-                  <img
-                    src={img.previewUrl}
-                    alt={`preview-${i}`}
-                    className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl shadow-sm border border-gray-200"
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveImage(i);
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 hover:scale-110 transition-transform"
-                  >
-                    <FaTimes size={10} />
-                  </button>
-                </div>
-              ))}
-
-              {images.length < MAX_IMAGES && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-2xl text-gray-400 hover:bg-gray-50 hover:text-black hover:border-black transition-all"
-                >
-                  <FaImage size={24} className="mb-1" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Subir</span>
-                </button>
-              )}
+    <ModalShell
+      onClose={onCancel}
+      size="md"
+      icon={FaPlus}
+      eyebrow="Nuevo ingreso"
+      title="Agregar producto"
+      closeOnBackdrop={!loading}
+      footer={(close) => (
+        <>
+          <button type="button" className="md-btn is-flat" onClick={close} disabled={loading}>
+            Cancelar
+          </button>
+          <button type="button" className="md-btn is-primary" onClick={handleSubmit} disabled={loading}>
+            {loading && <span className="md-spinner" aria-hidden="true" />}
+            {loading ? "Guardando…" : "Guardar producto"}
+          </button>
+        </>
+      )}
+    >
+      {/* IMÁGENES */}
+      <div className="md-field">
+        <span className="md-label">Imágenes ({images.length}/{MAX_IMAGES})</span>
+        <div className="md-uploads">
+          {images.map((img, i) => (
+            <div key={`preview-${i}`} className="md-thumb">
+              <img src={img.previewUrl} alt={`preview-${i}`} />
+              {i === 0 && <em>Principal</em>}
+              <button
+                type="button"
+                className="md-thumb-del"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveImage(i);
+                }}
+                aria-label="Quitar imagen"
+              >
+                <FaTimes />
+              </button>
             </div>
+          ))}
+
+          {images.length < MAX_IMAGES && (
+            <button type="button" className="md-drop" onClick={() => fileInputRef.current?.click()}>
+              <FaImage />
+              <span>Subir</span>
+            </button>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      </div>
+
+      {/* DATOS PRINCIPALES */}
+      <label className="md-field">
+        <span className="md-label">Nombre</span>
+        <input
+          type="text"
+          className="md-input"
+          placeholder="Ej. Camiseta Barcelona Local 26/27"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </label>
+
+      <div className="md-row">
+        <label className="md-field">
+          <span className="md-label">Precio</span>
+          <div className="md-affix">
+            <span className="md-affix-sign">₡</span>
             <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
+              type="number"
+              inputMode="numeric"
+              className="md-input is-money"
+              placeholder="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
             />
           </div>
+        </label>
+        <label className="md-field">
+          <span className="md-label">Oferta</span>
+          <div className="md-affix">
+            <span className="md-affix-sign">₡</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              className="md-input is-money is-green"
+              placeholder="0"
+              value={discountPrice}
+              onChange={(e) => setDiscountPrice(e.target.value)}
+            />
+          </div>
+        </label>
+      </div>
 
-          {/* DATOS PRINCIPALES */}
-          <div className="flex flex-col gap-4 mb-6">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
+      <label className="md-field">
+        <span className="md-label">Tipo de producto</span>
+        <select className="md-input" value={type} onChange={(e) => setType(e.target.value)}>
+          {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"] }).map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </label>
+
+      {/* INVENTARIO */}
+      <div className="md-section">
+        <span className="md-section-title">
+          Inventario inicial{totalUnidades > 0 ? ` · ${totalUnidades} u.` : ""}
+        </span>
+        <div className="md-seg" role="tablist">
+          {MODES.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              role="tab"
+              aria-selected={mode === m.key}
+              className={`md-seg-btn ${mode === m.key ? "is-active" : ""}`}
+              style={{ "--seg": m.color }}
+              onClick={() => setMode(m.key)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="md-sizes" style={{ "--seg": modeColor }}>
+          {tallas.map((size) => (
+            <label key={size} className="md-size">
+              <span>{size}</span>
               <input
-                type="text"
-                placeholder="Ej. Camiseta Deportiva Lisa"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={visibleInv[size] ?? ""}
+                onChange={(e) => handleInvChange(size, e.target.value)}
+                placeholder="0"
               />
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Precio ₡</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Descuento ₡</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={discountPrice}
-                  onChange={(e) => setDiscountPrice(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-green-700 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Tipo de Producto</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all cursor-pointer"
-              >
-                {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"] }).map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* INVENTARIO */}
-          <div className="mb-6">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 text-center">
-              Gestionar Inventario Inicial
             </label>
-            <div className="flex gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => setMode('stock')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                  mode === 'stock' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300 hover:text-blue-500'
-                }`}
-              >
-                Bodega 1
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('bodega')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                  mode === 'bodega' ? 'bg-purple-600 text-white border-purple-600 shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-purple-200 hover:text-purple-500'
-                }`}
-              >
-                Bodega 2
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('tienda')}
-                className={`flex-1 p-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                  mode === 'tienda' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                Tienda
-              </button>
-            </div>
-
-            <div className={`p-4 sm:p-5 rounded-2xl transition-colors duration-300 ${mode === 'tienda' ? 'bg-gray-50 border border-gray-100' : mode === 'stock' ? 'bg-blue-50/50 border border-blue-100' : 'bg-purple-50/50 border border-purple-100'}`}>
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4">
-                {tallas.map((size) => {
-                  const inputColors = mode === "tienda"
-                      ? "focus:border-black text-black border-gray-200" 
-                      : mode === "stock" 
-                      ? "focus:border-blue-500 text-blue-900 border-blue-200"
-                      : "focus:border-purple-500 text-purple-900 border-purple-200";
-                  
-                  const labelColors = mode === "tienda" ? "text-gray-500" : mode === "stock" ? "text-blue-600" : "text-purple-600";
-
-                  return (
-                    <div key={size} className="relative mt-2">
-                      <div className={`absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-transparent px-1 text-[10px] font-black tracking-widest uppercase z-10 ${labelColors}`}>
-                          {size}
-                      </div>
-                      <input
-                          type="number"
-                          min="0"
-                          value={visibleInv[size] ?? ""}
-                          onChange={(e) => handleInvChange(size, e.target.value)}
-                          placeholder="0"
-                          className={`w-full h-11 pt-1 border bg-white rounded-xl text-center font-black text-sm focus:outline-none focus:ring-0 transition-all shadow-sm ${inputColors}`}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* OPCIONES EXTRAS DEL SISTEMA */}
-          <div className="bg-gray-50/80 p-5 rounded-2xl border border-gray-100 mb-6">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
-              Opciones del Sistema
-            </label>
-            <div className="flex flex-col gap-4">
-              {/* 🔒 SOLO SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
-              {isSuperAdmin && (
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-sm font-bold text-gray-800 select-none">Ocultar Producto</span>
-                  <div className="relative flex items-center">
-                    <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} className="sr-only" />
-                    <div className={`w-11 h-6 rounded-full transition-colors ${hidden ? 'bg-red-500' : 'bg-gray-300'}`}></div>
-                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${hidden ? 'transform translate-x-5' : ''}`}></div>
-                  </div>
-                </label>
-              )}
-
-              <label className="flex items-center justify-between cursor-pointer group">
-                <span className="text-sm font-bold text-gray-800 select-none">Torneo: Mundial 2026</span>
-                <div className="relative flex items-center">
-                  <input type="checkbox" checked={isMundial2026} onChange={(e) => setIsMundial2026(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${isMundial2026 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isMundial2026 ? 'transform translate-x-5' : ''}`}></div>
-                </div>
-              </label>
-
-              <label className="flex items-center justify-between cursor-pointer group">
-                <span className="text-sm font-bold text-gray-800 select-none">Temporada 26-27 (Sello)</span>
-                <div className="relative flex items-center">
-                  <input type="checkbox" checked={isTemporada2627} onChange={(e) => setIsTemporada2627(e.target.checked)} className="sr-only" />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${isTemporada2627 ? 'bg-red-600' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isTemporada2627 ? 'transform translate-x-5' : ''}`}></div>
-                </div>
-              </label>
-
-              {/* 🔥 CHECK INTERRUPTOR PARA PERSONALIZAR DORSALES (SOLO SUPER ADMIN) 🔥 */}
-              {isSuperAdmin && (
-                <label className="flex items-center justify-between cursor-pointer group border-t border-gray-200 pt-4 mt-2">
-                  <span className="text-sm font-bold text-blue-800 select-none">Habilitar Dorsales (Nombres / Números)</span>
-                  <div className="relative flex items-center">
-                    <input type="checkbox" checked={isNumerable} onChange={(e) => setIsNumerable(e.target.checked)} className="sr-only" />
-                    <div className={`w-11 h-6 rounded-full transition-colors ${isNumerable ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${isNumerable ? 'transform translate-x-5' : ''}`}></div>
-                  </div>
-                </label>
-              )}
-
-              {/* 🔥 SELECTOR DE TIPOGRAFÍA (SOLO VISIBLE SI SE ACTIVA DORSALES) 🔥 */}
-              {isSuperAdmin && isNumerable && (
-                <div className="animate-fade-in-up mt-2">
-                  <label className="block text-xs font-bold text-blue-800 uppercase tracking-widest mb-1.5">Tipografía Oficial</label>
-                  <select
-                    value={teamFont}
-                    onChange={(e) => setTeamFont(e.target.value)}
-                    className="w-full bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm font-bold text-blue-900 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none transition-all cursor-pointer"
-                  >
-                    <option value="barca">F.C. Barcelona (26/27)</option>
-                    <option value="madrid">Real Madrid</option>
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 🔥 CAJITAS BLANCAS DE DORSALES 🔥 */}
-          {isSuperAdmin && isNumerable && (
-            <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl mb-6 shadow-sm">
-               <label className="block text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 text-center">
-                 Dorsales Disponibles en Imprenta
-               </label>
-               <div className="space-y-3">
-                 {dorsalOptions.map((opt, i) => (
-                    <div key={`dorsal-${i}`} className="flex gap-2">
-                       <input
-                         type="text"
-                         placeholder="Jugador (Ej. RODRI)"
-                         value={opt.name}
-                         onChange={(e) => handleDorsalChange(i, 'name', e.target.value)}
-                         className="w-1/2 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 uppercase focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                       <input
-                         type="text"
-                         placeholder="N°"
-                         value={opt.number}
-                         onChange={(e) => handleDorsalChange(i, 'number', e.target.value)}
-                         className="w-1/4 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 text-center focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                       <input
-                         type="number"
-                         min="0"
-                         placeholder="Cant."
-                         value={opt.quantity}
-                         onChange={(e) => handleDorsalChange(i, 'quantity', e.target.value)}
-                         title="Cantidad de este dorsal disponible"
-                         className="w-1/4 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-900 text-center focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all placeholder-blue-300"
-                       />
-                    </div>
-                 ))}
-               </div>
-               <p className="text-[10px] text-blue-500 font-medium leading-tight mt-3 text-center">
-                 Dejá los espacios vacíos si no los usás. En la tienda aparecerán solo los llenos. Si la cantidad llega a 0, dejará de ofrecerse.
-               </p>
-            </div>
-          )}
-
-          {/* BOTÓN SUBMIT */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full bg-black hover:bg-gray-900 text-white py-4 text-sm rounded-2xl font-black tracking-widest uppercase shadow-lg transition-transform transform hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 mt-2"
-          >
-            {loading ? "GUARDANDO..." : "GUARDAR PRODUCTO"}
-          </button>
-
+          ))}
         </div>
       </div>
 
-      <style>{`
-        @keyframes fadeInUpModal {
-          from { opacity: 0; transform: translateY(20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUpModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
-    </div>
+      {/* OPCIONES EXTRAS DEL SISTEMA */}
+      <div className="md-section">
+        <span className="md-section-title">Opciones</span>
+
+        {/* 🔒 SOLO SUPER ADMIN VE LA OPCIÓN DE OCULTAR PRODUCTO */}
+        {isSuperAdmin && (
+          <Switch label="Ocultar producto" hint="No aparece en el catálogo público" checked={hidden} onChange={setHidden} color="#dc2626" />
+        )}
+        <Switch label="Mundial 2026" hint="Aparece en el filtro Mundial 2026" checked={isMundial2026} onChange={setIsMundial2026} color="#D4A000" />
+        <Switch label="Temporada 26-27" hint="Muestra el sello en la tarjeta" checked={isTemporada2627} onChange={setIsTemporada2627} color="#dc2626" />
+
+        {/* 🔥 INTERRUPTOR PARA PERSONALIZAR DORSALES (SOLO SUPER ADMIN) 🔥 */}
+        {isSuperAdmin && (
+          <>
+            <div className="md-divider" />
+            <Switch label="Dorsales" hint="Nombre y número personalizables" checked={isNumerable} onChange={setIsNumerable} color="#2563eb" />
+          </>
+        )}
+
+        {/* 🔥 SELECTOR DE TIPOGRAFÍA (SOLO VISIBLE SI SE ACTIVA DORSALES) 🔥 */}
+        {isSuperAdmin && isNumerable && (
+          <label className="md-field">
+            <span className="md-label">Tipografía oficial</span>
+            <select className="md-input" value={teamFont} onChange={(e) => setTeamFont(e.target.value)}>
+              <option value="barca">F.C. Barcelona (26/27)</option>
+              <option value="madrid">Real Madrid</option>
+            </select>
+          </label>
+        )}
+      </div>
+
+      {/* 🔥 DORSALES DISPONIBLES 🔥 */}
+      {isSuperAdmin && isNumerable && (
+        <div className="md-section is-blue">
+          <span className="md-section-title">Dorsales en imprenta</span>
+          {dorsalOptions.map((opt, i) => (
+            <div key={`dorsal-${i}`} className="md-row" style={{ gap: 8 }}>
+              <input
+                type="text"
+                className="md-input is-sm"
+                style={{ flex: 2, textTransform: "uppercase" }}
+                placeholder="Jugador (Ej. RODRI)"
+                value={opt.name}
+                onChange={(e) => handleDorsalChange(i, "name", e.target.value)}
+              />
+              <input
+                type="text"
+                className="md-input is-sm is-center"
+                placeholder="N°"
+                value={opt.number}
+                onChange={(e) => handleDorsalChange(i, "number", e.target.value)}
+              />
+              <input
+                type="number"
+                min="0"
+                className="md-input is-sm is-center"
+                placeholder="Cant."
+                title="Cantidad de este dorsal disponible"
+                value={opt.quantity}
+                onChange={(e) => handleDorsalChange(i, "quantity", e.target.value)}
+              />
+            </div>
+          ))}
+          <p className="md-hint">
+            Dejá vacíos los que no uses: en la tienda solo aparecen los llenos. Si la cantidad llega a 0, deja de ofrecerse.
+          </p>
+        </div>
+      )}
+    </ModalShell>
   );
 }

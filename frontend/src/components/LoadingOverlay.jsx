@@ -1,11 +1,12 @@
 // src/components/LoadingOverlay.jsx
-export default function LoadingOverlay() {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="font-semibold">Cargando datos iniciales...</p>
-        </div>
+// ⚠️ Estilos en index.css (sección "MODALES", clases md-loading*).
+export default function LoadingOverlay({ message = "Cargando datos iniciales…" }) {
+  return (
+    <div className="md-loading" role="status" aria-live="polite">
+      <div className="md-loading-box">
+        <span className="md-loading-ring" aria-hidden="true" />
+        <p>{message}</p>
       </div>
-    );
-  }
+    </div>
+  );
+}

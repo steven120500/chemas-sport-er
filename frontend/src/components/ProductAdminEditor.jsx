@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
-import { FaTimes, FaStore, FaWarehouse, FaBoxOpen, FaPlus, FaTshirt } from "react-icons/fa";
+import { FaTimes, FaStore, FaWarehouse, FaBoxOpen, FaPlus, FaTshirt, FaUser, FaCheck } from "react-icons/fa";
+import ModalShell from "./ModalShell";
 
 const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 const TALLAS_NINO = ["16", "18", "20", "22", "24", "26", "28"];
@@ -725,111 +726,124 @@ export default function ProductAdminEditor({
 
       {/* 🔥 MODAL MULTI-PASO DE VENTA CON SELECTOR DE DORSAL 🔥 */}
       {showBuyerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-200 bg-white flex flex-col items-center text-center relative">
-            
-            {!confirmCommission ? (
+        <ModalShell
+          size="sm"
+          dismissible={false}
+          footer={
+            !confirmCommission ? (
               <>
-                <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mb-4 shadow-md text-2xl">👤</div>
-                <h3 className="text-xl font-black text-black mb-1">¿Quién compró esta camiseta?</h3>
-                <p className="text-xs text-gray-500 mb-5 font-medium leading-relaxed">Notamos que rebajaste existencias del inventario. Ingresa el nombre del cliente para dejarlo registrado.</p>
-                
-                <div className="w-full relative mb-4">
-                  <input 
-                    type="text" 
-                    placeholder="Ej: Emanuel Espinoza" 
-                    className="w-full px-4 py-3.5 border border-gray-300 bg-gray-50 rounded-2xl font-bold text-black text-center text-sm focus:border-black focus:outline-none shadow-inner transition-colors placeholder-gray-400" 
-                    value={buyerName} 
-                    onChange={(e) => setBuyerName(e.target.value)} 
-                    autoFocus 
-                  />
-                </div>
-
-                {/* 🔥 SELECT DE DORSAL (SOLO APARECE SI EL PRODUCTO TIENE NUMERABLE ACTIVADO) 🔥 */}
-                {editedIsNumerable && validDorsalsForSelect.length > 0 && (
-                  <div className="w-full mb-6 text-left bg-blue-50/70 border border-blue-200 p-3.5 rounded-2xl">
-                    <label className="block text-[11px] font-black text-blue-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <FaTshirt className="text-blue-700" size={13} />
-                      ¿Con qué dorsal se vendió? (Descuenta Player/Fan)
-                    </label>
-                    <select
-                      value={purchasedDorsalIndex}
-                      onChange={(e) => setPurchasedDorsalIndex(e.target.value)}
-                      className="w-full bg-white border-2 border-blue-200 focus:border-blue-600 rounded-xl px-3 py-2.5 text-xs font-black text-blue-950 uppercase outline-none cursor-pointer shadow-sm transition-colors"
-                    >
-                      <option value="">-- Sin Dorsal (Camiseta Lisa) --</option>
-                      {validDorsalsForSelect.map((opt) => (
-                        <option key={`sale-dorsal-${opt.originalIdx}`} value={opt.originalIdx}>
-                          {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number} (Quedan: {opt.quantity || 0})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                <div className="flex gap-3 w-full">
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      if (!buyerName.trim()) {
-                        toast.error("Debes ingresar el nombre del cliente para registrar la venta.", { style: { background: '#fff', color: '#000' }});
-                        return;
-                      }
-                      setConfirmCommission(true); 
-                    }} 
-                    disabled={loading} 
-                    className="flex-1 bg-black text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-md hover:bg-zinc-800 transition-colors cursor-pointer"
-                  >
-                    REGISTRAR VENTA
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setShowBuyerModal(false); 
-                      handleSave(buyerName.trim(), false);
-                      setBuyerName(""); 
-                    }} 
-                    disabled={loading} 
-                    className="flex-1 bg-white text-black font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-100 transition-colors cursor-pointer border border-gray-300 shadow-sm"
-                  >
-                    SOLO ACTUALIZAR
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBuyerModal(false);
+                    handleSave(buyerName.trim(), false);
+                    setBuyerName("");
+                  }}
+                  disabled={loading}
+                  className="md-btn is-ghost"
+                >
+                  Solo actualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!buyerName.trim()) {
+                      toast.error("Debes ingresar el nombre del cliente para registrar la venta.", { style: { background: '#fff', color: '#000' }});
+                      return;
+                    }
+                    setConfirmCommission(true);
+                  }}
+                  disabled={loading}
+                  className="md-btn is-primary"
+                >
+                  Registrar venta
+                </button>
               </>
             ) : (
               <>
-                <h3 className="text-xl font-black text-black mb-2">Confirmar Comisión</h3>
-                <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">¿Seguro que hiciste una venta o un cambio?</p>
-                
-                <div className="flex gap-3 w-full">
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setShowBuyerModal(false); 
-                      setConfirmCommission(false);
-                      handleSave(buyerName.trim(), true); 
-                      setBuyerName("");     
-                    }} 
-                    disabled={loading} 
-                    className="flex-1 bg-green-600 text-white font-black py-4 rounded-2xl text-xs tracking-widest uppercase shadow-md hover:bg-green-700 transition-colors cursor-pointer"
-                  >
-                    SÍ
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => setConfirmCommission(false)} 
-                    disabled={loading} 
-                    className="flex-1 bg-white text-black font-bold py-4 rounded-2xl text-xs uppercase tracking-wider hover:bg-gray-100 transition-colors cursor-pointer border border-gray-300 shadow-sm"
-                  >
-                    NO, VOLVER
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfirmCommission(false)}
+                  disabled={loading}
+                  className="md-btn is-ghost"
+                >
+                  No, volver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBuyerModal(false);
+                    setConfirmCommission(false);
+                    handleSave(buyerName.trim(), true);
+                    setBuyerName("");
+                  }}
+                  disabled={loading}
+                  className="md-btn is-success"
+                >
+                  Sí, confirmar
+                </button>
               </>
-            )}
+            )
+          }
+        >
+          <div className="md-steps" aria-hidden="true">
+            <i className="is-on" />
+            <i className={confirmCommission ? "is-on" : ""} />
           </div>
-        </div>
+
+          {!confirmCommission ? (
+            <>
+              <div className="md-center">
+                <span className="md-big-icon"><FaUser /></span>
+                <span className="md-eyebrow">Venta · Paso 1 de 2</span>
+                <h3 className="md-title">¿Quién compró?</h3>
+                <p className="md-subtitle">Rebajaste existencias del inventario. Ingresá el nombre del cliente para dejarlo registrado.</p>
+              </div>
+
+              <label className="md-field">
+                <span className="md-label">Nombre del cliente</span>
+                <input
+                  type="text"
+                  placeholder="Ej: Emanuel Espinoza"
+                  className="md-input"
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && buyerName.trim()) setConfirmCommission(true); }}
+                  autoFocus
+                />
+              </label>
+
+              {/* 🔥 SELECT DE DORSAL (SOLO APARECE SI EL PRODUCTO TIENE NUMERABLE ACTIVADO) 🔥 */}
+              {editedIsNumerable && validDorsalsForSelect.length > 0 && (
+                <div className="md-section is-blue">
+                  <span className="md-section-title"><FaTshirt /> Dorsal vendido</span>
+                  <select
+                    value={purchasedDorsalIndex}
+                    onChange={(e) => setPurchasedDorsalIndex(e.target.value)}
+                    className="md-input"
+                  >
+                    <option value="">Sin dorsal (camiseta lisa)</option>
+                    {validDorsalsForSelect.map((opt) => (
+                      <option key={`sale-dorsal-${opt.originalIdx}`} value={opt.originalIdx}>
+                        {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number} (Quedan: {opt.quantity || 0})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="md-hint">Descuenta el dorsal del inventario de Player/Fan.</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="md-center">
+              <span className="md-big-icon is-green"><FaCheck /></span>
+              <span className="md-eyebrow">Venta · Paso 2 de 2</span>
+              <h3 className="md-title">Confirmar comisión</h3>
+              <p className="md-subtitle">
+                ¿Seguro que hiciste una venta o un cambio{buyerName.trim() ? <> a <b style={{ color: "#000" }}>{buyerName.trim()}</b></> : null}?
+              </p>
+            </div>
+          )}
+        </ModalShell>
       )}
     </>
   );
