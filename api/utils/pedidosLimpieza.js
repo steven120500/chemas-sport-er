@@ -5,6 +5,8 @@
 // También borra los pedidos semanales viejos que ya se quedaron sin pedidos.
 // N = PEDIDOS_RETENCION_DIAS (por defecto 60 ≈ 2 meses).
 import Pedido, { ESTADOS_CERRADOS, PedidoLote } from '../models/Pedido.js';
+import { publicIdFromUrl } from '../config/cloudinary.js';
+import { destroyIfUnused } from './cloudinaryCleanup.js';
 
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -16,7 +18,14 @@ export const diasRetencion = () => {
 export async function limpiarPedidosViejos() {
   try {
     const limite = new Date(Date.now() - diasRetencion() * DIA);
-    const r = await Pedido.deleteMany({ estado: { $in: ESTADOS_CERRADOS }, cerradoAt: { $ne: null, $lt: limite } });
+    const filtro = { estado: { $in: ESTADOS_CERRADOS }, cerradoAt: { $ne: null, $lt: limite } };
+    const fotos = (await Pedido.find(filtro, 'items.fotos').lean()).flatMap((p) => (p.items || []).flatMap((i) => i.fotos || []));
+    const r = await Pedido.deleteMany(filtro);
+    // 📸 Fotos subidas en el pedido: se borran de Cloudinary si ya nadie más las usa
+    if (r.deletedCount && fotos.length) {
+      const ids = [...new Set(fotos.map(publicIdFromUrl).filter(Boolean))];
+      destroyIfUnused(ids).catch(() => {});
+    }
     if (r.deletedCount) console.log(`🧹 Pedidos: ${r.deletedCount} pedido(s) completado(s) de hace más de ${diasRetencion()} días borrado(s)`);
 
     const lotesViejos = await PedidoLote.find({ createdAt: { $lt: limite } }, '_id').lean();

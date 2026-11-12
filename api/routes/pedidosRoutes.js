@@ -8,6 +8,8 @@ import Pedido, { ESTADOS_PEDIDO, ESTADOS_ENTREGA, METODOS_PAGO, ENTREGAS, siguie
 import Product from '../models/Product.js';
 import { requireAuth, requireSuper, escapeRegex } from '../middleware/auth.js';
 import { fechaCR, fotosDeProducto, cldTransform } from '../utils/pedidosUtils.js';
+import cloudinary, { UPLOAD_LIMIT, publicIdFromUrl } from '../config/cloudinary.js';
+import { destroyIfUnused } from '../utils/cloudinaryCleanup.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -76,7 +78,8 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
   const porId = new Map(productos.map((p) => [String(p._id), p]));
   const previos = new Map(itemsPrevios.map((it) => [String(it._id), it]));
 
-  return itemsIn.map((it, i) => {
+  // 1) Validar todo primero (para no subir fotos de un pedido que igual va a fallar)
+  const base = itemsIn.map((it, i) => {
     const prod = porId.get(String(it?.producto || ''));
     const previo = it?._id ? previos.get(String(it._id)) : null;
     const equipo = str(it?.equipo, 150) || prod?.name || '';
@@ -84,29 +87,70 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
     if (!equipo) throw Object.assign(new Error(`Camiseta ${i + 1}: falta el equipo / producto.`), { status: 400 });
     if (!talla) throw Object.assign(new Error(`Camiseta ${i + 1}: falta la talla.`), { status: 400 });
 
-    // 📸 Fotos: si es la misma camiseta de antes se conservan; si es del catálogo se copian del producto
-    let fotos = [];
-    if (previo && String(previo.producto || '') === String(prod?._id || it?.producto || '') && previo.fotos?.length) fotos = previo.fotos;
-    else if (prod) fotos = fotosDeProducto(prod);
+    // 📸 Fotos que manda el formulario (máx. 2): nuevas (data:image) o las que ya tenía este pedido.
+    // Si no manda la lista (versión vieja), se conserva lo de antes / se copian del catálogo.
+    let fotosIn = null;
+    if (Array.isArray(it?.fotos)) {
+      const yaTenia = new Set(previo?.fotos || []);
+      fotosIn = it.fotos
+        .filter((f) => typeof f === 'string' && (f.startsWith('data:image/') ? f.length <= MAX_FOTO : yaTenia.has(f)))
+        .slice(0, 2);
+    }
 
     const precioIn = it?.precio;
     const precio = precioIn === '' || precioIn == null ? precioEfectivo(prod) : entero(precioIn);
 
     return {
-      ...(previo ? { _id: previo._id } : {}),
-      producto: prod?._id || null,
-      equipo,
-      version: str(it?.version, 40) || prod?.type || '',
-      talla,
-      nombre: str(it?.nombre, 40).toUpperCase(),
-      dorsal: str(it?.dorsal, 10),
-      parche: str(it?.parche, 120),
-      cantidad: Math.min(99, Math.max(1, entero(it?.cantidad) || 1)),
-      precio,
-      costoProveedor: Math.max(0, Number(it?.costoProveedor) || 0),
-      fotos,
+      fotosIn,
+      prod,
+      previo,
+      item: {
+        ...(previo ? { _id: previo._id } : {}),
+        producto: prod?._id || null,
+        equipo,
+        version: str(it?.version, 40) || prod?.type || '',
+        talla,
+        nombre: str(it?.nombre, 40).toUpperCase(),
+        dorsal: str(it?.dorsal, 10),
+        parche: str(it?.parche, 120),
+        cantidad: Math.min(99, Math.max(1, entero(it?.cantidad) || 1)),
+        precio,
+        costoProveedor: Math.max(0, Number(it?.costoProveedor) || 0),
+      },
     };
   });
+
+  // 2) Subir a Cloudinary las fotos nuevas (carpeta products/pedidos: la cubre el reporte de huérfanas)
+  const out = [];
+  for (const b of base) {
+    let fotos = [];
+    if (b.fotosIn) {
+      for (const f of b.fotosIn) {
+        if (!f.startsWith('data:')) { fotos.push(f); continue; }
+        try {
+          const up = await cloudinary.uploader.upload(f, { folder: 'products/pedidos', resource_type: 'image', ...UPLOAD_LIMIT });
+          fotos.push(up.secure_url);
+        } catch (err) {
+          console.error('Pedidos: error subiendo foto a Cloudinary:', err?.message || err);
+          throw Object.assign(new Error('No se pudo subir la foto. Probá de nuevo.'), { status: 502 });
+        }
+      }
+    } else if (b.previo && String(b.previo.producto || '') === String(b.prod?._id || '') && b.previo.fotos?.length) {
+      fotos = b.previo.fotos;
+    } else if (b.prod) {
+      fotos = fotosDeProducto(b.prod);
+    }
+    out.push({ ...b.item, fotos });
+  }
+  return out;
+}
+
+const MAX_FOTO = 8 * 1024 * 1024; // data URL de una foto (el navegador ya la achica a ~1000px)
+
+/** 🧹 Borra de Cloudinary las fotos que ya nadie usa (las del catálogo nunca, porque las usa el producto) */
+function borrarFotosSinUso(urls) {
+  const ids = [...new Set((urls || []).map(publicIdFromUrl).filter(Boolean))];
+  if (ids.length) destroyIfUnused(ids).catch(() => {});
 }
 
 function datosGenerales(body) {
@@ -404,9 +448,12 @@ router.put('/:id', async (req, res) => {
     if (pedido.estado !== 'Nuevo') return res.status(409).json({ error: 'Este pedido ya se le pidió al proveedor: no se puede editar.' });
 
     const generales = datosGenerales(req.body);
+    const fotosAntes = pedido.items.flatMap((i) => i.fotos || []);
     const items = await prepararItems(req.body?.items, pedido.items.map((i) => i.toObject()));
     pedido.set({ ...generales, items });
     await pedido.save();
+    const quedan = new Set(items.flatMap((i) => i.fotos || []));
+    borrarFotosSinUso(fotosAntes.filter((u) => !quedan.has(u)));
     res.json(pedido);
   } catch (err) {
     enviarError(res, err, 'Error al actualizar el pedido');
@@ -467,6 +514,7 @@ router.delete('/:id', requireSuper, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
     const r = await Pedido.findByIdAndDelete(req.params.id);
     if (!r) return res.status(404).json({ error: 'Pedido no encontrado' });
+    borrarFotosSinUso((r.items || []).flatMap((i) => i.fotos || []));
     res.json({ ok: true });
   } catch (err) {
     enviarError(res, err, 'Error al eliminar el pedido');

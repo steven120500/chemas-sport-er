@@ -30,7 +30,7 @@ const ItemSchema = new mongoose.Schema(
     cantidad: { type: Number, min: 1, max: 99, default: 1 },
     precio:   { type: Number, min: 0, default: 0 },                         // precio unitario al cliente (₡)
     costoProveedor: { type: Number, min: 0, default: 0 },                   // "Price" del Excel (opcional)
-    // 📸 Copia de las fotos del producto al momento del pedido (frente / espalda)
+    // 📸 Fotos de la camiseta (máx. 2): subidas al registrar el pedido (products/pedidos) o, en pedidos viejos, copia de las del catálogo
     fotos:    { type: [String], default: [] },
   },
   { _id: true }
