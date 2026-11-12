@@ -4,6 +4,7 @@
 import cloudinary, { publicIdFromUrl } from '../config/cloudinary.js';
 import Product from '../models/Product.js';
 import TiendaFactura from '../models/TiendaFactura.js';
+import Pedido from '../models/Pedido.js';
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -39,12 +40,14 @@ async function isStillReferenced(publicId, excludeProductId) {
   };
   if (excludeProductId) productFilter._id = { $ne: excludeProductId };
 
-  const [inProduct, inFactura] = await Promise.all([
+  const [inProduct, inFactura, inPedido] = await Promise.all([
     Product.exists(productFilter),
     // las facturas guardan la miniatura para reimprimir el tiquete
     TiendaFactura.exists({ 'ventas.imagen': rx }),
+    // 🧾 los pedidos guardan las fotos de frente/espalda de la camiseta encargada
+    Pedido.exists({ 'items.fotos': rx }),
   ]);
-  return Boolean(inProduct || inFactura);
+  return Boolean(inProduct || inFactura || inPedido);
 }
 
 /**

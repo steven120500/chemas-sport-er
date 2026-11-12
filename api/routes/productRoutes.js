@@ -7,6 +7,7 @@ import multer from 'multer';
 
 import { requireAuth, requireRole, canSeeHidden, escapeRegex } from '../middleware/auth.js';
 import { emitProductUpdate } from '../utils/realtime.js';
+import { leerImpresiones, rebajarEnOpciones, rebajarEnHermanos, devolverImpresiones, esMismaImpresion, cambiosManuales, sincronizarManualEnHermanos } from '../utils/dorsales.js';
 
 const router = express.Router();
 
@@ -337,8 +338,16 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
     if (req.body.isNumerable !== undefined) {
       update.isNumerable = req.body.isNumerable === 'true' || req.body.isNumerable === true;
     }
+    // ✍️ Cambios a mano en las impresiones: solo lo que se tocó en el editor (se copia luego al hermano Player/Fan)
+    // ⚠️ Frontend viejo (manda purchasedDorsal, sin purchasedDorsals ni dorsalOptionsBase): él mismo ya rebajó la impresión vendida en dorsalOptions,
+    // así que aquí no se rebaja otra vez ni se copian cambios manuales (evita rebajar doble mientras conviven versiones).
+    const frontViejo = req.body.dorsalOptionsBase === undefined && req.body.purchasedDorsals === undefined;
+    let cambiosDorsal = null;
     if (req.body.dorsalOptions !== undefined) {
-      update.dorsalOptions = await processDorsalOptions(req.body.dorsalOptions);
+      const enviadas = await processDorsalOptions(req.body.dorsalOptions);
+      const r = cambiosManuales(enviadas, req.body.dorsalOptionsBase, prev.dorsalOptions || []);
+      update.dorsalOptions = r.opciones;
+      cambiosDorsal = frontViejo ? null : r.cambios;
     }
     if (req.body.teamFont !== undefined) {
       update.teamFont = req.body.teamFont;
@@ -376,40 +385,29 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
     const esVenta = Boolean(req.body.isSale === true || req.body.isSale === 'true') && restadas > 0;
     const huboRebajaStock = restadas > 0;
 
-    // 🔥 1. PROCESAR DESCUENTO DE DORSAL ANTES DE DEVOLVER EL PRODUCTO AL FRONTEND 🔥
-    let requestedDorsalData = null;
-    if (req.body.purchasedDorsal) {
-      try {
-        requestedDorsalData = typeof req.body.purchasedDorsal === 'string'
-          ? JSON.parse(req.body.purchasedDorsal)
-          : req.body.purchasedDorsal;
-      } catch {
-        requestedDorsalData = null;
+    // 👕 1. IMPRESIONES: una por cada camiseta rebajada que lleva dorsal (ver utils/dorsales.js).
+    // Se rebajan aquí (en este producto) y luego en su hermano Player/Fan. El frontend ya no las rebaja.
+    const impresiones = huboRebajaStock ? leerImpresiones(req.body).slice(0, restadas) : [];
+    let descontadosAqui = [];
+    if (impresiones.length && frontViejo && Array.isArray(update.dorsalOptions)) {
+      // Ya viene rebajada: solo anotamos lo que bajó de verdad (para devolverlo al anular)
+      for (const imp of impresiones) {
+        const antes = (prev.dorsalOptions || []).find((o) => esMismaImpresion(o, imp));
+        const ahora = update.dorsalOptions.find((o) => esMismaImpresion(o, imp));
+        if (antes && ahora && Number(antes.quantity) > Number(ahora.quantity)) {
+          descontadosAqui.push({ name: ahora.name, number: ahora.number, qty: 1 });
+        }
       }
+    } else if (impresiones.length) {
+      const base = Array.isArray(update.dorsalOptions)
+        ? update.dorsalOptions
+        : (prev.dorsalOptions || []).map((o) => ({ ...o }));
+      update.dorsalOptions = base.map((o) => ({ ...o }));
+      descontadosAqui = rebajarEnOpciones(update.dorsalOptions, impresiones);
     }
-
-    const targetDorsalName = String(requestedDorsalData?.name || '').trim().toUpperCase();
-    const targetDorsalNumber = String(requestedDorsalData?.number || '').trim();
-    let selectedDorsalText = "";
-
-    // Si rebajó stock y eligió un dorsal en el modal, descontamos en ESTE producto primero
-    if (huboRebajaStock && (targetDorsalName || targetDorsalNumber)) {
-      selectedDorsalText = ` | 👕 Dorsal Impreso: ${targetDorsalName} #${targetDorsalNumber}`;
-
-      if (Array.isArray(update.dorsalOptions)) {
-        update.dorsalOptions = update.dorsalOptions.map(opt => {
-          const optName = String(opt.name || '').trim().toUpperCase();
-          const optNum = String(opt.number || '').trim();
-          const match = (targetDorsalName && optName === targetDorsalName) ||
-                        (!targetDorsalName && targetDorsalNumber && optNum === targetDorsalNumber);
-          // Solo restamos aquí si es venta (porque cuando no es venta, el frontend ya lo restó en finalDorsalOptions)
-          if (match && esVenta && opt.quantity > 0) {
-            return { ...opt, quantity: opt.quantity - 1 };
-          }
-          return opt;
-        });
-      }
-    }
+    const selectedDorsalText = impresiones.length
+      ? ` | 👕 Dorsal Impreso: ${impresiones.map((d) => `${d.name.toUpperCase()} #${d.number}`).join(', ')}`
+      : '';
 
     // Ahora sí guardamos el producto principal ya con su dorsal rebajado
     const updated = await Product.findByIdAndUpdate(
@@ -432,36 +430,19 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
 
     const io = req.app.get('io');
 
-    // 🔥 2. SINCRONIZAR DESCUENTO EN PRODUCTOS HERMANOS (PLAYER <-> FAN) Y EMITIR EN VIVO 🔥
-    if (huboRebajaStock && (targetDorsalName || targetDorsalNumber)) {
-      const otherProducts = await Product.find({
-        _id: { $ne: updated._id },
-        isNumerable: true
-      });
+    // ✍️ Copiar al hermano Player <-> Fan lo cambiado a mano (antes de rebajar la venta, para que cuadren igual)
+    const sincronizados = (updated.isNumerable && cambiosDorsal)
+      ? await sincronizarManualEnHermanos(updated, cambiosDorsal, io)
+      : [];
+    const sincronizadosText = sincronizados.length
+      ? ` | 🔁 Impresiones copiadas a: ${sincronizados.map((p) => `${p.name} (${p.type})`).join(', ')}`
+      : '';
 
-      for (const prod of otherProducts) {
-        let changed = false;
-        prod.dorsalOptions = (prod.dorsalOptions || []).map(opt => {
-          const optName = String(opt.name || '').trim().toUpperCase();
-          const optNum = String(opt.number || '').trim();
-          const match = (targetDorsalName && optName === targetDorsalName && (!targetDorsalNumber || optNum === targetDorsalNumber)) ||
-                        (!targetDorsalName && targetDorsalNumber && optNum === targetDorsalNumber);
-
-          if (match && opt.quantity > 0) {
-            opt.quantity -= 1;
-            changed = true;
-          }
-          return opt;
-        });
-
-        if (changed) {
-          prod.markModified('dorsalOptions');
-          await prod.save();
-          // Emitimos por socket cada camiseta hermana (ej. la Fan) para que se actualice sin refrescar
-          emitProductUpdate(io, prod.toObject());
-        }
-      }
-    }
+    // 👕 2. Rebajar las mismas impresiones en el hermano Player <-> Fan (mismo nombre) y emitir en vivo
+    const descontados = [
+      ...descontadosAqui.map((d) => ({ productId: String(updated._id), ...d })),
+      ...(await rebajarEnHermanos(updated, impresiones, io)),
+    ];
 
     const updatedObj = updated.toObject();
 
@@ -476,6 +457,13 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
       if (removed.length && quedanFotos) destroyIfUnused(removed, { excludeProductId: prev._id }).catch(() => {});
     }
     const changes = diffProduct(prev, updatedObj);
+    // ✍️ Impresiones cambiadas a mano (antes no quedaban en el historial)
+    if (cambiosDorsal && updated.isNumerable) {
+      const et = (o) => `${String(o.name || '').toUpperCase()} #${o.number}`;
+      cambiosDorsal.cantidad.forEach((c) => changes.push(`Impresión ${et(c)} → ${c.quantity}`));
+      cambiosDorsal.nuevas.forEach((c) => changes.push(`Impresión nueva ${et(c)}: ${Math.max(0, parseInt(c.quantity, 10) || 0)}`));
+      cambiosDorsal.quitadas.forEach((c) => changes.push(`Impresión quitada ${et(c)}`));
+    }
     
     const clienteFinal = nombreCliente && nombreCliente !== "No especificado" && nombreCliente !== "Ajuste de inventario"
       ? nombreCliente
@@ -498,17 +486,23 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
         detalleText = `[ID:${prev._id}] | ${detalleText}`;
       }
 
-      detalleText += selectedDorsalText;
+      detalleText += selectedDorsalText + sincronizadosText;
 
       await History.create({
-        productId: prev._id,
         user: user,
         action: accionTexto,
         item: `${updated.name} (${updated.type})`,
         date: new Date(),
-        dorsalRefundData: huboRebajaStock && (targetDorsalName || targetDorsalNumber)
-          ? { name: targetDorsalName, number: targetDorsalNumber, teamFont: updated.teamFont }
-          : null,
+        productId: String(prev._id),
+        dorsalRefundData: impresiones.length
+          ? {
+              name: impresiones[0].name.toUpperCase(),
+              number: impresiones[0].number,
+              teamFont: updated.teamFont,
+              impresiones,
+              descontados,
+            }
+          : undefined,
         details: detalleText
       });
     }
@@ -596,42 +590,8 @@ router.post('/anular/:id', requireAuth, async (req, res) => {
 
     const io = req.app.get('io');
 
-    // 🔥 DEVOLVER EL DORSAL A TODAS LAS CAMISETAS HERMANAS SI SE ANULA LA VENTA 🔥
-    let refundName = historyEntry?.dorsalRefundData?.name || "";
-    let refundNumber = historyEntry?.dorsalRefundData?.number || "";
-
-    // Respaldo: si no tenía dorsalRefundData pero está escrito en el texto de details
-    if (!refundName && historyEntry?.details) {
-      const matchText = historyEntry.details.match(/Dorsal Impreso:\s*([^#|\n]+?)\s*#(\S+)/i);
-      if (matchText) {
-        refundName = matchText[1].trim().toUpperCase();
-        refundNumber = matchText[2].trim();
-      }
-    }
-
-    if (refundName || refundNumber) {
-      const numerableProducts = await Product.find({ isNumerable: true });
-      for (const prod of numerableProducts) {
-        let changed = false;
-        prod.dorsalOptions = (prod.dorsalOptions || []).map(opt => {
-          const optName = String(opt.name || '').trim().toUpperCase();
-          const optNum = String(opt.number || '').trim();
-          const match = (refundName && optName === refundName && (!refundNumber || optNum === refundNumber)) ||
-                        (!refundName && refundNumber && optNum === refundNumber);
-          if (match) {
-            opt.quantity = (Number(opt.quantity) || 0) + 1;
-            changed = true;
-          }
-          return opt;
-        });
-
-        if (changed) {
-          prod.markModified('dorsalOptions');
-          await prod.save();
-          emitProductUpdate(io, prod.toObject());
-        }
-      }
-    }
+    // 👕 Devolver las impresiones que se rebajaron (este producto y su hermano Player/Fan)
+    await devolverImpresiones(historyEntry, product, io);
 
     if (historyEntry) await History.findByIdAndDelete(req.params.id);
     

@@ -92,6 +92,10 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   } else if (categoria.includes("llavero") || txt.includes("llavero")) {
     nombreProductoAlegra = "Llavero Deportivo";
     precioBase = 2500;
+  } else if (categoria.includes("lego")) {
+    // 🧱 LEGO: usa el producto "LEGO" de Alegra si existe (si no, cae al de siempre)
+    nombreProductoAlegra = "LEGO";
+    precioBase = 20000;
   } else if (categoria.includes("mujer") || txt.includes("(mujer)") || txt.includes("dama") || txt.includes("crop top")) {
     nombreProductoAlegra = "Camisa Version Fan Mujer";
     precioBase = 20000;

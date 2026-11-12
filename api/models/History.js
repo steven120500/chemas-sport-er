@@ -16,6 +16,21 @@ const HistorySchema = new mongoose.Schema({
       return val;
     },
   },
+
+  // Producto de la venta (antes no estaba en el esquema y Mongo lo descartaba)
+  productId: { type: String, default: undefined },
+
+  // 👕 Impresiones vendidas y lo que se rebajó exactamente (para devolverlo al anular). Ver utils/dorsales.js
+  dorsalRefundData: {
+    type: {
+      name: String,          // primera impresión (lo lee ComisionesPage)
+      number: String,
+      teamFont: String,
+      impresiones: [{ name: String, number: String, _id: false }],
+      descontados: [{ productId: String, name: String, number: String, qty: Number, _id: false }],
+    },
+    default: undefined,
+  },
 });
 
 // Índice compuesto opcional (user + date) para búsquedas específicas

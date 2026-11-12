@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 
 import { requireAuth } from '../middleware/auth.js';
 import { emitProductUpdate } from '../utils/realtime.js';
+import { devolverImpresiones } from '../utils/dorsales.js';
 
 const router = express.Router();
 
@@ -157,6 +158,15 @@ router.post('/anular/:id', requireAuth, async (req, res) => {
       }
     } else {
       console.log("ℹ️ [ANULAR] Registro sin tallas físicas registradas; procediendo a limpiar del historial.");
+    }
+
+    // 👕 4b. Devolvemos las impresiones (dorsales) que se rebajaron, en el producto y su hermano Player/Fan
+    let impresionesDevueltas = 0;
+    try {
+      impresionesDevueltas = await devolverImpresiones(log, product, req.app.get('io'));
+      if (impresionesDevueltas) console.log(`👕 [ANULAR] ${impresionesDevueltas} impresión(es) devuelta(s)`);
+    } catch (err) {
+      console.error("⚠️ [ANULAR] No se pudieron devolver las impresiones:", err.message);
     }
 
     // 5. Eliminamos la venta de History en todos los casos

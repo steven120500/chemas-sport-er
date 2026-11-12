@@ -24,6 +24,7 @@ const { default: cloudinary, publicIdFromUrl } = await import('../config/cloudin
 const { default: connectDB } = await import('../config/db.js');
 const { default: Product } = await import('../models/Product.js');
 const { default: TiendaFactura } = await import('../models/TiendaFactura.js');
+const { default: Pedido } = await import('../models/Pedido.js');
 
 // cloudinary.config() se ejecutó al importar; lo reafirmamos ya con el .env cargado
 cloudinary.config({
@@ -67,7 +68,11 @@ for (const f of facturas) {
   for (const m of JSON.stringify(f.ventas || []).matchAll(CLD_URL_RX)) addUrl(m[0]);
 }
 
-console.log(`📦 ${products.length} productos y ${facturas.length} facturas referencian ${referenced.size} imágenes`);
+// Pedidos: guardan las fotos de frente/espalda de cada camiseta encargada
+const pedidos = await Pedido.find({}, 'items.fotos').lean();
+for (const pe of pedidos) for (const it of pe.items || []) for (const u of it.fotos || []) addUrl(u);
+
+console.log(`📦 ${products.length} productos, ${facturas.length} facturas y ${pedidos.length} pedidos referencian ${referenced.size} imágenes`);
 
 /* 2) Todo lo que hay en Cloudinary */
 const all = [];
