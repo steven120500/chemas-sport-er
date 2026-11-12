@@ -137,7 +137,7 @@ const productSchema = new mongoose.Schema(
     // 🔥 NUEVO CAMPO PARA SABER QUÉ TIPOGRAFÍA USAR 🔥
     teamFont: {
       type: String,
-      enum: ['barca', 'madrid', 'boca', 'river', 'none'],
+      enum: ['barca', 'barca_visita', 'barca_tercera', 'madrid', 'madrid_rosa', 'madrid_verde', 'boca', 'river', 'none'],
       default: 'barca'
     },
 

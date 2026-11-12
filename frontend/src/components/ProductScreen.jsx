@@ -21,7 +21,20 @@ const MODAL_IMG_MAX_W = 1000; // fijo: nítido en pantallas retina sin descargar
 const getDorsalLayout = (teamFont, productType = "") => {
   const isPlayer = productType.toLowerCase().includes("player");
 
-  if (teamFont === 'madrid') {
+  // 🎨 Variantes de color (misma calibración que la base del equipo, solo cambia color/borde)
+  const VARIANTES_COLOR = {
+    // Real Madrid tercera rosada: letras beige
+    madrid_rosa: { colorTop: "#F6EBCB", colorMid: "#EEDFB6", colorBottom: "#E2D09F", stroke: "rgba(0,0,0,0.12)" },
+    // Real Madrid tercera verde: letras blancas
+    madrid_verde: { colorTop: "#FFFFFF", colorMid: "#F6F5EF", colorBottom: "#E9E7DE", stroke: "rgba(0,0,0,0.12)" },
+    // Barcelona visita (negra/morada): dorado
+    barca_visita: { colorTop: "#F6CF7A", colorMid: "#E9B65A", colorBottom: "#D49C3E", stroke: "#B9852F" },
+    // Barcelona tercera (aqua): azul marino con borde rojo
+    barca_tercera: { colorTop: "#2E3478", colorMid: "#262B66", colorBottom: "#1D2152", stroke: "#E0313B", strokeName: 1.4, strokeNumber: 4 },
+  };
+  const variante = VARIANTES_COLOR[teamFont] || {};
+
+  if (teamFont === 'madrid' || teamFont === 'madrid_rosa' || teamFont === 'madrid_verde') {
     return {
       boxWidth: "60%",      
       offsetY: "-15%",       
@@ -34,7 +47,8 @@ const getDorsalLayout = (teamFont, productType = "") => {
       colorTop: "#1A362D",    
       colorMid: "#122A21",    
       colorBottom: "#0A1712", 
-      stroke: "rgba(255, 255, 255, 0.15)" 
+      stroke: "rgba(255, 255, 255, 0.15)",
+      ...variante
     };
   }
   
@@ -87,7 +101,8 @@ const getDorsalLayout = (teamFont, productType = "") => {
     colorTop: "#FFE600",
     colorMid: "#F5C400",
     colorBottom: "#D4A000",
-    stroke: "#C79200"
+    stroke: "#C79200",
+    ...variante
   };
 };
 
@@ -385,7 +400,9 @@ export default function ProductScreen({
 
   // 🔥 PASAMOS EL TIPO DE PRODUCTO (Player / Fan) PARA QUE SE CALIBRE AUTOMÁTICAMENTE 🔥
   const getActiveFontFamily = (fontType) => {
-    if (fontType === 'madrid') return "'FontMadrid', sans-serif";
+    if (fontType === 'madrid' || fontType === 'madrid_rosa' || fontType === 'madrid_verde') return "'FontMadrid', sans-serif";
+    if (fontType === 'barca_visita') return "'FontBarcaVisita', sans-serif";
+    if (fontType === 'barca_tercera') return "'FontBarcaTercera', sans-serif";
     if (fontType === 'boca') return "'FontBoca', sans-serif";
     if (fontType === 'river') return "'FontRiver', sans-serif";
     return "'FontBarca', sans-serif";
@@ -396,6 +413,10 @@ export default function ProductScreen({
 
   const fontClassMap = {
     madrid: 'font-madrid',
+    madrid_rosa: 'font-madrid',
+    madrid_verde: 'font-madrid',
+    barca_visita: 'font-barca-visita',
+    barca_tercera: 'font-barca-tercera',
     boca: 'font-boca',
     river: 'font-river',
     barca: 'font-barca'
@@ -487,6 +508,22 @@ export default function ProductScreen({
         }
 
         @font-face {
+          font-family: 'FontBarcaVisita';
+          src: url('/fonts/Barcelona%20Tipografia%20Visita.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
+        }
+
+        @font-face {
+          font-family: 'FontBarcaTercera';
+          src: url('/fonts/Barcelona%20Tipografia%20Tercera.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
+        }
+
+        @font-face {
           font-family: 'FontMadrid';
           src: url('/fonts/Real%20Madrid%20Tipografia.ttf') format('truetype'),
                url('/fonts/Real Madrid Tipografia.ttf') format('truetype');
@@ -515,6 +552,8 @@ export default function ProductScreen({
 
         .font-barca { font-family: 'FontBarca', sans-serif !important; }
         .font-madrid { font-family: 'FontMadrid', sans-serif !important; }
+        .font-barca-visita { font-family: 'FontBarcaVisita', sans-serif !important; }
+        .font-barca-tercera { font-family: 'FontBarcaTercera', sans-serif !important; }
         .font-boca { font-family: 'FontBoca', sans-serif !important; }
         .font-river { font-family: 'FontRiver', sans-serif !important; }
       `}</style>
@@ -522,6 +561,8 @@ export default function ProductScreen({
       <div aria-hidden="true" className="opacity-0 pointer-events-none fixed -top-96 -left-96 select-none">
         <span style={{ fontFamily: "'FontBarca'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
         <span style={{ fontFamily: "'FontMadrid'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
+        <span style={{ fontFamily: "'FontBarcaVisita'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
+        <span style={{ fontFamily: "'FontBarcaTercera'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
         <span style={{ fontFamily: "'FontBoca'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
         <span style={{ fontFamily: "'FontRiver'" }}>ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
       </div>
@@ -667,7 +708,8 @@ export default function ProductScreen({
                                   <text
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
-                                    strokeWidth="0.5"
+                                    strokeWidth={currentLayout.strokeName || 0.5}
+                                    paintOrder={currentLayout.strokeName ? "stroke" : undefined}
                                     className={activeFontClass}
                                     style={nameTextStyle}
                                   >
@@ -695,7 +737,8 @@ export default function ProductScreen({
                                     textAnchor="middle"
                                     fill="url(#dorsalColorGrad)"
                                     stroke={currentLayout.stroke}
-                                    strokeWidth="0.8"
+                                    strokeWidth={currentLayout.strokeNumber || 0.8}
+                                    paintOrder={currentLayout.strokeNumber ? "stroke" : undefined}
                                     className={activeFontClass}
                                     style={{ ...numberTextStyle, transformBox: "fill-box", transformOrigin: "50% 50%" }}
                                     initial={reduceMotion ? false : { opacity: 0, scale: 1.7 }}

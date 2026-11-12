@@ -287,6 +287,23 @@ button:focus-visible {
     font-display: swap;
   }
   
+  /* Barcelona visita (dorada) y tercera (aqua) 26/27 */
+  @font-face {
+    font-family: 'FontBarcaVisita';
+    src: url('/fonts/Barcelona%20Tipografia%20Visita.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'FontBarcaTercera';
+    src: url('/fonts/Barcelona%20Tipografia%20Tercera.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+
   @font-face {
     font-family: 'FontMadrid';
     src: url('/fonts/Real Madrid Tipografia.ttf') format('truetype');

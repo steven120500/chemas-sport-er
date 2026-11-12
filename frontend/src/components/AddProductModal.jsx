@@ -449,7 +449,11 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
             <span className="md-label">Tipografía oficial</span>
             <select className="md-input" value={teamFont} onChange={(e) => setTeamFont(e.target.value)}>
               <option value="barca">F.C. Barcelona (26/27)</option>
+              <option value="barca_visita">F.C. Barcelona Visita (dorado)</option>
+              <option value="barca_tercera">F.C. Barcelona Tercera (azul/rojo)</option>
               <option value="madrid">Real Madrid</option>
+              <option value="madrid_rosa">Real Madrid Tercera Rosada (beige)</option>
+              <option value="madrid_verde">Real Madrid Tercera Verde (blanco)</option>
             </select>
           </label>
         )}
