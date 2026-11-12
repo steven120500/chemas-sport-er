@@ -20,6 +20,7 @@ const categories = [
   { label: "Niño", value: "Niño" },
   { label: "Abrigos", value: "Abrigos" },
   { label: "Llaveros", value: "Llaveros" },
+  { label: "LEGO", value: "LEGO" },
   { label: "NBA", value: "NBA" },
   { label: "MLB", value: "MLB" },
   { label: "NFL", value: "NFL" },

@@ -3290,3 +3290,41 @@ select.md-input {
 .cp-total span { font-size: 10px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #a1a1aa; }
 .cp-total b { font-size: 20px; font-weight: 900; letter-spacing: -0.01em; }
 .cp-total small { width: 100%; font-size: 11px; font-weight: 700; color: #4ade80; }
+
+/* ================= LOGO LOADER (LogoLoader.jsx) ================= */
+/* Tapa toda la pantalla y bloquea los clics mientras se procesa algo lento (ej. anular una venta) */
+.ll-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: llFade 0.25s ease-out both;
+  cursor: wait;
+}
+.ll-box { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 0 16px; text-align: center; }
+.ll-spinner { position: relative; width: 112px; height: 112px; }
+.ll-ring {
+  position: absolute; inset: 0; border-radius: 9999px;
+  border: 3px solid transparent; border-top-color: #000; border-right-color: #000;
+  animation: llSpin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+.ll-ring.is-red {
+  inset: 9px; border-width: 2px; border-top-color: #dc2626; border-right-color: transparent; border-left-color: #dc2626;
+  animation-duration: 1.4s; animation-direction: reverse;
+}
+.ll-logo {
+  position: absolute; inset: 20px; border-radius: 9999px; overflow: hidden;
+  background: #000; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: llPulse 1.6s ease-in-out infinite;
+}
+/* el PNG trae ~18% de margen transparente: se agranda y se recorta al círculo (igual que en el header) */
+.ll-logo img { position: absolute; top: -28.9%; left: -28.9%; width: 157.8%; height: 157.8%; max-width: none; }
+.ll-msg { margin: 0; font-size: 12px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #000; }
+.ll-detail { margin: -10px 0 0; font-size: 12px; font-weight: 600; color: #71717a; max-width: 320px; }
+@keyframes llSpin { to { transform: rotate(360deg); } }
+@keyframes llPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.94); } }
+@keyframes llFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ll-ring { animation-duration: 2.4s; }
+  .ll-logo { animation: none; }
+}

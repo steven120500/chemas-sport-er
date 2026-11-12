@@ -11,6 +11,7 @@ export const tallaPorTipo = {
   MLB: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
   NFL: ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
   Balón: ['3', '4', '5'],
+  LEGO: ['U'], // por unidad, como los llaveros
 };
   export default tallaPorTipo;
   

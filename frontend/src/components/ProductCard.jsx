@@ -100,7 +100,7 @@ export default function ProductCard({ product, onClick, user, index = 0 }) {
   const isAdmin = user?.isSuperUser || user?.roles?.includes("edit");
   const isNino = product.type === "Niño";
   const isBalon = product.type === "Balón" || product.type === "Balones";
-  const isLlavero = product.type === "Llaveros";
+  const isLlavero = product.type === "Llaveros" || product.type === "LEGO"; // por unidad
 
   const sizesToCheck = isLlavero ? ["U"] : isBalon ? BALL_SIZES : isNino ? KID_SIZES : ADULT_SIZES;
 

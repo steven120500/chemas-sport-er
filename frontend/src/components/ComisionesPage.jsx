@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
+import LogoLoader from "./LogoLoader";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -743,12 +744,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     ), { duration: 8000 });
   };
 
+  // ⏳ Venta que se está anulando: muestra el loader con el logo y bloquea los botones (evita anular dos veces)
+  const [anulando, setAnulando] = useState(null);
+
   const ejecutarAnulacion = async (venta) => {
+    if (anulando) return;
     if (!puedeAnularVenta(venta)) {
       toastHOT.error("Solo puedes anular tus propias ventas.");
       return;
     }
 
+    setAnulando(venta);
     try {
       const payload = { productId: venta.productId || null, item: venta.item, items: venta.items || [], totalUnidades: venta.totalUnidades || 1 };
       let res = await fetch(`${API_BASE}/api/sales/anular/${venta._id}`, {
@@ -766,10 +772,13 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
       toastHOT.success("Venta anulada. Camisetas devueltas al inventario.", { style: { background: "#000", color: "#fff", fontWeight: "bold" } });
     } catch (err) {
       toastHOT.error(err.message || "No se pudo anular la venta.");
+    } finally {
+      setAnulando(null);
     }
   };
 
   const confirmarAnulacion = (venta) => {
+    if (anulando) return;
     if (!puedeAnularVenta(venta)) {
       toastHOT.error(`Solo puedes anular tus propias ventas (esta venta pertenece a ${venta.vendedor}).`);
       return;
@@ -1240,6 +1249,12 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
   return (
     <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
+      {anulando && (
+        <LogoLoader
+          mensaje="Anulando venta…"
+          detalle={`Devolviendo ${anulando.totalUnidades || 1} camiseta(s)${anulando.dorsalTexto ? " y sus impresiones" : ""} al inventario. No cierres la página.`}
+        />
+      )}
       <div className="max-w-6xl mx-auto">
         <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8">
           <FaChevronLeft size={12} /> Volver al catálogo
@@ -1556,7 +1571,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                             <div className="flex justify-center items-center gap-3">
                               <button onClick={() => abrirModalFacturacion([venta])} disabled={generandoTiquete} className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer" title="Emitir Tiquete / Factura"><FaReceipt size={14} /></button>
                               {permitidoAnular ? (
-                                <button onClick={() => confirmarAnulacion(venta)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer" title="Anular Venta"><FaTrash size={13} /></button>
+                                <button onClick={() => confirmarAnulacion(venta)} disabled={Boolean(anulando)} className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-wait" title="Anular Venta"><FaTrash size={13} /></button>
                               ) : (
                                 <button type="button" onClick={() => toastHOT.error(`Solo puedes anular tus propias ventas (esta venta es de ${venta.vendedor}).`)} className="p-2 text-zinc-200 cursor-not-allowed rounded-xl" title="Acción restringida"><FaTrash size={13} /></button>
                               )}

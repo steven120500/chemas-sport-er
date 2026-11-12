@@ -361,6 +361,11 @@ router.post('/lotes/cerrar', requireCierre, async (req, res) => {
       { _id: { $in: ids }, estado: 'Nuevo' },
       { $set: { estado: 'Pedido', lote: lote._id, loteNumero: lote.numero }, $push: { historialEstados: { estado: 'Pedido', por: req.user.name, fecha: new Date() } } }
     );
+    // Dos cierres en el mismo segundo (ej. Johanna y el súper admin): el que llegó tarde no se lleva ninguno → se deshace
+    if (!r.modifiedCount) {
+      await PedidoLote.deleteOne({ _id: lote._id });
+      return res.status(409).json({ error: 'Esta semana ya la acaba de cerrar otra persona.' });
+    }
     res.status(201).json({ lote, pedidos: r.modifiedCount });
   } catch (err) {
     enviarError(res, err, 'Error al cerrar el pedido semanal');
@@ -451,10 +456,22 @@ router.put('/:id', async (req, res) => {
     const fotosAntes = pedido.items.flatMap((i) => i.fotos || []);
     const items = await prepararItems(req.body?.items, pedido.items.map((i) => i.toObject()));
     pedido.set({ ...generales, items });
-    await pedido.save();
+    await pedido.validate();
+    // Guardar solo si sigue en "Nuevo" (si cerraron la semana mientras se editaba, no se toca)
+    const guardado = await Pedido.findOneAndUpdate(
+      { _id: pedido._id, estado: 'Nuevo' },
+      { $set: { cliente: pedido.cliente, adelanto: pedido.adelanto, metodoPago: pedido.metodoPago, notas: pedido.notas, items: pedido.items, total: pedido.total } },
+      { new: true }
+    );
+    if (!guardado) {
+      // las fotos nuevas que se subieron para esta edición ya no se usan
+      const viejas = new Set(fotosAntes);
+      borrarFotosSinUso(items.flatMap((i) => i.fotos || []).filter((u) => !viejas.has(u)));
+      return res.status(409).json({ error: 'Este pedido ya se le pidió al proveedor: no se puede editar.' });
+    }
     const quedan = new Set(items.flatMap((i) => i.fotos || []));
     borrarFotosSinUso(fotosAntes.filter((u) => !quedan.has(u)));
-    res.json(pedido);
+    res.json(guardado);
   } catch (err) {
     enviarError(res, err, 'Error al actualizar el pedido');
   }

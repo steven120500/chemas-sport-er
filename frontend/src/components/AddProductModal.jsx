@@ -133,7 +133,8 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       ...tallaPorTipo, 
       Balón: ["3", "4", "5"], 
       Balones: ["3", "4", "5"],
-      Llaveros: ["U"] 
+      Llaveros: ["U"],
+      LEGO: ["U"]
     };
     return tipos[type] || [];
   }, [type]);
@@ -380,7 +381,7 @@ export default function AddProductModal({ onAdd, onCancel, user }) {
       <label className="md-field">
         <span className="md-label">Tipo de producto</span>
         <select className="md-input" value={type} onChange={(e) => setType(e.target.value)}>
-          {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"] }).map((t) => (
+          {Object.keys({ ...tallaPorTipo, Balón: ["3", "4", "5"], Balones: ["3", "4", "5"], Llaveros: ["U"], LEGO: ["U"] }).map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>

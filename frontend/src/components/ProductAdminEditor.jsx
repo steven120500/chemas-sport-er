@@ -102,8 +102,16 @@ export default function ProductAdminEditor({
     ];
   });
 
-  // 🔥 ESTADO PARA SELECCIONAR QUÉ DORSAL SE VENDIÓ / DESCONTÓ 🔥
-  const [purchasedDorsalIndex, setPurchasedDorsalIndex] = useState("");
+  // ✍️ Impresiones como estaban al abrir el editor: el backend compara contra esto para saber qué se cambió a mano
+  // (y copiarlo a la hermana Player/Fan) sin pisar ventas que pasen mientras el editor está abierto.
+  const [dorsalOptionsBase] = useState(() =>
+    (Array.isArray(product?.dorsalOptions) ? product.dorsalOptions : [])
+      .filter((o) => o && (o.name || o.number))
+      .map((o) => ({ name: o.name || "", number: o.number || "", quantity: o.quantity ?? 0 }))
+  );
+
+  // 👕 IMPRESIÓN DE CADA CAMISETA REBAJADA: un índice de dorsalOptions por camiseta ("" = sin impresión)
+  const [purchasedDorsalIdxs, setPurchasedDorsalIdxs] = useState([]);
   
   const [loading, setLoading] = useState(false);
   const [showBuyerModal, setShowBuyerModal] = useState(false);
@@ -125,7 +133,7 @@ export default function ProductAdminEditor({
 
   const isNino = editedType === "Niño";
   const isBalon = editedType === "Balón" || editedType === "Balones";
-  const isLlavero = editedType === "Llaveros";
+  const isLlavero = editedType === "Llaveros" || editedType === "LEGO"; // por unidad (talla U)
   const tallasVisibles = isLlavero ? ["U"] : (isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO);
 
   const handleStockChange = (size, value) => {
@@ -222,10 +230,38 @@ export default function ProductAdminEditor({
     return decreased;
   };
 
+  // Cuántas camisetas se están rebajando (sumando Tienda, Bodega 1 y Bodega 2)
+  const contarUnidadesRebajadas = () => {
+    if (isLlavero) return 0;
+    const baseTienda = viewProduct?.tienda || product?.tienda || {};
+    const baseStock = viewProduct?.stock || product?.stock || {};
+    const baseBodega = viewProduct?.bodega || product?.bodega || {};
+    let n = 0;
+    tallasVisibles.forEach((size) => {
+      [[baseTienda, editedTienda], [baseStock, editedStock], [baseBodega, editedBodega]].forEach(([antes, ahora]) => {
+        const d = parseInt(antes[size] ?? 0, 10) - parseInt(ahora?.[size] ?? 0, 10);
+        if (d > 0) n += d;
+      });
+    });
+    return n;
+  };
+
   // Filtramos las opciones válidas de dorsal para mostrarlas en el selector de venta
   const validDorsalsForSelect = editedDorsalOptions
     .map((opt, originalIdx) => ({ ...opt, originalIdx }))
     .filter((opt) => (opt.name && opt.name.trim() !== "") || (opt.number && opt.number.trim() !== ""));
+
+  // ¿Alcanzan las impresiones escogidas? (ej. 2 camisetas con FERMÍN #7 y solo queda 1)
+  const impresionFaltante = () => {
+    const usadas = {};
+    purchasedDorsalIdxs.forEach((v) => { if (v !== "") usadas[v] = (usadas[v] || 0) + 1; });
+    for (const [idx, n] of Object.entries(usadas)) {
+      const opt = editedDorsalOptions[Number(idx)];
+      const quedan = Math.max(0, parseInt(opt?.quantity, 10) || 0);
+      if (opt && n > quedan) return `Solo ${quedan === 1 ? "queda 1 impresión" : `quedan ${quedan} impresiones`} de ${(opt.name || "JUGADOR").toUpperCase()} #${opt.number}.`;
+    }
+    return "";
+  };
 
   const handleSave = async (clientName = "", isSale = false) => {
     if (loading) return;
@@ -242,26 +278,13 @@ export default function ProductAdminEditor({
       const finalCustomer = clientName || (isSale ? "Cliente General / Tienda" : "Ajuste de inventario");
       const clientTag = isSale && finalCustomer ? `👤 Cliente: ${finalCustomer} | ` : "";
 
-      // 🔥 Si seleccionó un dorsal al rebajar la camiseta, descontamos 1 en este producto y lo enviamos al backend para sincronizar Player/Fan
-      let finalDorsalOptions = editedDorsalOptions.map(opt => ({ ...opt }));
-      let selectedPurchasedDorsal = null;
-
-      if (editedIsNumerable && purchasedDorsalIndex !== "" && finalDorsalOptions[Number(purchasedDorsalIndex)]) {
-        const idxToDiscount = Number(purchasedDorsalIndex);
-        selectedPurchasedDorsal = {
-          name: finalDorsalOptions[idxToDiscount].name,
-          number: finalDorsalOptions[idxToDiscount].number,
-        };
-
-        // Si solo presionó "SOLO ACTUALIZAR" (no es venta con comisión), lo descontamos aquí para que igual baje
-        // Si es venta (isSale === true), el backend (productRoutes.js) se encarga de restar -1 globalmente en Player y Fan
-        if (!isSale) {
-          const currentQty = Math.max(0, parseInt(finalDorsalOptions[idxToDiscount].quantity, 10) || 0);
-          if (currentQty > 0) {
-            finalDorsalOptions[idxToDiscount].quantity = currentQty - 1;
-          }
-        }
-      }
+      // 👕 Impresiones escogidas (una por camiseta). El backend las rebaja aquí y en el hermano Player/Fan.
+      const finalDorsalOptions = editedDorsalOptions.map(opt => ({ ...opt }));
+      const purchasedDorsals = editedIsNumerable
+        ? purchasedDorsalIdxs
+            .filter((v) => v !== "" && finalDorsalOptions[Number(v)])
+            .map((v) => ({ name: finalDorsalOptions[Number(v)].name, number: finalDorsalOptions[Number(v)].number }))
+        : [];
 
       const payload = {
         productId: id,
@@ -283,7 +306,8 @@ export default function ProductAdminEditor({
         isNumerable: editedIsNumerable,
         teamFont: editedIsNumerable ? editedTeamFont : 'barca',
         dorsalOptions: editedIsNumerable ? finalDorsalOptions : [],
-        purchasedDorsal: selectedPurchasedDorsal ? JSON.stringify(selectedPurchasedDorsal) : null,
+        dorsalOptionsBase,
+        purchasedDorsals,
 
         customerName: finalCustomer,
         sellerName: displayName,
@@ -314,7 +338,7 @@ export default function ProductAdminEditor({
       }
 
       const dbUpdatedProduct = await res.json();
-      setPurchasedDorsalIndex("");
+      setPurchasedDorsalIdxs([]);
       onSaveSuccess(dbUpdatedProduct);
 
       if (isSale) {
@@ -399,7 +423,7 @@ export default function ProductAdminEditor({
               onChange={(e) => setEditedType(e.target.value)} 
               className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-4 font-semibold outline-none cursor-pointer focus:border-black bg-white text-black transition-colors shadow-sm"
             >
-              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón", "Llaveros"].map((t) => <option key={t} value={t}>{t}</option>)}
+              {["Player", "Fan", "Mujer", "Nacional", "Abrigos", "Retro", "Niño", "F1", "NBA", "MLB", "NFL", "Balón", "Llaveros", "LEGO"].map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <label className="block text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-widest ml-1">Nombre</label>
@@ -632,46 +656,12 @@ export default function ProductAdminEditor({
               onClick={() => {
                 const changes = getInventoryChanges();
                 
-                // Si redujo stock y el producto es numerable, abrimos el modal pidiendo el dorsal afectado
-                if (checkHasDeduction() && editedIsNumerable && editedDorsalOptions.length > 0) {
-                  toastHOT(
-                    (t) => (
-                      <div className="text-center p-4 rounded-xl border border-gray-200 bg-white shadow-xl max-w-sm w-full">
-                        <p className="font-black text-black mb-1 text-sm">¿Qué dorsal se utilizó en esta venta?</p>
-                        <p className="text-[11px] text-gray-500 mb-4">Selecciona el jugador para descontar su impresión de la imprenta.</p>
-                        
-                        <select
-                          id="select-dorsal-venta"
-                          className="w-full bg-gray-50 border-2 border-black rounded-xl px-3 py-3 text-xs font-black text-black uppercase mb-4 outline-none cursor-pointer"
-                        >
-                          <option value="">-- Sin Dorsal / Camiseta Lisa --</option>
-                          {editedDorsalOptions.filter(o => o.name || o.number).map((opt, idx) => (
-                            <option key={idx} value={idx}>
-                              {opt.name.toUpperCase()} (#{opt.number}) — Disp: {opt.quantity}
-                            </option>
-                          ))}
-                        </select>
-
-                        <div className="flex gap-2 justify-center">
-                          <button 
-                            onClick={() => { 
-                              const sel = document.getElementById("select-dorsal-venta")?.value;
-                              setPurchasedDorsalIndex(sel !== undefined ? sel : "");
-                              toastHOT.dismiss(t.id); 
-                              setConfirmCommission(false); 
-                              setShowBuyerModal(true);
-                            }} 
-                            className="bg-black text-white px-4 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-zinc-800 cursor-pointer shadow-sm"
-                          >
-                            CONTINUAR
-                          </button>
-                          <button onClick={() => toastHOT.dismiss(t.id)} className="text-black bg-gray-100 px-4 py-2.5 rounded-xl font-bold tracking-wider text-xs hover:bg-gray-200 cursor-pointer border border-gray-200">
-                            CANCELAR
-                          </button>
-                        </div>
-                      </div>
-                    ), { duration: Infinity, style: { background: 'transparent', boxShadow: 'none', padding: 0 } }
-                  );
+                // Si redujo stock y el producto es numerable, vamos directo a la venta: ahí se escoge
+                // la impresión de CADA camiseta rebajada (ver purchasedDorsalIdxs)
+                if (checkHasDeduction() && editedIsNumerable && validDorsalsForSelect.length > 0) {
+                  setPurchasedDorsalIdxs(Array(contarUnidadesRebajadas()).fill(""));
+                  setConfirmCommission(false);
+                  setShowBuyerModal(true);
                 } else {
                   toastHOT(
                     (t) => (
@@ -689,7 +679,7 @@ export default function ProductAdminEditor({
                             onClick={() => { 
                               toastHOT.dismiss(t.id); 
                               if (checkHasDeduction()) {
-                                setPurchasedDorsalIndex("");
+                                setPurchasedDorsalIdxs(Array(contarUnidadesRebajadas()).fill(""));
                                 setConfirmCommission(false); 
                                 setShowBuyerModal(true);
                               } else {
@@ -735,6 +725,8 @@ export default function ProductAdminEditor({
                 <button
                   type="button"
                   onClick={() => {
+                    const falta = impresionFaltante();
+                    if (falta) return toast.error(falta);
                     setShowBuyerModal(false);
                     handleSave(buyerName.trim(), false);
                     setBuyerName("");
@@ -751,6 +743,8 @@ export default function ProductAdminEditor({
                       toast.error("Debes ingresar el nombre del cliente para registrar la venta.", { style: { background: '#fff', color: '#000' }});
                       return;
                     }
+                    const falta = impresionFaltante();
+                    if (falta) return toast.error(falta);
                     setConfirmCommission(true);
                   }}
                   disabled={loading}
@@ -813,23 +807,30 @@ export default function ProductAdminEditor({
                 />
               </label>
 
-              {/* 🔥 SELECT DE DORSAL (SOLO APARECE SI EL PRODUCTO TIENE NUMERABLE ACTIVADO) 🔥 */}
-              {editedIsNumerable && validDorsalsForSelect.length > 0 && (
+              {/* 👕 IMPRESIÓN POR CAMISETA (solo si el producto es numerable) */}
+              {editedIsNumerable && validDorsalsForSelect.length > 0 && purchasedDorsalIdxs.length > 0 && (
                 <div className="md-section is-blue">
-                  <span className="md-section-title"><FaTshirt /> Dorsal vendido</span>
-                  <select
-                    value={purchasedDorsalIndex}
-                    onChange={(e) => setPurchasedDorsalIndex(e.target.value)}
-                    className="md-input"
-                  >
-                    <option value="">Sin dorsal (camiseta lisa)</option>
-                    {validDorsalsForSelect.map((opt) => (
-                      <option key={`sale-dorsal-${opt.originalIdx}`} value={opt.originalIdx}>
-                        {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number} (Quedan: {opt.quantity || 0})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="md-hint">Descuenta el dorsal del inventario de Player/Fan.</p>
+                  <span className="md-section-title">
+                    <FaTshirt /> {purchasedDorsalIdxs.length > 1 ? `Impresión de cada camiseta (${purchasedDorsalIdxs.length})` : "Dorsal vendido"}
+                  </span>
+                  {purchasedDorsalIdxs.map((valor, n) => (
+                    <label key={`sale-dorsal-${n}`} className="md-field">
+                      {purchasedDorsalIdxs.length > 1 && <span className="md-label">Camiseta {n + 1}</span>}
+                      <select
+                        value={valor}
+                        onChange={(e) => setPurchasedDorsalIdxs((arr) => arr.map((v, k) => (k === n ? e.target.value : v)))}
+                        className="md-input"
+                      >
+                        <option value="">Sin dorsal (camiseta lisa)</option>
+                        {validDorsalsForSelect.map((opt) => (
+                          <option key={`sale-dorsal-${n}-${opt.originalIdx}`} value={opt.originalIdx}>
+                            {opt.name ? opt.name.toUpperCase() : "JUGADOR"} — #{opt.number} (Quedan: {opt.quantity || 0})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <p className="md-hint">Se rebaja de las impresiones de la Player y la Fan a la vez. Si se anula la venta, se devuelven.</p>
                 </div>
               )}
             </>

@@ -314,6 +314,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     "Balón",
     "Abrigos",
     "Llaveros",
+    "LEGO",
     "NBA",
     "MLB",
     "NFL",

@@ -419,6 +419,7 @@ export default function HistoryPage({ isSuperUser = false }) {
                         <option value="F1">F1</option>
                         <option value="NFL">NFL</option>
                         <option value="Llaveros">Llaveros</option>
+                        <option value="LEGO">LEGO</option>
                       </select>
                     </div>
                   </div>

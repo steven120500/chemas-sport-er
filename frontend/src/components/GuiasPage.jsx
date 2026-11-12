@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import GuiasCorreos from "./GuiasCorreos";
+import { generarPdfMensajero } from "../utils/guiasPdf";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const STORAGE_KEY = "chemasport_guias_registradas";
@@ -25,25 +26,6 @@ function limpiarMontoCR(val) {
   if (!val) return 0;
   const soloDigitos = String(val).replace(/\D/g, "");
   return Number(soloDigitos) || 0;
-}
-
-function cargarJsPDF() {
-  return new Promise((resolve, reject) => {
-    if (window.jspdf && window.jspdf.jsPDF) {
-      return resolve(window.jspdf.jsPDF);
-    }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    script.onload = () => {
-      if (window.jspdf && window.jspdf.jsPDF) {
-        resolve(window.jspdf.jsPDF);
-      } else {
-        reject(new Error("No se pudo inicializar jsPDF"));
-      }
-    };
-    script.onerror = () => reject(new Error("Error cargando librería PDF"));
-    document.body.appendChild(script);
-  });
 }
 
 export default function GuiasPage() {
@@ -364,82 +346,7 @@ export default function GuiasPage() {
   const handleDescargarYCompartirPDF = async (guia) => {
     const toastId = toastHOT.loading("Generando PDF para descargar y compartir...");
     try {
-      const jsPDF = await cargarJsPDF();
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [101.6, 152.4]
-      });
-
-      const montoGuia = limpiarMontoCR(guia.monto);
-      const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
-      const esMayorista = guia.esMayorista === "Sí";
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
-
-      doc.setLineWidth(0.6);
-      doc.line(6, 16.5, 95.6, 16.5);
-
-      let y = 25;
-      const margenIzq = 6;
-      const anchoMax = 89.6;
-
-      const agregarCampo = (etiqueta, valor) => {
-        const textoValor = String(valor || "").trim();
-        if (!textoValor) return;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        
-        if (etiqueta === "Comentarios") {
-          doc.text(`${etiqueta}:`, margenIzq, y);
-          y += 6;
-          doc.setFont("helvetica", "normal");
-          const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
-          doc.text(lineasValor, margenIzq, y);
-          y += (lineasValor.length * 6) + 4;
-        } else {
-          doc.text(`${etiqueta}:`, margenIzq, y);
-          doc.setFont("helvetica", "normal");
-          const lineasValor = doc.splitTextToSize(textoValor, anchoMax - 26);
-          doc.text(lineasValor, margenIzq + 26, y);
-          y += (lineasValor.length * 6) + 3;
-        }
-      };
-
-      agregarCampo("Nombre", guia.nombre);
-      agregarCampo("Provincia", guia.provincia);
-      agregarCampo("Cantón", guia.canton);
-      agregarCampo("Distrito", guia.distrito);
-      agregarCampo("Teléfono", guia.telefono);
-      agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
-      agregarCampo("Raspa", guia.meterRaspa);
-      agregarCampo("Comentarios", guia.comentarios);
-
-      if (esMayorista && guia.nombreMayorista) {
-        const yLinea = Math.max(y + 2, 115);
-        doc.setLineWidth(0.7);
-        doc.setLineDashPattern([2, 2], 0);
-        doc.line(6, yLinea, 95.6, yLinea);
-        doc.setLineDashPattern([], 0);
-
-        const textoMay = guia.nombreMayorista.toUpperCase();
-        
-        let tamFuente = 24;
-        if (textoMay.length > 12) tamFuente = 18;
-        if (textoMay.length > 20) tamFuente = 14;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(tamFuente);
-        
-        const lineasMayorista = doc.splitTextToSize(textoMay, 88);
-        doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
-      }
-
-      const nombreLimpio = String(guia.nombre || "Guia").replace(/[\\/:*?"<>|_]/g, "").trim();
-      const fileName = `${nombreLimpio}.pdf`;
+      const { doc, fileName } = await generarPdfMensajero(guia);
 
       doc.save(fileName);
 

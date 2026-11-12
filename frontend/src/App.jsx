@@ -368,19 +368,47 @@ function MainApp() {
     fetchProducts({ page, q: searchTerm, type: filterType });
   }, [page, searchTerm, filterType, filterSizes, storeView]);
 
-  // 🔥 5. SCROLL INMEDIATO
+  // 🔥 5. SCROLL AL INICIO DEL CATÁLOGO
+  // Calcula el destino con la altura real del header sticky (cambia entre celular/desktop y al hacer scroll).
+  const scrollToGrid = (behavior = 'smooth') => {
+    if (!pageTopRef.current) return;
+    const header = document.querySelector('.hd');
+    const headerH = header ? header.getBoundingClientRect().height : 0;
+    const top = pageTopRef.current.getBoundingClientRect().top + window.scrollY - headerH - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior });
+  };
+
+  // Cambio de página: sube al inicio de la grilla (no se queda abajo donde estaba la paginación).
+  // Al terminar de cargar se corrige la posición por si la altura cambió mientras llegaban los productos.
+  const pendingGridScrollRef = useRef(false);
+  const goToPage = (n) => {
+    if (n === page) return;
+    pendingGridScrollRef.current = true;
+    setPage(n);
+    scrollToGrid('smooth');
+  };
+
   useEffect(() => {
-    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || soloOcultos || page > 1;
-    
+    if (loading || !pendingGridScrollRef.current) return;
+    pendingGridScrollRef.current = false;
+    requestAnimationFrame(() => {
+      if (!pageTopRef.current) return;
+      const header = document.querySelector('.hd');
+      const headerH = header ? header.getBoundingClientRect().height : 0;
+      const off = pageTopRef.current.getBoundingClientRect().top - headerH - 12;
+      if (Math.abs(off) > 40) scrollToGrid('auto');
+    });
+  }, [loading, page]);
+
+  // Cambio de filtros/búsqueda: va a la grilla; sin filtros vuelve arriba del todo
+  useEffect(() => {
+    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || soloOcultos;
+
     setTimeout(() => {
-      if (hasFilters && pageTopRef.current) {
-        const yOffset = pageTopRef.current.getBoundingClientRect().top + window.scrollY - 140;
-        window.scrollTo({ top: yOffset, behavior: 'smooth' });
-      } else if (!hasFilters && page === 1) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }, 50); 
-  }, [searchTerm, filterType, filterSizes, soloOcultos, page]);
+      if (hasFilters) scrollToGrid('smooth');
+      else if (page === 1) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 50);
+  }, [searchTerm, filterType, filterSizes, soloOcultos]);
 
   const refreshCounts = () => {
     setTimeout(() => fetchAllForCounts(), 600);
@@ -753,7 +781,8 @@ function MainApp() {
                 <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div id="products-section" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                   {loading && !usingFullCatalog ? (
-                    Array.from({ length: 8 }).map((_, i) => (
+                    // Tantos esqueletos como productos por página: la altura no se encoge al cambiar de página
+                    Array.from({ length: limit }).map((_, i) => (
                       <div key={i} className="flex flex-col gap-3 w-full animate-pulse bg-white p-3 rounded-2xl border border-gray-200 shadow-sm">
                         <div className="w-full bg-gray-200 rounded-xl" style={{ paddingTop: '115%' }}></div>
                         <div className="w-3/4 h-5 bg-gray-200 rounded-full mt-2"></div>
@@ -801,7 +830,7 @@ function MainApp() {
                     <div className="pg-row">
                       <button
                         type="button"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        onClick={() => goToPage(Math.max(1, page - 1))}
                         disabled={page === 1}
                         className="pg-btn pg-btn--arrow"
                         aria-label="Página anterior"
@@ -820,7 +849,7 @@ function MainApp() {
                               {showDots && <span className="pg-dots">…</span>}
                               <button
                                 type="button"
-                                onClick={() => setPage(n)}
+                                onClick={() => goToPage(n)}
                                 className={`pg-btn ${isCurrent ? 'is-current' : ''}`}
                                 aria-current={isCurrent ? 'page' : undefined}
                               >
@@ -833,7 +862,7 @@ function MainApp() {
 
                       <button
                         type="button"
-                        onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                        onClick={() => goToPage(Math.min(pages, page + 1))}
                         disabled={page === pages}
                         className="pg-btn pg-btn--arrow"
                         aria-label="Página siguiente"

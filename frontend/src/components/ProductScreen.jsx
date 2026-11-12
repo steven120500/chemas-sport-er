@@ -335,7 +335,7 @@ export default function ProductScreen({
 
   const isNino = viewProduct?.type === "Niño";
   const isBalon = viewProduct?.type === "Balón" || viewProduct?.type === "Balones";
-  const isLlavero = viewProduct?.type === "Llaveros";
+  const isLlavero = viewProduct?.type === "Llaveros" || viewProduct?.type === "LEGO"; // por unidad
   const tallasVisibles = isLlavero ? ["U"] : (isBalon ? TALLAS_BALON : isNino ? TALLAS_NINO : TALLAS_ADULTO);
   
   const isCorteAjustado = useMemo(() => {
