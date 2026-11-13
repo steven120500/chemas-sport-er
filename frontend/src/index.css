@@ -3488,6 +3488,7 @@ select.md-input {
 .pd-tags span.is-dark { background: #000; color: #fff; }
 .pd-item-price { font-size: 14px; font-weight: 900; }
 .pd-item-price small { font-size: 11px; font-weight: 700; color: #a1a1aa; }
+.pd-item-antes { margin-right: 6px; font-size: 12px; font-weight: 700; color: #a1a1aa; }
 @media (max-width: 480px) {
   .pd-item { flex-direction: column; }
   .pd-item-fotos img, .pd-noimg.is-big { width: 110px; height: 126px; }
@@ -3627,6 +3628,11 @@ select.md-input {
 .pd-parche-foto img { width: 150px; height: 70px; object-fit: contain; background: #fff; border: 1px solid #e4e4e7; border-radius: 10px; }
 .pd-parche-foto span { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
 .pd-tags span.is-yellow { background: #fef08a; color: #713f12; border-color: #facc15; }
+.pd-tags span.is-red { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+/* 🎟️ Raspa: 5 opciones, que no se aprieten en celular */
+.pd-seg-raspa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 640px) { .pd-seg-raspa { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.md-card .pd-seg-raspa .md-seg-btn { padding: 0 4px; font-size: 12px; }
 
 /* 🖱️ Zonas para arrastrar y soltar fotos (camiseta y parche) */
 .pd-drop { position: relative; border-radius: 16px; transition: background-color 0.15s, box-shadow 0.15s; }

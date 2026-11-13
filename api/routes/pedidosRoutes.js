@@ -7,7 +7,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
 import Pedido, {
-  ESTADOS_PEDIDO, ESTADOS_ENTREGA, ESTADOS_SEMANA, METODOS_PAGO, METODOS_ABONO, ENTREGAS, MANGAS, fotosDeItems,
+  ESTADOS_PEDIDO, ESTADOS_ENTREGA, ESTADOS_SEMANA, METODOS_PAGO, METODOS_ABONO, ENTREGAS, MANGAS, RASPAS, precioItemDe, fotosDeItems,
   siguienteNumeroPedido, siguienteNumeroLote, PedidoLote, pagadoDe, saldoDe,
 } from '../models/Pedido.js';
 import Product from '../models/Product.js';
@@ -135,6 +135,7 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
         manga: MANGAS.includes(it?.manga) ? it.manga : 'Corta',
         cantidad: Math.min(99, Math.max(1, entero(it?.cantidad) || 1)),
         precio,
+        raspa: RASPAS.includes(Number(it?.raspa)) ? Number(it.raspa) : 0,
         costoProveedor: Math.max(0, Number(it?.costoProveedor) || 0),
       },
     };
@@ -273,6 +274,7 @@ router.get('/exportar', async (req, res) => {
       { header: 'Teléfono', key: 'tel', width: 13 },
       { header: 'Estado', key: 'estado', width: 18 },
       { header: 'Precio cliente', key: 'precio', width: 13 },
+      { header: 'Raspa', key: 'raspa', width: 10 },
     ];
     const head = ws.getRow(1);
     head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -307,7 +309,8 @@ router.get('/exportar', async (req, res) => {
           fecha: p.fechaYMD,
           tel: p.cliente?.telefono,
           estado: p.estado,
-          precio: it.precio * it.cantidad,
+          precio: precioItemDe(it), // ya con la raspa
+          raspa: it.raspa ? (it.raspa >= 100 ? 'REGALADA' : `${it.raspa}%`) : '',
         });
         row.alignment = { vertical: 'middle', wrapText: true };
         ['talla', 'version', 'dorsal', 'nombre'].forEach((k) => {

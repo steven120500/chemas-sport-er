@@ -27,7 +27,7 @@ import { API_BASE } from "../authFetch";
 import tallaPorTipo from "../utils/tallaPorTipo";
 import { compartirImagenPedido } from "../utils/pedidoImagen";
 const esMangaLarga = (it) => it?.manga === "Larga";
-import { abonadoDe, pagadoDe, saldoDe, METODOS_ABONO } from "../utils/pedidosPago";
+import { abonadoDe, pagadoDe, saldoDe, METODOS_ABONO, RASPAS, raspaLabel, precioItemDe, listaRaspas } from "../utils/pedidosPago";
 
 /* ================= CONSTANTES ================= */
 const ESTADO_INFO = {
@@ -62,7 +62,15 @@ function lineaItem(it) {
   if (!sinParche(it.parche)) partes.push(`Parche: ${it.parche}`);
   else if (it.fotoParche) partes.push("Parche (ver foto)");
   if ((it.cantidad || 1) > 1) partes.push(`x${it.cantidad}`);
+  if (it.raspa > 0) partes.push(`${raspaLabel(it.raspa)} (${colones(precioItemDe(it))})`);
   return partes.join(" · ");
+}
+
+/** 🎟️ Si el pedido usó raspa: el cliente tiene que dársela al mensajero para que valga el precio */
+function avisoRaspa(p) {
+  const lista = listaRaspas(p); // una raspa por camisa: "2 raspas de 20% y 1 raspa de regalía"
+  if (!lista) return [];
+  return ["", `🎟️ *Importante:* ocupamos que le entregués ${lista} al mensajero (o en tienda) para que sea válido el precio que te dimos.`];
 }
 
 /** Mensaje para avisarle al cliente que su pedido ya llegó */
@@ -78,6 +86,7 @@ function mensajeAviso(p) {
     ...(p.items || []).map((it) => `• ${lineaItem(it)}`),
     "",
     saldo > 0 ? `Saldo pendiente: *${colones(saldo)}*` : "Tu pedido ya está cancelado por completo ✅",
+    ...avisoRaspa(p),
     entrega,
     "",
     "¡Gracias por tu compra! 🙌",
@@ -915,6 +924,7 @@ function PedidoDetalle({ pedido: p, permisos, onClose, onChanged, onDeleted, onE
                 {(it.nombre || it.dorsal) && <span>{[it.nombre, it.dorsal && `#${it.dorsal}`].filter(Boolean).join(" ")}</span>}
                 {!sinParche(it.parche) && <span>Parche: {it.parche}</span>}
                 {it.cantidad > 1 && <span>x{it.cantidad}</span>}
+                {it.raspa > 0 && <span className="is-red">🎟️ {raspaLabel(it.raspa)}</span>}
               </div>
               {it.fotoParche && (
                 <a className="pd-parche-foto" href={fotoGrande(it.fotoParche)} target="_blank" rel="noopener noreferrer" title="Parche">
@@ -923,7 +933,8 @@ function PedidoDetalle({ pedido: p, permisos, onClose, onChanged, onDeleted, onE
                 </a>
               )}
               <span className="pd-item-price">
-                {colones(it.precio * (it.cantidad || 1))}
+                {it.raspa > 0 && <s className="pd-item-antes">{colones(it.precio * (it.cantidad || 1))}</s>}
+                {colones(precioItemDe(it))}
               </span>
             </div>
           </div>
@@ -1069,7 +1080,7 @@ function Abonos({ p, permisos, onChanged }) {
 
 /* ================= FORMULARIO (crear / editar) ================= */
 let keySeq = 0;
-const itemVacio = () => ({ _k: ++keySeq, producto: null, prodInfo: null, equipo: "", version: "", talla: "", nombre: "", dorsal: "", parche: "", fotoParche: "", manga: "Corta", cantidad: 1, precio: "", costoProveedor: "", fotos: [] });
+const itemVacio = () => ({ _k: ++keySeq, producto: null, prodInfo: null, equipo: "", version: "", talla: "", nombre: "", dorsal: "", parche: "", fotoParche: "", manga: "Corta", cantidad: 1, precio: "", raspa: 0, costoProveedor: "", fotos: [] });
 
 function PedidoForm({ inicial, vuelveARevision, onClose, onSaved }) {
   const editando = Boolean(inicial?._id);
@@ -1086,6 +1097,7 @@ function PedidoForm({ inicial, vuelveARevision, onClose, onSaved }) {
           fotos: it.fotos || [],
           fotoParche: it.fotoParche || "",
           manga: it.manga || "Corta",
+          raspa: Number(it.raspa) || 0,
           costoProveedor: it.costoProveedor || "",
         }))
       : [itemVacio()]
@@ -1105,7 +1117,7 @@ function PedidoForm({ inicial, vuelveARevision, onClose, onSaved }) {
   }, []);
 
   const setItem = (k, cambios) => setItems((arr) => arr.map((it) => (it._k === k ? { ...it, ...cambios } : it)));
-  const total = items.reduce((a, it) => a + (Number(it.precio) || 0) * (Number(it.cantidad) || 1), 0);
+  const total = items.reduce((a, it) => a + precioItemDe(it), 0); // ya con la raspa
   const saldo = Math.max(0, total - (Number(adelanto) || 0) - abonadoDe(inicial)); // los abonos se registran en el detalle
 
   const guardar = async (close) => {
@@ -1307,6 +1319,30 @@ function ItemEditor({ index, item: it, puedeQuitar, onChange, onRemove }) {
             <input className="md-input is-sm is-money" type="number" min="0" inputMode="numeric" value={it.precio} onChange={(e) => onChange({ precio: e.target.value })} placeholder="0" />
           </div>
         </label>
+      </div>
+      {/* 🎟️ Raspa: descuento que da el jefe; al cobrar el cliente se la entrega al mensajero */}
+      <div className="md-field">
+        <span className="md-label">
+          ¿Tiene raspa? <small className="pd-fotos-hint">(por camisa{Number(it.cantidad) > 1 ? `: ${it.cantidad} raspas` : ""})</small>
+          {Number(it.raspa) > 0 && Number(it.precio) > 0 && (
+            <small className="pd-fotos-hint"> → queda en {colones(precioItemDe(it))}</small>
+          )}
+        </span>
+        <div className="md-seg pd-seg pd-seg-raspa" role="radiogroup">
+          {RASPAS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={(Number(it.raspa) || 0) === r}
+              className={`md-seg-btn ${(Number(it.raspa) || 0) === r ? "is-active" : ""}`}
+              style={{ "--seg": r === 0 ? "#000" : r >= 100 ? "#16a34a" : "#dc2626" }}
+              onClick={() => onChange({ raspa: r })}
+            >
+              {r === 0 ? "No" : r >= 100 ? "Regalada" : `${r}%`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {index === 0 && (

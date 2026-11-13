@@ -21,6 +21,10 @@ export const ESTADOS_ENTREGA = ['Llegó', 'Avisado', 'Completado'];
 export const METODOS_PAGO = ['', 'SINPE', 'Efectivo', 'Transferencia', 'Datáfono', 'Mixto'];
 export const ENTREGAS = ['Correos de CR', 'Mensajero', 'Retiro en tienda', 'Otro'];
 export const MANGAS = ['Corta', 'Larga'];
+// 🎟️ Raspas que da el jefe (% de descuento por camisa: cada camisa lleva su propia raspa). 100 = regalada.
+export const RASPAS = [0, 10, 15, 20, 30, 100];
+/** Precio de una línea (precio × cantidad) ya con la raspa aplicada */
+export const precioItemDe = (it) => Math.round((Number(it?.precio) || 0) * (Number(it?.cantidad) || 1) * (1 - (Number(it?.raspa) || 0) / 100));
 /** 📸 Todas las fotos de las camisetas de un pedido (frente/espalda + parche), para limpiar Cloudinary */
 export const fotosDeItems = (items) => (items || []).flatMap((i) => [...(i?.fotos || []), ...(i?.fotoParche ? [i.fotoParche] : [])]);
 // Estados de la semana en curso (antes de cerrar el pedido semanal)
@@ -56,7 +60,8 @@ const ItemSchema = new mongoose.Schema(
     fotoParche: { type: String, default: '' },                              // 📸 foto del parche (opcional, Cloudinary products/pedidos)
     manga:    { type: String, enum: MANGAS, default: 'Corta' },             // Larga → "LONG SLEEVE" en la talla (como en la hoja)
     cantidad: { type: Number, min: 1, max: 99, default: 1 },
-    precio:   { type: Number, min: 0, default: 0 },                         // precio unitario al cliente (₡)
+    precio:   { type: Number, min: 0, default: 0 },                         // precio unitario al cliente (₡), sin raspa
+    raspa:    { type: Number, enum: RASPAS, default: 0 },                   // 🎟️ % de raspa (el cliente se la da al mensajero al pagar)
     costoProveedor: { type: Number, min: 0, default: 0 },                   // "Price" del Excel (opcional)
     // 📸 Fotos de la camiseta (máx. 2): subidas al registrar el pedido (products/pedidos) o, en pedidos viejos, copia de las del catálogo
     fotos:    { type: [String], default: [] },
@@ -127,7 +132,7 @@ pedidoSchema.pre('validate', function () {
     it.precio = Math.trunc(Number(it.precio) || 0);
     it.cantidad = Math.max(1, Math.trunc(Number(it.cantidad) || 1));
   }
-  this.total = (this.items || []).reduce((a, it) => a + it.precio * it.cantidad, 0);
+  this.total = (this.items || []).reduce((a, it) => a + precioItemDe(it), 0); // ya con la raspa
   this.adelanto = Math.trunc(Number(this.adelanto) || 0);
 });
 

@@ -11,7 +11,7 @@ import { FaTruck, FaCheck, FaMotorcycle, FaEnvelope } from "react-icons/fa";
 import ModalShell from "./ModalShell";
 import { API_BASE } from "../authFetch";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
-import { saldoDe } from "../utils/pedidosPago";
+import { saldoDe, textoRecogerRaspa } from "../utils/pedidosPago";
 
 // Mismas opciones que el formulario de GuiasPage (mensajero)
 const PROVINCIAS_MENSAJERO = ["Alajuela", "Cartago", "Heredia", "San José"];
@@ -46,6 +46,7 @@ async function postJSON(url, body, method = "POST") {
 
 export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
   const saldo = saldoDe(p); // adelanto + abonos
+  const recogerRaspa = textoRecogerRaspa(p);
   const [tipo, setTipo] = useState(p.guia?.tipo || "Correos");
   const [nombre, setNombre] = useState(p.cliente?.nombre || "");
   const [telefono, setTelefono] = useState(soloDigitos(p.cliente?.telefono, 8));
@@ -56,7 +57,10 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
   const [msj, setMsj] = useState({
     provincia: "", canton: "", distrito: "",
     debe: saldo > 0 ? "Sí" : "No", monto: saldo > 0 ? String(saldo) : "",
-    meterRaspa: "No", comentarioSelect: "Sin comentario", comentarioCustom: "",
+    meterRaspa: "No",
+    // 🎟️ Si el pedido usó raspa, el mensajero la tiene que recoger para que valga el precio
+    comentarioSelect: recogerRaspa ? "Otro comentario..." : "Sin comentario",
+    comentarioCustom: recogerRaspa,
   });
 
   // --- Correos ---
