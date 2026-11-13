@@ -45,7 +45,7 @@ async function isStillReferenced(publicId, excludeProductId) {
     // las facturas guardan la miniatura para reimprimir el tiquete
     TiendaFactura.exists({ 'ventas.imagen': rx }),
     // 🧾 los pedidos guardan las fotos de frente/espalda de la camiseta encargada
-    Pedido.exists({ 'items.fotos': rx }),
+    Pedido.exists({ $or: [{ 'items.fotos': rx }, { 'items.fotoParche': rx }] }), // + foto del parche
   ]);
   return Boolean(inProduct || inFactura || inPedido);
 }

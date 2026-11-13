@@ -69,8 +69,8 @@ for (const f of facturas) {
 }
 
 // Pedidos: guardan las fotos de frente/espalda de cada camiseta encargada
-const pedidos = await Pedido.find({}, 'items.fotos').lean();
-for (const pe of pedidos) for (const it of pe.items || []) for (const u of it.fotos || []) addUrl(u);
+const pedidos = await Pedido.find({}, 'items.fotos items.fotoParche').lean();
+for (const pe of pedidos) for (const it of pe.items || []) for (const u of [...(it.fotos || []), it.fotoParche]) if (u) addUrl(u);
 
 console.log(`📦 ${products.length} productos, ${facturas.length} facturas y ${pedidos.length} pedidos referencian ${referenced.size} imágenes`);
 

@@ -7,7 +7,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
 import Pedido, {
-  ESTADOS_PEDIDO, ESTADOS_ENTREGA, ESTADOS_SEMANA, METODOS_PAGO, METODOS_ABONO, ENTREGAS,
+  ESTADOS_PEDIDO, ESTADOS_ENTREGA, ESTADOS_SEMANA, METODOS_PAGO, METODOS_ABONO, ENTREGAS, MANGAS, fotosDeItems,
   siguienteNumeroPedido, siguienteNumeroLote, PedidoLote, pagadoDe, saldoDe,
 } from '../models/Pedido.js';
 import Product from '../models/Product.js';
@@ -108,11 +108,19 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
         .slice(0, 2);
     }
 
+    // 📸 Foto del parche (opcional, 1): nueva (data:image), la que ya tenía, o '' para quitarla
+    let fotoParcheIn = previo?.fotoParche || '';
+    if (it?.fotoParche !== undefined) {
+      const f = it.fotoParche;
+      fotoParcheIn = typeof f === 'string' && (f.startsWith('data:image/') ? f.length <= MAX_FOTO : f && f === previo?.fotoParche) ? f : '';
+    }
+
     const precioIn = it?.precio;
     const precio = precioIn === '' || precioIn == null ? precioEfectivo(prod) : entero(precioIn);
 
     return {
       fotosIn,
+      fotoParcheIn,
       prod,
       previo,
       item: {
@@ -124,6 +132,7 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
         nombre: str(it?.nombre, 40).toUpperCase(),
         dorsal: str(it?.dorsal, 10),
         parche: str(it?.parche, 120),
+        manga: MANGAS.includes(it?.manga) ? it.manga : 'Corta',
         cantidad: Math.min(99, Math.max(1, entero(it?.cantidad) || 1)),
         precio,
         costoProveedor: Math.max(0, Number(it?.costoProveedor) || 0),
@@ -132,26 +141,29 @@ async function prepararItems(itemsIn, itemsPrevios = []) {
   });
 
   // 2) Subir a Cloudinary las fotos nuevas (carpeta products/pedidos: la cubre el reporte de huérfanas)
+  const subir = async (f) => {
+    try {
+      const up = await cloudinary.uploader.upload(f, { folder: 'products/pedidos', resource_type: 'image', ...UPLOAD_LIMIT });
+      return up.secure_url;
+    } catch (err) {
+      console.error('Pedidos: error subiendo foto a Cloudinary:', err?.message || err);
+      throw Object.assign(new Error('No se pudo subir la foto. Probá de nuevo.'), { status: 502 });
+    }
+  };
   const out = [];
   for (const b of base) {
     let fotos = [];
     if (b.fotosIn) {
       for (const f of b.fotosIn) {
-        if (!f.startsWith('data:')) { fotos.push(f); continue; }
-        try {
-          const up = await cloudinary.uploader.upload(f, { folder: 'products/pedidos', resource_type: 'image', ...UPLOAD_LIMIT });
-          fotos.push(up.secure_url);
-        } catch (err) {
-          console.error('Pedidos: error subiendo foto a Cloudinary:', err?.message || err);
-          throw Object.assign(new Error('No se pudo subir la foto. Probá de nuevo.'), { status: 502 });
-        }
+        fotos.push(f.startsWith('data:') ? await subir(f) : f);
       }
     } else if (b.previo && String(b.previo.producto || '') === String(b.prod?._id || '') && b.previo.fotos?.length) {
       fotos = b.previo.fotos;
     } else if (b.prod) {
       fotos = fotosDeProducto(b.prod);
     }
-    out.push({ ...b.item, fotos });
+    const fotoParche = b.fotoParcheIn.startsWith('data:') ? await subir(b.fotoParcheIn) : b.fotoParcheIn;
+    out.push({ ...b.item, fotos, fotoParche });
   }
   return out;
 }
@@ -211,11 +223,17 @@ router.get('/', async (req, res) => {
 
 /* ================= EXPORTAR A EXCEL ================= */
 // Mismas columnas que la hoja del admin (Image, Team, Size, Versión, Number, Name, Patches, Quantity, Client, Pago, Pendiente…)
-async function bajarMiniatura(url) {
+// Como la hoja de Johanna: manga larga → "M LONG SLEEVE" con la talla en amarillo;
+// Fan con nombre/número → número y nombre en amarillo; parche con foto → la foto en la columna Patches.
+const tallaHoja = (it) => (it.manga === 'Larga' ? `${it.talla} LONG SLEEVE` : it.talla);
+const resaltarDorsal = (it) => /fan/i.test(it.version || '') && Boolean(it.nombre || it.dorsal);
+const AMARILLO = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+async function bajarMiniatura(url, trans = 'c_fill,w_120,h_138') {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
-    const r = await fetch(cldTransform(url, 'f_jpg,q_auto:eco,c_fill,w_120,h_138'), { signal: ctrl.signal });
+    const r = await fetch(cldTransform(url, `f_jpg,q_auto:eco,${trans}`), { signal: ctrl.signal });
     clearTimeout(t);
     if (!r.ok) return null;
     return Buffer.from(await r.arrayBuffer());
@@ -270,11 +288,11 @@ router.get('/exportar', async (req, res) => {
         const primera = idx === 0; // Pago / Pendiente / notas solo en la 1ra fila del pedido (para no sumarlos doble)
         const row = ws.addRow({
           equipo: it.equipo,
-          talla: it.talla,
+          talla: tallaHoja(it),
           version: it.version,
           dorsal: it.dorsal ? (/^\d+$/.test(it.dorsal) ? Number(it.dorsal) : it.dorsal) : 'N/A',
           nombre: it.nombre || 'N/A',
-          parche: it.parche || 'N/A',
+          parche: it.parche || (it.fotoParche ? '' : 'N/A'),
           cantidad: it.cantidad,
           cliente: p.cliente?.nombre,
           pago: primera ? pagado : null,
@@ -292,10 +310,17 @@ router.get('/exportar', async (req, res) => {
           precio: it.precio * it.cantidad,
         });
         row.alignment = { vertical: 'middle', wrapText: true };
-        if (conFotos && it.fotos?.[0]) {
-          row.height = 78;
-          filasConFoto.push({ row: row.number, url: it.fotos[0] });
-        }
+        ['talla', 'version', 'dorsal', 'nombre'].forEach((k) => {
+          const c = row.getCell(k);
+          c.font = { bold: true };
+          c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        });
+        if (it.manga === 'Larga') row.getCell('talla').fill = AMARILLO;
+        if (resaltarDorsal(it)) { row.getCell('dorsal').fill = AMARILLO; row.getCell('nombre').fill = AMARILLO; }
+        if (conFotos && it.fotos?.[0]) filasConFoto.push({ row: row.number, col: 0, url: it.fotos[0] });
+        if (conFotos && it.fotoParche) filasConFoto.push({ row: row.number, col: 6, url: it.fotoParche, parche: true });
+        if (conFotos && (it.fotos?.[0] || it.fotoParche)) row.height = 78;
+        if (conFotos && it.fotoParche && it.parche) row.getCell('parche').alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
       });
     }
     ['pago', 'pendiente', 'precio'].forEach((k) => { ws.getColumn(k).numFmt = '"₡"#,##0'; });
@@ -303,11 +328,17 @@ router.get('/exportar', async (req, res) => {
     // Miniaturas (de 6 en 6 para no saturar)
     for (let i = 0; i < filasConFoto.length; i += 6) {
       const lote = filasConFoto.slice(i, i + 6);
-      const bufs = await Promise.all(lote.map((f) => bajarMiniatura(f.url)));
+      const bufs = await Promise.all(lote.map((f) => bajarMiniatura(f.url, f.parche ? 'c_pad,b_white,w_300,h_140' : undefined)));
       lote.forEach((f, j) => {
-        if (!bufs[j]) { ws.getCell(`A${f.row}`).value = { text: 'ver foto', hyperlink: f.url }; return; }
+        const celda = ws.getRow(f.row).getCell(f.col + 1);
+        if (!bufs[j]) {
+          if (!celda.value) celda.value = { text: f.parche ? 'ver parche' : 'ver foto', hyperlink: f.url };
+          return;
+        }
         const imageId = wb.addImage({ buffer: bufs[j], extension: 'jpeg' });
-        ws.addImage(imageId, { tl: { col: 0.1, row: f.row - 1 + 0.05 }, ext: { width: 88, height: 100 } });
+        // parche: foto ancha (puede traer varios parches juntos); si también hay texto, queda abajo de la foto
+        const ext = f.parche ? { width: 150, height: 70 } : { width: 88, height: 100 };
+        ws.addImage(imageId, { tl: { col: f.col + 0.1, row: f.row - 1 + 0.05 }, ext });
       });
     }
 
@@ -477,7 +508,7 @@ router.put('/:id', async (req, res) => {
     const estadoNuevo = estadoAntes === 'Por confirmar' && !jefa ? 'Nuevo' : estadoAntes;
 
     const generales = datosGenerales(req.body);
-    const fotosAntes = pedido.items.flatMap((i) => i.fotos || []);
+    const fotosAntes = fotosDeItems(pedido.items);
     const items = await prepararItems(req.body?.items, pedido.items.map((i) => i.toObject()));
     pedido.set({ ...generales, items });
     await pedido.validate();
@@ -488,10 +519,10 @@ router.put('/:id', async (req, res) => {
     if (!guardado) {
       // las fotos nuevas que se subieron para esta edición ya no se usan
       const viejas = new Set(fotosAntes);
-      borrarFotosSinUso(items.flatMap((i) => i.fotos || []).filter((u) => !viejas.has(u)));
+      borrarFotosSinUso(fotosDeItems(items).filter((u) => !viejas.has(u)));
       return res.status(409).json({ error: 'El pedido cambió de estado mientras lo editabas. Abrilo otra vez.' });
     }
-    const quedan = new Set(items.flatMap((i) => i.fotos || []));
+    const quedan = new Set(fotosDeItems(items));
     borrarFotosSinUso(fotosAntes.filter((u) => !quedan.has(u)));
     res.json(guardado);
   } catch (err) {
@@ -639,7 +670,7 @@ router.delete('/:id', requireSuper, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
     const r = await Pedido.findByIdAndDelete(req.params.id);
     if (!r) return res.status(404).json({ error: 'Pedido no encontrado' });
-    borrarFotosSinUso((r.items || []).flatMap((i) => i.fotos || []));
+    borrarFotosSinUso(fotosDeItems(r.items));
     res.json({ ok: true });
   } catch (err) {
     enviarError(res, err, 'Error al eliminar el pedido');

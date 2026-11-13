@@ -20,6 +20,9 @@ export const ESTADOS_CERRADOS = ['Completado'];
 export const ESTADOS_ENTREGA = ['Llegó', 'Avisado', 'Completado'];
 export const METODOS_PAGO = ['', 'SINPE', 'Efectivo', 'Transferencia', 'Datáfono', 'Mixto'];
 export const ENTREGAS = ['Correos de CR', 'Mensajero', 'Retiro en tienda', 'Otro'];
+export const MANGAS = ['Corta', 'Larga'];
+/** 📸 Todas las fotos de las camisetas de un pedido (frente/espalda + parche), para limpiar Cloudinary */
+export const fotosDeItems = (items) => (items || []).flatMap((i) => [...(i?.fotos || []), ...(i?.fotoParche ? [i.fotoParche] : [])]);
 // Estados de la semana en curso (antes de cerrar el pedido semanal)
 export const ESTADOS_SEMANA = ['Nuevo', 'Por confirmar', 'Confirmado'];
 export const METODOS_ABONO = ['SINPE', 'Efectivo', 'Transferencia', 'Datáfono'];
@@ -49,7 +52,9 @@ const ItemSchema = new mongoose.Schema(
     talla:    { type: String, trim: true, maxlength: 40, required: true },
     nombre:   { type: String, trim: true, maxlength: 40, default: '' },    // nombre en la espalda
     dorsal:   { type: String, trim: true, maxlength: 10, default: '' },    // número
-    parche:   { type: String, trim: true, maxlength: 120, default: '' },
+    parche:   { type: String, trim: true, maxlength: 120, default: '' },    // parche en texto (Johanna a veces escribe, a veces pone foto)
+    fotoParche: { type: String, default: '' },                              // 📸 foto del parche (opcional, Cloudinary products/pedidos)
+    manga:    { type: String, enum: MANGAS, default: 'Corta' },             // Larga → "LONG SLEEVE" en la talla (como en la hoja)
     cantidad: { type: Number, min: 1, max: 99, default: 1 },
     precio:   { type: Number, min: 0, default: 0 },                         // precio unitario al cliente (₡)
     costoProveedor: { type: Number, min: 0, default: 0 },                   // "Price" del Excel (opcional)
