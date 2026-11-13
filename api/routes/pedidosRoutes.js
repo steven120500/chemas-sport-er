@@ -1,10 +1,15 @@
 // routes/pedidosRoutes.js
 // 🧾 Pedidos por encargo. Todo exige sesión (empleados y súper usuarios); borrar, solo súper usuario.
 // Cerrar la semana y marcar que llegó: súper usuario o los usuarios de PEDIDOS_CIERRE_USUARIOS (por defecto Johanna).
+// Revisión: el empleado registra (Nuevo) → Johanna lo manda a confirmar (Por confirmar) → el empleado que lo registró
+// confirma con el cliente (Confirmado) → al cerrar la semana solo entran los Confirmado.
 import express from 'express';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
-import Pedido, { ESTADOS_PEDIDO, ESTADOS_ENTREGA, METODOS_PAGO, ENTREGAS, siguienteNumeroPedido, siguienteNumeroLote, PedidoLote } from '../models/Pedido.js';
+import Pedido, {
+  ESTADOS_PEDIDO, ESTADOS_ENTREGA, ESTADOS_SEMANA, METODOS_PAGO, METODOS_ABONO, ENTREGAS,
+  siguienteNumeroPedido, siguienteNumeroLote, PedidoLote, pagadoDe, saldoDe,
+} from '../models/Pedido.js';
 import Product from '../models/Product.js';
 import { requireAuth, requireSuper, escapeRegex } from '../middleware/auth.js';
 import { fechaCR, fotosDeProducto, cldTransform } from '../utils/pedidosUtils.js';
@@ -29,6 +34,11 @@ function puedeCerrar(user) {
   const lista = (process.env.PEDIDOS_CIERRE_USUARIOS || 'johanna,johana').split(',').map(sinTildes).filter(Boolean);
   return lista.includes(sinTildes(user.name));
 }
+/** ¿Es quien registró el pedido? (es quien habla con el cliente) */
+const esQuienRegistro = (pedido, user) => Boolean(user?.id && pedido?.registradoPorId && String(pedido.registradoPorId) === String(user.id));
+const conSaldo = (p) => ({ ...p, pagado: pagadoDe(p), saldo: saldoDe(p) });
+const colonesTxt = (n) => `₡${Number(n || 0).toLocaleString('de-DE')}`;
+
 function requireCierre(req, res, next) {
   if (puedeCerrar(req.user)) return next();
   return res.status(403).json({ error: 'Solo el súper admin o Johanna pueden cerrar el pedido semanal.' });
@@ -42,6 +52,7 @@ function construirFiltro(query) {
   const estado = str(query.estado, 40);
   if (estado && ESTADOS_PEDIDO.includes(estado)) f.estado = estado;
   else if (estado === 'Pendientes') f.estado = { $in: ['Llegó', 'Avisado'] }; // llegaron y falta entregar
+  else if (estado === 'Semana') f.estado = { $in: ESTADOS_SEMANA }; // semana en curso (por revisar / por confirmar / confirmados)
 
   const lote = str(query.lote, 40);
   if (mongoose.isValidObjectId(lote)) f.lote = new mongoose.Types.ObjectId(lote);
@@ -190,7 +201,7 @@ router.get('/', async (req, res) => {
     ]);
     const conteos = Object.fromEntries(conteo.map((c) => [c._id, c.n]));
     res.json({
-      pedidos: pedidos.map((p) => ({ ...p, saldo: Math.max(0, (p.total || 0) - (p.adelanto || 0)) })),
+      pedidos: pedidos.map(conSaldo),
       total, page, pages: Math.max(1, Math.ceil(total / limit)), conteos,
     });
   } catch (err) {
@@ -253,7 +264,8 @@ router.get('/exportar', async (req, res) => {
 
     const filasConFoto = [];
     for (const p of pedidos) {
-      const saldo = Math.max(0, (p.total || 0) - (p.adelanto || 0));
+      const saldo = saldoDe(p);
+      const pagado = pagadoDe(p); // adelanto + abonos
       p.items.forEach((it, idx) => {
         const primera = idx === 0; // Pago / Pendiente / notas solo en la 1ra fila del pedido (para no sumarlos doble)
         const row = ws.addRow({
@@ -265,7 +277,7 @@ router.get('/exportar', async (req, res) => {
           parche: it.parche || 'N/A',
           cantidad: it.cantidad,
           cliente: p.cliente?.nombre,
-          pago: primera ? p.adelanto : null,
+          pago: primera ? pagado : null,
           pendiente: primera ? saldo : null,
           notas: primera ? p.notas : '',
           costo: it.costoProveedor || null,
@@ -311,7 +323,9 @@ router.get('/exportar', async (req, res) => {
 });
 
 /* ================= PERMISOS DEL USUARIO ================= */
-router.get('/permisos', (req, res) => res.json({ puedeCerrar: puedeCerrar(req.user), isSuperUser: !!req.user.isSuperUser }));
+router.get('/permisos', (req, res) =>
+  res.json({ puedeCerrar: puedeCerrar(req.user), isSuperUser: !!req.user.isSuperUser, id: String(req.user.id || ''), nombre: req.user.name || '' })
+);
 
 /* ================= PEDIDOS SEMANALES (lotes) ================= */
 router.get('/lotes', async (_req, res) => {
@@ -331,7 +345,7 @@ router.get('/lotes', async (_req, res) => {
         },
       ]),
       Pedido.aggregate([
-        { $match: { estado: 'Nuevo' } },
+        { $match: { estado: 'Confirmado' } }, // lo que entraría si se cierra hoy
         { $group: { _id: null, clientes: { $sum: 1 }, camisetas: { $sum: { $sum: '$items.cantidad' } } } },
       ]),
     ]);
@@ -348,17 +362,18 @@ router.get('/lotes', async (_req, res) => {
   }
 });
 
-// 🔒 Cerrar la semana: todos los pedidos "Nuevo" pasan al pedido semanal #N y ya no se editan
+// 🔒 Cerrar la semana: los pedidos "Confirmado" pasan al pedido semanal #N y ya no se editan.
+// Los que siguen por revisar / por confirmar se quedan para el próximo pedido.
 router.post('/lotes/cerrar', requireCierre, async (req, res) => {
   try {
-    const ids = (await Pedido.find({ estado: 'Nuevo' }, '_id').lean()).map((p) => p._id);
-    if (!ids.length) return res.status(400).json({ error: 'No hay pedidos nuevos para cerrar esta semana.' });
+    const ids = (await Pedido.find({ estado: 'Confirmado' }, '_id').lean()).map((p) => p._id);
+    if (!ids.length) return res.status(400).json({ error: 'No hay pedidos confirmados por el cliente para cerrar esta semana.' });
 
     const { fechaYMD, fecha } = fechaCR();
     const lote = await PedidoLote.create({ numero: await siguienteNumeroLote(), fechaYMD, fecha, cerradoPor: req.user.name });
-    // Solo los que siguen en "Nuevo" (por si alguien editó/borró uno en el mismo segundo)
+    // Solo los que siguen en "Confirmado" (por si alguien lo devolvió/borró en el mismo segundo)
     const r = await Pedido.updateMany(
-      { _id: { $in: ids }, estado: 'Nuevo' },
+      { _id: { $in: ids }, estado: 'Confirmado' },
       { $set: { estado: 'Pedido', lote: lote._id, loteNumero: lote.numero }, $push: { historialEstados: { estado: 'Pedido', por: req.user.name, fecha: new Date() } } }
     );
     // Dos cierres en el mismo segundo (ej. Johanna y el súper admin): el que llegó tarde no se lleva ninguno → se deshace
@@ -378,7 +393,7 @@ router.get('/lotes/:id', async (req, res) => {
     const lote = await PedidoLote.findById(req.params.id).lean();
     if (!lote) return res.status(404).json({ error: 'Pedido semanal no encontrado' });
     const pedidos = await Pedido.find({ lote: lote._id }).sort({ numero: 1 }).lean();
-    res.json({ lote, pedidos: pedidos.map((p) => ({ ...p, saldo: Math.max(0, (p.total || 0) - (p.adelanto || 0)) })) });
+    res.json({ lote, pedidos: pedidos.map(conSaldo) });
   } catch (err) {
     enviarError(res, err, 'Error al cargar el pedido semanal');
   }
@@ -450,24 +465,31 @@ router.put('/:id', async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
     const pedido = await Pedido.findById(req.params.id);
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
-    if (pedido.estado !== 'Nuevo') return res.status(409).json({ error: 'Este pedido ya se le pidió al proveedor: no se puede editar.' });
+    if (!ESTADOS_SEMANA.includes(pedido.estado)) return res.status(409).json({ error: 'Este pedido ya se le pidió al proveedor: no se puede editar.' });
+
+    // ✏️ Quién edita: por revisar / por confirmar → quien lo registró o Johanna; confirmado → solo Johanna / súper
+    const jefa = puedeCerrar(req.user);
+    const dueno = esQuienRegistro(pedido, req.user);
+    if (pedido.estado === 'Confirmado' && !jefa) return res.status(403).json({ error: 'El pedido ya está confirmado: solo Johanna o el súper admin lo pueden editar.' });
+    if (!jefa && !dueno) return res.status(403).json({ error: 'Solo quien registró el pedido o Johanna lo pueden editar.' });
+    const estadoAntes = pedido.estado;
+    // Si el empleado lo cambia cuando ya estaba por confirmar, Johanna lo tiene que volver a revisar
+    const estadoNuevo = estadoAntes === 'Por confirmar' && !jefa ? 'Nuevo' : estadoAntes;
 
     const generales = datosGenerales(req.body);
     const fotosAntes = pedido.items.flatMap((i) => i.fotos || []);
     const items = await prepararItems(req.body?.items, pedido.items.map((i) => i.toObject()));
     pedido.set({ ...generales, items });
     await pedido.validate();
-    // Guardar solo si sigue en "Nuevo" (si cerraron la semana mientras se editaba, no se toca)
-    const guardado = await Pedido.findOneAndUpdate(
-      { _id: pedido._id, estado: 'Nuevo' },
-      { $set: { cliente: pedido.cliente, adelanto: pedido.adelanto, metodoPago: pedido.metodoPago, notas: pedido.notas, items: pedido.items, total: pedido.total } },
-      { new: true }
-    );
+    // Guardar solo si sigue en el mismo estado (si cerraron la semana o lo movieron mientras se editaba, no se toca)
+    const cambios = { $set: { cliente: pedido.cliente, adelanto: pedido.adelanto, metodoPago: pedido.metodoPago, notas: pedido.notas, items: pedido.items, total: pedido.total, estado: estadoNuevo } };
+    cambios.$push = { historialEstados: { estado: estadoNuevo !== estadoAntes ? 'Nuevo' : 'Editado', por: req.user.name, fecha: new Date() } };
+    const guardado = await Pedido.findOneAndUpdate({ _id: pedido._id, estado: estadoAntes }, cambios, { new: true });
     if (!guardado) {
       // las fotos nuevas que se subieron para esta edición ya no se usan
       const viejas = new Set(fotosAntes);
       borrarFotosSinUso(items.flatMap((i) => i.fotos || []).filter((u) => !viejas.has(u)));
-      return res.status(409).json({ error: 'Este pedido ya se le pidió al proveedor: no se puede editar.' });
+      return res.status(409).json({ error: 'El pedido cambió de estado mientras lo editabas. Abrilo otra vez.' });
     }
     const quedan = new Set(items.flatMap((i) => i.fotos || []));
     borrarFotosSinUso(fotosAntes.filter((u) => !quedan.has(u)));
@@ -478,13 +500,42 @@ router.put('/:id', async (req, res) => {
 });
 
 /* ================= CAMBIAR ESTADO ================= */
+// Revisión (semana en curso):
+//   Nuevo → Por confirmar          Johanna / súper (ya lo revisó)
+//   Por confirmar → Confirmado     quien lo registró o Johanna (el cliente confirmó la imagen)
+//   Por confirmar / Confirmado → Nuevo   Johanna / súper (devolver a revisión)
+const PASOS_REVISION = {
+  'Por confirmar': { desde: ['Nuevo'], quien: 'jefa' },
+  Confirmado: { desde: ['Por confirmar'], quien: 'dueno' },
+  Nuevo: { desde: ['Por confirmar', 'Confirmado'], quien: 'jefa' },
+};
+
 router.put('/:id/estado', async (req, res) => {
   try {
     const estado = str(req.body?.estado, 40);
-    if (!ESTADOS_ENTREGA.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
+    if (!ESTADOS_ENTREGA.includes(estado) && !PASOS_REVISION[estado]) return res.status(400).json({ error: 'Estado inválido' });
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
     const pedido = await Pedido.findById(req.params.id);
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+    const paso = PASOS_REVISION[estado];
+    if (paso) {
+      if (pedido.estado === estado) return res.json(pedido);
+      if (!paso.desde.includes(pedido.estado)) return res.status(409).json({ error: `El pedido está "${pedido.estado}": no se puede pasar a "${estado}".` });
+      const jefa = puedeCerrar(req.user);
+      if (paso.quien === 'jefa' && !jefa) return res.status(403).json({ error: 'Solo Johanna o el súper admin pueden hacer esto.' });
+      if (paso.quien === 'dueno' && !jefa && !esQuienRegistro(pedido, req.user)) {
+        return res.status(403).json({ error: `Lo confirma quien registró el pedido (${pedido.registradoPor || '—'}) o Johanna.` });
+      }
+      // Atómico: si alguien cerró la semana o lo movió en el mismo momento, no se pisa
+      const r = await Pedido.findOneAndUpdate(
+        { _id: pedido._id, estado: pedido.estado },
+        { $set: { estado }, $push: { historialEstados: { estado, por: req.user.name, fecha: new Date() } } },
+        { new: true }
+      );
+      if (!r) return res.status(409).json({ error: 'El pedido acaba de cambiar. Recargá la página.' });
+      return res.json(r);
+    }
 
     // Avisado / Completado solo después de que llegó el pedido semanal
     if (!ESTADOS_ENTREGA.includes(pedido.estado)) {
@@ -501,6 +552,63 @@ router.put('/:id/estado', async (req, res) => {
     res.json(pedido);
   } catch (err) {
     enviarError(res, err, 'Error al cambiar el estado');
+  }
+});
+
+/* ================= ABONOS ================= */
+// 💵 El cliente abona después del adelanto (ej. ₡10.000 una semana antes de que llegue): baja el saldo pendiente.
+// Cualquier empleado con sesión lo puede registrar (cualquiera puede recibir el SINPE).
+router.post('/:id/abonos', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const monto = entero(req.body?.monto);
+    if (!monto) return res.status(400).json({ error: 'Poné el monto del abono.' });
+    const metodo = METODOS_ABONO.includes(req.body?.metodo) ? req.body.metodo : '';
+    const pedido = await Pedido.findById(req.params.id);
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const saldo = saldoDe(pedido);
+    if (saldo <= 0) return res.status(409).json({ error: 'Este pedido ya está pagado por completo.' });
+    if (monto > saldo) return res.status(400).json({ error: `El abono es mayor a lo que debe (${colonesTxt(saldo)}).` });
+
+    const abono = { monto, metodo, nota: str(req.body?.nota, 200), fecha: new Date(), por: req.user.name, porId: String(req.user.id || '') };
+    // $push atómico (dos empleados abonando al mismo tiempo no se pisan)
+    const r = await Pedido.findByIdAndUpdate(
+      pedido._id,
+      {
+        $push: {
+          abonos: abono,
+          historialEstados: { estado: `Abono ${colonesTxt(monto)}${metodo ? ` (${metodo})` : ''}`, por: req.user.name, fecha: new Date() },
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    res.status(201).json(r);
+  } catch (err) {
+    enviarError(res, err, 'Error al registrar el abono');
+  }
+});
+
+// Quitar un abono (por error): quien lo registró, Johanna o el súper admin
+router.delete('/:id/abonos/:abonoId', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.abonoId)) return res.status(404).json({ error: 'Abono no encontrado' });
+    const pedido = await Pedido.findById(req.params.id);
+    const abono = pedido?.abonos?.id(req.params.abonoId);
+    if (!abono) return res.status(404).json({ error: 'Abono no encontrado' });
+    if (!puedeCerrar(req.user) && String(abono.porId) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Solo quien registró el abono o Johanna lo pueden quitar.' });
+    }
+    const r = await Pedido.findByIdAndUpdate(
+      pedido._id,
+      {
+        $pull: { abonos: { _id: abono._id } },
+        $push: { historialEstados: { estado: `Abono quitado ${colonesTxt(abono.monto)}`, por: req.user.name, fecha: new Date() } },
+      },
+      { new: true }
+    );
+    res.json(r);
+  } catch (err) {
+    enviarError(res, err, 'Error al quitar el abono');
   }
 });
 
