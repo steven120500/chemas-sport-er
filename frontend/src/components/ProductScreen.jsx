@@ -332,6 +332,26 @@ export default function ProductScreen({
     };
   }, [isEditing]);
 
+  // 🔒 Mientras el editor está abierto se renueva el candado cada 3 min (vence a los 10).
+  // Antes, si alguien tardaba más de 10 min editando, otro usuario podía tomar el candado y al guardar daba 409.
+  useEffect(() => {
+    if (!isEditing) return;
+    const id = product?._id || product?.id;
+    if (!id) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}/lock`, {
+          method: "POST", headers: { "Content-Type": "application/json", "x-user": displayName },
+        });
+        if (res.status === 409) {
+          const data = await res.json().catch(() => ({}));
+          toast.warn(`Ojo: ${data.lockedBy || "otro usuario"} está editando esta camiseta.`);
+        }
+      } catch { /* sin conexión: se reintenta en el próximo ciclo */ }
+    }, 3 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [isEditing, product?._id, product?.id, displayName]);
+
   const unlockProduct = async () => {
     const id = product?._id || product?.id;
     if (!id) return;

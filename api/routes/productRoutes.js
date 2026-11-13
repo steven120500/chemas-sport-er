@@ -32,6 +32,14 @@ function whoDidIt(req) {
          'Sistema';
 }
 
+// 🔒 Dueño del candado: SIEMPRE el usuario de la sesión (JWT). Lock, unlock y PUT usan esta misma función
+// (antes el PUT comparaba contra sellerName y el lock contra req.user → si no coincidían daba 409 al guardar).
+function lockOwner(req) {
+  return String(req.user?.name || req.headers['x-user'] || req.body?.user || 'Sistema').trim();
+}
+const mismoDueno = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+const LOCK_MS = 10 * 60 * 1000;
+
 function diffInv(label, prev = {}, next = {}) {
   const sizes = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
   const out = [];
@@ -220,15 +228,15 @@ router.post('/', requireRole('add'), upload.any(), async (req, res) => {
 
 router.post('/:id/lock', requireRole('edit'), async (req, res) => {
   try {
-      const product = await Product.findById(req.params.id);
+      const product = await Product.findById(req.params.id).select('lockedBy lockedAt').lean();
       if (!product) return res.status(404).json({ error: "Producto no encontrado" });
 
-      const user = whoDidIt(req);
+      const user = lockOwner(req);
       const now = new Date();
 
-      if (product.lockedBy && product.lockedBy !== user) {
-          const lockAge = now - product.lockedAt;
-          if (lockAge < 600000) { 
+      if (product.lockedBy && !mismoDueno(product.lockedBy, user)) {
+          const lockAge = now - new Date(product.lockedAt || 0);
+          if (lockAge < LOCK_MS) { 
               return res.status(409).json({ 
                   error: "Bloqueado", 
                   lockedBy: product.lockedBy 
@@ -236,9 +244,9 @@ router.post('/:id/lock', requireRole('edit'), async (req, res) => {
           }
       }
 
-      product.lockedBy = user;
-      product.lockedAt = now;
-      await product.save();
+      // updateOne (no save) → un producto con datos viejos que no pasan validación igual se puede bloquear.
+      // Llamarlo otra vez estando bloqueado por uno mismo renueva el candado (el editor lo hace cada pocos minutos).
+      await Product.updateOne({ _id: req.params.id }, { $set: { lockedBy: user, lockedAt: now } });
 
       const freshProduct = await Product.findById(req.params.id).lean();
       res.json({ success: true, lockedBy: user, product: freshProduct });
@@ -250,13 +258,11 @@ router.post('/:id/lock', requireRole('edit'), async (req, res) => {
 
 router.post('/:id/unlock', requireRole('edit'), async (req, res) => {
   try {
-      const product = await Product.findById(req.params.id);
-      const user = whoDidIt(req);
+      const product = await Product.findById(req.params.id).select('lockedBy').lean();
+      const user = lockOwner(req);
 
-      if (product && product.lockedBy === user) {
-          product.lockedBy = null;
-          product.lockedAt = null;
-          await product.save();
+      if (product && mismoDueno(product.lockedBy, user)) {
+          await Product.updateOne({ _id: req.params.id }, { $set: { lockedBy: null, lockedAt: null } });
       }
       res.json({ success: true });
   } catch (err) {
@@ -272,9 +278,9 @@ router.put('/:id', requireRole('edit'), async (req, res) => {
 
     const user = (req.body.sellerName || req.body.user || whoDidIt(req) || 'Sistema').trim();
 
-    if (prev.lockedBy && prev.lockedBy !== user) {
-      const lockAge = new Date() - prev.lockedAt;
-      if (lockAge < 600000) {
+    if (prev.lockedBy && !mismoDueno(prev.lockedBy, lockOwner(req))) {
+      const lockAge = new Date() - new Date(prev.lockedAt || 0);
+      if (lockAge < LOCK_MS) {
         return res.status(409).json({ error: "Producto bloqueado por otro usuario", lockedBy: prev.lockedBy });
       }
     }

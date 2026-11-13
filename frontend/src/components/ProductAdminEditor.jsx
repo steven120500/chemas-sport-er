@@ -334,6 +334,12 @@ export default function ProductAdminEditor({
 
       if (!res.ok) {
         if (res.status === 413) throw new Error("La foto es demasiado pesada.");
+        if (res.status === 409) {
+          const data = await res.json().catch(() => ({}));
+          const err = new Error("Bloqueado");
+          err.lockedBy = data.lockedBy;
+          throw err;
+        }
         throw new Error("Error en el servidor al guardar.");
       }
 
@@ -349,7 +355,11 @@ export default function ProductAdminEditor({
 
     } catch (err) {
       console.error("Error al guardar:", err);
-      toast.error(err.message === "La foto es demasiado pesada." ? "La foto pesa mucho. Intenta subir una más ligera." : "Error al procesar datos");
+      if (err.message === "Bloqueado") {
+        toast.error(`No se guardó: ${err.lockedBy || "otro usuario"} tiene abierta esta camiseta. Cancelá la edición y volvé a entrar cuando termine.`);
+      } else {
+        toast.error(err.message === "La foto es demasiado pesada." ? "La foto pesa mucho. Intenta subir una más ligera." : "Error al procesar datos");
+      }
     } finally {
       setLoading(false);
     }
