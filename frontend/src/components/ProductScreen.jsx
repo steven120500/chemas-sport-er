@@ -21,18 +21,62 @@ const MODAL_IMG_MAX_W = 1000; // fijo: nítido en pantallas retina sin descargar
 const getDorsalLayout = (teamFont, productType = "") => {
   const isPlayer = productType.toLowerCase().includes("player");
 
-  // 🎨 Variantes de color (misma calibración que la base del equipo, solo cambia color/borde)
+  // 🎨 Variantes de color (solo color/borde; las medidas están en MEDIDAS_NUEVAS)
   const VARIANTES_COLOR = {
-    // Real Madrid tercera rosada: letras beige
-    madrid_rosa: { colorTop: "#F6EBCB", colorMid: "#EEDFB6", colorBottom: "#E2D09F", stroke: "rgba(0,0,0,0.12)" },
-    // Real Madrid tercera verde: letras blancas
+    // Real Madrid tercera rosada: beige casi blanco (offsetX: centrado en la espalda)
+    madrid_rosa: { colorTop: "#FDFAF1", colorMid: "#F8F2E2", colorBottom: "#EFE6CF", stroke: "rgba(0,0,0,0.12)" },
+    // Real Madrid visitante verde: letras blancas
     madrid_verde: { colorTop: "#FFFFFF", colorMid: "#F6F5EF", colorBottom: "#E9E7DE", stroke: "rgba(0,0,0,0.12)" },
-    // Barcelona visita (negra/morada): dorado
+    // Barcelona visita (negra/morada): dorado, letra más pequeña que la local
     barca_visita: { colorTop: "#F6CF7A", colorMid: "#E9B65A", colorBottom: "#D49C3E", stroke: "#B9852F" },
     // Barcelona tercera (aqua): azul marino con borde rojo
     barca_tercera: { colorTop: "#2E3478", colorMid: "#262B66", colorBottom: "#1D2152", stroke: "#E0313B", strokeName: 1.4, strokeNumber: 4 },
   };
-  const variante = VARIANTES_COLOR[teamFont] || {};
+  // 📐 Medidas separadas PLAYER / FAN de las tipografías nuevas (como Boca y River).
+  // ⚠️ De momento Player y Fan tienen los MISMOS valores (los que ya tenían): retocar cuando lleguen las camisetas.
+  const MEDIDAS_NUEVAS = {
+    madrid_rosa: {
+      boxWidth: isPlayer ? "50%" : "60%",
+      offsetY: isPlayer ? "-23%" : "-23%",
+      offsetX: isPlayer ? "1%" : "1%",
+      nameY: isPlayer ? 120 : 123,
+      nameCurve: isPlayer ? 120 : 120,
+      nameSize: isPlayer ? 38 : 38,
+      numberY: isPlayer ? 235 : 285,
+      numberSize: isPlayer ? 180 : 180,
+    },
+    madrid_verde: {
+      boxWidth: isPlayer ? "60%" : "60%",
+      offsetY: isPlayer ? "-28%" : "-28%",
+      offsetX: isPlayer ? "-1%" : "1.5%",
+      nameY: isPlayer ? 123 : 123,
+      nameCurve: isPlayer ? 120 : 120,
+      nameSize: isPlayer ? 38 : 38,
+      numberY: isPlayer ? 285 : 285,
+      numberSize: isPlayer ? 180 : 180,
+    },
+    barca_visita: {
+      boxWidth: isPlayer ? "60%" : "60%",
+      offsetY: isPlayer ? "-0%" : "-0%",
+      offsetX: isPlayer ? "0%" : "0%",
+      nameY: isPlayer ? 50 : 160,
+      nameCurve: isPlayer ? 30 : 30,
+      nameSize: isPlayer ? 43 : 43,
+      numberY: isPlayer ? 150 : 190,
+      numberSize: isPlayer ? 190 : 172,
+    },
+    barca_tercera: {
+      boxWidth: isPlayer ? "60%" : "60%",
+      offsetY: isPlayer ? "-5%" : "-5%",
+      offsetX: isPlayer ? "-3%" : "-3%",
+      nameY: isPlayer ? 50 : 50,
+      nameCurve: isPlayer ? 40 : 40,
+      nameSize: isPlayer ? 50 : 50,
+      numberY: isPlayer ? 173 : 173,
+      numberSize: isPlayer ? 210 : 210,
+    },
+  };
+  const variante = { ...(VARIANTES_COLOR[teamFont] || {}), ...(MEDIDAS_NUEVAS[teamFont] || {}) };
 
   if (teamFont === 'madrid' || teamFont === 'madrid_rosa' || teamFont === 'madrid_verde') {
     return {

@@ -50,10 +50,23 @@ function buildPages(page, pages) {
 
 const getPid = (p) => String(p?._id ?? p?.id ?? '');
 
-// 🏷️ filterType admite varios tipos separados por coma (ej. "Player,Fan").
-// Se combinan con O. "Nuevo" no filtra: solo ordena por más reciente.
+// 🏷️ filterType admite varios tipos separados por coma (ej. "Player,Fan,Temp 26-27").
+// Categorías reales (Player, Fan, Retro…) se combinan con O entre sí; las etiquetas especiales
+// (Ofertas, Populares, Mundial 2026, Temp 26-27) se combinan con Y: "Player + Temp 26-27" = Player DE la 26-27.
+// "Nuevo" no filtra: solo ordena por más reciente.
 const parseTypes = (ft = '') =>
   String(ft || '').split(',').map((t) => t.trim()).filter((t) => t && t !== 'Todos');
+
+const ETIQUETAS_ESPECIALES = new Set(['Ofertas', 'Populares', 'Mundial 2026', 'Temp 26-27', 'Temporada 26-27']);
+
+/** (categoría1 O categoría2 …) Y etiqueta1 Y etiqueta2 … */
+const matchesTypes = (product, tipos) => {
+  const categorias = tipos.filter((t) => !ETIQUETAS_ESPECIALES.has(t));
+  const etiquetas = tipos.filter((t) => ETIQUETAS_ESPECIALES.has(t));
+  if (categorias.length && !categorias.some((t) => matchesType(product, t))) return false;
+  return etiquetas.every((t) => matchesType(product, t));
+};
+
 
 const matchesType = (product, t) => {
   if (t === 'Ofertas') return Number(product.discountPrice) > 0 && Number(product.discountPrice) < Number(product.price);
@@ -534,7 +547,7 @@ function MainApp() {
 
       const restrictive = activeTypes.filter((t) => t !== 'Nuevo');
       if (restrictive.length === 0) return true;
-      return restrictive.some((t) => matchesType(product, t));
+      return matchesTypes(product, restrictive);
     });
 
     if (usingFullCatalog) {

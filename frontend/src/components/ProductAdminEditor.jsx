@@ -582,7 +582,7 @@ export default function ProductAdminEditor({
                     <option value="barca_tercera">F.C. Barcelona Tercera (azul/rojo)</option>
                     <option value="madrid">Real Madrid</option>
                     <option value="madrid_rosa">Real Madrid Tercera Rosada (beige)</option>
-                    <option value="madrid_verde">Real Madrid Tercera Verde (blanco)</option>
+                    <option value="madrid_verde">Real Madrid Visitante Verde (blanco)</option>
                     <option value="boca">Boca Juniors</option>
                     <option value="river">River Plate</option>
                   </select>
