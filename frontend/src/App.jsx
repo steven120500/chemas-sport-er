@@ -30,6 +30,7 @@ import WorldCupIntro from './components/WorldCupIntro';
 import ComisionesPage from './components/ComisionesPage';
 import GuiasPage from './components/GuiasPage';
 import TiendaPage from './components/TiendaPage';
+import PedidosPage from './components/PedidosPage'; // 🧾 Panel de pedidos (/admin)
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -66,7 +67,6 @@ const matchesTypes = (product, tipos) => {
   if (categorias.length && !categorias.some((t) => matchesType(product, t))) return false;
   return etiquetas.every((t) => matchesType(product, t));
 };
-
 
 const matchesType = (product, t) => {
   if (t === 'Ofertas') return Number(product.discountPrice) > 0 && Number(product.discountPrice) < Number(product.price);
@@ -668,6 +668,8 @@ function MainApp() {
             <Route path="/comisiones" element={<ComisionesPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/guias" element={<GuiasPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/tienda" element={<TiendaPage isSuperUser={isSuperUser} user={user} />} />
+            <Route path="/admin" element={<PedidosPage isSuperUser={isSuperUser} user={user} />} />
+            <Route path="/admin/pedidos" element={<Navigate to="/admin" replace />} />
 
             <Route path="/" element={
               <>
@@ -894,7 +896,7 @@ function MainApp() {
 
         <Footer />
         {/* El WhatsApp para clientes no se muestra en las páginas de administración */}
-        {!anyModalOpen && !['/tienda', '/comisiones', '/guias', '/history'].includes(location.pathname) && <FloatingWhatsapp />}
+        {!anyModalOpen && !['/tienda', '/comisiones', '/guias', '/history', '/admin'].includes(location.pathname) && <FloatingWhatsapp />}
 
       </div>
     </>

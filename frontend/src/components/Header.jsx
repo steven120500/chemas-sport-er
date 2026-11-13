@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import logo from "../assets/logo.png";
 import {
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaPercentage, FaTruck, FaStore,
+  FaPercentage, FaTruck, FaStore, FaClipboardList,
 } from "react-icons/fa";
 
 // ⚠️ Estilos en index.css (sección "HEADER", clases hd-*).
@@ -172,6 +172,7 @@ export default function Header({
   const menu = user
     ? [
         esAdminTienda && { key: "tienda", icon: FaStore, label: "Tienda física", onClick: () => navigate("/tienda"), featured: true },
+        { key: "pedidos", icon: FaClipboardList, label: "Pedidos", onClick: () => navigate("/admin") },
         { key: "comisiones", icon: FaPercentage, label: "Comisiones", onClick: () => navigate("/comisiones") },
         { key: "guias", icon: FaTruck, label: "Guías", onClick: () => navigate("/guias") },
         !esSoloUsuarioTienda && (isSuperUser || user?.roles?.includes("add")) && {
