@@ -82,7 +82,7 @@ Filtros del catálogo se sincronizan con la URL: `?q=&type=&sizes=S,M`. Si hay f
 - **Backend**: `middleware/attachUser.js` valida el JWT → `req.user = { id, name, roles, isSuperUser }`. `middleware/auth.js`: `requireAuth`, `requireRole(...)` (súper usuario siempre pasa), `requireSuper`, `canSeeHidden`, `rateLimit`, `escapeRegex`. **Los headers `x-super`/`x-admin`/`x-roles` ya no dan permisos** (el frontend todavía los manda; se ignoran). `x-user`/`sellerName` solo sirven para atribuir nombre en el historial.
 - **Permisos por ruta** (mismos que exige la UI):
   - Públicas: `GET /api/products`, `GET /api/products/:id` (ocultos → 404 sin permiso), `POST /api/auth/login`, health/ping.
-  - Sesión: historial (GET), comisiones, `/api/pedidos/*` (borrar pedido: súper usuario), anular ventas, `/api/tienda/*`, `/api/alegra/*`, `/api/guias/*`, `/api/correos/*`, export PDF.
+  - Sesión: historial (GET), comisiones, `/api/pedidos/*` (borrar pedido: súper usuario cualquiera; el colaborador solo los suyos en `Nuevo`), anular ventas, `/api/tienda/*`, `/api/alegra/*`, `/api/guias/*`, `/api/correos/*`, export PDF.
   - `edit`: PUT / lock / unlock producto · `add`: crear producto, registrar usuario · `delete`: eliminar producto · `view_users`: listar/borrar usuarios (no a sí mismo ni a súper usuarios) · súper usuario: `DELETE /api/history`.
 - **Socket.io**: con token válido → sala `admins` (objeto completo); público → versión sin `_lastEditMeta`/`lockedBy` (`utils/realtime.js`, usar siempre `emitProductUpdate(io, obj)`).
 - Roles usados: `add`, `edit`, `delete`, `history`, `ver_ocultos`, `view_users`, `tienda`.

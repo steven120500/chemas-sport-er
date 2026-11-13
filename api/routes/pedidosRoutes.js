@@ -11,7 +11,7 @@ import Pedido, {
   siguienteNumeroPedido, siguienteNumeroLote, PedidoLote, pagadoDe, saldoDe,
 } from '../models/Pedido.js';
 import Product from '../models/Product.js';
-import { requireAuth, requireSuper, escapeRegex } from '../middleware/auth.js';
+import { requireAuth, escapeRegex } from '../middleware/auth.js';
 import { fechaCR, fotosDeProducto, cldTransform } from '../utils/pedidosUtils.js';
 import cloudinary, { UPLOAD_LIMIT, publicIdFromUrl } from '../config/cloudinary.js';
 import { destroyIfUnused } from '../utils/cloudinaryCleanup.js';
@@ -324,6 +324,40 @@ router.get('/exportar', async (req, res) => {
       });
     }
     ['pago', 'pendiente', 'precio'].forEach((k) => { ws.getColumn(k).numFmt = '"₡"#,##0'; });
+
+    // 👥 Solo súper admin: tabla a la par con cuántas camisetas encargó cada colaborador
+    if (req.user.isSuperUser && pedidos.length) {
+      const porColab = new Map();
+      for (const p of pedidos) {
+        const nombre = (p.registradoPor || '—').trim() || '—';
+        const key = sinTildes(nombre);
+        const acc = porColab.get(key) || { nombre, pedidos: 0, camisetas: 0 };
+        acc.pedidos += 1;
+        acc.camisetas += p.items.reduce((a, it) => a + (Number(it.cantidad) || 1), 0);
+        porColab.set(key, acc);
+      }
+      const filas = [...porColab.values()].sort((a, b) => b.camisetas - a.camisetas || a.nombre.localeCompare(b.nombre));
+      const c0 = ws.columns.length + 2; // una columna vacía de separación
+      ws.getColumn(c0).width = 18;
+      ws.getColumn(c0 + 1).width = 10;
+      ws.getColumn(c0 + 2).width = 11;
+      const pintar = (rowNum, valores, estilo) => {
+        valores.forEach((v, i) => {
+          const c = ws.getRow(rowNum).getCell(c0 + i);
+          c.value = v;
+          c.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center' };
+          c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+          if (estilo) Object.assign(c, estilo);
+        });
+      };
+      const negro = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } } };
+      pintar(1, ['Colaborador', 'Pedidos', 'Camisetas'], negro);
+      filas.forEach((f, i) => pintar(i + 2, [f.nombre, f.pedidos, f.camisetas]));
+      pintar(filas.length + 2, ['TOTAL', filas.reduce((a, f) => a + f.pedidos, 0), filas.reduce((a, f) => a + f.camisetas, 0)], {
+        font: { bold: true },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } },
+      });
+    }
 
     // Miniaturas (de 6 en 6 para no saturar)
     for (let i = 0; i < filasConFoto.length; i += 6) {
@@ -664,11 +698,24 @@ router.put('/:id/guia', async (req, res) => {
   }
 });
 
-/* ================= ELIMINAR (solo súper usuario) ================= */
-router.delete('/:id', requireSuper, async (req, res) => {
+/* ================= ELIMINAR =================
+   🗑️ Súper usuario: cualquier pedido.
+   👤 Colaborador: solo SUS pedidos y solo al principio ("Nuevo" / por revisar, sin semana),
+      p. ej. si lo metió mal o el cliente al final no lo va a pedir. */
+router.delete('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Pedido no encontrado' });
-    const r = await Pedido.findByIdAndDelete(req.params.id);
+    const pedido = await Pedido.findById(req.params.id);
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+    if (!req.user.isSuperUser) {
+      if (!esQuienRegistro(pedido, req.user)) {
+        return res.status(403).json({ error: 'Solo podés eliminar pedidos que registraste vos.' });
+      }
+      if (pedido.estado !== 'Nuevo' || pedido.lote) {
+        return res.status(403).json({ error: 'Solo se puede eliminar mientras está "Por revisar". Pedile al súper admin.' });
+      }
+    }
+    const r = await Pedido.findByIdAndDelete(pedido._id);
     if (!r) return res.status(404).json({ error: 'Pedido no encontrado' });
     borrarFotosSinUso(fotosDeItems(r.items));
     res.json({ ok: true });
