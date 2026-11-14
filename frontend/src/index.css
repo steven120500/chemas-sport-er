@@ -3187,7 +3187,7 @@ select.md-input {
   font-size: 24px;
   box-shadow: 0 14px 28px -12px rgba(0, 0, 0, 0.6);
 }
-.md-big-icon.is-green { background: #16a34a; box-shadow: 0 14px 28px -12px rgba(22, 163, 74, 0.8); }
+.md-big-icon.is-green { background: #16a34a; color: #fff; /* 👈 la regla genérica .is-green (pedidos) lo pintaba verde sobre verde */ box-shadow: 0 14px 28px -12px rgba(22, 163, 74, 0.8); }
 .md-steps { display: flex; justify-content: center; gap: 6px; }
 .md-steps > i { width: 22px; height: 4px; border-radius: 9999px; background: #e4e4e7; transition: background-color 0.3s, width 0.3s; }
 .md-steps > i.is-on { width: 34px; background: #000; }
