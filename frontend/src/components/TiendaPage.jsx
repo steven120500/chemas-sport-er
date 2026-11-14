@@ -226,6 +226,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const [contactosAlegra, setContactosAlegra] = useState([]);
   const [mostrarListaContactos, setMostrarListaContactos] = useState(false);
+  // 👇 Datos del cliente plegados por defecto para que el formulario no se vea tan cargado
+  const [mostrarDatosCliente, setMostrarDatosCliente] = useState(false);
   const [favoritosIds, setFavoritosIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem("chemasport_contactos_favoritos") || "[]"); } catch { return []; }
   });
@@ -935,7 +937,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const tipoIdFinal = facturaPendiente.cliente?.tipoIdentificacion || formCliente.tipoIdentificacion || "01";
 
     if (facturaPendiente.tipo === "hacienda" && (!cedulaFinal || !nombreFinal || !correoFinal || !telefonoFinal)) {
-      toastHOT.error("Para emitir a Hacienda completa Cédula, Nombre, Teléfono y Correo arriba (o cambia a Ticket Interno).");
+      setMostrarDatosCliente(true);
+      toastHOT.error("Para emitir a Hacienda completa Cédula, Nombre, Teléfono y Correo en \"Datos del cliente\" arriba (o cambia a Ticket Interno).");
       return;
     }
 
@@ -1831,88 +1834,116 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
             <div>
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo de Comprobante *</label>
-              <select value={formCliente.tipoEmision} onChange={(e) => setFormCliente({ ...formCliente, tipoEmision: e.target.value })} className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none cursor-pointer">
+              <select value={formCliente.tipoEmision} onChange={(e) => { setFormCliente({ ...formCliente, tipoEmision: e.target.value }); if (e.target.value === "hacienda") setMostrarDatosCliente(true); }} className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none cursor-pointer">
                 <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
                 <option value="interno">Ticket Normal (Uso Interno)</option>
               </select>
             </div>
 
-            <div className="relative">
-              <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-2xl text-xs font-black text-zinc-950 transition-all cursor-pointer">
-                <span className="flex items-center gap-2">
-                  <FaStar className="text-amber-500" size={14} />
-                  <span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span>
+            <div>
+              <button
+                type="button"
+                onClick={() => setMostrarDatosCliente((v) => !v)}
+                aria-expanded={mostrarDatosCliente}
+                className="tp-datos-toggle w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-zinc-50 hover:bg-zinc-100 border-2 border-zinc-200 rounded-2xl text-left transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <FaUserCheck className="text-zinc-700 shrink-0" size={15} />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-black uppercase tracking-wider text-black">
+                      Datos del cliente {formCliente.tipoEmision === "hacienda" ? "*" : "(opcional)"}
+                    </span>
+                    <span className="block text-[11px] font-bold text-zinc-500 truncate">
+                      {formCliente.nombre.trim() || formCliente.cedula.trim()
+                        ? `${formCliente.nombre.trim() || "Sin nombre"}${formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}`
+                        : "Cliente de contado · tocá para agregar cédula, nombre, teléfono o correo"}
+                    </span>
+                  </span>
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
+                <FaChevronRight size={12} className={`shrink-0 text-zinc-600 transition-transform duration-200 ${mostrarDatosCliente ? "transform rotate-90" : ""}`} />
               </button>
 
-              {mostrarListaContactos && (
-                <div className="mt-2 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl divide-y divide-zinc-100 z-30">
-                  {contactosOrdenadosYFiltrados.length === 0 ? (
-                    <p className="p-4 text-center text-xs text-zinc-400 font-bold">No hay contactos guardados en Alegra.</p>
-                  ) : (
-                    contactosOrdenadosYFiltrados.map((c) => {
-                      const esFav = favoritosIds.includes(String(c.id));
-                      return (
-                        <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors">
-                          <div className="min-w-0 flex-1 pr-2">
-                            <p className="text-xs font-black text-black truncate flex items-center gap-1.5">
-                              <FaUserCheck className="text-blue-600 shrink-0" size={12} />
-                              <span className="truncate">{c.nombre}</span>
-                            </p>
-                            <p className="text-[10px] text-zinc-500 font-mono truncate">
-                              {c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""}
-                            </p>
-                          </div>
-                          <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-2 rounded-lg hover:bg-zinc-100 cursor-pointer">
-                            <FaStar size={14} className={esFav ? "text-amber-400" : "text-zinc-300"} />
-                          </button>
-                        </div>
-                      );
-                    })
+              {mostrarDatosCliente && (
+                <div className="mt-4 space-y-6">
+                <div className="relative">
+                  <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-2xl text-xs font-black text-zinc-950 transition-all cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <FaStar className="text-amber-500" size={14} />
+                      <span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span>
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
+                  </button>
+
+                  {mostrarListaContactos && (
+                    <div className="mt-2 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl divide-y divide-zinc-100 z-30">
+                      {contactosOrdenadosYFiltrados.length === 0 ? (
+                        <p className="p-4 text-center text-xs text-zinc-400 font-bold">No hay contactos guardados en Alegra.</p>
+                      ) : (
+                        contactosOrdenadosYFiltrados.map((c) => {
+                          const esFav = favoritosIds.includes(String(c.id));
+                          return (
+                            <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors">
+                              <div className="min-w-0 flex-1 pr-2">
+                                <p className="text-xs font-black text-black truncate flex items-center gap-1.5">
+                                  <FaUserCheck className="text-blue-600 shrink-0" size={12} />
+                                  <span className="truncate">{c.nombre}</span>
+                                </p>
+                                <p className="text-[10px] text-zinc-500 font-mono truncate">
+                                  {c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""}
+                                </p>
+                              </div>
+                              <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-2 rounded-lg hover:bg-zinc-100 cursor-pointer">
+                                <FaStar size={14} className={esFav ? "text-amber-400" : "text-zinc-300"} />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID (Opcional al registrar)</label>
-                <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="w-full px-3 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs font-bold text-black outline-none">
-                  <option value="01">Física</option>
-                  <option value="02">Jurídica</option>
-                  <option value="03">DIMEX</option>
-                  <option value="04">NITE</option>
-                  <option value="05">Extranjero</option>
-                  <option value="06">No Contrib.</option>
-                </select>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID (Opcional al registrar)</label>
+                    <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="w-full px-3 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs font-bold text-black outline-none">
+                      <option value="01">Física</option>
+                      <option value="02">Jurídica</option>
+                      <option value="03">DIMEX</option>
+                      <option value="04">NITE</option>
+                      <option value="05">Extranjero</option>
+                      <option value="06">No Contrib.</option>
+                    </select>
+                  </div>
 
-              <div className="sm:col-span-3">
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula (Opcional al registrar)</label>
-                <div className="flex gap-2">
-                  <input type="text" value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-                  <button type="button" onClick={buscarCedulaHacienda} className="bg-black text-white px-5 rounded-2xl hover:bg-zinc-800 transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar">
-                    <FaSearch size={14} />
-                  </button>
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula (Opcional al registrar)</label>
+                    <div className="flex gap-2">
+                      <input type="text" value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                      <button type="button" onClick={buscarCedulaHacienda} className="bg-black text-white px-5 rounded-2xl hover:bg-zinc-800 transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar">
+                        <FaSearch size={14} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente (Opcional al registrar)</label>
-              <input type="text" value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Cliente de Contado o nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-            </div>
+                <div>
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente (Opcional al registrar)</label>
+                  <input type="text" value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Cliente de Contado o nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono (Opcional al registrar)</label>
-                <input type="tel" value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo (Opcional al registrar)</label>
-                <input type="email" value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono (Opcional al registrar)</label>
+                    <input type="tel" value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo (Opcional al registrar)</label>
+                    <input type="email" value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                  </div>
+                </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-2">
