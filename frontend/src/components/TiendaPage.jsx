@@ -8,6 +8,7 @@ import {
   FaCheckCircle, FaClock, FaTimes, FaChevronRight
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
+import ModalShell from "./ModalShell";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const PENDIENTES_STORAGE_KEY = "chemasport_tienda_ventas_pendientes_v1";
@@ -228,6 +229,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   const [mostrarListaContactos, setMostrarListaContactos] = useState(false);
   // 👇 Datos del cliente plegados por defecto para que el formulario no se vea tan cargado
   const [mostrarDatosCliente, setMostrarDatosCliente] = useState(false);
+  // 🧾 Pop up con el resumen de la venta antes de registrarla
+  const [resumenVentaAbierto, setResumenVentaAbierto] = useState(false);
   const [favoritosIds, setFavoritosIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem("chemasport_contactos_favoritos") || "[]"); } catch { return []; }
   });
@@ -827,33 +830,47 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const vueltoCalculado = (Number(formCliente.pagoConBillete) || 0) - totalCalculadoForm;
 
-  const handleAgregarVentaATabla = () => {
+  // ✅ Validaciones antes de registrar (se usan al abrir el resumen y otra vez al confirmar)
+  const validarVentaParaRegistrar = () => {
     if (listaFinalParaCobrar.length === 0) {
       toastHOT.error("Agrega al menos una prenda o un abono/ingreso extra para registrar en la tabla.");
-      return;
+      return false;
     }
     if (totalCalculadoForm <= 0) {
       toastHOT.error("El monto total debe ser mayor a 0.");
-      return;
+      return false;
     }
 
     if (!metodoInfo(formCliente.metodoPago)) {
       toastHOT.error("Escogé el método de pago antes de registrar la venta.");
       document.getElementById("tienda-metodo-pago")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+      return false;
     }
+
+    if (formCliente.metodoPago === "Mixto") {
+      const sumaMixto =
+        (Number(formCliente.montoEfectivoMixto) || 0) +
+        (Number(formCliente.montoDatafonoMixto) || 0) +
+        (Number(formCliente.montoSinpeMixto) || 0);
+      if (Math.abs(sumaMixto - totalCalculadoForm) > 1) {
+        toastHOT.error(`La suma del pago mixto (₡${sumaMixto.toLocaleString("es-CR")}) debe ser igual al total.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 👈 El botón "Registrar" primero muestra el resumen; la venta se registra al confirmar
+  const abrirResumenVenta = () => {
+    if (validarVentaParaRegistrar()) setResumenVentaAbierto(true);
+  };
+
+  const handleAgregarVentaATabla = () => {
+    if (!validarVentaParaRegistrar()) return false;
 
     let efecMixto = Number(formCliente.montoEfectivoMixto) || 0;
     let datMixto = Number(formCliente.montoDatafonoMixto) || 0;
     let sinpeMixto = Number(formCliente.montoSinpeMixto) || 0;
-
-    if (formCliente.metodoPago === "Mixto") {
-      const sumaMixto = efecMixto + datMixto + sinpeMixto;
-      if (Math.abs(sumaMixto - totalCalculadoForm) > 1) {
-        toastHOT.error(`La suma del pago mixto (₡${sumaMixto.toLocaleString("es-CR")}) debe ser igual al total.`);
-        return;
-      }
-    }
 
     const clienteNombreFinal = formCliente.nombre.trim() || "Cliente de Contado";
 
@@ -920,6 +937,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setFormCliente((prev) => ({ ...prev, pagoConBillete: "", metodoPago: "", montoEfectivoMixto: "", montoDatafonoMixto: "", montoSinpeMixto: "" }));
 
     toastHOT.success(`Venta registrada en ${formCliente.metodoPago} · ₡${totalCalculadoForm.toLocaleString("es-CR")}`);
+    return true;
   };
 
   const handleEmitirDesdeTabla = async (facturaPendiente) => {
@@ -1950,7 +1968,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               {(() => {
                 const met = metodoInfo(formCliente.metodoPago);
                 return (
-                  <button type="button" onClick={handleAgregarVentaATabla} disabled={generandoTiquete} className={`w-full ${met ? met.activo : "bg-zinc-400"} py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]`}>
+                  <button type="button" onClick={abrirResumenVenta} disabled={generandoTiquete} className={`w-full ${met ? met.activo : "bg-zinc-400"} py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]`}>
                     {met ? <met.Icono size={16} /> : <FaPlus size={14} />}
                     <span>
                       {met
@@ -2212,6 +2230,110 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         </div>
 
       </div>
+
+      {/* 🧾 RESUMEN DE LA VENTA: se confirma antes de registrarla */}
+      {resumenVentaAbierto && (() => {
+        const met = metodoInfo(formCliente.metodoPago);
+        const unidades = listaFinalParaCobrar.reduce((acc, it) => acc + (Number(it.totalUnidades) || 1), 0);
+        const fmt = (n) => `₡${(Number(n) || 0).toLocaleString("de-DE")}`;
+        const billete = Number(formCliente.pagoConBillete) || 0;
+        const desgloseMixto = [
+          ["Efectivo", formCliente.montoEfectivoMixto],
+          ["Datáfono", formCliente.montoDatafonoMixto],
+          ["SINPE", formCliente.montoSinpeMixto]
+        ].filter(([, v]) => Number(v) > 0);
+        const cliente = formCliente.nombre.trim() || "Cliente de Contado";
+        return (
+          <ModalShell
+            onClose={() => setResumenVentaAbierto(false)}
+            size="md"
+            icon={FaReceipt}
+            eyebrow="Confirmar venta"
+            title="Resumen de la venta"
+            subtitle={`${unidades} artículo${unidades === 1 ? "" : "s"} · revisá que todo esté bien antes de registrar`}
+            footer={(close) => (
+              <>
+                <button type="button" onClick={close} className="md-btn is-flat">Volver</button>
+                <button
+                  type="button"
+                  className="md-btn is-success"
+                  onClick={() => { if (handleAgregarVentaATabla()) close(); }}
+                >
+                  <FaCheckCircle size={14} /> Confirmar · {fmt(totalCalculadoForm)}
+                </button>
+              </>
+            )}
+          >
+            <div className="md-section">
+              <span className="md-section-title">Artículos</span>
+              <ul className="tr-list">
+                {listaFinalParaCobrar.map((it, idx) => {
+                  const cant = Number(it.totalUnidades) || 1;
+                  const unit = Number(it.precioUnitarioCustom) || 0;
+                  return (
+                    <li key={it.uid || idx} className="tr-item">
+                      <div className="tr-item-info">
+                        <b>{cant}× {it.item}</b>
+                        <small>
+                          {it.tallasTexto || it.talla ? `Talla ${it.tallasTexto || it.talla}` : ""}
+                          {it.ubicacion ? ` · ${it.ubicacion}` : ""}
+                          {cant > 1 ? ` · ${fmt(unit)} c/u` : ""}
+                        </small>
+                      </div>
+                      <span className="tr-item-precio">{fmt(unit * cant)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div className="md-section">
+              <span className="md-section-title">Pago</span>
+              <div className="tr-row">
+                <span>Método</span>
+                <span className={`tr-badge border ${met?.badge || ""}`}>
+                  {met && <met.Icono size={11} />} {formCliente.metodoPago}
+                </span>
+              </div>
+              {formCliente.metodoPago === "Mixto" && desgloseMixto.map(([k, v]) => (
+                <div key={k} className="tr-row is-sub"><span>{k}</span><b>{fmt(v)}</b></div>
+              ))}
+              {formCliente.metodoPago === "Efectivo" && billete > 0 && (
+                <>
+                  <div className="tr-row is-sub"><span>Pagó con</span><b>{fmt(billete)}</b></div>
+                  <div className="tr-row is-sub">
+                    <span>Vuelto</span>
+                    <b style={{ color: vueltoCalculado >= 0 ? "#a16207" : "#dc2626" }}>{fmt(vueltoCalculado)}</b>
+                  </div>
+                </>
+              )}
+              <div className="tr-row">
+                <span>Comprobante</span>
+                <b>{formCliente.tipoEmision === "hacienda" ? "Tiquete Electrónico (Hacienda)" : "Ticket interno"}</b>
+              </div>
+              <div className="tr-row">
+                <span>Cliente</span>
+                <b>{cliente}{formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}</b>
+              </div>
+              <div className="tr-row">
+                <span>Vendedor</span>
+                <b>{nombreUsuarioActual}</b>
+              </div>
+            </div>
+
+            {formCliente.metodoPago === "Efectivo" && billete > 0 && vueltoCalculado < 0 && (
+              <p className="tr-alerta">
+                <FaExclamationTriangle size={12} /> El billete no alcanza: faltan {fmt(-vueltoCalculado)}.
+              </p>
+            )}
+
+            <div className="tr-total">
+              <span>Total a cobrar</span>
+              <b>{fmt(totalCalculadoForm)}</b>
+            </div>
+          </ModalShell>
+        );
+      })()}
     </div>
   );
 }
