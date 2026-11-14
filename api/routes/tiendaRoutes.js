@@ -5,6 +5,7 @@ import History from '../models/History.js';
 
 import { requireAuth, requireSuper } from '../middleware/auth.js';
 import { emitProductUpdate } from '../utils/realtime.js';
+import { leerImpresiones, rebajarEnOpciones, rebajarEnHermanos, devolverImpresiones } from '../utils/dorsales.js';
 
 const router = express.Router();
 
@@ -43,6 +44,8 @@ function getHoyYMD() {
 - "Bodega 1" -> product.stock
 - "Bodega 2" -> product.bodega
    delta = -1 (rebajar al vender) | +1 (devolver al anular)
+   👕 impresiones: dorsales vendidos (uno por camiseta) → se rebajan aquí y en el hermano Player/Fan
+   👕 dorsalesDevolver: lo que se rebajó al vender (venta.dorsalesDescontados) → se devuelve al anular
    ======================================================== */
 async function ajustarStockPorUbicacion({
   productId,
@@ -54,10 +57,12 @@ async function ajustarStockPorUbicacion({
   vendedor = "Tienda",
   nombreCliente = "Cliente Tienda",
   crearHistorial = false,
+  impresiones = [],
+  dorsalesDevolver = null,
   io = null
 }) {
   try {
-    if (!talla) return { product: null, historyId: null };
+    if (!talla) return { product: null, historyId: null, dorsalesDescontados: [] };
 
     let product = null;
     if (productId) {
@@ -83,7 +88,7 @@ async function ajustarStockPorUbicacion({
       }
     }
 
-    if (!product) return { product: null, historyId: null };
+    if (!product) return { product: null, historyId: null, dorsalesDescontados: [] };
 
     const tallaLimpia = String(talla).replace(/^\d+x\s*/i, "").trim().toUpperCase();
     const ubiNorm = limpiarTexto(ubicacion);
@@ -131,17 +136,54 @@ async function ajustarStockPorUbicacion({
       product.isPopular = totalMonth >= 10;
     }
 
+    // 👕 Impresiones: una por camiseta rebajada (solo si la camiseta tiene dorsales y queda > 0)
+    const imps = (delta < 0 && product.isNumerable && antes > despues)
+      ? (Array.isArray(impresiones) ? impresiones : []).slice(0, antes - despues)
+      : [];
+    let descontadosAqui = [];
+    if (imps.length) {
+      const opciones = (product.dorsalOptions || []).map((o) => (o.toObject ? o.toObject() : { ...o }));
+      descontadosAqui = rebajarEnOpciones(opciones, imps);
+      if (descontadosAqui.length) {
+        product.dorsalOptions = opciones;
+        product.markModified('dorsalOptions');
+      }
+    }
+
     await product.save();
+
+    const dorsalesDescontados = descontadosAqui.map((h) => ({ productId: String(product._id), ...h }));
+    if (imps.length) {
+      const enHermanos = await rebajarEnHermanos(product, imps, io);
+      dorsalesDescontados.push(...enHermanos);
+    }
+
+    // ↩️ Al anular: devolver exactamente las impresiones que se rebajaron en esa venta
+    if (delta > 0 && Array.isArray(dorsalesDevolver) && dorsalesDevolver.length) {
+      await devolverImpresiones({ dorsalRefundData: { descontados: dorsalesDevolver } }, product, io);
+    }
 
     let historyDoc = null;
     if (crearHistorial && delta < 0) {
-      const detalleText = `👤 Cliente: ${nombreCliente || "Cliente Tienda"} | [ID:${product._id}] | ${etiquetaHistorial}[${claveReal}]: ${antes} → ${despues}`;
+      const dorsalText = imps.length
+        ? ` | 👕 Dorsal Impreso: ${imps.map((d) => `${d.name.toUpperCase()} #${d.number}`).join(', ')}`
+        : '';
+      const detalleText = `👤 Cliente: ${nombreCliente || "Cliente Tienda"} | [ID:${product._id}] | ${etiquetaHistorial}[${claveReal}]: ${antes} → ${despues}${dorsalText}`;
       historyDoc = await History.create({
         productId: product._id,
         user: vendedor || "Tienda",
         action: "vendió / rebajó stock",
         item: `${product.name} (${product.type})`,
         date: new Date(),
+        dorsalRefundData: imps.length
+          ? {
+              name: imps[0].name.toUpperCase(),
+              number: imps[0].number,
+              teamFont: product.teamFont,
+              impresiones: imps,
+              descontados: dorsalesDescontados,
+            }
+          : undefined,
         details: detalleText
       });
     }
@@ -153,11 +195,12 @@ async function ajustarStockPorUbicacion({
 
     return {
       product: updatedObj,
-      historyId: historyDoc ? String(historyDoc._id) : null
+      historyId: historyDoc ? String(historyDoc._id) : null,
+      dorsalesDescontados
     };
   } catch (err) {
     console.error("⚠️ Error ajustando stock en Tienda:", err);
-    return { product: null, historyId: null };
+    return { product: null, historyId: null, dorsalesDescontados: [] };
   }
 }
 
@@ -569,6 +612,9 @@ router.post('/emitir', async (req, res) => {
       const ubicacionVenta = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
       const tallaVenta = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
       const cantVenta = Number(v.totalUnidades) || 1;
+      // 👕 Lo rebajado lo calcula siempre el backend (al re-emitir llega la copia vieja de la venta)
+      const impresionesVenta = leerImpresiones({ purchasedDorsals: v.dorsales }).slice(0, cantVenta);
+      delete v.dorsalesDescontados;
 
       if (tallaVenta && !String(v.item || "").toLowerCase().includes("envio gam")) {
         const resultado = await ajustarStockPorUbicacion({
@@ -581,8 +627,13 @@ router.post('/emitir', async (req, res) => {
           vendedor: v.vendedor || "Tienda",
           nombreCliente: nombreCliente || "Cliente Tienda",
           crearHistorial: true,
+          impresiones: impresionesVenta,
           io
         });
+
+        if (resultado.dorsalesDescontados?.length) {
+          v.dorsalesDescontados = resultado.dorsalesDescontados;
+        }
 
         if (resultado.historyId) {
           historyIdsCreados.push(resultado.historyId);
@@ -675,9 +726,13 @@ router.delete('/:id', requireSuper, async (req, res) => {
               ubicacion: ubicacionOrigen,
               cantidad: cantOrigen,
               delta: 1, // Devolver stock
+              dorsalesDevolver: v.dorsalesDescontados, // 👕 y las impresiones que se rebajaron
               io
             });
-            devoluciones.push(`${cantOrigen}x ${v.item} (Talla ${tallaOrigen}) → ${ubicacionOrigen}`);
+            const dorsalTxt = Array.isArray(v.dorsales) && v.dorsales.length
+              ? ` + impresión ${v.dorsales.map((d) => `${d.name} #${d.number}`).join(', ')}`
+              : '';
+            devoluciones.push(`${cantOrigen}x ${v.item} (Talla ${tallaOrigen})${dorsalTxt} → ${ubicacionOrigen}`);
           }
         }
       }
