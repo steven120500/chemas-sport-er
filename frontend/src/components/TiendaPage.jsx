@@ -9,6 +9,8 @@ import {
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
+import { io } from "socket.io-client";
+import { getToken } from "../authFetch";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const PENDIENTES_STORAGE_KEY = "chemasport_tienda_ventas_pendientes_v1";
@@ -134,6 +136,24 @@ function ajustarStockProductoLocal(prod, tallaBuscada, ubicacionBuscada, deltaCa
   return copia;
 }
 
+/* 👕 IMPRESIONES (DORSALES) — mismas reglas que api/utils/dorsales.js */
+const normDorsal = (s) =>
+  String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+const mismaImpresion = (a, b) => normDorsal(a?.name) === normDorsal(b?.name) && normDorsal(a?.number) === normDorsal(b?.number);
+const textoDorsales = (lista) =>
+  Array.isArray(lista) && lista.length ? lista.map((d) => `${String(d.name || "").toUpperCase()} #${d.number}`).join(", ") : "";
+
+/** Suma/resta impresiones en la copia local del producto (para que el selector muestre lo que queda) */
+function ajustarDorsalesLocal(prod, dorsales, delta) {
+  if (!prod || !Array.isArray(dorsales) || !dorsales.length || !Array.isArray(prod.dorsalOptions)) return prod;
+  const opciones = prod.dorsalOptions.map((o) => ({ ...o }));
+  dorsales.forEach((d) => {
+    const opt = opciones.find((o) => mismaImpresion(o, d));
+    if (opt) opt.quantity = Math.max(0, (Number(opt.quantity) || 0) + delta);
+  });
+  return { ...prod, dorsalOptions: opciones };
+}
+
 function recalcularMontosFactura(factura, nuevoTotal) {
   const met = factura.metodoPago || "Efectivo";
   let montoEfectivo = 0;
@@ -205,6 +225,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   const [tallaSeleccionada, setTallaSeleccionada] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState(1);
   const [precioUnitarioInput, setPrecioUnitarioInput] = useState("");
+  // 👕 Impresión de cada camiseta que se vende ("" = sin impresión, si no el índice en dorsalOptions)
+  const [dorsalesVenta, setDorsalesVenta] = useState([]);
 
   const [carritoVentas, setCarritoVentas] = useState([]);
 
@@ -315,6 +337,25 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     return () => { cancelado = true; };
   }, []);
 
+  // 🔴 EN VIVO: cuando el backend rebaja stock o impresiones (al emitir, o la hermana Player/Fan),
+  // se actualiza aquí de una vez sin tener que refrescar
+  useEffect(() => {
+    const socket = io(API_BASE, {
+      transports: ["websocket", "polling"],
+      auth: { token: getToken() },
+    });
+    const pidDe = (p) => String(p?._id || p?.id || "");
+    socket.on("productoActualizado", (prodNuevo) => {
+      const pid = pidDe(prodNuevo);
+      if (!pid) return;
+      const mezclar = (p) => (pidDe(p) === pid ? { ...p, ...prodNuevo } : p);
+      setCatalogoBase((prev) => prev.map(mezclar));
+      setResultadosBusqueda((prev) => prev.map(mezclar));
+      setProductoSeleccionado((prev) => (prev && pidDe(prev) === pid ? { ...prev, ...prodNuevo } : prev));
+    });
+    return () => socket.disconnect();
+  }, []);
+
   const tiposDisponibles = [
     "Todos",
     "Temp 26-27",
@@ -370,7 +411,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         if (res.ok) {
           const data = await res.json();
           const remotos = Array.isArray(data?.items) ? data.items : [];
-          const remotosConStock = remotos.filter((p) => getAvailableSizes(p).length > 0);
+          // 👈 Si ya lo tenemos en el catálogo local (al día por socket y ventas pendientes), usamos esa copia
+          const locales = new Map(catalogoBase.map((p) => [String(p._id || p.id), p]));
+          const remotosConStock = remotos
+            .map((p) => locales.get(String(p._id || p.id)) || p)
+            .filter((p) => getAvailableSizes(p).length > 0);
           if (remotosConStock.length > 0) setResultadosBusqueda(remotosConStock.slice(0, 15));
         }
       } catch (err) {
@@ -493,6 +538,46 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     return todasTallasDelProducto.filter((x) => x.ubicacion === ubicacionSeleccionada);
   }, [todasTallasDelProducto, ubicacionSeleccionada]);
 
+  // 👕 Dorsales del producto elegido (solo si tiene la función activada)
+  const opcionesDorsal = useMemo(() => {
+    if (!productoSeleccionado?.isNumerable || !Array.isArray(productoSeleccionado.dorsalOptions)) return [];
+    return productoSeleccionado.dorsalOptions
+      .map((o, idx) => ({ ...o, idx }))
+      .filter((o) => o.name || o.number);
+  }, [productoSeleccionado]);
+
+  const unidadesVenta = Math.max(1, Math.min(50, Math.trunc(Number(cantidadVenta) || 1)));
+
+  // Impresiones ya apartadas en la cuenta (mismo nombre de camiseta = Player y Fan comparten)
+  const dorsalesEnCarrito = useMemo(() => {
+    const nombre = normDorsal(productoSeleccionado?.name);
+    return carritoVentas
+      .filter((it) => it.nombreBase && normDorsal(it.nombreBase) === nombre)
+      .flatMap((it) => it.dorsales || []);
+  }, [carritoVentas, productoSeleccionado]);
+
+  const disponibleDorsal = (opt, posicion) => {
+    const enCarrito = dorsalesEnCarrito.filter((d) => mismaImpresion(d, opt)).length;
+    const enEsta = dorsalesVenta.filter((v, i) => i !== posicion && i < unidadesVenta && v !== "" && Number(v) === opt.idx).length;
+    return (Number(opt.quantity) || 0) - enCarrito - enEsta;
+  };
+
+  const dorsalesElegidos = useMemo(
+    () =>
+      dorsalesVenta
+        .slice(0, unidadesVenta)
+        .filter((v) => v !== "" && productoSeleccionado?.dorsalOptions?.[Number(v)])
+        .map((v) => {
+          const o = productoSeleccionado.dorsalOptions[Number(v)];
+          return { name: String(o.name || "").trim(), number: String(o.number || "").trim() };
+        }),
+    [dorsalesVenta, unidadesVenta, productoSeleccionado]
+  );
+
+  // ¿Faltan camisetas por escoger dorsal? (obligatorio mientras haya impresiones disponibles)
+  const hayDorsalDisponible = opcionesDorsal.some((o) => (Number(o.quantity) || 0) > 0);
+  const faltaEscogerDorsal = hayDorsalDisponible && dorsalesElegidos.length < unidadesVenta;
+
   const seleccionarProductoBusqueda = (prod) => {
     setProductoSeleccionado(prod);
     setMostrarDropdownProductos(false);
@@ -506,6 +591,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const tallasDeUbi = disponibles.filter((d) => d.ubicacion === primeraUbicacionConStock);
     setTallaSeleccionada(tallasDeUbi[0]?.talla || "");
     setCantidadVenta(1);
+    setDorsalesVenta([]);
     setPrecioUnitarioInput(String(getProductPrice(prod)));
   };
 
@@ -580,6 +666,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       return;
     }
 
+    if (faltaEscogerDorsal) {
+      toastHOT.error(unidadesVenta > 1 ? "Escogé el dorsal de cada camiseta." : "Escogé el dorsal de la camiseta.");
+      return;
+    }
+
+    const sinExistencia = opcionesDorsal.find((o) =>
+      dorsalesVenta.slice(0, unidadesVenta).some((v, i) => v !== "" && Number(v) === o.idx && disponibleDorsal(o, i) <= 0)
+    );
+    if (sinExistencia) {
+      toastHOT.error(`No quedan impresiones de ${String(sinExistencia.name || "").toUpperCase()} #${sinExistencia.number}.`);
+      return;
+    }
+
     const nombreBase = productoSeleccionado.name || productoSeleccionado.nombre || productoSeleccionado.title || "Camiseta";
     const tipoCat = productoSeleccionado.type || productoSeleccionado.tipo || "";
     const nombreCompleto = tipoCat && !nombreBase.includes(`(${tipoCat})`)
@@ -598,6 +697,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       tallasTexto: cant > 1 ? `${cant}x ${tallaSeleccionada}` : tallaSeleccionada,
       totalUnidades: cant,
       precioUnitarioCustom: precioUnit,
+      nombreBase,
+      dorsales: dorsalesElegidos,
       items: Array.from({ length: cant }, () => ({
         talla: tallaSeleccionada,
         tienda: ubicacionSeleccionada,
@@ -609,6 +710,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setProductoSeleccionado(null);
     setTallaSeleccionada("");
     setCantidadVenta(1);
+    setDorsalesVenta([]);
     setPrecioUnitarioInput("");
     toastHOT.success(`Prenda agregada desde ${ubicacionSeleccionada}.`);
   };
@@ -659,7 +761,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       const subtotalLinea = Math.round(Number(v.precioUnitarioCustom || v.precio || 0) * cant);
       return `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; font-weight: 900; color: #000; margin-bottom: 6px;">
-          <span style="flex: 1; padding-right: 8px;">${cant}x ${v.item} (${v.tallasTexto || v.talla || 'U'})</span>
+          <span style="flex: 1; padding-right: 8px;">${cant}x ${v.item} (${v.tallasTexto || v.talla || 'U'})${textoDorsales(v.dorsales) ? `<br/><small>Impresión: ${textoDorsales(v.dorsales)}</small>` : ""}</span>
           <span style="font-weight: 900; white-space: nowrap;">₡${subtotalLinea.toLocaleString("es-CR")}</span>
         </div>
       `;
@@ -807,6 +909,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         tallasTexto: cant > 1 ? `${cant}x ${tallaSeleccionada}` : tallaSeleccionada,
         totalUnidades: cant,
         precioUnitarioCustom: precioUnit,
+        nombreBase,
+        dorsales: dorsalesElegidos,
         items: Array.from({ length: cant }, () => ({
           talla: tallaSeleccionada,
           tienda: ubicacionSeleccionada,
@@ -818,7 +922,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   }, [
     carritoVentas, modoIngresoProducto, montoExtraCustom, cantidadExtraCustom,
     detalleExtraCustom, conceptoExtraTipo, tallaExtraCustom,
-    productoSeleccionado, tallaSeleccionada, ubicacionSeleccionada, cantidadVenta, precioUnitarioInput
+    productoSeleccionado, tallaSeleccionada, ubicacionSeleccionada, cantidadVenta, precioUnitarioInput, dorsalesElegidos
   ]);
 
   const totalCalculadoForm = useMemo(() => {
@@ -838,6 +942,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     }
     if (totalCalculadoForm <= 0) {
       toastHOT.error("El monto total debe ser mayor a 0.");
+      return false;
+    }
+    if (carritoVentas.length === 0 && modoIngresoProducto === "catalogo" && productoSeleccionado && faltaEscogerDorsal) {
+      toastHOT.error(unidadesVenta > 1 ? "Escogé el dorsal de cada camiseta." : "Escogé el dorsal de la camiseta.");
       return false;
     }
 
@@ -886,6 +994,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       precioUnitarioCustom: Number(item.precioUnitarioCustom),
       productId: item.productId || null,
       esIngresoExtra: Boolean(item.esIngresoExtra),
+      dorsales: Array.isArray(item.dorsales) ? item.dorsales : [],
       items: item.items
     }));
 
@@ -918,6 +1027,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         ventasParaGuardar.forEach((v) => {
           if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
             mod = ajustarStockProductoLocal(mod, v.talla, v.ubicacion, -Number(v.totalUnidades || 1));
+            mod = ajustarDorsalesLocal(mod, v.dorsales, -1);
           }
         });
         return mod;
@@ -930,6 +1040,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setProductoSeleccionado(null);
     setBusquedaProducto("");
     setCantidadVenta(1);
+    setDorsalesVenta([]);
     setPrecioUnitarioInput("");
     setDetalleExtraCustom("");
     setMontoExtraCustom("");
@@ -1045,7 +1156,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         setCatalogoBase((prev) =>
           prev.map((prod) => {
             if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
-              return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+              return ajustarDorsalesLocal(ajustarStockProductoLocal(prod, talla, ubi, cantQuitada), articuloQuitado.dorsales, 1);
             }
             return prod;
           })
@@ -1115,7 +1226,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   setCatalogoBase((prev) =>
                     prev.map((prod) => {
                       if (String(prod._id || prod.id) === String(articuloQuitado.productId)) {
-                        return ajustarStockProductoLocal(prod, talla, ubi, cantQuitada);
+                        return ajustarDorsalesLocal(ajustarStockProductoLocal(prod, talla, ubi, cantQuitada), articuloQuitado.dorsales, 1);
                       }
                       return prod;
                     })
@@ -1191,7 +1302,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
                         const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
                         if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
-                          mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
+                          mod = ajustarDorsalesLocal(ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1)), v.dorsales, 1);
                         }
                       });
                       return mod;
@@ -1214,7 +1325,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
                           const talla = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
                           if (v.productId && String(prod._id || prod.id) === String(v.productId)) {
-                            mod = ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1));
+                            mod = ajustarDorsalesLocal(ajustarStockProductoLocal(mod, talla, ubi, Number(v.totalUnidades || 1)), v.dorsales, 1);
                           }
                         });
                         return mod;
@@ -1513,7 +1624,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         const tipo = p.type || p.tipo || "";
                         const precio = getProductPrice(p);
                         const thumb = getProductThumb(p);
-                        const tallasDisp = getAvailableSizes(p);
+                        const totalDisp = getAvailableSizes(p).reduce((acc, t) => acc + (Number(t.stock) || 0), 0);
 
                         return (
                           <div
@@ -1534,13 +1645,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 <p className="font-black text-xs text-black truncate">
                                   {nombre} {tipo ? <span className="text-zinc-500 font-bold">({tipo})</span> : ""}
                                 </p>
-                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                  {tallasDisp.map((t, i) => (
-                                    <span key={`${t.ubicacion}_${t.talla}_${i}`} className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[9px] font-bold">
-                                      {t.ubicacion} · {t.talla}: {t.stock}
-                                    </span>
-                                  ))}
-                                </div>
+                                {/* 👈 Solo el total: las tallas se ven al seleccionar la camiseta */}
+                                <p className="text-[10px] font-bold text-zinc-500 mt-0.5">
+                                  {totalDisp} disponible{totalDisp === 1 ? "" : "s"}
+                                </p>
                               </div>
                             </div>
 
@@ -1625,6 +1733,45 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         })}
                       </div>
                     </div>
+
+                    {opcionesDorsal.length > 0 && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+                        <label className="block text-[10px] font-black text-blue-800 uppercase tracking-wider">
+                          👕 Dorsal de {unidadesVenta > 1 ? "cada camiseta" : "la camiseta"} *
+                        </label>
+                        <p className="text-[10px] font-bold text-blue-700">
+                          {hayDorsalDisponible
+                            ? "Se rebaja también en la versión Player/Fan del mismo equipo."
+                            : "No quedan impresiones disponibles de esta camiseta."}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Array.from({ length: unidadesVenta }, (_, i) => (
+                            <select
+                              key={`dorsal_venta_${i}`}
+                              value={dorsalesVenta[i] ?? ""}
+                              onChange={(e) =>
+                                setDorsalesVenta((prev) => {
+                                  const copia = Array.from({ length: unidadesVenta }, (_, j) => prev[j] ?? "");
+                                  copia[i] = e.target.value;
+                                  return copia;
+                                })
+                              }
+                              className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-black text-black outline-none focus:border-black"
+                            >
+                              <option value="" disabled>{unidadesVenta > 1 ? `Camiseta ${i + 1}: ` : ""}Escogé el dorsal…</option>
+                              {opcionesDorsal.map((o) => {
+                                const quedan = disponibleDorsal(o, i);
+                                return (
+                                  <option key={o.idx} value={String(o.idx)} disabled={quedan <= 0 && String(dorsalesVenta[i]) !== String(o.idx)}>
+                                    {unidadesVenta > 1 ? `Camiseta ${i + 1}: ` : ""}{String(o.name || "").toUpperCase()} #{o.number} ({Math.max(0, quedan)} disp.)
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                       <div>
@@ -1767,6 +1914,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           <p className="text-[10px] font-bold text-zinc-500">
                             Cantidad: {item.totalUnidades} · Talla: {item.talla} · Ubicación: <span className="text-black font-black">{item.ubicacion || "Tienda"}</span>
                           </p>
+                          {textoDorsales(item.dorsales) && (
+                            <p className="text-[10px] font-black text-blue-700">👕 Impresión: {textoDorsales(item.dorsales)}</p>
+                          )}
                         </div>
                       </div>
 
@@ -2052,6 +2202,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 <div key={idx} className="inline-flex items-center justify-between gap-2 bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-[11px] font-bold text-zinc-800 w-fit shadow-2xs">
                                   <span>
                                     {v.totalUnidades || 1}x {v.item} {v.tallasTexto ? `(${v.tallasTexto})` : ""}
+                                    {textoDorsales(v.dorsales) && <span className="text-blue-700"> · 👕 {textoDorsales(v.dorsales)}</span>}
                                   </span>
                                   {(esPendiente || puedeAnularVentas) && <button
                                     type="button"
@@ -2278,6 +2429,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           {it.tallasTexto || it.talla ? `Talla ${it.tallasTexto || it.talla}` : ""}
                           {it.ubicacion ? ` · ${it.ubicacion}` : ""}
                           {cant > 1 ? ` · ${fmt(unit)} c/u` : ""}
+                          {textoDorsales(it.dorsales) ? ` · 👕 ${textoDorsales(it.dorsales)}` : ""}
                         </small>
                       </div>
                       <span className="tr-item-precio">{fmt(unit * cant)}</span>
