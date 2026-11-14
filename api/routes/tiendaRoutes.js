@@ -3,7 +3,7 @@ import TiendaFactura from '../models/TiendaFactura.js';
 import Product from '../models/Product.js';
 import History from '../models/History.js';
 
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireSuper } from '../middleware/auth.js';
 import { emitProductUpdate } from '../utils/realtime.js';
 
 const router = express.Router();
@@ -651,7 +651,8 @@ router.post('/emitir', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+// 🔒 Anular / quitar artículos de una venta ya registrada: solo el súper usuario
+router.delete('/:id', requireSuper, async (req, res) => {
   try {
     const factura = await TiendaFactura.findById(req.params.id);
     if (!factura) return res.status(404).json({ error: "Registro no encontrado." });

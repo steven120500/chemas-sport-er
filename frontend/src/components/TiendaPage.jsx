@@ -166,6 +166,15 @@ function buildPages(page, pages) {
   return pageNumbers;
 }
 
+// 💳 Métodos de pago: icono + explicación + color, para que no se confundan al cobrar
+const METODOS_PAGO = [
+  { id: "Efectivo", Icono: FaMoneyBillWave, ayuda: "Billetes o monedas", activo: "bg-yellow-500 text-white border-yellow-500", badge: "bg-yellow-100 text-yellow-800 border-yellow-300" },
+  { id: "Datáfono", Icono: FaCreditCard, ayuda: "Tarjeta en el datáfono", activo: "bg-blue-600 text-white border-blue-600", badge: "bg-blue-100 text-blue-800 border-blue-300" },
+  { id: "SINPE", Icono: FaMobileAlt, ayuda: "SINPE Móvil al celular", activo: "bg-purple-600 text-white border-purple-600", badge: "bg-purple-100 text-purple-800 border-purple-300" },
+  { id: "Mixto", Icono: FaCashRegister, ayuda: "Pagó con 2 o más formas", activo: "bg-black text-white border-black", badge: "bg-gray-200 text-gray-900 border-gray-400" }
+];
+const metodoInfo = (id) => METODOS_PAGO.find((m) => m.id === id);
+
 export default function TiendaPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
 
@@ -223,7 +232,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const [formCliente, setFormCliente] = useState({
     tipoEmision: "interno",
-    metodoPago: "Efectivo",
+    metodoPago: "", // 👈 sin valor por defecto: el vendedor tiene que escogerlo en cada venta
     pagoConBillete: "",
     montoEfectivoMixto: "",
     montoDatafonoMixto: "",
@@ -258,6 +267,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       storedUser?.rol === "admin"
     );
   }, [isSuperUser, user, storedUser]);
+
+  // 🔒 Solo el súper usuario puede anular ventas ya registradas o quitarles artículos (el backend también lo exige)
+  const puedeAnularVentas = Boolean(isSuperUser || user?.isSuperUser || storedUser?.isSuperUser === true);
 
   const nombreUsuarioActual = useMemo(() => {
     return user?.username || user?.name || user?.firstName || storedUser?.username || storedUser?.name || "Tienda";
@@ -823,6 +835,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       return;
     }
 
+    if (!metodoInfo(formCliente.metodoPago)) {
+      toastHOT.error("Escogé el método de pago antes de registrar la venta.");
+      document.getElementById("tienda-metodo-pago")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     let efecMixto = Number(formCliente.montoEfectivoMixto) || 0;
     let datMixto = Number(formCliente.montoDatafonoMixto) || 0;
     let sinpeMixto = Number(formCliente.montoSinpeMixto) || 0;
@@ -897,9 +915,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setDetalleExtraCustom("");
     setMontoExtraCustom("");
     setCantidadExtraCustom(1);
-    setFormCliente((prev) => ({ ...prev, pagoConBillete: "" }));
+    setFormCliente((prev) => ({ ...prev, pagoConBillete: "", metodoPago: "", montoEfectivoMixto: "", montoDatafonoMixto: "", montoSinpeMixto: "" }));
 
-    toastHOT.success("Venta / ingreso enviado a la tabla inferior. Puedes emitirlo cuando gustes.");
+    toastHOT.success(`Venta registrada en ${formCliente.metodoPago} · ₡${totalCalculadoForm.toLocaleString("es-CR")}`);
   };
 
   const handleEmitirDesdeTabla = async (facturaPendiente) => {
@@ -971,6 +989,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const ventasActuales = Array.isArray(factura.ventas) ? factura.ventas : [];
     const articuloQuitado = ventasActuales[idxArticulo];
     if (!articuloQuitado) return;
+    if (!factura.esPendiente && !puedeAnularVentas) {
+      toastHOT.error("Solo el súper admin puede modificar una venta ya registrada.");
+      return;
+    }
 
     if (ventasActuales.length <= 1) {
       eliminarRegistroFacturaCaja(factura);
@@ -1098,6 +1120,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   };
 
   const eliminarRegistroFacturaCaja = (factura) => {
+    if (!factura.esPendiente && !puedeAnularVentas) {
+      toastHOT.error("Solo el súper admin puede anular ventas.");
+      return;
+    }
     const detalleUbicaciones = Array.isArray(factura.ventas)
       ? factura.ventas.map((v) => {
           const ubi = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
@@ -1738,28 +1764,31 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               </div>
             )}
 
-            <div>
+            <div id="tienda-metodo-pago">
               <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                Método de Pago (Para Cuadre de Caja) *
+                ¿Cómo pagó el cliente? *
               </label>
+              {!formCliente.metodoPago && (
+                <p className="text-[11px] font-bold text-red-600 mb-2">👆 Tocá la forma de pago. Se pide en cada venta para que la caja cuadre.</p>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { id: "Efectivo", activeClass: "bg-yellow-500 text-white border-yellow-500" },
-                  { id: "Datáfono", activeClass: "bg-blue-500 text-white border-blue-500" },
-                  { id: "SINPE", activeClass: "bg-purple-500 text-white border-purple-500" },
-                  { id: "Mixto", activeClass: "bg-black text-white border-black" }
-                ].map((m) => {
+                {METODOS_PAGO.map((m) => {
                   const activo = formCliente.metodoPago === m.id;
+                  const hayOtro = Boolean(formCliente.metodoPago) && !activo;
                   return (
                     <button
                       key={m.id}
                       type="button"
+                      aria-pressed={activo}
                       onClick={() => setFormCliente({ ...formCliente, metodoPago: m.id })}
-                      className={`py-3 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                        activo ? `${m.activeClass} shadow-md` : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                      }`}
+                      className={`tp-metodo relative flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-2xl border-2 transition-all cursor-pointer ${
+                        activo ? `${m.activo} shadow-lg` : "bg-white text-zinc-800 border-zinc-200 hover:border-zinc-400"
+                      } ${hayOtro ? "opacity-50" : ""}`}
                     >
-                      {m.id}
+                      {activo && <FaCheckCircle size={14} className="absolute top-2 right-2" />}
+                      <m.Icono size={22} />
+                      <span className="text-xs font-black uppercase tracking-wider">{m.id}</span>
+                      <span className={`text-[10px] font-bold leading-tight text-center ${activo ? "" : "text-zinc-500"}`}>{m.ayuda}</span>
                     </button>
                   );
                 })}
@@ -1887,10 +1916,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             </div>
 
             <div className="pt-2">
-              <button type="button" onClick={handleAgregarVentaATabla} disabled={generandoTiquete} className="w-full bg-black hover:bg-zinc-800 text-white py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]">
-                <FaPlus size={14} className="text-amber-400" />
-                <span>{`Registrar Venta en Tabla abajo · ₡${totalCalculadoForm.toLocaleString("es-CR")} (${listaFinalParaCobrar.length} artículo${listaFinalParaCobrar.length === 1 ? "" : "s"})`}</span>
-              </button>
+              {(() => {
+                const met = metodoInfo(formCliente.metodoPago);
+                return (
+                  <button type="button" onClick={handleAgregarVentaATabla} disabled={generandoTiquete} className={`w-full ${met ? met.activo : "bg-zinc-400"} py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]`}>
+                    {met ? <met.Icono size={16} /> : <FaPlus size={14} />}
+                    <span>
+                      {met
+                        ? `Registrar ₡${totalCalculadoForm.toLocaleString("es-CR")} en ${met.id.toUpperCase()} (${listaFinalParaCobrar.length} artículo${listaFinalParaCobrar.length === 1 ? "" : "s"})`
+                        : "Escogé el método de pago para registrar"}
+                    </span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1966,14 +2004,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                   <span>
                                     {v.totalUnidades || 1}x {v.item} {v.tallasTexto ? `(${v.tallasTexto})` : ""}
                                   </span>
-                                  <button
+                                  {(esPendiente || puedeAnularVentas) && <button
                                     type="button"
                                     onClick={() => quitarArticuloDeFacturaEnTabla(f, idx)}
                                     className="text-zinc-400 hover:text-red-600 p-0.5 rounded transition-colors cursor-pointer"
                                     title="Quitar este artículo de la factura y devolver al stock"
                                   >
                                     <FaTimes size={11} />
-                                  </button>
+                                  </button>}
                                 </div>
                               ))}
                             </div>
@@ -1996,9 +2034,15 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           </td>
 
                           <td className="py-3.5 px-3 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg border font-black text-[11px] bg-emerald-100 text-emerald-800 border-emerald-200">
-                              {f.metodoPago}
-                            </span>
+                            {(() => {
+                              const met = metodoInfo(f.metodoPago);
+                              return (
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-black text-[11px] ${met ? met.badge : "bg-gray-100 text-gray-700 border-gray-300"}`}>
+                                  {met && <met.Icono size={11} />}
+                                  {f.metodoPago || "—"}
+                                </span>
+                              );
+                            })()}
                           </td>
 
                           <td className="py-3.5 px-3 text-right font-black text-blue-600 text-xs whitespace-nowrap">
@@ -2057,14 +2101,16 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 </>
                               )}
 
-                              <button
-                                type="button"
-                                onClick={() => eliminarRegistroFacturaCaja(f)}
-                                className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                                title="Anular factura completa y devolver stock"
-                              >
-                                <FaTrash size={12} />
-                              </button>
+                              {(esPendiente || puedeAnularVentas) && (
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarRegistroFacturaCaja(f)}
+                                  className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                  title={esPendiente ? "Eliminar venta pendiente" : "Anular factura completa y devolver stock"}
+                                >
+                                  <FaTrash size={12} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

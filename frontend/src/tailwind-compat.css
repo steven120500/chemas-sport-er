@@ -17,7 +17,6 @@
 .bg-blue-50\/30 { background-color: rgba(239, 246, 255, 0.3); }
 .bg-blue-50\/40 { background-color: rgba(239, 246, 255, 0.4); }
 .bg-blue-50\/80 { background-color: rgba(239, 246, 255, 0.8); }
-.bg-emerald-100 { background-color: #d1fae5; }
 .bg-emerald-50 { background-color: #ecfdf5; }
 .bg-emerald-50\/50 { background-color: rgba(236, 253, 245, 0.5); }
 .bg-emerald-600 { background-color: #059669; }
@@ -29,6 +28,7 @@
 .bg-zinc-100 { background-color: #f4f4f5; }
 .bg-zinc-200 { background-color: #e4e4e7; }
 .bg-zinc-200\/70 { background-color: rgba(228, 228, 231, 0.7); }
+.bg-zinc-400 { background-color: #a1a1aa; }
 .bg-zinc-50 { background-color: #fafafa; }
 .bg-zinc-50\/60 { background-color: rgba(250, 250, 250, 0.6); }
 .bg-zinc-900 { background-color: #18181b; }
@@ -69,6 +69,7 @@
 .hover\:bg-zinc-50\/80:hover { background-color: rgba(250, 250, 250, 0.8); }
 .hover\:bg-zinc-700:hover { background-color: #3f3f46; }
 .hover\:bg-zinc-800:hover { background-color: #27272a; }
+.hover\:border-zinc-400:hover { border-color: #a1a1aa; }
 .hover\:text-emerald-600:hover { color: #059669; }
 .placeholder-zinc-400::placeholder { color: #a1a1aa; }
 .text-\[\#0f2d5c\] { color: #0f2d5c; }
