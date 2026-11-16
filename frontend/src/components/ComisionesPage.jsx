@@ -224,14 +224,8 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // ✏️ Contrapedido por vendedor persistente por mes
-  const [contrapedidosMes, setContrapedidosMes] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("chemasport_contrapedidos_mes") || "{}");
-    } catch {
-      return {};
-    }
-  });
+  // ✏️ Contrapedido por vendedor por mes — se guarda en el backend para que todos lo vean 👈
+  const [contrapedidosMes, setContrapedidosMes] = useState({});
 
   // 🗓️ Modal de contrapedido por semanas: { vendedor, semanas: ["", "", "", ""] } (5 con semana extra)
   const [modalContrap, setModalContrap] = useState(null);
@@ -305,6 +299,42 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     const usuarioAutorizadoExtra = "Johanna"; // Cambia esto por el nombre real del usuario
     return normText(nombreUsuarioActual) === normText(usuarioAutorizadoExtra);
   }, [esSuperAdmin, nombreUsuarioActual]);
+
+  // 🗓️ Cargar contrapedidos del backend. Si este dispositivo tenía datos viejos en localStorage
+  // (antes solo se guardaban ahí), quien puede editar los sube una vez sin pisar lo que ya hay.
+  useEffect(() => {
+    let cancelado = false;
+    const cargar = async () => {
+      try {
+        let res = await fetch(`${API_BASE}/api/comisiones/contrapedidos`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let mapa = await res.json();
+        if (puedeEditarContrapedidos) {
+          let locales = null;
+          try { locales = JSON.parse(localStorage.getItem("chemasport_contrapedidos_mes") || "null"); } catch { locales = null; }
+          if (locales && typeof locales === "object" && Object.keys(locales).length > 0) {
+            const resImp = await fetch(`${API_BASE}/api/comisiones/contrapedidos/importar`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ datos: locales }),
+            });
+            if (resImp.ok) {
+              mapa = await resImp.json();
+              try { localStorage.removeItem("chemasport_contrapedidos_mes"); } catch { /* sin storage */ }
+            }
+          }
+        }
+        if (!cancelado) setContrapedidosMes(mapa || {});
+      } catch (e) {
+        console.error("Error cargando contrapedidos:", e);
+      }
+    };
+    cargar();
+    // Refrescar al volver a la pestaña para ver lo que metieron en otro dispositivo
+    const alVolver = () => { if (document.visibilityState === "visible") cargar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { cancelado = true; document.removeEventListener("visibilitychange", alVolver); };
+  }, [puedeEditarContrapedidos]);
 
   const puedeAnularVenta = (venta) => {
     if (esSuperAdmin) return true;
@@ -519,22 +549,29 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     }
     const semanas = modalContrap.semanas.map((v) => Math.max(0, Math.trunc(Number(v) || 0)));
     const { vendedor } = modalContrap;
-    setContrapedidosMes((prev) => {
-      const actualizado = {
-        ...prev,
-        [selectedMonth]: {
-          ...(prev[selectedMonth] || {}),
-          [vendedor]: { semanas }
-        }
-      };
-      try {
-        localStorage.setItem("chemasport_contrapedidos_mes", JSON.stringify(actualizado));
-      } catch (e) {
-        console.error(e);
-      }
-      return actualizado;
-    });
-    toastHOT.success(`Contrapedido de ${vendedor}: ${semanas.reduce((a, b) => a + b, 0)} prendas.`);
+    const mes = selectedMonth;
+    const anterior = contrapedidosMes;
+    // Se muestra de una vez y se guarda en el backend; si falla se devuelve como estaba
+    setContrapedidosMes((prev) => ({
+      ...prev,
+      [mes]: { ...(prev[mes] || {}), [vendedor]: { semanas } }
+    }));
+    fetch(`${API_BASE}/api/comisiones/contrapedidos`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mes, vendedor, semanas }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        setContrapedidosMes(data || {});
+        toastHOT.success(`Contrapedido de ${vendedor}: ${semanas.reduce((a, b) => a + b, 0)} prendas.`);
+      })
+      .catch((e) => {
+        console.error("Error guardando contrapedido:", e);
+        setContrapedidosMes(anterior);
+        toastHOT.error(`No se pudo guardar el contrapedido: ${e.message}`);
+      });
     return true;
   };
 
