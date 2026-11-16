@@ -13,6 +13,7 @@ const guiaSchema = new mongoose.Schema({
   esMayorista: { type: String, default: "No" },
   nombreMayorista: { type: String, default: "" },
   comentarios: { type: String, default: "" },
+  fechaEntrega: { type: String, default: "" }, // 📅 YYYY-MM-DD (opcional), sale grande en el centro de la guía
   fechaYMD: { type: String, required: true }, // Formato YYYY-MM-DD para el calendario
   fecha: { type: String, required: true }     // Fecha y hora formateada
 }, { timestamps: true });

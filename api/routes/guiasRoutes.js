@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Guardar nueva guía
 const CAMPOS_GUIA = ['numeroGuia', 'nombre', 'provincia', 'canton', 'distrito', 'telefono', 'debe', 'monto',
-  'meterRaspa', 'esMayorista', 'nombreMayorista', 'comentarios', 'fechaYMD', 'fecha'];
+  'meterRaspa', 'esMayorista', 'nombreMayorista', 'comentarios', 'fechaEntrega', 'fechaYMD', 'fecha'];
 const soloCamposGuia = (body = {}) =>
   Object.fromEntries(CAMPOS_GUIA.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
 
