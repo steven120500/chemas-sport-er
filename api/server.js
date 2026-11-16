@@ -20,6 +20,7 @@ import guiasRoutes from './routes/guiasRoutes.js';
 import tiendaRoutes from './routes/tiendaRoutes.js'; 
 import correosRoutes from './routes/correosRoutes.js'; // 👈 1. IMPORTAR RUTA DE CORREOS CR
 import pedidosRoutes from './routes/pedidosRoutes.js'; // 🧾 Pedidos por encargo (/admin)
+import comisionesRoutes from './routes/comisionesRoutes.js'; // 🗓️ Contrapedidos de comisiones
 import { programarLimpiezaPedidos } from './utils/pedidosLimpieza.js';
 
 const app = express();
@@ -108,6 +109,7 @@ app.use('/api/guias', guiasRoutes);
 app.use('/api/tienda', tiendaRoutes); 
 app.use('/api/correos', correosRoutes); // 👈 2. MONTAR LA RUTA DE CORREOS CR
 app.use('/api/pedidos', pedidosRoutes);
+app.use('/api/comisiones', comisionesRoutes);
 
 // 🧹 Borra solos los pedidos Entregados/Cancelados de hace más de 2 meses (PEDIDOS_RETENCION_DIAS)
 programarLimpiezaPedidos();
