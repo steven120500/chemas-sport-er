@@ -8,7 +8,10 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 // Las tarjetas se dibujan cada frame con transform + clip-path (sin layout), así corre liso en iPhone.
 
 const FILTRO_TEMPORADA = 'Temp 26-27';
-const IMG = (n) => `/Bienvenido/v2/${n}.webp`;
+// 👈 Las fotos las empaqueta Vite con nombre con hash (como el JS): así un deploy nunca sirve
+// una foto vieja/rota desde el caché de Cloudflare (pasó con las de public/Bienvenido/web).
+const FOTOS = import.meta.glob('../assets/bienvenido/*.webp', { eager: true, import: 'default' });
+const IMG = (n) => FOTOS[`../assets/bienvenido/${n}.webp`];
 const VUELTAS_POR_COLECCION = 1; // 👈 cambia de colección en cada vuelta…
 const SEGUNDOS_MENOS = 7; // …pero 7 s antes de completarla
 
