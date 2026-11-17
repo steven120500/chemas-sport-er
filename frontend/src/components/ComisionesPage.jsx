@@ -300,6 +300,17 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
     return normText(nombreUsuarioActual) === normText(usuarioAutorizadoExtra);
   }, [esSuperAdmin, nombreUsuarioActual]);
 
+  // 👀 Ver el ranking completo: solo súper admin o Johanna. Los demás solo ven sus propios números.
+  const puedeVerTodo = useMemo(() => {
+    if (esSuperAdmin) return true;
+    return ["johanna", "johana"].includes(normText(nombreUsuarioActual));
+  }, [esSuperAdmin, nombreUsuarioActual]);
+
+  // 🙈 Números de otro vendedor: se ven las posiciones pero no cuántas lleva
+  const verNumerosDe = (vendedor) =>
+    puedeVerTodo || (Boolean(nombreUsuarioActual) && normText(vendedor) === normText(nombreUsuarioActual));
+  const mostrar = (item, valor) => (item && !verNumerosDe(item.vendedor) ? "•••" : valor);
+
   // 🗓️ Cargar contrapedidos del backend. Si este dispositivo tenía datos viejos en localStorage
   // (antes solo se guardaban ahí), quien puede editar los sube una vez sin pisar lo que ya hay.
   useEffect(() => {
@@ -1348,7 +1359,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
               <div className="flex justify-around text-center mb-2 items-center">
                 <div>
-                  <p className="text-xl font-black text-black">{top2?.unidades || 0}</p>
+                  <p className="text-xl font-black text-black">{mostrar(top2, top2?.unidades || 0)}</p>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase">Stock</p>
                 </div>
                 <div className="border-r border-zinc-200 h-6"></div>
@@ -1360,16 +1371,16 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                       title="Clic para ver / editar contrapedido por semana"
                     >
-                      +{top2?.contrapedidoUds || 0}
+                      {mostrar(top2, `+${top2?.contrapedidoUds || 0}`)}
                     </button>
                   ) : (
-                    <p className="text-xl font-black text-emerald-700">+{top2?.contrapedidoUds || 0}</p>
+                    <p className="text-xl font-black text-emerald-700">{mostrar(top2, `+${top2?.contrapedidoUds || 0}`)}</p>
                   )}
                   <p className="text-[9px] font-bold text-zinc-400 uppercase">Contrap.</p>
                 </div>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{top2?.totalUdsCombinadas || 0}</strong> prendas</p>
-              <p className="text-sm font-black text-emerald-600 mt-2">₡{(top2?.totalComision || 0).toLocaleString("es-CR")}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{mostrar(top2, top2?.totalUdsCombinadas || 0)}</strong> prendas</p>
+              <p className="text-sm font-black text-emerald-600 mt-2">{mostrar(top2, `₡${(top2?.totalComision || 0).toLocaleString("es-CR")}`)}</p>
             </div>
           </div>
 
@@ -1381,7 +1392,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <div className="mt-4 w-full bg-amber-50/60 rounded-2xl p-4 border border-amber-200">
               <div className="flex justify-around text-center mb-2 items-center">
                 <div>
-                  <p className="text-2xl font-black text-black">{top1?.unidades || 0}</p>
+                  <p className="text-2xl font-black text-black">{mostrar(top1, top1?.unidades || 0)}</p>
                   <p className="text-[9px] font-bold text-zinc-500 uppercase">Stock</p>
                 </div>
                 <div className="border-r border-amber-300 h-8"></div>
@@ -1393,16 +1404,16 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       className="text-2xl font-black text-emerald-700 hover:underline cursor-pointer"
                       title="Clic para ver / editar contrapedido por semana"
                     >
-                      +{top1?.contrapedidoUds || 0}
+                      {mostrar(top1, `+${top1?.contrapedidoUds || 0}`)}
                     </button>
                   ) : (
-                    <p className="text-2xl font-black text-emerald-700">+{top1?.contrapedidoUds || 0}</p>
+                    <p className="text-2xl font-black text-emerald-700">{mostrar(top1, `+${top1?.contrapedidoUds || 0}`)}</p>
                   )}
                   <p className="text-[9px] font-bold text-zinc-500 uppercase">Contrap.</p>
                 </div>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mt-1">Total: <strong>{top1?.totalUdsCombinadas || 0}</strong> prendas</p>
-              <p className="text-lg font-black text-emerald-600 mt-2">₡{(top1?.totalComision || 0).toLocaleString("es-CR")}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mt-1">Total: <strong>{mostrar(top1, top1?.totalUdsCombinadas || 0)}</strong> prendas</p>
+              <p className="text-lg font-black text-emerald-600 mt-2">{mostrar(top1, `₡${(top1?.totalComision || 0).toLocaleString("es-CR")}`)}</p>
             </div>
           </div>
 
@@ -1414,7 +1425,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
             <div className="mt-4 w-full bg-zinc-50 rounded-2xl p-3 border border-zinc-100">
               <div className="flex justify-around text-center mb-2 items-center">
                 <div>
-                  <p className="text-xl font-black text-black">{top3?.unidades || 0}</p>
+                  <p className="text-xl font-black text-black">{mostrar(top3, top3?.unidades || 0)}</p>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase">Stock</p>
                 </div>
                 <div className="border-r border-zinc-200 h-6"></div>
@@ -1426,16 +1437,16 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                       className="text-xl font-black text-emerald-700 hover:underline cursor-pointer"
                       title="Clic para ver / editar contrapedido por semana"
                     >
-                      +{top3?.contrapedidoUds || 0}
+                      {mostrar(top3, `+${top3?.contrapedidoUds || 0}`)}
                     </button>
                   ) : (
-                    <p className="text-xl font-black text-emerald-700">+{top3?.contrapedidoUds || 0}</p>
+                    <p className="text-xl font-black text-emerald-700">{mostrar(top3, `+${top3?.contrapedidoUds || 0}`)}</p>
                   )}
                   <p className="text-[9px] font-bold text-zinc-400 uppercase">Contrap.</p>
                 </div>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{top3?.totalUdsCombinadas || 0}</strong> prendas</p>
-              <p className="text-sm font-black text-emerald-600 mt-2">₡{(top3?.totalComision || 0).toLocaleString("es-CR")}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-1">Total: <strong>{mostrar(top3, top3?.totalUdsCombinadas || 0)}</strong> prendas</p>
+              <p className="text-sm font-black text-emerald-600 mt-2">{mostrar(top3, `₡${(top3?.totalComision || 0).toLocaleString("es-CR")}`)}</p>
             </div>
           </div>
         </div>
@@ -1457,7 +1468,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                     <div className="flex flex-wrap items-center justify-between sm:justify-end gap-y-2 gap-x-4 sm:gap-6 text-right pt-2 sm:pt-0 border-t border-zinc-200/50 sm:border-t-0">
                       
                       <div className="flex items-center gap-2 text-xs font-bold text-zinc-600">
-                        <span>Stock: <strong className="text-black">{item.unidades}</strong></span>
+                        <span>Stock: <strong className="text-black">{mostrar(item, item.unidades)}</strong></span>
                         <span className="text-zinc-300">|</span>
                         
                         {/* Contrapedido: Bloque clickeable o Input directo */}
@@ -1473,18 +1484,18 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
                               +{item.contrapedidoUds}
                             </button>
                           ) : (
-                            <strong className="text-emerald-800">+{item.contrapedidoUds}</strong>
+                            <strong className="text-emerald-800">{mostrar(item, `+${item.contrapedidoUds}`)}</strong>
                           )}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 sm:gap-6 ml-auto sm:ml-0">
                         <div>
-                          <span className="font-black text-sm sm:text-base text-black">{item.totalUdsCombinadas}</span>
+                          <span className="font-black text-sm sm:text-base text-black">{mostrar(item, item.totalUdsCombinadas)}</span>
                           <span className="text-[10px] text-zinc-400 font-bold uppercase ml-1">TOT.</span>
                         </div>
                         <span className="font-black text-sm sm:text-base text-emerald-600 min-w-[85px] sm:w-24 text-right">
-                          ₡{item.totalComision.toLocaleString("es-CR")}
+                          {mostrar(item, `₡${item.totalComision.toLocaleString("es-CR")}`)}
                         </span>
                       </div>
 
