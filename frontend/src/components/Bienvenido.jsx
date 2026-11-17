@@ -8,7 +8,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 // Las tarjetas se dibujan cada frame con transform + clip-path (sin layout), así corre liso en iPhone.
 
 const FILTRO_TEMPORADA = 'Temp 26-27';
-const IMG = (n) => `/Bienvenido/web/${n}.webp`;
+const IMG = (n) => `/Bienvenido/v2/${n}.webp`;
 const VUELTAS_POR_COLECCION = 1; // 👈 cambia de colección en cada vuelta…
 const SEGUNDOS_MENOS = 7; // …pero 7 s antes de completarla
 
