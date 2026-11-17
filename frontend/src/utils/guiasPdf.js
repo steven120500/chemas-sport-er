@@ -9,6 +9,17 @@ function limpiarMontoCR(val) {
   return Number(soloDigitos) || 0;
 }
 
+// 📅 "2026-11-16" → "Lunes 16 de Noviembre" (fecha de entrega en el centro de la guía de mensajero)
+const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+export function textoFechaEntrega(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || "").trim());
+  if (!m) return "";
+  const fecha = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])); // 👈 hora local, sin corrimiento de zona
+  if (isNaN(fecha)) return "";
+  return `${DIAS_SEMANA[fecha.getDay()]} ${fecha.getDate()} de ${MESES[fecha.getMonth()]}`;
+}
+
 // jsPDF por CDN (así lo usaba GuiasPage para la guía de mensajero)
 export function cargarJsPDF() {
   return new Promise((resolve, reject) => {
@@ -41,69 +52,118 @@ export async function generarPdfMensajero(guia) {
   const montoGuia = limpiarMontoCR(guia.monto);
   const cobroPendiente = guia.debe === "Sí" && montoGuia > 0;
   const esMayorista = guia.esMayorista === "Sí";
+  const fechaEntrega = textoFechaEntrega(guia.fechaEntrega);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Mensajería Privada", 50.8, 13, { align: "center" });
-
-  doc.setLineWidth(0.6);
-  doc.line(6, 16.5, 95.6, 16.5);
-
-  let y = 25;
+  const ALTO_HOJA = 152.4;
+  const MARGEN_ABAJO = 4;
   const margenIzq = 6;
   const anchoMax = 89.6;
 
-  const agregarCampo = (etiqueta, valor) => {
-    const textoValor = String(valor || "").trim();
-    if (!textoValor) return;
+  // 📏 Dibuja toda la guía a una escala dada. Con dibujar=false solo mide hasta dónde llega.
+  // Si los comentarios son largos, se va achicando todo hasta que quepa en una sola hoja.
+  const maquetar = (k, dibujar) => {
+    const txt = (...args) => { if (dibujar) doc.text(...args); };
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
+    doc.setFontSize(18 * k);
+    txt("Mensajería Privada", 50.8, 13 * k, { align: "center" });
 
-    if (etiqueta === "Comentarios") {
-      doc.text(`${etiqueta}:`, margenIzq, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
-      doc.text(lineasValor, margenIzq, y);
-      y += (lineasValor.length * 6) + 4;
-    } else {
-      doc.text(`${etiqueta}:`, margenIzq, y);
-      doc.setFont("helvetica", "normal");
-      const lineasValor = doc.splitTextToSize(textoValor, anchoMax - 26);
-      doc.text(lineasValor, margenIzq + 26, y);
-      y += (lineasValor.length * 6) + 3;
+    const yTitulo = 16.5 * k;
+    if (dibujar) {
+      doc.setLineWidth(0.6);
+      doc.line(6, yTitulo, 95.6, yTitulo);
     }
+
+    let y = yTitulo + 8.5 * k;
+    const lh = 6 * k; // alto de línea
+    const altoRenglon = 12 * k * 0.3528 * 1.15; // 👈 lo que jsPDF deja entre renglones de un mismo texto (pt → mm)
+
+    const agregarCampo = (etiqueta, valor) => {
+      const textoValor = String(valor || "").trim();
+      if (!textoValor) return;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12 * k);
+
+      if (etiqueta === "Comentarios") {
+        txt(`${etiqueta}:`, margenIzq, y);
+        y += lh;
+        doc.setFont("helvetica", "normal");
+        const lineasValor = doc.splitTextToSize(textoValor, anchoMax);
+        txt(lineasValor, margenIzq, y, { lineHeightFactor: 1.15 });
+        y += (lineasValor.length - 1) * altoRenglon + 10 * k;
+      } else {
+        txt(`${etiqueta}:`, margenIzq, y);
+        doc.setFont("helvetica", "normal");
+        const sangria = 26 * k;
+        const lineasValor = doc.splitTextToSize(textoValor, anchoMax - sangria);
+        txt(lineasValor, margenIzq + sangria, y, { lineHeightFactor: 1.15 });
+        y += (lineasValor.length - 1) * altoRenglon + 9 * k;
+      }
+    };
+
+    agregarCampo("Nombre", guia.nombre);
+    agregarCampo("Provincia", guia.provincia);
+    agregarCampo("Cantón", guia.canton);
+    agregarCampo("Distrito", guia.distrito);
+    agregarCampo("Teléfono", guia.telefono);
+    agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
+    agregarCampo("Raspa", guia.meterRaspa);
+    agregarCampo("Comentarios", guia.comentarios);
+
+    let yFinal = y - 3 * k;
+
+    // 📅 Fecha de entrega grande en el centro (normal o mayorista)
+    if (fechaEntrega) {
+      const yCaja = Math.max(y + 1 * k, 74);
+      const altoCaja = 16 * k;
+      if (dibujar) {
+        doc.setLineWidth(0.6);
+        doc.rect(6, yCaja, 89.6, altoCaja);
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8 * k);
+      txt("ENTREGAR EL", 50.8, yCaja + 4.5 * k, { align: "center" });
+      doc.setFontSize((fechaEntrega.length > 22 ? 17 : 20) * k);
+      txt(fechaEntrega, 50.8, yCaja + 12.5 * k, { align: "center" });
+      y = yCaja + altoCaja + 4 * k;
+      yFinal = yCaja + altoCaja;
+    }
+
+    if (esMayorista && guia.nombreMayorista) {
+      const yLinea = Math.max(y + 2 * k, 115);
+      if (dibujar) {
+        doc.setLineWidth(0.7);
+        doc.setLineDashPattern([2, 2], 0);
+        doc.line(6, yLinea, 95.6, yLinea);
+        doc.setLineDashPattern([], 0);
+      }
+
+      const textoMay = guia.nombreMayorista.toUpperCase();
+
+      let tamFuente = 24;
+      if (textoMay.length > 12) tamFuente = 18;
+      if (textoMay.length > 20) tamFuente = 14;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(tamFuente * k);
+
+      const lineasMayorista = doc.splitTextToSize(textoMay, 88);
+      const altoLineaMay = tamFuente * k * 0.3528 * 1.15; // pt → mm
+      const yTexto = yLinea + 10 * k;
+      txt(lineasMayorista, 50.8, yTexto, { align: "center" });
+      yFinal = yTexto + (lineasMayorista.length - 1) * altoLineaMay + altoLineaMay * 0.3;
+    }
+
+    return yFinal;
   };
 
-  agregarCampo("Nombre", guia.nombre);
-  agregarCampo("Provincia", guia.provincia);
-  agregarCampo("Cantón", guia.canton);
-  agregarCampo("Distrito", guia.distrito);
-  agregarCampo("Teléfono", guia.telefono);
-  agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
-  agregarCampo("Raspa", guia.meterRaspa);
-  agregarCampo("Comentarios", guia.comentarios);
-
-  if (esMayorista && guia.nombreMayorista) {
-    const yLinea = Math.max(y + 2, 115);
-    doc.setLineWidth(0.7);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.line(6, yLinea, 95.6, yLinea);
-    doc.setLineDashPattern([], 0);
-
-    const textoMay = guia.nombreMayorista.toUpperCase();
-
-    let tamFuente = 24;
-    if (textoMay.length > 12) tamFuente = 18;
-    if (textoMay.length > 20) tamFuente = 14;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(tamFuente);
-
-    const lineasMayorista = doc.splitTextToSize(textoMay, 88);
-    doc.text(lineasMayorista, 50.8, yLinea + 10, { align: "center" });
+  // 🔍 Buscar la escala más grande que quepa en la hoja (mínimo 45%)
+  let escala = 1;
+  while (escala > 0.45 && maquetar(escala, false) > ALTO_HOJA - MARGEN_ABAJO) {
+    escala -= 0.03;
   }
+  maquetar(escala, true);
 
   const nombreLimpio = String(guia.nombre || "Guia").replace(/[\\/:*?"<>|_]/g, "").trim();
   const fileName = `${nombreLimpio}.pdf`;

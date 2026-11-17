@@ -8,7 +8,7 @@ import {
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import GuiasCorreos from "./GuiasCorreos";
-import { generarPdfMensajero } from "../utils/guiasPdf";
+import { generarPdfMensajero, textoFechaEntrega } from "../utils/guiasPdf";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const STORAGE_KEY = "chemasport_guias_registradas";
@@ -96,7 +96,8 @@ export default function GuiasPage() {
     esMayorista: "No",
     nombreMayorista: "",
     comentarioSelect: "Sin comentario",
-    comentarioCustom: ""
+    comentarioCustom: "",
+    fechaEntrega: ""
   });
 
   const handleChange = (e) => {
@@ -187,6 +188,7 @@ export default function GuiasPage() {
       esMayorista: form.esMayorista,
       nombreMayorista: form.esMayorista === "Sí" ? form.nombreMayorista.trim() : "",
       comentarios: comentarioFinal === "Sin comentario" ? "" : comentarioFinal,
+      fechaEntrega: form.fechaEntrega || "",
       fechaYMD,
       fecha: `${fechaFormateada} ${horaFormateada}`
     };
@@ -218,7 +220,8 @@ export default function GuiasPage() {
         esMayorista: "No",
         nombreMayorista: "",
         comentarioSelect: "Sin comentario",
-        comentarioCustom: ""
+        comentarioCustom: "",
+        fechaEntrega: ""
       });
 
       toastHOT.success("¡Guía guardada con éxito en el servidor!", { id: toastId });
@@ -416,6 +419,14 @@ export default function GuiasPage() {
             .bold {
               font-weight: 900;
             }
+            .entrega {
+              text-align: center;
+              border: 3px solid #000;
+              margin: 14px 0;
+              padding: 6px 4px;
+            }
+            .entrega small { display: block; font-size: 14px; font-weight: 900; letter-spacing: 1px; }
+            .entrega div { font-size: 34px; font-weight: 900; }
             .mayorista-bottom {
               text-align: center;
               font-size: 44px;
@@ -440,6 +451,10 @@ export default function GuiasPage() {
             <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
             <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
             <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
+
+            ${textoFechaEntrega(guia.fechaEntrega) ? `
+              <div class="entrega"><small>ENTREGAR EL</small><div>${textoFechaEntrega(guia.fechaEntrega)}</div></div>
+            ` : ""}
 
             ${esMayorista && guia.nombreMayorista ? `
               <div class="mayorista-bottom">
@@ -643,6 +658,30 @@ export default function GuiasPage() {
                       className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
                     />
                   </div>
+                </div>
+
+                {/* 📅 FECHA DE ENTREGA (sale grande en el centro de la guía) */}
+                <div>
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    Fecha de entrega
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-4 text-zinc-500 pointer-events-none">
+                      <FaCalendarAlt size={13} />
+                    </span>
+                    <input
+                      type="date"
+                      name="fechaEntrega"
+                      value={form.fechaEntrega}
+                      onChange={handleChange}
+                      className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
+                    />
+                  </div>
+                  {form.fechaEntrega && (
+                    <p className="mt-1.5 text-[11px] font-black text-zinc-600 uppercase tracking-wider">
+                      En la guía: {textoFechaEntrega(form.fechaEntrega)}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1022,6 +1061,22 @@ export default function GuiasPage() {
                                       <>
                                         <span className="text-zinc-800 font-bold text-[10px]">Raspa: {g.meterRaspa}</span>
                                         <button onClick={() => iniciarEdicionCelda(g, "meterRaspa")} className="opacity-0 group-hover/raspa:opacity-100 text-white hover:text-white cursor-pointer" title="Editar raspa"><FaPencilAlt size={9} /></button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* 📅 FECHA DE ENTREGA EDITABLE */}
+                                  <div className="flex items-center gap-1 group/entrega bg-zinc-100 px-2 py-0.5 rounded-md">
+                                    {isEditingField("fechaEntrega") ? (
+                                      <div className="flex items-center gap-1">
+                                        <input type="date" value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-0.5 bg-white border border-black rounded text-[10px] font-bold" />
+                                        <button onClick={() => guardarEdicionCelda(g, "fechaEntrega")} className="p-0.5 bg-black text-white rounded"><FaCheck size={8} /></button>
+                                        <button onClick={cancelarEdicionCelda} className="p-0.5 bg-zinc-200 rounded"><FaTimesIcon size={8} /></button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <span className="text-zinc-800 font-bold text-[10px]">Entrega: {textoFechaEntrega(g.fechaEntrega) || "—"}</span>
+                                        <button onClick={() => iniciarEdicionCelda(g, "fechaEntrega")} className="opacity-0 group-hover/entrega:opacity-100 text-white hover:text-white cursor-pointer" title="Editar fecha de entrega"><FaPencilAlt size={9} /></button>
                                       </>
                                     )}
                                   </div>
