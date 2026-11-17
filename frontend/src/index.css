@@ -722,338 +722,424 @@ button:focus-visible {
 
 /* =================================================================
    BIENVENIDO (Bienvenido.jsx) — clases bv-*
-   Hero "Nueva temporada 26/27": carrusel de camisetas.
+   Hero navideño: noche verde con luces, nieve y gorrito en el titular +
+   UN carrusel curvo (interior de un cilindro) que rota de colección
+   en cada vuelta: Temporada 26/27 → Retro → LEGO.
+   --u lo pone el componente (1440 unidades de ancho en compu, 640 en celular).
+   La posición/forma de cada card se calcula en JS cada frame.
    ================================================================= */
 .bv-section {
+  --bv-ink: #FFFDF7;
+  --bv-sub: rgba(255, 253, 247, 0.72);
+  --bv-green: #0f5132;
+  --bv-red: #d42a2a;
+  --bv-gold: #F5C400;
   position: relative;
   width: 100%;
   overflow: hidden;
-  padding: 36px 0 32px;
-  background: #050505;
-  color: #fff;
+  padding: calc(var(--u) * 56) 0 calc(var(--u) * 48);
+  background:
+    radial-gradient(900px 420px at 15% 0%, rgba(212, 42, 42, 0.28), transparent 70%),
+    radial-gradient(800px 420px at 90% 100%, rgba(245, 196, 0, 0.12), transparent 70%),
+    linear-gradient(180deg, #0d3d27 0%, #0a2f1e 60%, #082416 100%);
+  color: var(--bv-ink);
   user-select: none;
   -webkit-user-select: none;
 }
-.bv-texture {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.06;
-  pointer-events: none;
-}
-.bv-glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(600px 300px at 12% 0%, rgba(220, 38, 38, 0.22), transparent 70%),
-    radial-gradient(600px 300px at 88% 100%, rgba(22, 163, 74, 0.2), transparent 70%);
-}
 
-/* --- Encabezado --- */
-.bv-header {
+/* --- Texto --- */
+.bv-copy {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
   padding: 0 16px;
-  margin-bottom: 22px;
+  pointer-events: none; /* 👈 deja arrastrar las cards que suben por los lados */
 }
-.bv-eyebrow {
+.bv-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 12px;
+  padding: calc(var(--u) * 8) calc(var(--u) * 18);
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
-}
-.bv-eyebrow-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: #F5C400;
-  box-shadow: 0 0 0 0 rgba(245, 196, 0, 0.6);
-  animation: bvPing 2s infinite;
-}
-.bv-title {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
+  background: var(--bv-red);
   color: #fff;
+  box-shadow: 0 6px 18px -8px rgba(212, 42, 42, 0.8);
+  font-size: max(12px, calc(var(--u) * 16.6));
+  font-weight: 600;
+  line-height: 1.2;
 }
-.bv-title-accent {
+.bv-badge svg { width: 1.05em; height: 1.05em; flex: none; color: var(--bv-gold); }
+.bv-title {
+  margin: calc(var(--u) * 22) 0 0;
+  font-family: 'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: calc(var(--u) * 100);
+  line-height: 1.045;
+  letter-spacing: -0.035em;
+  color: var(--bv-ink);
+  text-transform: none;
+}
+.bv-title-line { display: block; }
+/* Colecciones del carrusel en una línea chiquita (la activa en dorado) */
+.bv-colecciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 0;
+  margin: calc(var(--u) * 14) 0 0;
+  font-size: max(11px, calc(var(--u) * 13));
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 253, 247, 0.45);
+}
+.bv-colecciones span { transition: color 0.4s ease; }
+.bv-colecciones span + span::before {
+  content: '✦';
+  margin: 0 0.9em;
+  color: rgba(245, 196, 0, 0.5);
+}
+.bv-colecciones span.is-active { color: var(--bv-gold); }
+.bv-title-line--2 { letter-spacing: -0.022em; }
+.bv-title-mark {
+  position: relative;
+  display: inline-block;
   background: linear-gradient(90deg, #FFE600, #F5C400 50%, #D4A000);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+/* Gorrito de Santa sobre la "V" */
+.bv-title-hat-wrap { position: relative; display: inline-block; }
+.bv-title-hat {
+  position: absolute;
+  left: -0.2em;
+  top: -0.36em;
+  width: 0.62em;
+  height: 0.54em;
+  transform: rotate(-16deg);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+.bv-title-mark svg {
+  position: absolute;
+  left: -2%;
+  bottom: -0.06em;
+  width: 104%;
+  height: 0.2em;
+  overflow: visible;
+}
+.bv-title-mark path {
+  fill: none;
+  stroke: var(--bv-red);
+  stroke-width: 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
 .bv-subtitle {
-  margin: 0;
-  max-width: 420px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.55);
+  margin: calc(var(--u) * 24) 0 0;
+  max-width: calc(var(--u) * 620);
+  font-size: max(14px, calc(var(--u) * 20.8));
+  line-height: 1.54;
+  color: var(--bv-sub);
 }
 
-/* --- Carrusel --- */
-.bv-track-wrap {
-  position: relative;
-  z-index: 2;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+/* Notas a mano */
+.bv-note {
+  position: absolute;
+  font-family: 'Caveat', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-weight: 600;
+  color: #fff;
+  line-height: 0.95;
+  white-space: nowrap;
+  pointer-events: none;
 }
-.bv-track {
-  /* Se mueve con transform desde Bienvenido.jsx (no con scroll nativo: en iPhone fallaba) */
+.bv-note--top {
+  color: var(--bv-gold);
+  top: calc(var(--u) * 92);
+  left: calc(50% + var(--u) * 420);
+  font-size: calc(var(--u) * 38);
+  text-align: center;
+}
+.bv-arrow-top {
+  position: absolute;
+  top: calc(var(--u) * 172);
+  left: calc(50% + var(--u) * 400);
+  width: calc(var(--u) * 110);
+  height: calc(var(--u) * 150);
+  overflow: visible;
+}
+.bv-doodle {
+  position: absolute;
+  top: calc(var(--u) * 196);
+  left: calc(50% - var(--u) * 330);
+  width: calc(var(--u) * 54);
+  height: calc(var(--u) * 54);
+}
+.bv-arrow-top path,
+.bv-doodle path { stroke: var(--bv-gold) !important; }
+.bv-arrow-top path,
+.bv-doodle path,
+.bv-note--cta path {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- Escenario de los carruseles --- */
+.bv-stage-wrap {
+  position: relative;
+  z-index: 1;
+}
+.bv-stage {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  padding: 12px 16px 18px;
   cursor: grab;
   touch-action: pan-y;
-  -webkit-user-select: none;
-  user-select: none;
   -webkit-touch-callout: none;
 }
-.bv-track:active { cursor: grabbing; }
-.bv-track-inner {
-  display: flex;
-  gap: 14px;
-  width: max-content;
-  will-change: transform;
+.bv-stage:active { cursor: grabbing; }
+.bv-stage-set { position: absolute; inset: 0; }
+
+.bv-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  cursor: pointer;
+  visibility: hidden; /* 👈 se muestra en el primer dibujo (evita un frame en la esquina) */
+  will-change: transform, clip-path;
+  contain: layout style;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 62%),
+    var(--card-bg);
+}
+.bv-card--rojo { --card-bg: linear-gradient(170deg, #e23b3b, #a51616 60%, #6e0c0c); }
+.bv-card--menta { --card-bg: linear-gradient(170deg, #EAF3E3, #C7DDBA); }
+.bv-card--crema { --card-bg: linear-gradient(170deg, #FFFBF2, #EFE4CF); }
+.bv-card--rosa { --card-bg: linear-gradient(170deg, #FCEDEA, #F0CFC8); }
+/* Nieve acumulada en el borde de arriba (sigue la inclinación desde JS) */
+.bv-card-snow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  fill: #fff;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.12));
+  pointer-events: none;
 }
 
-/* --- Card --- */
-.bv-card {
-  position: relative;
-  flex: none;
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  overflow: hidden;
-  cursor: pointer;
-  outline: none;
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.45s ease;
+.bv-card-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  object-fit: contain;
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 10px 12px rgba(16, 20, 16, 0.22));
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
+.bv-card-img.is-blend { mix-blend-mode: multiply; filter: none; }
+.bv-card-img.is-cover { object-fit: cover; filter: none; }
+
+/* --- Hover (solo con mouse) ---
+   El transform de la card/foto/etiqueta lo escribe el JS cada frame, así que el hover usa
+   las propiedades sueltas `scale`/`translate` (se suman al transform sin pisarlo). */
 .bv-card::after {
-  /* brillo diagonal */
+  /* brillo diagonal que barre la card */
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%);
-  transform: translateX(-120%);
-  transition: transform 0.9s ease;
-  pointer-events: none;
-}
-.bv-card--red {
-  background: linear-gradient(165deg, #dc2626 0%, #991b1b 55%, #450a0a 100%);
-  box-shadow: 0 12px 30px -14px rgba(220, 38, 38, 0.6);
-}
-.bv-card--green {
-  background: linear-gradient(165deg, #16a34a 0%, #166534 55%, #052e16 100%);
-  box-shadow: 0 12px 30px -14px rgba(22, 163, 74, 0.6);
-}
-.bv-card:focus-visible { transform: translateY(-6px); }
-/* Hover solo en dispositivos con mouse (en iPhone el :hover se queda "pegado" al tocar) */
-@media (hover: hover) {
-  .bv-card:hover { transform: translateY(-6px); }
-  .bv-card:hover::after { transform: translateX(120%); }
-  .bv-card--red:hover { box-shadow: 0 22px 40px -16px rgba(220, 38, 38, 0.8); }
-  .bv-card--green:hover { box-shadow: 0 22px 40px -16px rgba(22, 163, 74, 0.8); }
-  .bv-card:hover .bv-img { transform: scale(1.08) rotate(-3deg); }
-  .bv-card:hover .bv-spot { transform: scale(1.15); opacity: 1; }
-}
-.bv-card:focus-visible { box-shadow: 0 0 0 3px #fff; }
-
-.bv-card-top {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.bv-tag {
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.85);
-}
-.bv-kit {
-  padding: 3px 8px;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.bv-jersey {
-  position: relative;
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.bv-watermark {
-  position: absolute;
-  font-size: 150px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.06em;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.12);
-  pointer-events: none;
-}
-.bv-spot {
-  position: absolute;
-  width: 75%;
-  height: 75%;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 65%);
-  filter: blur(6px);
-  transition: transform 0.5s ease, opacity 0.5s ease;
-  opacity: 0.8;
-}
-.bv-img {
-  position: relative;
   z-index: 1;
-  max-height: 100%;
-  max-width: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.45));
-  animation: bvFloat 4s ease-in-out infinite;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  -webkit-user-drag: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.38) 50%, transparent 65%);
+  translate: -120% 0;
+  pointer-events: none;
+}
+.bv-card-snow, .bv-card-label { z-index: 2; }
+.bv-card { transition: opacity 0.35s ease; }
+.bv-card-img { transition: scale 0.6s cubic-bezier(0.16, 1, 0.3, 1), translate 0.6s cubic-bezier(0.16, 1, 0.3, 1), rotate 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.bv-card-label i { transition: background-color 0.3s ease, translate 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.bv-card-label i svg { transition: rotate 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (hover: hover) {
+  /* Las demás se apagan solo cuando hay una card bajo el mouse (no en los huecos) */
+  .bv-stage:has(.bv-card:hover) .bv-card:not(:hover) { opacity: 0.6; }
+  .bv-card:hover::after { translate: 120% 0; transition: translate 0.9s ease; }
+  .bv-card:hover .bv-card-img { scale: 1.09; translate: 0 calc(var(--u) * -10); rotate: -3deg; }
+  .bv-card:hover .bv-card-img.is-cover { scale: 1.07; translate: 0 0; rotate: 0deg; }
+  .bv-card:hover .bv-card-label i { background: var(--bv-red); translate: calc(var(--u) * 2) 0; }
+  .bv-card:hover .bv-card-label i svg { rotate: -45deg; }
 }
 
-.bv-card-bottom {
-  position: relative;
-  z-index: 2;
-  display: flex;
+.bv-card-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-}
-.bv-team { min-width: 0; }
-.bv-team h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bv-team span {
-  display: block;
-  margin-top: 2px;
-  font-size: 10px;
+  gap: calc(var(--u) * 6);
+  max-width: 88%;
+  padding: calc(var(--u) * 4) calc(var(--u) * 10) calc(var(--u) * 4) calc(var(--u) * 4);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #141210;
+  font-size: max(10px, calc(var(--u) * 12.5));
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.2;
+  white-space: nowrap;
+  transform-origin: 0 100%;
+  pointer-events: none;
 }
-.bv-arrow {
-  flex: none;
+.bv-card-label i {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  flex: none;
+  width: max(16px, calc(var(--u) * 22));
+  height: max(16px, calc(var(--u) * 22));
   border-radius: 9999px;
-  background: #fff;
-  color: #000;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--bv-green);
+  color: #fff;
 }
-.bv-arrow svg { width: 15px; height: 15px; }
-@media (hover: hover) {
-  .bv-card:hover .bv-arrow { transform: translateX(3px) scale(1.08); }
-}
+.bv-card-label svg { width: 60%; height: 60%; }
 
 /* --- CTA --- */
 .bv-cta-wrap {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
-  justify-content: center;
-  margin-top: 10px;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 18);
+  margin-top: calc(var(--u) * 8);
   padding: 0 16px;
+}
+.bv-cta-row { position: relative; display: flex; justify-content: center; }
+.bv-cta-ring {
+  display: inline-flex;
+  padding: calc(var(--u) * 7);
+  border: 1.5px dashed var(--bv-gold);
+  border-radius: 9999px;
 }
 .bv-section .bv-cta {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 26px;
+  justify-content: center;
+  min-width: calc(var(--u) * 190);
+  min-height: max(46px, calc(var(--u) * 58));
+  padding: 0 calc(var(--u) * 30);
+  border: 0;
   border-radius: 9999px;
-  border: 1px solid #fff;
-  background: #fff;
-  color: #000;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 10px 30px -10px rgba(255, 255, 255, 0.35);
-  transition: background-color 0.3s, color 0.3s, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.bv-section .bv-cta svg { width: 16px; height: 16px; transition: transform 0.3s; }
-.bv-section .bv-cta:hover {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: var(--bv-red);
   color: #fff;
+  font-size: max(15px, calc(var(--u) * 17));
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+  transform: none;
+  transition: background-color 0.25s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bv-section .bv-cta:hover {
+  background: #b71f1f;
+  border: 0;
   transform: translateY(-2px);
 }
-.bv-section .bv-cta:hover svg { transform: translateX(4px); }
-.bv-section .bv-cta:focus-visible { outline: 3px solid #F5C400; outline-offset: 3px; }
+.bv-section .bv-cta:focus-visible { outline: 3px solid var(--bv-gold); outline-offset: 4px; }
 
-@keyframes bvFloat {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -6px; }
+/* --- Luces y nieve --- */
+.bv-lights {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
 }
+.bv-lights-wire { fill: none; stroke: #2b3a2f; stroke-width: 1.6; }
+.bv-light {
+  filter: drop-shadow(0 0 5px currentColor);
+  animation: bvTwinkle 1.8s ease-in-out infinite;
+}
+@keyframes bvTwinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.bv-snow {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bv-snow i {
+  position: absolute;
+  top: -10px;
+  border-radius: 9999px;
+  background: #fff;
+  animation: bvSnow linear infinite;
+}
+@keyframes bvSnow {
+  0% { transform: translate3d(0, -10px, 0); }
+  100% { transform: translate3d(var(--drift), 1300px, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bv-light { animation: none; }
+  .bv-snow { display: none; }
+}
+
+.bv-note--cta {
+  right: calc(100% + var(--u) * 14);
+  top: calc(var(--u) * -6);
+  font-size: calc(var(--u) * 32);
+}
+.bv-note--cta svg {
+  position: absolute;
+  left: 70%;
+  top: 85%;
+  width: calc(var(--u) * 62);
+  height: calc(var(--u) * 36);
+  overflow: visible;
+}
+
+/* --- Celular (≤ 820px): escala de 640 unidades --- */
+.bv-section.is-mobile { padding: 28px 0 30px; }
+.bv-section.is-mobile .bv-badge { padding: 6px 13px; font-size: 12.5px; }
+.bv-section.is-mobile .bv-title {
+  margin-top: 16px;
+  font-size: clamp(38px, 11.4vw, 56px);
+}
+.bv-section.is-mobile .bv-subtitle {
+  margin-top: 14px;
+  max-width: 360px;
+  font-size: 14.5px;
+}
+.bv-section.is-mobile .bv-colecciones { margin-top: 10px; font-size: 9.5px; letter-spacing: 0.08em; flex-wrap: nowrap; white-space: nowrap; }
+.bv-section.is-mobile .bv-colecciones span + span::before { margin: 0 0.6em; }
+.bv-section.is-mobile .bv-cta-wrap { gap: 14px; margin-top: 4px; }
+.bv-section.is-mobile .bv-cta-row { flex-direction: column; align-items: center; }
+.bv-section.is-mobile .bv-cta-ring { padding: 5px; }
+.bv-section.is-mobile .bv-cta { min-width: 190px; padding: 0 26px; }
+.bv-section.is-mobile .bv-note--cta {
+  position: relative;
+  order: 2;
+  right: auto;
+  top: auto;
+  margin: 8px 0 4px;
+  font-size: 24px;
+}
+.bv-section.is-mobile .bv-note--cta svg { display: none; }
+
 @keyframes bvPing {
   0% { box-shadow: 0 0 0 0 rgba(245, 196, 0, 0.6); }
   80%, 100% { box-shadow: 0 0 0 8px rgba(245, 196, 0, 0); }
 }
-
-@media (min-width: 768px) {
-  .bv-section { padding: 56px 0 44px; }
-  .bv-header { margin-bottom: 30px; gap: 12px; }
-  .bv-title { font-size: 52px; }
-  .bv-subtitle { font-size: 15px; }
-  .bv-track { padding: 14px 24px 22px; }
-  .bv-track-inner { gap: 20px; }
-  .bv-card { width: 250px; padding: 18px; border-radius: 26px; gap: 10px; }
-  .bv-jersey { height: 230px; }
-  .bv-watermark { font-size: 190px; }
-  .bv-team h3 { font-size: 16px; }
-  .bv-cta-wrap { margin-top: 16px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bv-img, .bv-eyebrow-dot { animation: none; }
-  .bv-card, .bv-card::after, .bv-img, .bv-arrow { transition: none; }
-}
-
 
 /* =================================================================
    INTRO NAVIDEÑA (WorldCupIntro.jsx) — clases xi-*
@@ -1908,7 +1994,6 @@ button:focus-visible {
 .hd .hd-nav-item:hover { color: #000; transform: none; border-color: transparent; }
 .hd .hd-nav-item.is-active { color: #000; }
 .hd .hd-nav-item:focus-visible { outline: 2px solid #000; outline-offset: -4px; border-radius: 6px; }
-.hd-dot { width: 6px; height: 6px; border-radius: 9999px; flex: none; }
 .hd-underline {
   position: absolute;
   left: 12px;

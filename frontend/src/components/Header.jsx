@@ -12,11 +12,11 @@ import {
 
 const navItems = [
   { label: "Todo", value: "" },
-  { label: "Temporada 26-27", value: "Temp 26-27", dot: "#F5C400" },
-  { label: "Nuevo", value: "Nuevo", dot: "#16a34a" },
+  { label: "Temporada 26-27", value: "Temp 26-27" },
+  { label: "Nuevo", value: "Nuevo" },
   { label: "Populares", value: "Populares" },
   { label: "Mundial 2026", value: "Mundial 2026" },
-  { label: "Ofertas", value: "Ofertas", dot: "#dc2626" },
+  { label: "Ofertas", value: "Ofertas" },
   { label: "Nacional", value: "Nacional" },
   { label: "Player", value: "Player" },
   { label: "Fan", value: "Fan" },
@@ -244,7 +244,6 @@ export default function Header({
                 aria-hidden={isCopy || undefined}
                 tabIndex={isCopy ? -1 : undefined}
               >
-                {item.dot && <i className="hd-dot" style={{ background: item.dot }} />}
                 {item.label}
                 <motion.span
                   className="hd-underline"
