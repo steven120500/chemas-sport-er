@@ -510,6 +510,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       total += Number(f.totalCobrado || 0);
       if (Array.isArray(f.ventas)) {
         f.ventas.forEach((v) => {
+          // 👈 Abonos / saldos / ingresos extra suman a caja pero NO son chemas vendidas (no comisionan)
+          const esAbono =
+            v.esIngresoExtra ||
+            v.ubicacion === "Ingreso / Abono" ||
+            (Array.isArray(v.items) && v.items[0]?.tienda === "Ingreso / Abono");
+          if (esAbono) return;
           totalPrendas += Number(v.totalUnidades || 1);
         });
       }

@@ -47,6 +47,14 @@ function getHoyYMD() {
    👕 impresiones: dorsales vendidos (uno por camiseta) → se rebajan aquí y en el hermano Player/Fan
    👕 dorsalesDevolver: lo que se rebajó al vender (venta.dorsalesDescontados) → se devuelve al anular
    ======================================================== */
+// 👈 ¿Es un abono / saldo / ingreso extra de la Tienda? (no es una chema de inventario)
+function esAbonoTienda(v) {
+  if (!v) return false;
+  if (v.esIngresoExtra) return true;
+  const ubi = v.ubicacion || (Array.isArray(v.items) && v.items[0]?.tienda) || "";
+  return ubi === "Ingreso / Abono";
+}
+
 async function ajustarStockPorUbicacion({
   productId,
   itemNombre = "",
@@ -616,7 +624,8 @@ router.post('/emitir', async (req, res) => {
       const impresionesVenta = leerImpresiones({ purchasedDorsals: v.dorsales }).slice(0, cantVenta);
       delete v.dorsalesDescontados;
 
-      if (tallaVenta && !String(v.item || "").toLowerCase().includes("envio gam")) {
+      // 👈 Abonos / saldos / ingresos extra: solo suman a caja, nunca tocan stock ni crean historial (no comisionan)
+      if (tallaVenta && !esAbonoTienda(v) && !String(v.item || "").toLowerCase().includes("envio gam")) {
         const resultado = await ajustarStockPorUbicacion({
           productId: v.productId,
           itemNombre: v.item,
@@ -713,7 +722,7 @@ router.delete('/:id', requireSuper, async (req, res) => {
 
     if (Array.isArray(factura.ventas)) {
       for (const v of factura.ventas) {
-        if (v && (v.productId || v.item)) {
+        if (v && !esAbonoTienda(v) && (v.productId || v.item)) {
           const ubicacionOrigen = v.ubicacion || (v.items && v.items[0]?.tienda) || "Tienda";
           const tallaOrigen = v.talla || (v.items && v.items[0]?.talla) || v.tallasTexto;
           const cantOrigen = Number(v.totalUnidades) || 1;
