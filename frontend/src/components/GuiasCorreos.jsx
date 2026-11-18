@@ -49,6 +49,8 @@ export default function GuiasCorreos() {
   });
 
   const [fechaFiltro, setFechaFiltro] = useState(new Date().toISOString().split('T')[0]);
+  // 🔍 Buscador por nombre: si tiene texto busca en TODAS las fechas, si está vacío se ve por día
+  const [busquedaNombre, setBusquedaNombre] = useState("");
   
   // Paginado de la tabla histórica (10 en 10)
   const [paginaActual, setPaginaActual] = useState(1);
@@ -109,7 +111,7 @@ export default function GuiasCorreos() {
   // Reiniciar a la página 1 cuando se cambie la fecha del filtro
   useEffect(() => {
     setPaginaActual(1);
-  }, [fechaFiltro]);
+  }, [fechaFiltro, busquedaNombre]);
 
   // 1. Cargar Provincias (Con caché instantáneo en sessionStorage)
   useEffect(() => {
@@ -505,7 +507,20 @@ export default function GuiasCorreos() {
   };
 
   // Filtrado por día y cálculo de paginación (10 en 10)
-  const guiasFiltradasPorDia = historialGuias.filter(item => item.fechaYyyyMmDd === fechaFiltro);
+  // 🔍 Normaliza sin tildes ni mayúsculas para que "jose" encuentre "José"
+  const normalizarTexto = (txt) =>
+    String(txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const terminoBusqueda = normalizarTexto(busquedaNombre);
+  const buscando = terminoBusqueda.length > 0;
+  const guiasFiltradasPorDia = buscando
+    ? historialGuias
+        .filter(item =>
+          normalizarTexto(item.nombre).includes(terminoBusqueda) ||
+          normalizarTexto(item.enviold).includes(terminoBusqueda) ||
+          String(item.telefono || "").includes(busquedaNombre.trim())
+        )
+        .sort((a, b) => String(b.fechaYyyyMmDd || "").localeCompare(String(a.fechaYyyyMmDd || "")))
+    : historialGuias.filter(item => item.fechaYyyyMmDd === fechaFiltro);
   const totalPaginas = Math.max(1, Math.ceil(guiasFiltradasPorDia.length / guiasPorPagina));
   const indiceInicio = (paginaActual - 1) * guiasPorPagina;
   const guiasPaginadas = guiasFiltradasPorDia.slice(indiceInicio, indiceInicio + guiasPorPagina);
@@ -843,7 +858,30 @@ export default function GuiasCorreos() {
           </h3>
           
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+            {/* 🔍 BUSCADOR POR NOMBRE */}
+            <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 w-full sm:w-auto">
+              <FaSearch className="text-[#0f2d5c] flex-shrink-0" />
+              <input
+                type="text"
+                value={busquedaNombre}
+                onChange={(e) => setBusquedaNombre(e.target.value)}
+                placeholder="Buscar por nombre..."
+                className="bg-transparent text-sm font-semibold text-[#0f2d5c] outline-none w-full sm:w-48"
+              />
+              {busquedaNombre && (
+                <button
+                  type="button"
+                  onClick={() => setBusquedaNombre("")}
+                  className="text-gray-400 hover:text-red-600 text-xs font-bold cursor-pointer"
+                  style={{ background: "transparent", border: "none", transform: "none", padding: 0, outline: "none" }}
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className={`flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 ${buscando ? "opacity-50" : ""}`}>
               <FaCalendarAlt className="text-[#0f2d5c]" />
               <span className="text-xs font-semibold text-gray-600">Filtrar fecha:</span>
               <input
@@ -854,7 +892,7 @@ export default function GuiasCorreos() {
               />
             </div>
 
-            {guiasFiltradasPorDia.length > 0 && (
+            {!buscando && guiasFiltradasPorDia.length > 0 && (
               <button
                 type="button"
                 onClick={handleVaciarDia}
@@ -867,9 +905,17 @@ export default function GuiasCorreos() {
           </div>
         </div>
 
+        {buscando && (
+          <p className="text-xs text-gray-500 mb-3">
+            Mostrando resultados de <strong>todas las fechas</strong> para "{busquedaNombre.trim()}".
+          </p>
+        )}
+
         {guiasFiltradasPorDia.length === 0 ? (
           <p className="text-gray-500 text-sm italic text-center py-6">
-            No hay guías registradas para la fecha seleccionada ({fechaFiltro}).
+            {buscando
+              ? `No se encontraron guías con "${busquedaNombre.trim()}".`
+              : `No hay guías registradas para la fecha seleccionada (${fechaFiltro}).`}
           </p>
         ) : (
           <>
