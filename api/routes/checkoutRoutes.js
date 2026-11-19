@@ -10,6 +10,8 @@ import OrdenWeb, { siguienteNumeroOrdenWeb } from '../models/OrdenWeb.js';
 import { costoEnvio } from '../utils/coberturaMensajero.js';
 import { tilopayConfigurado, crearPago, ISO_PROVINCIA } from '../utils/tilopay.js';
 import { confirmarPago, rebajarStockOrden, facturarOrden } from '../utils/ordenesWeb.js';
+import { ajustarStockPorUbicacion } from './tiendaRoutes.js';
+import History from '../models/History.js';
 import { enviarCorreo, correoGuia, correoConfigurado } from '../utils/correo.js';
 import { readFileSync } from 'fs';
 
@@ -380,6 +382,49 @@ router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
   } catch (error) {
     console.error('❌ Refacturando orden web:', error.message);
     res.status(500).json({ error: 'No se pudo facturar.' });
+  }
+});
+
+// 🗑️ DELETE /api/checkout/admin/ordenes/:id → borra la venta.
+// Si ya se había rebajado stock, lo devuelve a la misma ubicación (con sus impresiones) y borra ese historial.
+// ⚠️ La factura de Alegra NO se anula sola (es un documento ante Hacienda): se avisa para anularla allá.
+router.delete('/admin/ordenes/:id', requireSuper, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const orden = await OrdenWeb.findById(req.params.id);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    if (orden.stock?.estado === 'rebajando' || orden.factura?.estado === 'facturando') {
+      return res.status(409).json({ error: 'La orden se está procesando, probá en un momento.' });
+    }
+
+    const io = req.app.get('io');
+    const devoluciones = [];
+    for (const m of orden.stock?.movimientos || []) {
+      await ajustarStockPorUbicacion({
+        productId: m.productId,
+        talla: m.talla,
+        ubicacion: m.ubicacion,
+        cantidad: m.cantidad,
+        delta: 1,
+        dorsalesDevolver: m.dorsalesDescontados,
+        io,
+      });
+      devoluciones.push(`${m.cantidad} talla ${m.talla} → ${m.ubicacion}`);
+    }
+    const historyIds = (orden.stock?.movimientos || []).map((m) => m.historyId).filter((id) => mongoose.isValidObjectId(id));
+    if (historyIds.length) await History.deleteMany({ _id: { $in: historyIds } }).catch(() => {});
+
+    await OrdenWeb.deleteOne({ _id: orden._id });
+    console.log(`🗑️ Orden web ${orden.orderNumber} borrada por ${req.user?.name || '?'} · stock devuelto: ${devoluciones.join(', ') || 'nada'}`);
+    res.json({
+      ok: true,
+      orderNumber: orden.orderNumber,
+      devoluciones,
+      facturaPendiente: orden.factura?.estado === 'lista' ? orden.factura.consecutivo || orden.factura.alegraId : '',
+    });
+  } catch (error) {
+    console.error('❌ Borrando orden web:', error);
+    res.status(500).json({ error: 'No se pudo borrar la venta.' });
   }
 });
 

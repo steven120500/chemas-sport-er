@@ -10,6 +10,7 @@ import Product from '../models/Product.js';
 import { consultarOrden, tilopayConfigurado } from './tilopay.js';
 import { ajustarStockPorUbicacion, obtenerMapaProductosAlegra, resolverProductoYPrecioBase } from '../routes/tiendaRoutes.js';
 import { ADMIN_ROOM } from './realtime.js';
+import { enviarCorreo, correoAvisoVenta, correoConfigurado, CORREO_AVISO_VENTAS } from './correo.js';
 
 // 📦 Orden en que se toma el inventario de una venta web (si una ubicación no alcanza, sigue con la próxima)
 // Etiquetas que entiende ajustarStockPorUbicacion: "Bodega 1" (stock), "Bodega 2" (bodega), "Tienda" (tienda)
@@ -76,6 +77,7 @@ export async function confirmarPago(orden, io) {
 
   console.log(`✅ Orden web ${pagada.orderNumber} pagada (₡${pagada.total}) [${aprobada.environment || ''}]`);
   io?.to(ADMIN_ROOM).emit('ordenWebPagada', { orderNumber: pagada.orderNumber, total: pagada.total, cliente: nombreCompleto(pagada) });
+  avisarVenta(pagada); // ✉️ correo a la tienda (no bloquea)
 
   // 🧪 Pago de prueba: no toca inventario real ni Hacienda
   if (esPrueba(pagada)) {
@@ -95,6 +97,15 @@ export async function confirmarPago(orden, io) {
   await rebajarStockOrden(pagada._id, io);
   facturarOrden(pagada._id).catch((e) => console.error('❌ Factura orden web:', e.message));
   return OrdenWeb.findById(pagada._id);
+}
+
+/* ✉️ Aviso de venta al correo de la tienda (AVISO_VENTAS_CORREO). Nunca frena el flujo del pago. */
+function avisarVenta(orden) {
+  if (!correoConfigurado() || !CORREO_AVISO_VENTAS) return;
+  const c = correoAvisoVenta(orden.toObject ? orden.toObject() : orden);
+  enviarCorreo({ para: CORREO_AVISO_VENTAS, asunto: c.asunto, texto: c.texto, html: c.html })
+    .then(() => console.log(`✉️ Aviso de venta ${orden.orderNumber} enviado`))
+    .catch((e) => console.warn(`⚠️ No se pudo mandar el aviso de venta ${orden.orderNumber}:`, e.message));
 }
 
 /* ========================================================
