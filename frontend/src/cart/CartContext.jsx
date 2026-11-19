@@ -7,8 +7,9 @@ import { API_BASE } from "../authFetch";
 // Cada línea = producto + talla + dorsal. La misma camiseta en otra talla o con otro dorsal es otra línea.
 // ⚠️ El precio guardado es solo referencia: al pagar (Tilopay) el backend lo recalcula desde la BD.
 //
-// ⏳ APARTADO: al agregar una camiseta se aparta en el servidor por 10 min (PUT /api/checkout/reservas).
-// Mientras tanto ningún otro cliente puede llevarse esa unidad. Al vencer, la línea sale sola del carrito.
+// ⏳ APARTADO: al agregar una camiseta se aparta en el servidor (PUT /api/checkout/reservas).
+// Un solo reloj por carrito: la primera da 10 min y cada camiseta extra le suma 2 min (tope 30).
+// Mientras tanto ningún otro cliente puede llevarse esa unidad. Al vencer, el carrito se libera solo.
 // Todas las líneas del mismo producto+talla comparten una sola reserva (con la suma de las cantidades).
 
 const STORAGE_KEY = "chemasport_carrito";
@@ -96,9 +97,9 @@ export function CartProvider({ children }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Pone la misma hora de vencimiento a todas las líneas de ese producto+talla
-  const ponerVence = useCallback((productId, talla, venceAt) => {
-    setItems((prev) => prev.map((l) => (l.productId === productId && l.talla === talla ? { ...l, venceAt } : l)));
+  // Pone la misma hora de vencimiento a todo el carrito (el servidor lleva un solo reloj por carrito)
+  const ponerVence = useCallback((venceAt) => {
+    setItems((prev) => prev.map((l) => ({ ...l, venceAt })));
   }, []);
 
   // 🌐 Al abrir la página: qué reservas siguen vivas en el servidor (las vencidas salen del carrito)
@@ -123,7 +124,7 @@ export function CartProvider({ children }) {
             .map((l) => ({ ...l, venceAt: vivas.get(grupoDe(l.productId, l.talla)) }))
         );
         if (vencidas.length) {
-          toastHOT(`⏳ Pasaron los 10 minutos: liberamos ${vencidas.length === 1 ? vencidas[0].name : `${vencidas.length} camisetas`} de tu carrito.`, { duration: 6000, style: ESTILO_TOAST });
+          toastHOT(`⏳ Se acabó el tiempo de apartado: liberamos ${vencidas.length === 1 ? vencidas[0].name : `${vencidas.length} camisetas`} de tu carrito.`, { duration: 6000, style: ESTILO_TOAST });
         }
       } catch {
         /* sin conexión: se deja como está */
@@ -236,7 +237,7 @@ export function CartProvider({ children }) {
           const nuevas = existe
             ? prev.map((l) => (l.key === key ? { ...l, cantidad: l.cantidad + suma, precio, precioAntes } : l))
             : [...prev, { key, productId, name, type, image, talla, dorsal, precio, precioAntes, cantidad: suma }];
-          return nuevas.map((l) => (l.productId === productId && l.talla === talla ? { ...l, venceAt } : l));
+          return nuevas.map((l) => ({ ...l, venceAt })); // 🔗 un solo reloj para todo el carrito
         });
         return true;
       } catch (err) {
@@ -260,7 +261,7 @@ export function CartProvider({ children }) {
         try {
           const r = await apartarEnServidor(carritoId, linea.productId, linea.talla, total);
           setItems((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: nueva } : l)));
-          ponerVence(linea.productId, linea.talla, aLocal(r.expiresAt, r.ahora));
+          ponerVence(aLocal(r.expiresAt, r.ahora));
         } catch (err) {
           avisarError(err);
         }

@@ -1,6 +1,7 @@
 // utils/reservas.js
 // ⏳ Apartado de camisetas del carrito (tienda online).
-//  - Al agregar al carrito se aparta la unidad por MINUTOS_APARTADO (10). Otro cliente ve esa talla con una menos.
+//  - Un solo reloj por carrito: la primera camiseta aparta MINUTOS_APARTADO (10) y cada extra suma MINUTOS_POR_EXTRA (2),
+//    hasta MINUTOS_MAX_APARTADO. Todas las reservas del carrito vencen juntas. Otro cliente ve esa talla con una menos.
 //  - Al tocar "Pagar" las reservas del carrito se amarran a la orden y se alargan MINUTOS_PAGO (lo que dura Tilopay).
 //  - Al confirmarse el pago se rebaja el inventario real y se borran las reservas (liberarReservasOrden).
 //  - Cada 20 s se borran las vencidas y se avisa por socket ('apartadasActualizadas') para que todos vean el stock al día.
@@ -8,7 +9,9 @@ import mongoose from 'mongoose';
 import Reserva from '../models/Reserva.js';
 import Product from '../models/Product.js';
 
-export const MINUTOS_APARTADO = 10;
+export const MINUTOS_APARTADO = 10; // ⏳ la primera camiseta del carrito
+export const MINUTOS_POR_EXTRA = 2; // ➕ cada camiseta extra le suma 2 min al mismo reloj (no otros 10)
+export const MINUTOS_MAX_APARTADO = 30; // 🔒 tope del reloj del carrito (para que nadie acapare tallas)
 export const MINUTOS_PAGO = 20;
 
 /** { productId: { talla: cantidad } } de las reservas vivas (opcional: solo esos productos / sin un carrito) */

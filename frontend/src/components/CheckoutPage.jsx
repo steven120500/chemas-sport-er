@@ -99,7 +99,7 @@ const validar = (f) => {
 
 export default function CheckoutPage({ products = [] }) {
   const navigate = useNavigate();
-  const { items, abrir: abrirCarrito, otrasApartadas, proximoVence, carritoId } = useCart();
+  const { items, abrir: abrirCarrito, otrasApartadas, proximoVence, carritoId, vaciar } = useCart();
   const [form, setForm] = useState(leerBorrador);
   const [errores, setErrores] = useState({});
   const [intentado, setIntentado] = useState(false);
@@ -200,8 +200,12 @@ export default function CheckoutPage({ products = [] }) {
     // 💬 Pago por WhatsApp: arma el pedido completo y abre el chat de la tienda
     if (form.pago === "whatsapp") {
       const url = `https://wa.me/${WHATSAPP_TIENDA}?text=${encodeURIComponent(mensajeWhatsapp())}`;
+      // 🧹 El pedido sigue por chat: se vacía el carrito y se sueltan los apartados (el stock real no se toca)
+      vaciar();
+      toastHOT.success("¡Listo! Terminá tu pedido en WhatsApp.", { duration: 6000, style: { borderRadius: "12px", background: "#000", color: "#fff" } });
       const win = window.open(url, "_blank", "noopener");
       if (!win) window.location.href = url; // si el navegador bloquea la pestaña nueva
+      else navigate("/");
       return;
     }
 

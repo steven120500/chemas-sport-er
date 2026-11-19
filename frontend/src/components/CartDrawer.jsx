@@ -10,7 +10,7 @@ import { ApartadoAviso, ApartadoChip } from "./ApartadoReloj";
 // 🛒 Panel lateral del carrito. ⚠️ Estilos en index.css (sección "CARRITO", clases ct-*).
 
 export default function CartDrawer({ products = [] }) {
-  const { items, open, cerrar, cambiarCantidad, quitar, MAX_POR_LINEA, otrasApartadas, proximoVence } = useCart();
+  const { items, open, cerrar, cambiarCantidad, quitar, MAX_POR_LINEA, otrasApartadas, proximoVence, vaciar } = useCart();
   const navigate = useNavigate();
 
   // Bloquear scroll del fondo + Escape
@@ -48,6 +48,17 @@ export default function CartDrawer({ products = [] }) {
     const msg = `¡Hola! Quiero hacer este pedido:\n\n${filas}\n\n*Total:* ${colones(subtotal)}`;
     return `https://wa.me/50660369857?text=${encodeURIComponent(msg)}`;
   }, [lineas, subtotal]);
+
+  // 💬 Pedido por WhatsApp: abre el chat con el pedido y vacía el carrito (suelta los apartados; el stock real no se toca)
+  const pedirPorWhatsapp = (e) => {
+    e.preventDefault();
+    if (unidades === 0) return;
+    const url = whatsappUrl; // 👈 se arma antes de vaciar
+    const win = window.open(url, "_blank", "noopener");
+    vaciar();
+    cerrar();
+    if (!win) window.location.href = url; // si el navegador bloquea la pestaña nueva
+  };
 
   const irAPagar = () => {
     cerrar();
@@ -200,6 +211,7 @@ export default function CartDrawer({ products = [] }) {
                     href={unidades > 0 ? whatsappUrl : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={pedirPorWhatsapp}
                     className="ct-btn is-wa"
                   >
                     <FaWhatsapp /> Prefiero pedir por WhatsApp

@@ -12,7 +12,7 @@ import { costoEnvio } from '../utils/coberturaMensajero.js';
 import { tilopayConfigurado, crearPago, ISO_PROVINCIA } from '../utils/tilopay.js';
 import { confirmarPago, rebajarStockOrden, facturarOrden, generarGuiaOrden } from '../utils/ordenesWeb.js';
 import Reserva from '../models/Reserva.js';
-import { apartadas, emitirApartadas, MINUTOS_APARTADO, MINUTOS_PAGO } from '../utils/reservas.js';
+import { apartadas, emitirApartadas, MINUTOS_APARTADO, MINUTOS_POR_EXTRA, MINUTOS_MAX_APARTADO, MINUTOS_PAGO } from '../utils/reservas.js';
 import { ajustarStockPorUbicacion } from './tiendaRoutes.js';
 import History from '../models/History.js';
 import { enviarCorreo, correoGuia, correoConfigurado } from '../utils/correo.js';
@@ -148,9 +148,10 @@ const ubicacionValida = (prov, cant, dist) => {
 };
 
 /* ========================================================
-   ⏳ APARTADO DE CAMISETAS EN EL CARRITO (10 min)
+   ⏳ APARTADO DE CAMISETAS EN EL CARRITO (10 min + 2 por camiseta extra)
    El carrito del navegador tiene un id aleatorio (carritoId). Cada producto+talla del carrito
-   tiene una reserva que vence a los 10 min; mientras tanto nadie más puede llevarse esa unidad.
+   tiene una reserva; todas vencen juntas (un solo reloj por carrito). Mientras tanto nadie más
+   puede llevarse esas unidades.
    ======================================================== */
 const carritoValido = (v) => /^[a-zA-Z0-9_-]{16,64}$/.test(String(v || ''));
 const limiteReservas = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, message: 'Demasiados cambios en el carrito. Probá en unos minutos.' });
@@ -180,7 +181,8 @@ router.get('/reservas/:carritoId', limiteReservas, async (req, res) => {
 
 // PUT /api/checkout/reservas { carritoId, productId, talla, cantidad }
 // Deja apartadas `cantidad` unidades de esa talla para ese carrito (0 = soltarlas).
-// Si se aparta MÁS que antes, el reloj vuelve a 10 min; si se baja, sigue el mismo.
+// ⏳ Un solo reloj por carrito: si el carrito no tenía nada apartado arranca en 10 min; si ya tenía,
+// cada camiseta extra le suma 2 min al reloj que ya corría (tope 30 min). Si se baja, el reloj sigue igual.
 router.put('/reservas', limiteReservas, async (req, res) => {
   try {
     const { carritoId, productId } = req.body || {};
@@ -214,8 +216,19 @@ router.put('/reservas', limiteReservas, async (req, res) => {
       });
     }
 
-    const previa = await Reserva.findOne({ ...clave, expiresAt: { $gt: new Date() } }).lean();
-    const expiresAt = !previa || cantidad > previa.cantidad ? new Date(Date.now() + MINUTOS_APARTADO * 60 * 1000) : previa.expiresAt;
+    const ahora = new Date();
+    const previa = await Reserva.findOne({ ...clave, expiresAt: { $gt: ahora } }).lean();
+    const antes = previa?.cantidad || 0;
+    // Reloj actual del carrito (reservas vivas que no están amarradas a un pago en curso)
+    const delCarrito = { carritoId, expiresAt: { $gt: ahora }, orderNumber: { $in: [null, ''] } };
+    const ultima = await Reserva.findOne(delCarrito).sort({ expiresAt: -1 }).select('expiresAt').lean();
+    const MIN = 60 * 1000;
+    let expiresAt;
+    if (cantidad <= antes) expiresAt = ultima?.expiresAt || previa?.expiresAt || new Date(ahora.getTime() + MINUTOS_APARTADO * MIN);
+    else if (!ultima) expiresAt = new Date(ahora.getTime() + (MINUTOS_APARTADO + (cantidad - antes - 1) * MINUTOS_POR_EXTRA) * MIN);
+    else expiresAt = new Date(new Date(ultima.expiresAt).getTime() + (cantidad - antes) * MINUTOS_POR_EXTRA * MIN);
+    const tope = new Date(ahora.getTime() + MINUTOS_MAX_APARTADO * MIN);
+    if (expiresAt > tope) expiresAt = tope;
     await Reserva.updateOne(clave, { $set: { cantidad, expiresAt }, $unset: { orderNumber: 1 } }, { upsert: true });
 
     // 🏁 Dos clientes al mismo tiempo: se vuelve a contar y, si nos pasamos, se deshace
@@ -225,6 +238,9 @@ router.put('/reservas', limiteReservas, async (req, res) => {
       else await Reserva.deleteOne(clave);
       return res.status(409).json({ error: `Otro cliente acaba de apartar la última talla ${talla}.`, libres: Math.max(0, libres - (total - stock)) });
     }
+
+    // 🔗 Todo el carrito vence a la misma hora
+    await Reserva.updateMany(delCarrito, { $set: { expiresAt } });
 
     await emitirApartadas(io, [productId]);
     res.json({ ok: true, cantidad, expiresAt, ahora: Date.now() });
