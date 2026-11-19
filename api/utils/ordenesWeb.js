@@ -27,9 +27,8 @@ const ORDEN_UBICACIONES = [
 ];
 const VENDEDOR_WEB = 'Tienda Online';
 
-// 🧪 Pagos en ambiente "Test" de Tilopay (switch "Modo pruebas"): rebajan stock igual que uno real
-// (si era una prueba, el basurero de Ventas web lo devuelve), pero NO se facturan solos en Alegra:
-// la factura de una prueba se hace a mano desde el panel, escogiendo Interno o Electrónica.
+// 🧪 Pagos en ambiente "Test" de Tilopay (switch "Modo pruebas"): hacen todo igual que uno real
+// (stock, factura y guía). El basurero de Ventas web devuelve el stock; la factura y la guía se anulan a mano.
 export const ID_NUMERACION_INTERNA = 1; // misma numeración interna que la Tienda (tiendaRoutes.js)
 export const esPrueba = (o) => String(o?.tilopay?.environment || '').toLowerCase() === 'test';
 
@@ -88,19 +87,8 @@ export async function confirmarPago(orden, io) {
   // 📦 Stock primero (rápido, así no se vende dos veces la misma camiseta); la factura corre aparte
   await rebajarStockOrden(pagada._id, io);
 
-  // 🧪 Pago de prueba: el stock sí se rebaja, pero la factura y la guía quedan para hacerlas a mano
-  //    (una guía de Correos es real y se cobra)
-  if (esPrueba(pagada)) {
-    await OrdenWeb.updateOne(
-      { _id: pagada._id },
-      {
-        factura: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): facturala a mano si querés', at: new Date() },
-        ...(pagada.entrega?.tipo !== 'retiro' && { guia: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): generala a mano si querés' } }),
-      }
-    );
-    return OrdenWeb.findById(pagada._id);
-  }
-
+  // 🧪 Un pago de prueba (Tilopay Test) hace TODO igual que uno real (decisión del dueño, nov-2026):
+  //    factura en Alegra y guía real de Correos. Si era solo una prueba, anular la guía en Correos y la factura en Alegra.
   // 🧾 → 🚚 Factura y, apenas termina (salga bien o mal), la guía. Corre aparte para no hacer esperar al cliente.
   facturarYGuia(pagada._id);
   return OrdenWeb.findById(pagada._id);
@@ -252,7 +240,7 @@ export async function facturarOrden(ordenId, { forzar = false, tipo } = {}) {
   const orden = await OrdenWeb.findOneAndUpdate(
     forzar
       ? { _id: ordenId, estado: 'pagada', 'factura.estado': { $nin: ['facturando', 'lista'] } }
-      : { _id: ordenId, estado: 'pagada', 'tilopay.environment': { $ne: 'Test' }, 'factura.estado': { $nin: ['facturando', 'lista', 'omitida'] } },
+      : { _id: ordenId, estado: 'pagada', 'factura.estado': { $nin: ['facturando', 'lista', 'omitida'] } },
     { 'factura.estado': 'facturando', 'factura.error': '' },
     { new: true }
   );
