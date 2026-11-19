@@ -21,10 +21,10 @@ const ORDEN_UBICACIONES = [
 ];
 const VENDEDOR_WEB = 'Tienda Online';
 
-// 🧪 Pagos en ambiente "Test" de Tilopay: se marcan pagados pero NO rebajan stock ni facturan en Alegra
-// (para no tocar inventario real ni mandar tiquetes falsos a Hacienda). Solo para probar con la BD chemas_pruebas:
-// TILOPAY_PROCESAR_PRUEBAS=1 hace que también rebajen stock (la factura de prueba nunca se emite).
-const PROCESAR_PRUEBAS = process.env.TILOPAY_PROCESAR_PRUEBAS === '1';
+// 🧪 Pagos en ambiente "Test" de Tilopay (switch "Modo pruebas"): rebajan stock igual que uno real
+// (si era una prueba, el basurero de Ventas web lo devuelve), pero NO se facturan solos en Alegra:
+// la factura de una prueba se hace a mano desde el panel, escogiendo Interno o Electrónica.
+export const ID_NUMERACION_INTERNA = 1; // misma numeración interna que la Tienda (tiendaRoutes.js)
 export const esPrueba = (o) => String(o?.tilopay?.environment || '').toLowerCase() === 'test';
 
 // Tilopay devuelve el número con prefijo del comercio: "PFC021519-CSW000002"
@@ -79,22 +79,18 @@ export async function confirmarPago(orden, io) {
   io?.to(ADMIN_ROOM).emit('ordenWebPagada', { orderNumber: pagada.orderNumber, total: pagada.total, cliente: nombreCompleto(pagada) });
   avisarVenta(pagada); // ✉️ correo a la tienda (no bloquea)
 
-  // 🧪 Pago de prueba: no toca inventario real ni Hacienda
+  // 📦 Stock primero (rápido, así no se vende dos veces la misma camiseta); la factura corre aparte
+  await rebajarStockOrden(pagada._id, io);
+
+  // 🧪 Pago de prueba: el stock sí se rebaja, pero la factura queda para hacerla a mano
   if (esPrueba(pagada)) {
-    const motivo = 'Pago de prueba (Tilopay Test)';
     await OrdenWeb.updateOne(
       { _id: pagada._id },
-      {
-        ...(PROCESAR_PRUEBAS ? {} : { stock: { estado: 'omitido', error: `${motivo}: no se rebaja stock`, at: new Date() } }),
-        factura: { estado: 'omitida', error: `${motivo}: no se factura`, at: new Date() },
-      }
+      { factura: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): facturala a mano si querés', at: new Date() } }
     );
-    if (PROCESAR_PRUEBAS) await rebajarStockOrden(pagada._id, io);
     return OrdenWeb.findById(pagada._id);
   }
 
-  // 📦 Stock primero (rápido, así no se vende dos veces la misma camiseta); la factura corre aparte
-  await rebajarStockOrden(pagada._id, io);
   facturarOrden(pagada._id).catch((e) => console.error('❌ Factura orden web:', e.message));
   return OrdenWeb.findById(pagada._id);
 }
@@ -224,7 +220,9 @@ async function impuestoExento() {
 }
 
 // forzar: el súper admin puede facturar a mano un pago de prueba o una factura omitida
-export async function facturarOrden(ordenId, { forzar = false } = {}) {
+// tipo: 'hacienda' (tiquete electrónico ante Hacienda, el automático) | 'interno' (numeración interna, sin Hacienda)
+export async function facturarOrden(ordenId, { forzar = false, tipo = 'hacienda' } = {}) {
+  const esInterna = tipo === 'interno';
   if (!ALEGRA_EMAIL || !ALEGRA_TOKEN) {
     await OrdenWeb.updateOne({ _id: ordenId }, { 'factura.estado': 'error', 'factura.error': 'Faltan ALEGRA_EMAIL / ALEGRA_TOKEN' });
     return null;
@@ -279,8 +277,8 @@ export async function facturarOrden(ordenId, { forzar = false } = {}) {
       status: 'open',
       payments: [{ account: { id: 1 }, amount: Number(total.toFixed(2)), date: hoy }],
       economicActivity: '4771.1',
-      documentType: '04', // Tiquete electrónico (igual que la Tienda)
-      stamp: { generateStamp: true },
+      // Igual que la Tienda: electrónica → tiquete 04 timbrado; interna → numeración propia, sin Hacienda
+      ...(esInterna ? { numberTemplate: { id: ID_NUMERACION_INTERNA } } : { documentType: '04', stamp: { generateStamp: true } }),
       observations: `Venta en línea · Orden ${orden.orderNumber} · Tilopay ${orden.tilopay?.idTransaccion || ''}`.trim(),
     });
 
@@ -289,7 +287,7 @@ export async function facturarOrden(ordenId, { forzar = false } = {}) {
     if (!r.ok) throw new Error(r.data?.message || `Alegra respondió ${r.status}`);
     const inv = r.data;
 
-    if (inv.id && (!inv.stamp || inv.stamp.legalStatus === 'NOT_SENT')) {
+    if (!esInterna && inv.id && (!inv.stamp || inv.stamp.legalStatus === 'NOT_SENT')) {
       await alegra('/invoices/stamp', { method: 'POST', body: { ids: [inv.id] } }).catch(() => {});
     }
     let pdfUrl = inv.pdf || inv.pdfUrl || '';
@@ -308,6 +306,7 @@ export async function facturarOrden(ordenId, { forzar = false } = {}) {
       {
         factura: {
           estado: 'lista',
+          tipo: esInterna ? 'interno' : 'hacienda',
           alegraId: String(inv.id || ''),
           consecutivo: inv.numberTemplate?.fullNumber || String(inv.id || ''),
           pdfUrl,

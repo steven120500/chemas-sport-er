@@ -66,6 +66,7 @@ const ordenWebSchema = new mongoose.Schema(
     // 🧾 Tiquete electrónico en Alegra (utils/ordenesWeb.js → facturarOrden)
     factura: {
       estado: { type: String, enum: ['facturando', 'lista', 'error', 'omitida'] }, // omitida = pago de prueba
+      tipo: { type: String, enum: ['hacienda', 'interno'] }, // electrónica (Hacienda) o interna
       alegraId: String,
       consecutivo: String,
       pdfUrl: String,

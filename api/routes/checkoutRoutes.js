@@ -377,7 +377,8 @@ router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
     if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo se facturan órdenes pagadas.' });
     if (orden.factura?.estado === 'lista') return res.status(400).json({ error: 'Esta orden ya está facturada.' });
     // El panel puede facturar a mano también un pago de prueba (pide confirmación en pantalla)
-    await facturarOrden(orden._id, { forzar: true });
+    const tipo = req.body?.tipo === 'interno' ? 'interno' : 'hacienda';
+    await facturarOrden(orden._id, { forzar: true, tipo });
     res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
   } catch (error) {
     console.error('❌ Refacturando orden web:', error.message);
