@@ -102,9 +102,9 @@ export default function PagoResultado() {
   const iconoEntrega = orden?.entrega === "mensajero" ? FaMotorcycle : orden?.entrega === "retiro" ? FaStore : FaTruck;
   const IconoEntrega = iconoEntrega;
   const textoEntrega =
-    orden?.entrega === "mensajero" ? "Te lo lleva nuestro mensajero. Te escribimos por WhatsApp para coordinar."
+    orden?.entrega === "mensajero" ? `${orden.envioTexto || "Te lo lleva nuestro mensajero."} Te escribimos por WhatsApp para coordinar.`
     : orden?.entrega === "retiro" ? "Te avisamos por WhatsApp cuando esté listo para retirar."
-    : "Lo enviamos por Correos de Costa Rica. La guía para rastrearlo te llega al correo.";
+    : `${orden?.envioTexto || "Lo enviamos por Correos de Costa Rica."} La guía para rastrearlo te llega al correo.`;
 
   const waAyuda = `https://wa.me/${WHATSAPP_TIENDA}?text=${encodeURIComponent(
     `¡Hola! Tengo una consulta sobre mi orden ${orden?.orderNumber || params.get("order") || ""}.`

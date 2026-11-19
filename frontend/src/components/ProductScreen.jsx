@@ -448,8 +448,10 @@ export default function ProductScreen({
     if (storeView === 'bodega2') return b;
     return t + a + b; 
   };
-  // ⏳ Para el cliente: lo que otro cliente tiene apartado en su carrito (10 min) no se ofrece
-  const apartadasDeOtros = (size) => (canEdit ? 0 : otrasApartadas(viewProduct?._id || viewProduct?.id || "", size));
+  // ⏳ Para el cliente: lo que otro cliente tiene apartado en su carrito (10 min) no se ofrece.
+  // 👥 El personal (cualquier usuario logueado) ve el stock real: si lo venden, al cliente se le quita del carrito.
+  const esPersonal = Boolean(canEdit || user?.token);
+  const apartadasDeOtros = (size) => (esPersonal ? 0 : otrasApartadas(viewProduct?._id || viewProduct?.id || "", size));
   const getDisponibleBySize = (size) => Math.max(0, getTotalBySize(size) - apartadasDeOtros(size));
 
   const finalPrice = hasDiscount ? viewProduct?.discountPrice : viewProduct?.price;

@@ -17,6 +17,7 @@ import { registrarGuiaCorreos, codigoPostalCCR } from '../routes/correosRoutes.j
 import { pdfGuiaCorreos } from './guiaPdfCorreos.js';
 import Guia from '../models/Guia.js';
 import { readFileSync } from 'fs';
+import { planEnvio, textoEnvio } from './fechasEnvio.js'; // 📦 cuándo sale / cuándo llega
 
 // 📦 Orden en que se toma el inventario de una venta web (si una ubicación no alcanza, sigue con la próxima)
 // Etiquetas que entiende ajustarStockPorUbicacion: "Bodega 1" (stock), "Bodega 2" (bodega), "Tienda" (tienda)
@@ -385,6 +386,9 @@ export async function generarGuiaOrden(ordenId, { forzar = false, por = '' } = {
   const telefono = String(orden.cliente?.telefono || '');
   const { ymd, fecha, hora } = fechasCR();
   const tipo = e.tipo === 'mensajero' ? 'Mensajero' : 'Correos';
+  // 📦 Según la hora del pago: el mensajero recoge L-V 3 pm y entrega al día siguiente; Correos abre L-V
+  const pagada = orden.pagadaAt || new Date();
+  const plan = planEnvio(e.tipo, pagada);
 
   try {
     let numero = '';
@@ -406,6 +410,7 @@ export async function generarGuiaOrden(ordenId, { forzar = false, por = '' } = {
         esMayorista: 'No',
         nombreMayorista: '',
         comentarios: [`Orden ${orden.orderNumber}`, e.senas].filter(Boolean).join(' · '),
+        fechaEntrega: plan?.entregaYMD || '', // 👈 sale grande en la guía ("ENTREGAR EL martes 24 de noviembre")
         fechaYMD: ymd,
         fecha: `${fecha} ${hora}`,
       };
@@ -451,7 +456,7 @@ export async function generarGuiaOrden(ordenId, { forzar = false, por = '' } = {
     try {
       if (!orden.cliente?.correo) throw new Error('La orden no tiene correo');
       if (!correoConfigurado()) throw new Error('El envío de correos no está configurado (SMTP)');
-      const c = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero, tipo, listaYa: true });
+      const c = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero, tipo, listaYa: true, envio: textoEnvio(e.tipo, pagada, null) });
       await enviarCorreo({
         para: orden.cliente.correo,
         asunto: c.asunto,

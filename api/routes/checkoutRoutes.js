@@ -2,6 +2,7 @@
 // 🛒 Rutas PÚBLICAS del checkout de la tienda online (el cliente no tiene sesión).
 // ⚠️ Todo lo que se agregue acá es público: limitar por IP y devolver solo lo mínimo.
 import crypto from 'crypto';
+import { textoEnvio } from '../utils/fechasEnvio.js'; // 📦 cuándo sale / cuándo llega
 import express from 'express';
 import mongoose from 'mongoose';
 import { rateLimit, requireSuper } from '../middleware/auth.js';
@@ -394,6 +395,7 @@ router.get(
         total: orden.total,
         envio: orden.envio,
         entrega: orden.entrega?.tipo,
+        envioTexto: orden.estado === 'pagada' ? textoEnvio(orden.entrega?.tipo, orden.pagadaAt || new Date(), new Date()) : '',
         nombre: orden.cliente?.nombre,
         correo: orden.cliente?.correo,
         items: orden.items.map((i) => ({ name: i.name, talla: i.talla, dorsal: i.dorsal, cantidad: i.cantidad, precio: i.precio })),

@@ -148,15 +148,59 @@ export function CartProvider({ children }) {
     return () => clearInterval(t);
   }, [hayApartadas]);
 
+  // 🛍️ ¿Nos soltaron algo en el servidor? (la tienda vendió esa camiseta y ya no alcanzaba para este carrito)
+  // Se compara lo apartado en el servidor con lo del carrito: si el servidor tiene MENOS y el reloj no había vencido → se vendió.
+  const revisarVendidas = useCallback(async (productId) => {
+    try {
+      const r = await fetch(`${API_BASE}/api/checkout/reservas/${carritoId}`);
+      if (!r.ok) return;
+      const { reservas = [] } = await r.json();
+      const enServidor = new Map(
+        reservas.filter((x) => String(x.productId) === productId).map((x) => [x.talla, Number(x.cantidad) || 0])
+      );
+      const ahora = Date.now();
+      const tallas = [...new Set(itemsRef.current.filter((l) => l.productId === productId && l.venceAt > ahora + 2000).map((l) => l.talla))];
+      const recorte = new Map(); // talla → cuántas quedan permitidas
+      for (const talla of tallas) {
+        const mias = totalGrupo(itemsRef.current, productId, talla);
+        const quedan = enServidor.get(talla) || 0;
+        if (quedan < mias) recorte.set(talla, quedan);
+      }
+      if (!recorte.size) return;
+      // Deja en cada talla solo lo que sigue apartado en el servidor
+      const recortar = (lista) => {
+        const restante = new Map(recorte);
+        const vendidas = [];
+        const nueva = lista.flatMap((l) => {
+          if (l.productId !== productId || !restante.has(l.talla)) return [l];
+          const cabe = restante.get(l.talla);
+          const cant = Math.min(l.cantidad, cabe);
+          restante.set(l.talla, cabe - cant);
+          if (cant < l.cantidad) vendidas.push(`${l.name} (talla ${nombreTalla(l.talla)})`);
+          return cant > 0 ? [{ ...l, cantidad: cant }] : [];
+        });
+        return { nueva, vendidas };
+      };
+      const { vendidas } = recortar(itemsRef.current);
+      setItems((prev) => recortar(prev).nueva);
+      if (vendidas.length) {
+        toastHOT(`😕 ${[...new Set(vendidas)].join(", ")} se acaba de vender. La quitamos de tu carrito.`, { duration: 8000, style: ESTILO_TOAST });
+      }
+    } catch {
+      /* sin conexión: se revisa en la próxima */
+    }
+  }, [carritoId]);
+
   // 📡 App reenvía el evento del socket ('apartadasActualizadas') como evento del navegador
   useEffect(() => {
     const on = (e) => {
       const { productId, apartadas } = e.detail || {};
       if (productId) setApartadasTodas((prev) => ({ ...prev, [String(productId)]: apartadas || {} }));
+      if (productId && itemsRef.current.some((l) => l.productId === String(productId) && l.venceAt)) revisarVendidas(String(productId));
     };
     window.addEventListener(EVENTO_APARTADAS, on);
     return () => window.removeEventListener(EVENTO_APARTADAS, on);
-  }, []);
+  }, [revisarVendidas]);
 
   // Cuántas tienen apartadas OTROS clientes (lo mío no me resta)
   const otrasApartadas = useCallback(

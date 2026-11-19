@@ -9,6 +9,7 @@ import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart
 import { toast as toastHOT } from "react-hot-toast";
 import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
 import { hayMensajero, COSTO_MENSAJERO } from "../utils/coberturaMensajero";
+import { planEnvio, cuandoTexto } from "../utils/fechasEnvio"; // 📦 cuándo sale / cuándo llega
 import { ApartadoAviso } from "./ApartadoReloj";
 
 // 💳 Checkout (MAQUETA). ⚠️ Estilos en index.css (sección "CHECKOUT", clases co-*).
@@ -171,6 +172,9 @@ export default function CheckoutPage({ products = [] }) {
   // 🛵 Mensajero solo si la dirección está en la cobertura; si no, va por Correos
   const cubreMensajero = hayMensajero(form.provincia, form.canton, form.distrito);
   const entrega = entregaEfectiva(form);
+  // 📦 Si compra hoy: mensajero recoge L-V 3 pm y entrega al día siguiente; Correos abre L-V
+  const planMensajero = planEnvio("mensajero");
+  const planCorreos = planEnvio("correos");
   const esDomicilio = entrega === "mensajero" || entrega === "correos";
   const envio = entrega === "mensajero" ? COSTO_MENSAJERO : entrega === "correos" ? COSTO_ENVIO_CORREOS : 0;
   const cantonesDe = UBICACIONES.find((p) => p.n === form.provincia)?.c || [];
@@ -413,8 +417,8 @@ export default function CheckoutPage({ products = [] }) {
                       <span className="co-label">¿Cómo querés recibirlo en {form.distrito}?</span>
                       <div className="co-options is-stack" role="radiogroup" aria-label="Forma de entrega" name="entrega" tabIndex={-1}>
                         {[
-                          cubreMensajero && { v: "mensajero", icon: FaMotorcycle, t: "Mensajero privado", badge: "Tu zona", d: "Entrega a domicilio en la GAM", p: colones(COSTO_MENSAJERO) },
-                          { v: "correos", icon: FaTruck, t: "Correos de Costa Rica", d: "2 a 4 días hábiles · con número de rastreo", p: colones(COSTO_ENVIO_CORREOS) },
+                          cubreMensajero && { v: "mensajero", icon: FaMotorcycle, t: "Mensajero privado", badge: "Tu zona", d: `Te llega ${cuandoTexto(planMensajero.entrega)} · a domicilio en la GAM`, p: colones(COSTO_MENSAJERO) },
+                          { v: "correos", icon: FaTruck, t: "Correos de Costa Rica", d: `Sale a Correos ${cuandoTexto(planCorreos.despacho)} · llega en 2 a 4 días hábiles · con rastreo`, p: colones(COSTO_ENVIO_CORREOS) },
                           { v: "retiro", icon: FaStore, t: "Retiro en tienda", d: "Te avisamos por WhatsApp cuando esté lista", p: "Gratis" },
                         ].filter(Boolean).map((o, i) => (
                           <motion.button

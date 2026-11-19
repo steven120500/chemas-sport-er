@@ -3,6 +3,7 @@
 // internos. Los usuarios logueados (sala "admins", ver server.js) reciben el objeto completo.
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { ajustarReservasAlStock } from './reservas.js'; // 🛍️ si el stock bajó, se sueltan apartados que ya no caben
 
 export const ADMIN_ROOM = 'admins';
 
@@ -37,4 +38,5 @@ export function emitProductUpdate(io, obj) {
   if (!io || !obj) return;
   io.to(ADMIN_ROOM).emit('productoActualizado', obj);
   io.except(ADMIN_ROOM).emit('productoActualizado', publicProduct(obj));
+  ajustarReservasAlStock(io, obj._id);
 }

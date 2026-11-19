@@ -6,6 +6,7 @@
 //  - Cada 20 s se borran las vencidas y se avisa por socket ('apartadasActualizadas') para que todos vean el stock al día.
 import mongoose from 'mongoose';
 import Reserva from '../models/Reserva.js';
+import Product from '../models/Product.js';
 
 export const MINUTOS_APARTADO = 10;
 export const MINUTOS_PAGO = 20;
@@ -56,4 +57,54 @@ async function limpiarVencidas(io) {
 export function programarLimpiezaReservas(io) {
   const tick = () => limpiarVencidas(io).catch((e) => console.warn('⚠️ Limpieza de reservas:', e.message));
   setInterval(tick, 20 * 1000).unref?.();
+}
+
+/* ========================================================
+   🛍️ Si el stock real baja (venta en tienda, POS, edición) y ya no alcanza para lo apartado,
+   se le quita el sobrante a los carritos que apartaron de último. El cliente lo nota porque su
+   carrito vuelve a leer sus reservas al recibir 'apartadasActualizadas' y le avisa "se vendió".
+   Las reservas amarradas a una orden (cliente ya en Tilopay) no se tocan: si falta stock al pagar,
+   la orden queda con "Faltó stock" en /ventas-web.
+   ======================================================== */
+const STOCK_UBICACIONES = ['tienda', 'stock', 'bodega'];
+const colaPorProducto = new Map(); // 🔒 una revisión a la vez por producto
+
+async function recortarReservas(io, productId) {
+  const vivas = await Reserva.find({ productId, expiresAt: { $gt: new Date() }, orderNumber: { $in: [null, ''] } })
+    .sort({ createdAt: -1 }) // 👈 las más nuevas primero
+    .lean();
+  if (!vivas.length) return;
+  const p = await Product.findById(productId).select(STOCK_UBICACIONES.join(' ')).lean();
+  const stockDe = (talla) => (p ? STOCK_UBICACIONES.reduce((s, k) => s + (parseInt(p?.[k]?.[talla] ?? 0, 10) || 0), 0) : 0);
+
+  const porTalla = new Map();
+  for (const r of vivas) (porTalla.get(r.talla) || porTalla.set(r.talla, []).get(r.talla)).push(r);
+
+  let cambio = false;
+  for (const [talla, lista] of porTalla) {
+    let sobra = lista.reduce((s, r) => s + r.cantidad, 0) - stockDe(talla);
+    for (const r of lista) {
+      if (sobra <= 0) break;
+      const quitar = Math.min(sobra, r.cantidad);
+      if (quitar >= r.cantidad) await Reserva.deleteOne({ _id: r._id });
+      else await Reserva.updateOne({ _id: r._id }, { $inc: { cantidad: -quitar } });
+      sobra -= quitar;
+      cambio = true;
+    }
+  }
+  if (cambio) {
+    console.log(`🛍️ Stock de ${productId} bajó: se soltaron apartados de carritos que ya no alcanzaban`);
+    await emitirApartadas(io, [productId]);
+  }
+}
+
+export function ajustarReservasAlStock(io, productId) {
+  if (!io || !productId || !mongoose.isValidObjectId(String(productId))) return;
+  const id = String(productId);
+  const previa = colaPorProducto.get(id) || Promise.resolve();
+  const sig = previa
+    .then(() => recortarReservas(io, id))
+    .catch((e) => console.warn('⚠️ Ajustando apartados al stock:', e.message))
+    .finally(() => { if (colaPorProducto.get(id) === sig) colaPorProducto.delete(id); });
+  colaPorProducto.set(id, sig);
 }

@@ -48,7 +48,7 @@ const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<
 
 /** Correo con la guía de envío. Correos de CR: número de rastreo + PDF adjunto. Mensajero: número de guía y aviso.
  *  `listaYa`: se manda solo apenas se paga (la camiseta todavía se está alistando), no "va en camino". */
-export function correoGuia({ nombre, orderNumber, numeroGuia, tipo = 'Correos', listaYa = false }) {
+export function correoGuia({ nombre, orderNumber, numeroGuia, tipo = 'Correos', listaYa = false, envio = '' }) {
   const rastreo = 'https://correos.go.cr/rastreo/';
   const esCorreos = tipo !== 'Mensajero';
   const asunto = listaYa
@@ -61,7 +61,7 @@ export function correoGuia({ nombre, orderNumber, numeroGuia, tipo = 'Correos', 
     : (esCorreos
       ? 'Tu pedido ya va en camino por <b>Correos de Costa Rica</b>.'
       : 'Tu pedido ya va en camino con nuestro <b>mensajero</b>.');
-  const texto = `¡Hola ${nombre}!\n\n${estadoTxt.replace(/<[^>]+>/g, '')}\nPedido: ${orderNumber}\nNúmero de guía: ${numeroGuia}${esCorreos ? `\nRastrealo en ${rastreo}\n\nTe adjuntamos la guía en PDF.` : ''}\n\nGracias por comprar en ChemaSport ER.`;
+  const texto = `¡Hola ${nombre}!\n\n${estadoTxt.replace(/<[^>]+>/g, '')}${envio ? `\n📦 ${envio}` : ''}\nPedido: ${orderNumber}\nNúmero de guía: ${numeroGuia}${esCorreos ? `\nRastrealo en ${rastreo}\n\nTe adjuntamos la guía en PDF.` : ''}\n\nGracias por comprar en ChemaSport ER.`;
   const html = `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#111">
     <div style="background:#000;color:#fff;padding:18px 22px;border-radius:14px 14px 0 0">
@@ -70,6 +70,7 @@ export function correoGuia({ nombre, orderNumber, numeroGuia, tipo = 'Correos', 
     <div style="border:1px solid #eee;border-top:0;padding:22px;border-radius:0 0 14px 14px">
       <p style="margin:0 0 12px;font-size:16px">¡Hola <b>${esc(nombre)}</b>! 👋</p>
       <p style="margin:0 0 16px;line-height:1.5">Pedido <b>${esc(orderNumber)}</b>. ${estadoTxt}</p>
+      ${envio ? `<p style="margin:0 0 16px;line-height:1.5;background:#fff8e1;border-radius:10px;padding:10px 14px">📦 <b>${esc(envio)}</b></p>` : ''}
       <div style="background:#f4f4f5;border-radius:12px;padding:14px 16px;margin:0 0 16px">
         <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#666">Número de guía${esCorreos ? ' (Correos de CR)' : ''}</div>
         <div style="font-size:22px;font-weight:900;letter-spacing:1px">${esc(numeroGuia)}</div>
