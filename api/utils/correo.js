@@ -46,11 +46,22 @@ const colones = (n) => `₡${Number(n || 0).toLocaleString('de-DE')}`;
 
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Correo con la guía de Correos de Costa Rica (PDF adjunto) */
-export function correoGuia({ nombre, orderNumber, numeroGuia }) {
+/** Correo con la guía de envío. Correos de CR: número de rastreo + PDF adjunto. Mensajero: número de guía y aviso.
+ *  `listaYa`: se manda solo apenas se paga (la camiseta todavía se está alistando), no "va en camino". */
+export function correoGuia({ nombre, orderNumber, numeroGuia, tipo = 'Correos', listaYa = false }) {
   const rastreo = 'https://correos.go.cr/rastreo/';
-  const asunto = `Tu pedido ${orderNumber} va en camino · Guía ${numeroGuia}`;
-  const texto = `¡Hola ${nombre}!\n\nTu pedido ${orderNumber} ya va en camino por Correos de Costa Rica.\nNúmero de guía: ${numeroGuia}\nRastrealo en ${rastreo}\n\nTe adjuntamos la guía en PDF.\n\nGracias por comprar en ChemaSport ER.`;
+  const esCorreos = tipo !== 'Mensajero';
+  const asunto = listaYa
+    ? `Tu pedido ${orderNumber} está confirmado · Guía ${numeroGuia}`
+    : `Tu pedido ${orderNumber} va en camino · Guía ${numeroGuia}`;
+  const estadoTxt = listaYa
+    ? (esCorreos
+      ? 'Ya estamos alistando tu pedido. Lo enviamos por <b>Correos de Costa Rica</b>: con este número lo podés rastrear apenas lo entreguemos en la oficina.'
+      : 'Ya estamos alistando tu pedido. Te lo lleva nuestro <b>mensajero</b>: te escribimos por WhatsApp para coordinar la entrega.')
+    : (esCorreos
+      ? 'Tu pedido ya va en camino por <b>Correos de Costa Rica</b>.'
+      : 'Tu pedido ya va en camino con nuestro <b>mensajero</b>.');
+  const texto = `¡Hola ${nombre}!\n\n${estadoTxt.replace(/<[^>]+>/g, '')}\nPedido: ${orderNumber}\nNúmero de guía: ${numeroGuia}${esCorreos ? `\nRastrealo en ${rastreo}\n\nTe adjuntamos la guía en PDF.` : ''}\n\nGracias por comprar en ChemaSport ER.`;
   const html = `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#111">
     <div style="background:#000;color:#fff;padding:18px 22px;border-radius:14px 14px 0 0">
@@ -58,13 +69,13 @@ export function correoGuia({ nombre, orderNumber, numeroGuia }) {
     </div>
     <div style="border:1px solid #eee;border-top:0;padding:22px;border-radius:0 0 14px 14px">
       <p style="margin:0 0 12px;font-size:16px">¡Hola <b>${esc(nombre)}</b>! 👋</p>
-      <p style="margin:0 0 16px;line-height:1.5">Tu pedido <b>${esc(orderNumber)}</b> ya va en camino por <b>Correos de Costa Rica</b>.</p>
+      <p style="margin:0 0 16px;line-height:1.5">Pedido <b>${esc(orderNumber)}</b>. ${estadoTxt}</p>
       <div style="background:#f4f4f5;border-radius:12px;padding:14px 16px;margin:0 0 16px">
-        <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#666">Número de guía</div>
+        <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#666">Número de guía${esCorreos ? ' (Correos de CR)' : ''}</div>
         <div style="font-size:22px;font-weight:900;letter-spacing:1px">${esc(numeroGuia)}</div>
       </div>
-      <p style="margin:0 0 18px"><a href="${rastreo}" style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:bold">Rastrear mi paquete</a></p>
-      <p style="margin:0;color:#555;font-size:13px">Te adjuntamos la guía en PDF. ¿Dudas? Escribinos al WhatsApp <a href="https://wa.me/50660369857">6036-9857</a>.</p>
+      ${esCorreos ? `<p style="margin:0 0 18px"><a href="${rastreo}" style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:bold">Rastrear mi paquete</a></p>` : ''}
+      <p style="margin:0;color:#555;font-size:13px">${esCorreos ? 'Te adjuntamos la guía en PDF. ' : ''}¿Dudas? Escribinos al WhatsApp <a href="https://wa.me/50660369857">6036-9857</a>.</p>
     </div>
   </div>`;
   return { asunto, texto, html };

@@ -238,79 +238,106 @@ router.get('/sucursales/:idProvincia/:idCanton', async (req, res) => {
 // ==========================================
 // 4. GENERAR GUÍA DE ENVÍO Y GUARDAR EN MONGODB
 // ==========================================
+// 🛒 Lógica compartida: la usa esta ruta y la guía automática de las ventas web (utils/ordenesWeb.js).
+// Registra la guía en Correos y la guarda en el historial (GuiaCorreos). Devuelve { respuesta, numeroGuia, guiaGuardada }.
+// Si Correos no la acepta lanza un Error con `.respuesta` (lo que contestó Correos).
+export async function registrarGuiaCorreos({
+  destNombre, destDireccion, destTelefono, destZip,
+  peso, observaciones, montoFlete = 1800, tipoDestino = "DOM", codigoSucursal = "",
+  fechaYyyyMmDd, fechaFormateada
+}) {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl || !CCR_CODIGO_CLIENTE) throw new Error('Faltan las variables CCR_* de Correos en el servidor');
+  const fechaActual = new Date().toISOString();
+
+  const payloadCorreos = {
+    codigoCliente: parseInt(CCR_CODIGO_CLIENTE, 10),
+    fechaImposicion: fechaActual,
+    envioId: "", 
+    servicioId: parseInt(CCR_CODIGO_SERVICIO, 10),
+    montoFlete: parseFloat(montoFlete),
+    destNombre: destNombre,
+    destDireccion: destDireccion || "",
+    destTelefono: destTelefono,
+    destZip: destZip || "",
+    
+    // Datos oficiales del remitente corporativo Chema Sport ER
+    sendNombre: "CHEMASPORT ER SOCIEDAD DE RESPONSABILIDAD LIMITADA",
+    sendDireccion: "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque", 
+    sendTelefono: "71103209",  
+    sendZip: "20307",          
+    
+    observaciones: observaciones || "Paquete",
+    usuarioId: CCR_CODIGO_CLIENTE.toString(), 
+    peso: parseInt(peso, 10) || 500, 
+    tipoDestino: tipoDestino,
+    codigoSucursal: codigoSucursal
+  };
+
+  console.log("[CCR-GUIA] -> Registrando guía en Producción:", JSON.stringify(payloadCorreos, null, 2));
+
+  const response = await peticionConTokenCCR((token) => 
+    axios.post(`${baseUrl}/guiasweb/registrar`, payloadCorreos, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  );
+
+  if (!response.data || !response.data.exito) {
+    const err = new Error(response.data?.mensaje || 'Correos no aceptó la guía');
+    err.respuesta = response.data;
+    throw err;
+  }
+
+  const numeroGuia = response.data.datos?.enviold || response.data.datos?.envioId || "PY086032498CR";
+  
+  let guiaGuardada = null;
+  try {
+    guiaGuardada = await GuiaCorreos.create({
+      enviold: numeroGuia,
+      nombre: destNombre,
+      telefono: destTelefono,
+      tipoEnvio: tipoDestino === "DOM" ? "Domicilio" : "Sucursal",
+      direccion: destDireccion || "",
+      detalleEnvio: observaciones || "Paquete",
+      codigoPostal: destZip || "",
+      codigoSucursal: tipoDestino === "SUC" ? codigoSucursal : "",
+      fechaYyyyMmDd: fechaYyyyMmDd || new Date().toISOString().split('T')[0],
+      fechaFormateada: fechaFormateada || new Date().toLocaleDateString('es-CR')
+    });
+  } catch (dbErr) {
+    console.error("Aviso: Guía creada en Correos pero error al guardar en Mongo:", dbErr.message);
+  }
+  return { respuesta: response.data, numeroGuia, guiaGuardada };
+}
+
+// 📮 Código postal de un distrito buscando por NOMBRE en el catálogo de Correos (con la misma caché).
+// Devuelve '' si no lo encuentra (quien llama usa su respaldo).
+const normCCR = (s = '') => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const listaCCR = (data) => (Array.isArray(data?.datos) ? data.datos : Array.isArray(data) ? data : []);
+export async function codigoPostalCCR(provincia, canton, distrito) {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return '';
+  const get = (url) => peticionConTokenCCR((token) => axios.get(`${baseUrl}${url}`, { headers: { Authorization: `Bearer ${token}` } })).then((r) => r.data);
+
+  if (!catalogosCache.provincias) catalogosCache.provincias = await get('/ubicaciones/provincias');
+  const p = listaCCR(catalogosCache.provincias).find((x) => normCCR(x.nombre) === normCCR(provincia));
+  if (!p) return '';
+  const kp = String(p.codigo);
+  if (!catalogosCache.cantones.has(kp)) catalogosCache.cantones.set(kp, await get(`/ubicaciones/cantones?provincia=${kp}`));
+  const c = listaCCR(catalogosCache.cantones.get(kp)).find((x) => normCCR(x.nombre) === normCCR(canton));
+  if (!c) return '';
+  const kc = `${kp}-${c.codigo}`;
+  if (!catalogosCache.distritos.has(kc)) catalogosCache.distritos.set(kc, await get(`/ubicaciones/distritos?provincia=${kp}&canton=${c.codigo}`));
+  const d = listaCCR(catalogosCache.distritos.get(kc)).find((x) => normCCR(x.nombre) === normCCR(distrito));
+  return d?.codigoPostal ? String(d.codigoPostal) : '';
+}
+
 router.post('/generar-guia', async (req, res) => {
   try {
-    const baseUrl = getBaseUrl();
-    const { 
-      destNombre, destDireccion, destTelefono, destZip, 
-      peso, observaciones, montoFlete = 1800, tipoDestino = "DOM", codigoSucursal = "",
-      fechaYyyyMmDd, fechaFormateada
-    } = req.body;
-
-    const fechaActual = new Date().toISOString();
-
-    const payloadCorreos = {
-      codigoCliente: parseInt(CCR_CODIGO_CLIENTE, 10),
-      fechaImposicion: fechaActual,
-      envioId: "", 
-      servicioId: parseInt(CCR_CODIGO_SERVICIO, 10),
-      montoFlete: parseFloat(montoFlete),
-      destNombre: destNombre,
-      destDireccion: destDireccion || "",
-      destTelefono: destTelefono,
-      destZip: destZip || "",
-      
-      // Datos oficiales del remitente corporativo Chema Sport ER
-      sendNombre: "CHEMASPORT ER SOCIEDAD DE RESPONSABILIDAD LIMITADA",
-      sendDireccion: "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque", 
-      sendTelefono: "71103209",  
-      sendZip: "20307",          
-      
-      observaciones: observaciones || "Paquete",
-      usuarioId: CCR_CODIGO_CLIENTE.toString(), 
-      peso: parseInt(peso, 10) || 500, 
-      tipoDestino: tipoDestino,
-      codigoSucursal: codigoSucursal
-    };
-
-    console.log("[CCR-GUIA] -> Registrando guía en Producción:", JSON.stringify(payloadCorreos, null, 2));
-
-    const response = await peticionConTokenCCR((token) => 
-      axios.post(`${baseUrl}/guiasweb/registrar`, payloadCorreos, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-    );
-
-    if (response.data && response.data.exito) {
-      const numeroGuia = response.data.datos?.enviold || response.data.datos?.envioId || "PY086032498CR";
-      
-      let guiaGuardada = null;
-      try {
-        guiaGuardada = await GuiaCorreos.create({
-          enviold: numeroGuia,
-          nombre: destNombre,
-          telefono: destTelefono,
-          tipoEnvio: tipoDestino === "DOM" ? "Domicilio" : "Sucursal",
-          direccion: destDireccion || "",
-          detalleEnvio: observaciones || "Paquete",
-          codigoPostal: destZip || "",
-          codigoSucursal: tipoDestino === "SUC" ? codigoSucursal : "",
-          fechaYyyyMmDd: fechaYyyyMmDd || new Date().toISOString().split('T')[0],
-          fechaFormateada: fechaFormateada || new Date().toLocaleDateString('es-CR')
-        });
-      } catch (dbErr) {
-        console.error("Aviso: Guía creada en Correos pero error al guardar en Mongo:", dbErr.message);
-      }
-
-      res.json({
-        ...response.data,
-        guiaGuardada
-      });
-    } else {
-      res.status(400).json(response.data);
-    }
-
+    const { respuesta, guiaGuardada } = await registrarGuiaCorreos(req.body || {});
+    res.json({ ...respuesta, guiaGuardada });
   } catch (error) {
+    if (error.respuesta) return res.status(400).json(error.respuesta);
     console.error("Error generando guía:", error?.response?.data || error.message);
     res.status(500).json({ 
       exito: false, 

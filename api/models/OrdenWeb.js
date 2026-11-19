@@ -43,6 +43,9 @@ const ordenWebSchema = new mongoose.Schema(
     envio: { type: Number, required: true },
     total: { type: Number, required: true },
     notas: String,
+    carritoId: String, // ⏳ carrito del navegador: sus reservas (utils/reservas.js) se liberan al pagar
+    // 🧾 El cliente marcó "Quiero factura electrónica" en el checkout → tiquete ante Hacienda; si no → ticket interno
+    facturaElectronica: { type: Boolean, default: true },
     metodoPago: { type: String, enum: ['tarjeta'], default: 'tarjeta' },
     estado: { type: String, enum: ['pendiente', 'pagada', 'rechazada'], default: 'pendiente', index: true },
     pagadaAt: Date,
@@ -74,8 +77,13 @@ const ordenWebSchema = new mongoose.Schema(
       error: String,
       at: Date,
     },
-    // 🚚 Guía de envío (panel Ventas web → mismos endpoints que /guias)
+    // 🚚 Guía de envío. Se genera SOLA después de facturar (utils/ordenesWeb.js → generarGuiaOrden);
+    // si falla, el panel Ventas web la reintenta o la hace a mano (mismos endpoints que /guias).
     guia: {
+      estado: { type: String, enum: ['generando', 'lista', 'error', 'omitida'] }, // vacío en guías viejas hechas a mano
+      auto: Boolean, // la hizo el sistema (no una persona)
+      error: String,
+      datos: mongoose.Schema.Types.Mixed, // lo necesario para volver a imprimir el PDF desde el panel
       tipo: { type: String, enum: ['Correos', 'Mensajero'] },
       numero: String,
       fecha: Date,

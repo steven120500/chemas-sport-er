@@ -2,7 +2,8 @@
 // 🛒 Qué pasa cuando una orden web se paga (todo de una vez, sin intervención):
 //   1) confirmarPago     → consult a Tilopay; si está aprobada (y el monto calza) la marca "pagada"
 //   2) rebajarStockOrden → descuenta inventario (+ impresiones de dorsal) y deja historial
-//   3) facturarOrden     → tiquete electrónico en Alegra + correo al cliente
+//   3) facturarOrden     → factura en Alegra (electrónica si el cliente la pidió, si no ticket interno) + correo al cliente
+//   4) generarGuiaOrden  → guía de Correos de CR o de mensajero + correo al cliente (solo queda alistar la camiseta)
 // Cada paso es idempotente (candados atómicos en la BD): se puede llamar varias veces sin duplicar.
 // Además, cada 5 min se revisan las órdenes pendientes (por si el cliente cerró la página antes de volver).
 import OrdenWeb from '../models/OrdenWeb.js';
@@ -10,7 +11,12 @@ import Product from '../models/Product.js';
 import { consultarOrden, tilopayConfigurado } from './tilopay.js';
 import { ajustarStockPorUbicacion, obtenerMapaProductosAlegra, resolverProductoYPrecioBase } from '../routes/tiendaRoutes.js';
 import { ADMIN_ROOM } from './realtime.js';
-import { enviarCorreo, correoAvisoVenta, correoConfigurado, CORREO_AVISO_VENTAS } from './correo.js';
+import { enviarCorreo, correoAvisoVenta, correoGuia, correoConfigurado, CORREO_AVISO_VENTAS } from './correo.js';
+import { liberarReservasOrden } from './reservas.js';
+import { registrarGuiaCorreos, codigoPostalCCR } from '../routes/correosRoutes.js';
+import { pdfGuiaCorreos } from './guiaPdfCorreos.js';
+import Guia from '../models/Guia.js';
+import { readFileSync } from 'fs';
 
 // 📦 Orden en que se toma el inventario de una venta web (si una ubicación no alcanza, sigue con la próxima)
 // Etiquetas que entiende ajustarStockPorUbicacion: "Bodega 1" (stock), "Bodega 2" (bodega), "Tienda" (tienda)
@@ -82,17 +88,30 @@ export async function confirmarPago(orden, io) {
   // 📦 Stock primero (rápido, así no se vende dos veces la misma camiseta); la factura corre aparte
   await rebajarStockOrden(pagada._id, io);
 
-  // 🧪 Pago de prueba: el stock sí se rebaja, pero la factura queda para hacerla a mano
+  // 🧪 Pago de prueba: el stock sí se rebaja, pero la factura y la guía quedan para hacerlas a mano
+  //    (una guía de Correos es real y se cobra)
   if (esPrueba(pagada)) {
     await OrdenWeb.updateOne(
       { _id: pagada._id },
-      { factura: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): facturala a mano si querés', at: new Date() } }
+      {
+        factura: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): facturala a mano si querés', at: new Date() },
+        ...(pagada.entrega?.tipo !== 'retiro' && { guia: { estado: 'omitida', error: 'Pago de prueba (Tilopay Test): generala a mano si querés' } }),
+      }
     );
     return OrdenWeb.findById(pagada._id);
   }
 
-  facturarOrden(pagada._id).catch((e) => console.error('❌ Factura orden web:', e.message));
+  // 🧾 → 🚚 Factura y, apenas termina (salga bien o mal), la guía. Corre aparte para no hacer esperar al cliente.
+  facturarYGuia(pagada._id);
   return OrdenWeb.findById(pagada._id);
+}
+
+/** Factura y después genera la guía (nunca lanza: los errores quedan anotados en la orden) */
+export function facturarYGuia(ordenId) {
+  return facturarOrden(ordenId)
+    .catch((e) => console.error('❌ Factura orden web:', e.message))
+    .then(() => generarGuiaOrden(ordenId))
+    .catch((e) => console.error('❌ Guía orden web:', e.message));
 }
 
 /* ✉️ Aviso de venta al correo de la tienda (AVISO_VENTAS_CORREO). Nunca frena el flujo del pago. */
@@ -160,6 +179,8 @@ export async function rebajarStockOrden(ordenId, io) {
       { _id: orden._id },
       { stock: { estado: 'listo', movimientos, faltantes, at: new Date() } }
     );
+    // ⏳ Ya se rebajó el inventario real: las camisetas apartadas en el carrito se sueltan
+    await liberarReservasOrden(orden, io).catch((e) => console.warn('⚠️ Liberando reservas:', e.message));
     if (faltantes.length) {
       console.warn(`⚠️ Orden web ${orden.orderNumber}: faltó stock →`, faltantes.join(' | '));
       io?.to(ADMIN_ROOM).emit('ordenWebAlerta', { orderNumber: orden.orderNumber, mensaje: `Faltó stock: ${faltantes.join(', ')}` });
@@ -220,9 +241,9 @@ async function impuestoExento() {
 }
 
 // forzar: el súper admin puede facturar a mano un pago de prueba o una factura omitida
-// tipo: 'hacienda' (tiquete electrónico ante Hacienda, el automático) | 'interno' (numeración interna, sin Hacienda)
-export async function facturarOrden(ordenId, { forzar = false, tipo = 'hacienda' } = {}) {
-  const esInterna = tipo === 'interno';
+// tipo: 'hacienda' (tiquete electrónico ante Hacienda) | 'interno' (numeración interna, sin Hacienda).
+//   Sin tipo → lo que escogió el cliente en el checkout (orden.facturaElectronica).
+export async function facturarOrden(ordenId, { forzar = false, tipo } = {}) {
   if (!ALEGRA_EMAIL || !ALEGRA_TOKEN) {
     await OrdenWeb.updateOne({ _id: ordenId }, { 'factura.estado': 'error', 'factura.error': 'Faltan ALEGRA_EMAIL / ALEGRA_TOKEN' });
     return null;
@@ -236,6 +257,7 @@ export async function facturarOrden(ordenId, { forzar = false, tipo = 'hacienda'
     { new: true }
   );
   if (!orden) return null;
+  const esInterna = tipo ? tipo === 'interno' : orden.facturaElectronica === false;
 
   try {
     const credentials = alegraAuth();
@@ -325,6 +347,150 @@ export async function facturarOrden(ordenId, { forzar = false, tipo = 'hacienda'
 }
 
 /* ========================================================
+   4) Guía de envío automática (después de facturar)
+   - Correos  → guía REAL en Correos de CR (queda en su historial de /guias) + PDF al correo del cliente
+   - Mensajero → guía en la lista de mensajero de /guias + correo al cliente con el número
+   - Retiro en tienda → no lleva guía
+   Así a la tienda solo le queda alistar la camiseta e imprimir la guía desde Ventas web.
+   ======================================================== */
+const UBICACIONES = JSON.parse(readFileSync(new URL('./crUbicaciones.json', import.meta.url), 'utf8'));
+
+// 📮 Respaldo APROXIMADO del código postal (solo si no se pudo leer el catálogo de Correos): crUbicaciones.json
+// sigue el orden oficial, pero le faltan distritos que se movieron (p. ej. Río Cuarto) y ahí el número se corre.
+const codigoPostalPorOrden = (prov, cant, dist) => {
+  const ip = UBICACIONES.findIndex((p) => p.n === prov);
+  const ic = ip >= 0 ? UBICACIONES[ip].c.findIndex((c) => c.n === cant) : -1;
+  const id = ic >= 0 ? UBICACIONES[ip].c[ic].d.indexOf(dist) : -1;
+  if (id < 0) return '';
+  return `${ip + 1}${String(ic + 1).padStart(2, '0')}${String(id + 1).padStart(2, '0')}`;
+};
+
+const fechasCR = (d = new Date()) => ({
+  ymd: d.toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' }),
+  fecha: d.toLocaleDateString('es-CR', { timeZone: 'America/Costa_Rica', day: '2-digit', month: '2-digit', year: 'numeric' }),
+  hora: d.toLocaleTimeString('es-CR', { timeZone: 'America/Costa_Rica', hour: '2-digit', minute: '2-digit' }),
+});
+
+const detallePaquete = (o) => {
+  const n = (o.items || []).reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
+  return n ? `${n} ${n === 1 ? 'camiseta' : 'camisetas'}` : 'Paquete';
+};
+
+// forzar: desde el panel se puede generar la de un pago de prueba o reintentar una que falló
+export async function generarGuiaOrden(ordenId, { forzar = false, por = '' } = {}) {
+  // 🔒 Candado: una sola guía por orden
+  const orden = await OrdenWeb.findOneAndUpdate(
+    {
+      _id: ordenId,
+      estado: 'pagada',
+      'entrega.tipo': { $in: ['mensajero', 'correos'] },
+      'guia.numero': { $exists: false },
+      'guia.estado': forzar ? { $nin: ['generando', 'lista'] } : { $nin: ['generando', 'lista', 'omitida', 'error'] },
+    },
+    { 'guia.estado': 'generando', 'guia.error': '' },
+    { new: true }
+  );
+  if (!orden) return null;
+
+  const e = orden.entrega || {};
+  const nombre = nombreCompleto(orden);
+  const telefono = String(orden.cliente?.telefono || '');
+  const { ymd, fecha, hora } = fechasCR();
+  const tipo = e.tipo === 'mensajero' ? 'Mensajero' : 'Correos';
+
+  try {
+    let numero = '';
+    let datos = {};
+    let pdf = null;
+
+    if (tipo === 'Mensajero') {
+      // Mismo formato que GuiasPage / GuiaPedidoModal
+      datos = {
+        numeroGuia: `CS-${String(Date.now()).slice(-6)}`,
+        nombre,
+        provincia: e.provincia || '',
+        canton: e.canton || '',
+        distrito: e.distrito || '',
+        telefono,
+        debe: 'No', // ya pagó con tarjeta
+        monto: '0',
+        meterRaspa: 'No',
+        esMayorista: 'No',
+        nombreMayorista: '',
+        comentarios: [`Orden ${orden.orderNumber}`, e.senas].filter(Boolean).join(' · '),
+        fechaYMD: ymd,
+        fecha: `${fecha} ${hora}`,
+      };
+      await Guia.create(datos);
+      numero = datos.numeroGuia;
+    } else {
+      const zip = (await codigoPostalCCR(e.provincia, e.canton, e.distrito).catch(() => '')) || codigoPostalPorOrden(e.provincia, e.canton, e.distrito) || '10101';
+      const payload = {
+        destNombre: nombre,
+        destDireccion: [e.provincia, e.canton, e.distrito].filter(Boolean).join(', ') + (e.senas ? `, ${e.senas}` : ''),
+        destTelefono: telefono,
+        destZip: zip,
+        peso: 500,
+        observaciones: `${detallePaquete(orden)} · Orden ${orden.orderNumber}`,
+        tipoDestino: 'DOM',
+        codigoSucursal: '',
+        fechaYyyyMmDd: ymd,
+        fechaFormateada: fecha,
+      };
+      const r = await registrarGuiaCorreos(payload);
+      numero = r.numeroGuia;
+      datos = {
+        enviold: numero,
+        nombre: payload.destNombre,
+        telefono: payload.destTelefono,
+        tipoEnvio: 'Domicilio',
+        direccion: payload.destDireccion,
+        detalleEnvio: payload.observaciones,
+        codigoPostal: payload.destZip,
+        codigoSucursal: '',
+        fechaYyyyMmDd: ymd,
+        fechaFormateada: fecha,
+      };
+      pdf = await pdfGuiaCorreos(datos).catch((err) => {
+        console.warn(`⚠️ PDF de la guía ${numero}:`, err.message);
+        return null;
+      });
+    }
+
+    // ✉️ Correo al cliente con la guía (Correos: con el PDF)
+    let correoEnviado = false;
+    let correoError = '';
+    try {
+      if (!orden.cliente?.correo) throw new Error('La orden no tiene correo');
+      if (!correoConfigurado()) throw new Error('El envío de correos no está configurado (SMTP)');
+      const c = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero, tipo, listaYa: true });
+      await enviarCorreo({
+        para: orden.cliente.correo,
+        asunto: c.asunto,
+        texto: c.texto,
+        html: c.html,
+        adjuntos: pdf ? [{ filename: `Guia-${numero}.pdf`, content: pdf, contentType: 'application/pdf' }] : [],
+      });
+      correoEnviado = true;
+    } catch (err) {
+      correoError = err.message;
+      console.warn(`⚠️ Guía ${numero} de ${orden.orderNumber}: no se pudo enviar el correo:`, err.message);
+    }
+
+    await OrdenWeb.updateOne(
+      { _id: orden._id },
+      { guia: { estado: 'lista', auto: true, error: '', datos, tipo, numero, fecha: new Date(), por: por || 'Automática', correoEnviado, correoError } }
+    );
+    console.log(`🚚 Orden web ${orden.orderNumber}: guía ${tipo} ${numero} lista${correoEnviado ? ' y enviada al cliente' : ''}`);
+  } catch (err) {
+    const msg = err.respuesta?.mensaje || err.message;
+    console.error(`❌ Guía de ${orden.orderNumber}:`, msg);
+    await OrdenWeb.updateOne({ _id: orden._id }, { 'guia.estado': 'error', 'guia.error': msg, 'guia.tipo': tipo });
+  }
+  return OrdenWeb.findById(orden._id);
+}
+
+/* ========================================================
    ⏱️ Respaldo: revisar pendientes de las últimas 24 h cada 5 min
    (si el cliente pagó pero cerró la pestaña antes de volver a la página)
    ======================================================== */
@@ -343,11 +509,17 @@ export async function revisarPendientes(io) {
   const aMedias = await OrdenWeb.find({
     estado: 'pagada',
     pagadaAt: { $gte: desde },
-    $or: [{ 'stock.estado': { $exists: false } }, { 'factura.estado': { $exists: false } }],
+    $or: [
+      { 'stock.estado': { $exists: false } },
+      { 'factura.estado': { $exists: false } },
+      // guía automática que no llegó a correr (sin número ni estado) y ya terminó la factura
+      { 'entrega.tipo': { $ne: 'retiro' }, 'guia.estado': { $exists: false }, 'guia.numero': { $exists: false }, 'factura.estado': { $in: ['lista', 'error'] } },
+    ],
   }).limit(30);
   for (const o of aMedias) {
     if (!o.stock?.estado) await rebajarStockOrden(o._id, io).catch(() => {});
-    if (!o.factura?.estado) await facturarOrden(o._id).catch(() => {});
+    if (!o.factura?.estado) await facturarYGuia(o._id);
+    else if (!o.guia?.estado && !o.guia?.numero) await generarGuiaOrden(o._id).catch(() => {});
   }
 }
 

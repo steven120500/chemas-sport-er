@@ -24,6 +24,7 @@ import comisionesRoutes from './routes/comisionesRoutes.js'; // 🗓️ Contrape
 import checkoutRoutes from './routes/checkoutRoutes.js'; // 🛒 Checkout público (cédula, luego Tilopay)
 import { programarLimpiezaPedidos } from './utils/pedidosLimpieza.js';
 import { programarRevisionOrdenesWeb } from './utils/ordenesWeb.js'; // 🛒 respaldo: confirma pagos de Tilopay pendientes
+import { programarLimpiezaReservas } from './utils/reservas.js'; // ⏳ libera camisetas apartadas en carritos (10 min)
 
 const app = express();
 
@@ -118,6 +119,7 @@ app.use('/api/checkout', checkoutRoutes); // 🛒 Público (limitado por IP)
 programarLimpiezaPedidos();
 // 🛒 Cada 5 min revisa órdenes web pendientes (por si el cliente pagó y cerró la página antes de volver)
 programarRevisionOrdenesWeb(io);
+programarLimpiezaReservas(io);
 
 app.get('/', (_req, res) => res.send('Chema Sport ER API con WebSockets'));
 

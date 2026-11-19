@@ -9,7 +9,9 @@ import Product from '../models/Product.js';
 import OrdenWeb, { siguienteNumeroOrdenWeb } from '../models/OrdenWeb.js';
 import { costoEnvio } from '../utils/coberturaMensajero.js';
 import { tilopayConfigurado, crearPago, ISO_PROVINCIA } from '../utils/tilopay.js';
-import { confirmarPago, rebajarStockOrden, facturarOrden } from '../utils/ordenesWeb.js';
+import { confirmarPago, rebajarStockOrden, facturarOrden, generarGuiaOrden } from '../utils/ordenesWeb.js';
+import Reserva from '../models/Reserva.js';
+import { apartadas, emitirApartadas, MINUTOS_APARTADO, MINUTOS_PAGO } from '../utils/reservas.js';
 import { ajustarStockPorUbicacion } from './tiendaRoutes.js';
 import History from '../models/History.js';
 import { enviarCorreo, correoGuia, correoConfigurado } from '../utils/correo.js';
@@ -144,6 +146,93 @@ const ubicacionValida = (prov, cant, dist) => {
   return Boolean(c && c.d.includes(dist));
 };
 
+/* ========================================================
+   ⏳ APARTADO DE CAMISETAS EN EL CARRITO (10 min)
+   El carrito del navegador tiene un id aleatorio (carritoId). Cada producto+talla del carrito
+   tiene una reserva que vence a los 10 min; mientras tanto nadie más puede llevarse esa unidad.
+   ======================================================== */
+const carritoValido = (v) => /^[a-zA-Z0-9_-]{16,64}$/.test(String(v || ''));
+const limiteReservas = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, message: 'Demasiados cambios en el carrito. Probá en unos minutos.' });
+
+// GET /api/checkout/apartadas → { productId: { talla: n } } de todas las reservas vivas (para restar en el catálogo)
+router.get('/apartadas', limiteReservas, async (req, res) => {
+  try {
+    res.json(await apartadas());
+  } catch (error) {
+    console.error('❌ Leyendo apartadas:', error.message);
+    res.status(500).json({ error: 'No se pudo leer el stock apartado.' });
+  }
+});
+
+// GET /api/checkout/reservas/:carritoId → reservas vivas de ese carrito [{ productId, talla, cantidad, expiresAt }]
+router.get('/reservas/:carritoId', limiteReservas, async (req, res) => {
+  try {
+    if (!carritoValido(req.params.carritoId)) return res.status(400).json({ error: 'Carrito inválido.' });
+    const reservas = await Reserva.find({ carritoId: req.params.carritoId, expiresAt: { $gt: new Date() } })
+      .select('productId talla cantidad expiresAt -_id').lean();
+    res.json({ reservas, ahora: Date.now() });
+  } catch (error) {
+    console.error('❌ Leyendo reservas:', error.message);
+    res.status(500).json({ error: 'No se pudo leer el carrito.' });
+  }
+});
+
+// PUT /api/checkout/reservas { carritoId, productId, talla, cantidad }
+// Deja apartadas `cantidad` unidades de esa talla para ese carrito (0 = soltarlas).
+// Si se aparta MÁS que antes, el reloj vuelve a 10 min; si se baja, sigue el mismo.
+router.put('/reservas', limiteReservas, async (req, res) => {
+  try {
+    const { carritoId, productId } = req.body || {};
+    const talla = txt(req.body?.talla, 10);
+    const cantidad = Math.trunc(Number(req.body?.cantidad));
+    if (!carritoValido(carritoId)) return res.status(400).json({ error: 'Carrito inválido.' });
+    if (!mongoose.isValidObjectId(productId) || !talla) return res.status(400).json({ error: 'Producto inválido.' });
+    if (!Number.isFinite(cantidad) || cantidad < 0 || cantidad > 30) return res.status(400).json({ error: 'Cantidad inválida.' });
+    const io = req.app.get('io');
+    const clave = { carritoId, productId, talla };
+
+    if (cantidad === 0) {
+      await Reserva.deleteOne(clave);
+      await emitirApartadas(io, [productId]);
+      return res.json({ ok: true, cantidad: 0 });
+    }
+
+    const p = await Product.findById(productId).lean();
+    if (!p || p.hidden) return res.status(404).json({ error: 'Esta camiseta ya no está disponible.' });
+    const stock = stockDe(p, talla);
+    const otros = (await apartadas({ productIds: [productId], excluirCarrito: carritoId }))[String(productId)]?.[talla] || 0;
+    const libres = Math.max(0, stock - otros);
+    if (cantidad > libres) {
+      return res.status(409).json({
+        error: libres > 0
+          ? `Solo quedan ${libres} disponibles en talla ${talla}.`
+          : otros > 0
+            ? `Otro cliente tiene apartada la última talla ${talla}. Si no la compra, se libera en unos minutos.`
+            : `Se agotó la talla ${talla}.`,
+        libres,
+      });
+    }
+
+    const previa = await Reserva.findOne({ ...clave, expiresAt: { $gt: new Date() } }).lean();
+    const expiresAt = !previa || cantidad > previa.cantidad ? new Date(Date.now() + MINUTOS_APARTADO * 60 * 1000) : previa.expiresAt;
+    await Reserva.updateOne(clave, { $set: { cantidad, expiresAt }, $unset: { orderNumber: 1 } }, { upsert: true });
+
+    // 🏁 Dos clientes al mismo tiempo: se vuelve a contar y, si nos pasamos, se deshace
+    const total = (await apartadas({ productIds: [productId] }))[String(productId)]?.[talla] || 0;
+    if (total > stock) {
+      if (previa) await Reserva.updateOne(clave, { $set: { cantidad: previa.cantidad, expiresAt: previa.expiresAt } });
+      else await Reserva.deleteOne(clave);
+      return res.status(409).json({ error: `Otro cliente acaba de apartar la última talla ${talla}.`, libres: Math.max(0, libres - (total - stock)) });
+    }
+
+    await emitirApartadas(io, [productId]);
+    res.json({ ok: true, cantidad, expiresAt, ahora: Date.now() });
+  } catch (error) {
+    console.error('❌ Apartando camiseta:', error.message);
+    res.status(500).json({ error: 'No se pudo apartar la camiseta. Probá de nuevo.' });
+  }
+});
+
 router.post(
   '/',
   rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: 'Demasiados intentos de pago. Probá en unos minutos.' }),
@@ -154,6 +243,9 @@ router.post(
         return res.status(503).json({ error: 'El pago con tarjeta no está disponible en este momento. Probá por WhatsApp.' });
       }
       const { cliente = {}, entrega = {}, items = [], notas = '' } = req.body || {};
+      const carritoId = carritoValido(req.body?.carritoId) ? String(req.body.carritoId) : '';
+      // Sin el campo (frontend viejo) → electrónica, como antes; el checkout nuevo siempre lo manda
+      const facturaElectronica = req.body?.facturaElectronica !== false;
 
       // 👤 Cliente
       const c = {
@@ -187,6 +279,8 @@ router.post(
       if (ids.some((id) => !mongoose.isValidObjectId(id))) return res.status(400).json({ error: 'Producto inválido.' });
       const productos = await Product.find({ _id: { $in: ids } }).lean();
       const porId = new Map(productos.map((p) => [String(p._id), p]));
+      // ⏳ Lo que tienen apartado OTROS carritos no se puede vender (lo de este carrito sí)
+      const deOtros = await apartadas({ productIds: ids, excluirCarrito: carritoId || '__sin_carrito__' });
 
       const lineas = [];
       const pedidoPorTalla = new Map(); // productId|talla → cantidad total pedida (varias líneas con distinto dorsal)
@@ -198,8 +292,13 @@ router.post(
         if (!talla || !Number.isFinite(cantidad) || cantidad < 1 || cantidad > 10) return res.status(400).json({ error: 'Cantidad inválida.' });
         const k = `${p._id}|${talla}`;
         pedidoPorTalla.set(k, (pedidoPorTalla.get(k) || 0) + cantidad);
-        if (pedidoPorTalla.get(k) > stockDe(p, talla)) {
-          return res.status(409).json({ error: `Ya no hay suficientes "${p.name}" en talla ${talla}. Revisá el carrito.` });
+        const otros = deOtros[String(p._id)]?.[talla] || 0;
+        if (pedidoPorTalla.get(k) > stockDe(p, talla) - otros) {
+          return res.status(409).json({
+            error: otros > 0
+              ? `"${p.name}" talla ${talla}: otro cliente la tiene apartada. Si no la compra, se libera en unos minutos.`
+              : `Ya no hay suficientes "${p.name}" en talla ${talla}. Revisá el carrito.`,
+          });
         }
         let dorsal;
         if (i.dorsal && p.isNumerable) {
@@ -226,7 +325,23 @@ router.post(
         numero, orderNumber, token, cliente: c,
         entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
         items: lineas, subtotal, envio, total, notas: txt(notas, 500),
+        carritoId, facturaElectronica,
       });
+
+      // ⏳ Mientras paga en Tilopay, las camisetas siguen apartadas (se amarran a la orden y se alargan)
+      if (carritoId) {
+        const hasta = new Date(Date.now() + MINUTOS_PAGO * 60 * 1000);
+        for (const [k, cant] of pedidoPorTalla) {
+          const [productId, talla] = k.split('|');
+          await Reserva.updateOne(
+            { carritoId, productId, talla },
+            { $set: { cantidad: cant, expiresAt: hasta, orderNumber } },
+            { upsert: true }
+          );
+        }
+        await Reserva.deleteMany({ carritoId, orderNumber: { $ne: orderNumber } }); // lo que ya no está en el carrito
+        await emitirApartadas(req.app.get('io'), ids);
+      }
 
       // 💳 Link de pago (el cliente vuelve a /checkout/resultado con ?order=...&code=...)
       const url = await crearPago({
@@ -308,6 +423,7 @@ const resumenOrden = (o) => ({
   envio: o.envio,
   total: o.total,
   notas: o.notas,
+  facturaElectronica: o.facturaElectronica !== false,
   tilopay: o.tilopay,
   stock: o.stock,
   factura: o.factura,
@@ -441,7 +557,7 @@ router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
     const tipo = ['Correos', 'Mensajero'].includes(req.body?.tipo) ? req.body.tipo : '';
     if (!numero || !tipo) return res.status(400).json({ error: 'Falta el número o el tipo de guía.' });
 
-    const guia = { tipo, numero, fecha: new Date(), por: req.user?.name || '', correoEnviado: false, correoError: '' };
+    const guia = { estado: 'lista', auto: false, error: '', tipo, numero, fecha: new Date(), por: req.user?.name || '', correoEnviado: false, correoError: '', datos: req.body?.datos || undefined };
 
     if (tipo === 'Correos' && req.body?.enviarCorreo) {
       const para = orden.cliente?.correo;
@@ -449,7 +565,7 @@ router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
       try {
         if (!para) throw new Error('La orden no tiene correo');
         if (!correoConfigurado()) throw new Error('El envío de correos no está configurado (SMTP)');
-        const contenido = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero });
+        const contenido = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero, tipo });
         await enviarCorreo({
           para,
           asunto: contenido.asunto,
@@ -470,6 +586,25 @@ router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
   } catch (error) {
     console.error('❌ Guardando guía de orden web:', error.message);
     res.status(500).json({ error: 'No se pudo guardar la guía.' });
+  }
+});
+
+// POST /api/checkout/admin/ordenes/:id/guia-auto → genera (o reintenta) la guía automática:
+// Correos de CR o mensajero según lo que escogió el cliente, y se la manda por correo.
+router.post('/admin/ordenes/:id/guia-auto', requireSuper, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const orden = await OrdenWeb.findById(req.params.id);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo órdenes pagadas.' });
+    if (orden.entrega?.tipo === 'retiro') return res.status(400).json({ error: 'Retiro en tienda: no lleva guía.' });
+    if (orden.guia?.numero) return res.status(400).json({ error: `Ya tiene la guía ${orden.guia.numero}.` });
+    if (orden.guia?.estado === 'generando') return res.status(409).json({ error: 'La guía se está generando, probá en un momento.' });
+    await generarGuiaOrden(orden._id, { forzar: true, por: req.user?.name || '' });
+    res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
+  } catch (error) {
+    console.error('❌ Guía automática (panel):', error.message);
+    res.status(500).json({ error: 'No se pudo generar la guía.' });
   }
 });
 
