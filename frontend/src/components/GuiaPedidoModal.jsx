@@ -5,10 +5,14 @@
 //   - Mensajero → POST /api/guias (queda en la lista de guías de mensajero) + PDF 4x6
 //   - Correos   → POST /api/correos/generar-guia (guía REAL en Correos, queda en su historial) + PDF oficial
 // y al final anota el número de guía en el pedido (PUT /api/pedidos/:id/guia).
-import { useEffect, useMemo, useState } from "react";
+// 🛒 También se usa desde Ventas web con `orden` (orden de la tienda online): jala sus datos y dirección,
+//    anota la guía en la orden (POST /api/checkout/admin/ordenes/:id/guia) y, si es Correos, manda el PDF al correo del cliente.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaTruck, FaCheck, FaMotorcycle, FaEnvelope } from "react-icons/fa";
 import ModalShell from "./ModalShell";
+import LoadingOverlay from "./LoadingOverlay";
 import { API_BASE } from "../authFetch";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
 import { saldoDe, textoRecogerRaspa } from "../utils/pedidosPago";
@@ -18,6 +22,11 @@ const PROVINCIAS_MENSAJERO = ["Alajuela", "Cartago", "Heredia", "San José"];
 const COMENTARIOS = ["Sin comentario", "ENTREGAR MISMO DIA", "PAQUETE PARA JOHAN", "Otro comentario..."];
 
 const soloDigitos = (v, max) => String(v || "").replace(/\D/g, "").slice(0, max);
+const normNombre = (s = "") => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const detalleOrden = (o) => {
+  const n = (o?.items || []).reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
+  return n ? `${n} ${n === 1 ? "camiseta" : "camisetas"}` : "Paquete";
+};
 const fechaLocalYMD = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -44,27 +53,36 @@ async function postJSON(url, body, method = "POST") {
   return { res, data };
 }
 
-export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
-  const saldo = saldoDe(p); // adelanto + abonos
-  const recogerRaspa = textoRecogerRaspa(p);
-  const [tipo, setTipo] = useState(p.guia?.tipo || "Correos");
-  const [nombre, setNombre] = useState(p.cliente?.nombre || "");
-  const [telefono, setTelefono] = useState(soloDigitos(p.cliente?.telefono, 8));
-  const [detalle, setDetalle] = useState("Paquete"); // predeterminado; se puede cambiar
+export default function GuiaPedidoModal({ pedido, orden, onClose, onDone }) {
+  const esOrden = Boolean(orden); // 🛒 orden de la tienda online (ya pagada: no debe nada)
+  const p = pedido || {};
+  const ent = orden?.entrega || {};
+  const saldo = esOrden ? 0 : saldoDe(p); // adelanto + abonos
+  const recogerRaspa = esOrden ? "" : textoRecogerRaspa(p);
+  const guiaActual = esOrden ? orden.guia : p.guia;
+  const [tipo, setTipo] = useState(guiaActual?.tipo || (esOrden && ent.tipo === "mensajero" ? "Mensajero" : "Correos"));
+  const [nombre, setNombre] = useState(esOrden ? `${orden.cliente?.nombre || ""} ${orden.cliente?.apellidos || ""}`.trim() : p.cliente?.nombre || "");
+  const [telefono, setTelefono] = useState(soloDigitos((esOrden ? orden.cliente : p.cliente)?.telefono, 8));
+  const [detalle, setDetalle] = useState(esOrden ? detalleOrden(orden) : "Paquete"); // predeterminado; se puede cambiar
+  const [enviarCorreo, setEnviarCorreo] = useState(true); // solo órdenes web + Correos
   const [generando, setGenerando] = useState(false);
+  const [pasoCarga, setPasoCarga] = useState(""); // texto del loading mientras se genera
+  const comentarioOrden = esOrden ? [`Orden ${orden.orderNumber}`, ent.senas].filter(Boolean).join(" · ") : "";
 
   // --- Mensajero ---
   const [msj, setMsj] = useState({
-    provincia: "", canton: "", distrito: "",
+    provincia: esOrden && PROVINCIAS_MENSAJERO.includes(ent.provincia) ? ent.provincia : "",
+    canton: esOrden ? ent.canton || "" : "",
+    distrito: esOrden ? ent.distrito || "" : "",
     debe: saldo > 0 ? "Sí" : "No", monto: saldo > 0 ? String(saldo) : "",
     meterRaspa: "No",
     // 🎟️ Si el pedido usó raspa, el mensajero la tiene que recoger para que valga el precio
-    comentarioSelect: recogerRaspa ? "Otro comentario..." : "Sin comentario",
-    comentarioCustom: recogerRaspa,
+    comentarioSelect: recogerRaspa || comentarioOrden ? "Otro comentario..." : "Sin comentario",
+    comentarioCustom: recogerRaspa || comentarioOrden,
   });
 
   // --- Correos ---
-  const [ccr, setCcr] = useState({ tipoEnvio: "DOM", provincia: "", canton: "", distrito: "", direccion: "", codigoSucursal: "" });
+  const [ccr, setCcr] = useState({ tipoEnvio: "DOM", provincia: "", canton: "", distrito: "", direccion: esOrden ? ent.senas || "" : "", codigoSucursal: "" });
   const [provincias, setProvincias] = useState([]);
   const [cantones, setCantones] = useState([]);
   const [distritos, setDistritos] = useState([]);
@@ -101,6 +119,27 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
     }
     return () => { vigente = false; };
   }, [ccr.tipoEnvio, ccr.provincia, ccr.canton]);
+
+  // 🛒 Orden web: escoger sola la provincia/cantón/distrito de Correos que coincide por nombre (una vez cada uno)
+  const autoCCR = useRef({ provincia: false, canton: false, distrito: false });
+  useEffect(() => {
+    if (!esOrden || autoCCR.current.provincia || !provincias.length) return;
+    autoCCR.current.provincia = true;
+    const m = provincias.find((x) => normNombre(x.nombre) === normNombre(ent.provincia));
+    if (m) setCcr((s) => ({ ...s, provincia: String(m.codigo), canton: "", distrito: "" }));
+  }, [esOrden, provincias, ent.provincia]);
+  useEffect(() => {
+    if (!esOrden || autoCCR.current.canton || !cantones.length) return;
+    autoCCR.current.canton = true;
+    const m = cantones.find((x) => normNombre(x.nombre) === normNombre(ent.canton));
+    if (m) setCcr((s) => ({ ...s, canton: String(m.codigo), distrito: "" }));
+  }, [esOrden, cantones, ent.canton]);
+  useEffect(() => {
+    if (!esOrden || autoCCR.current.distrito || !distritos.length) return;
+    autoCCR.current.distrito = true;
+    const m = distritos.find((x) => normNombre(x.nombre) === normNombre(ent.distrito));
+    if (m) setCcr((s) => ({ ...s, distrito: String(m.codigo) }));
+  }, [esOrden, distritos, ent.distrito]);
 
   const nombreDe = (lista, cod) => (lista.find((x) => String(x.codigo) === String(cod))?.nombre || "").trim();
   const codigoPostal = useMemo(
@@ -142,7 +181,7 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
 
     const { doc, fileName } = await generarPdfMensajero(guia);
     doc.save(fileName);
-    return guia.numeroGuia;
+    return { numero: guia.numeroGuia, datos: guia };
   };
 
   const hacerCorreos = async () => {
@@ -174,7 +213,7 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
     if (!res.ok || !data.exito) throw new Error(data.mensaje || data.error || "Correos no aceptó la guía");
 
     const numero = data.datos?.enviold || data.datos?.envioId || data.guiaGuardada?.enviold;
-    generarPdfOficialCorreos(data.guiaGuardada || {
+    const datos = data.guiaGuardada || {
       enviold: numero,
       nombre: payload.destNombre,
       telefono: payload.destTelefono,
@@ -185,8 +224,9 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
       codigoSucursal: payload.codigoSucursal,
       fechaYyyyMmDd: payload.fechaYyyyMmDd,
       fechaFormateada: payload.fechaFormateada,
-    });
-    return numero;
+    };
+    const doc = generarPdfOficialCorreos(datos);
+    return { numero, doc, datos };
   };
 
   const generar = async (close) => {
@@ -194,19 +234,37 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
     if (!nombre.trim()) return toastHOT.error("Falta el nombre.");
     if (!telefono.trim()) return toastHOT.error("Falta el teléfono.");
     setGenerando(true);
+    setPasoCarga(tipo === "Correos" ? "Generando la guía en Correos de Costa Rica…" : "Guardando la guía del mensajero…");
     const toastId = toastHOT.loading(tipo === "Correos" ? "Generando guía en Correos CR…" : "Guardando guía de mensajero…");
     try {
-      const numero = tipo === "Correos" ? await hacerCorreos() : await hacerMensajero();
-      // La guía ya existe y quedó en su lista: si falla anotarla en el pedido, solo se avisa
-      const { res, data } = await postJSON(`/api/pedidos/${p._id}/guia`, { numero, tipo }, "PUT");
-      if (res.ok) onDone(data);
-      else toastHOT.error(`La guía ${numero} se hizo, pero no se pudo anotar en el pedido: ${data.error || ""}`);
-      toastHOT.success(`Guía ${numero} lista: PDF descargado y guardada en Guías`, { id: toastId });
+      const r = tipo === "Correos" ? await hacerCorreos() : await hacerMensajero();
+      const numero = r.numero;
+      if (esOrden) {
+        // 🛒 Orden web: anotar la guía y (Correos) mandar el PDF al correo del cliente
+        const mandar = tipo === "Correos" && enviarCorreo;
+        setPasoCarga(mandar ? "Enviando la guía al correo del cliente…" : "Anotando la guía en la orden…");
+        let pdfBase64 = "";
+        try { if (mandar && r.doc) pdfBase64 = r.doc.output("datauristring"); } catch { /* sin PDF: va solo el número */ }
+        const { res, data } = await postJSON(`/api/checkout/admin/ordenes/${orden._id}/guia`, { numero, tipo, pdfBase64, enviarCorreo: mandar, datos: r.datos });
+        if (res.ok) {
+          onDone(data);
+          if (mandar && !data.guia?.correoEnviado) toastHOT.error(`La guía se hizo, pero no se pudo mandar el correo: ${data.guia?.correoError || ""}`, { duration: 9000 });
+        } else toastHOT.error(`La guía ${numero} se hizo, pero no se pudo anotar en la orden: ${data.error || ""}`);
+        toastHOT.success(`Guía ${numero} lista${mandar && res.ok && data.guia?.correoEnviado ? " y enviada al cliente" : ""}`, { id: toastId });
+      } else {
+        setPasoCarga("Anotando la guía en el pedido…");
+        // La guía ya existe y quedó en su lista: si falla anotarla en el pedido, solo se avisa
+        const { res, data } = await postJSON(`/api/pedidos/${p._id}/guia`, { numero, tipo }, "PUT");
+        if (res.ok) onDone(data);
+        else toastHOT.error(`La guía ${numero} se hizo, pero no se pudo anotar en el pedido: ${data.error || ""}`);
+        toastHOT.success(`Guía ${numero} lista: PDF descargado y guardada en Guías`, { id: toastId });
+      }
       close();
     } catch (e) {
       toastHOT.error(e.message, { id: toastId });
     } finally {
       setGenerando(false);
+      setPasoCarga("");
     }
   };
 
@@ -220,12 +278,17 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
     });
 
   return (
+    <>
+    {/* ⏳ Loading encima del modal mientras se genera (Correos puede tardar varios segundos) */}
+    {generando && createPortal(<div className="md-loading-top"><LoadingOverlay message={pasoCarga || "Generando guía…"} /></div>, document.body)}
     <ModalShell
       onClose={onClose}
       icon={FaTruck}
-      eyebrow={`Pedido #${p.numero}`}
+      eyebrow={esOrden ? `Orden ${orden.orderNumber}` : `Pedido #${p.numero}`}
       title="Hacer guía"
-      subtitle={p.guia?.numero ? `Ya tiene la guía ${p.guia.numero} (${p.guia.tipo}). Si hacés otra, se reemplaza en el pedido.` : "Los datos del pedido ya vienen puestos."}
+      subtitle={guiaActual?.numero
+        ? `Ya tiene la guía ${guiaActual.numero} (${guiaActual.tipo}). Si hacés otra, se reemplaza en ${esOrden ? "la orden" : "el pedido"}.`
+        : esOrden ? `El cliente escogió ${ent.tipo === "mensajero" ? "mensajero" : ent.tipo === "retiro" ? "retiro en tienda" : "Correos"}. Los datos ya vienen puestos.` : "Los datos del pedido ya vienen puestos."}
       closeOnBackdrop={false}
       footer={(close) => (
         <>
@@ -386,9 +449,16 @@ export default function GuiaPedidoModal({ pedido: p, onClose, onDone }) {
               <textarea className="md-input" rows={2} value={detalle} onChange={(e) => setDetalle(e.target.value)} placeholder="Paquete" />
             </label>
             {saldo > 0 && <p className="pd-note">Ojo: el cliente todavía debe {`₡${saldo.toLocaleString("de-DE")}`}.</p>}
+            {esOrden && (
+              <label className="vw-check">
+                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} />
+                <span>Mandar la guía (PDF) al correo del cliente: <b>{orden.cliente?.correo || "sin correo"}</b></span>
+              </label>
+            )}
           </div>
         </>
       )}
     </ModalShell>
+    </>
   );
 }

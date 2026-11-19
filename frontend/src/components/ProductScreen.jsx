@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { toast as toastHOT } from "react-hot-toast";
 import { FaChevronLeft, FaChevronRight, FaWhatsapp, FaRulerCombined, FaInfoCircle, FaTshirt, FaTruck, FaCreditCard, FaComments, FaEdit, FaTrashAlt } from "react-icons/fa";
+import { useCart } from "../cart/useCart";
+import { ShoppingCart } from "lucide-react";
 import { io } from "socket.io-client";
 import { getToken } from "../authFetch";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"; 
@@ -259,6 +261,8 @@ export default function ProductScreen({
   const [selectedDorsalIndex, setSelectedDorsalIndex] = useState("");
   const [dorsalAnimKey, setDorsalAnimKey] = useState(0);
   const [ctaShake, setCtaShake] = useState(0);
+  const { agregar: agregarAlCarrito, abrir: abrirCarrito, otrasApartadas } = useCart(); // 🛒
+  const [agregando, setAgregando] = useState(false); // apartando en el servidor
 
   const displayName = user?.username || user?.email || "ChemaSportER";
 
@@ -444,6 +448,9 @@ export default function ProductScreen({
     if (storeView === 'bodega2') return b;
     return t + a + b; 
   };
+  // ⏳ Para el cliente: lo que otro cliente tiene apartado en su carrito (10 min) no se ofrece
+  const apartadasDeOtros = (size) => (canEdit ? 0 : otrasApartadas(viewProduct?._id || viewProduct?.id || "", size));
+  const getDisponibleBySize = (size) => Math.max(0, getTotalBySize(size) - apartadasDeOtros(size));
 
   const finalPrice = hasDiscount ? viewProduct?.discountPrice : viewProduct?.price;
   const formattedPrice = `₡${Number(finalPrice || 0).toLocaleString("de-DE")}`;
@@ -947,7 +954,8 @@ export default function ProductScreen({
                 <div className="ps-sizes">
                   {tallasVisibles.map((size) => {
                     const total = getTotalBySize(size);
-                    const isAgotado = total === 0;
+                    const isAgotado = getDisponibleBySize(size) === 0;
+                    const isApartada = isAgotado && total > 0; // hay, pero la tiene otro cliente en el carrito
                     const isSelected = selectedSize === size;
                     return (
                       <motion.button
@@ -958,15 +966,55 @@ export default function ProductScreen({
                         whileTap={isAgotado ? undefined : { scale: 0.94 }}
                         className={`ps-size ${isAgotado ? "is-out" : ""} ${isSelected ? "is-active" : ""}`}
                         aria-pressed={isSelected}
-                        title={isAgotado ? "Agotado" : undefined}
+                        title={isApartada ? "Apartada por otro cliente: si no la compra, se libera en unos minutos" : isAgotado ? "Agotado" : undefined}
                       >
                         <span>{size === "U" ? "Única" : size}</span>
+                        {isApartada && !canEdit && <small>Apartada</small>}
                         {canEdit && <small>{isAgotado ? 'Agotado' : `${total} disp.`}</small>}
                       </motion.button>
                     );
                   })}
                 </div>
               </div>
+
+              {/* 🛒 Agregar al carrito (misma validación de talla que WhatsApp) */}
+              <motion.button
+                key={`cart-${ctaShake}`}
+                type="button"
+                disabled={agregando}
+                onClick={async () => {
+                  if (!selectedSize) {
+                    setCtaShake((n) => n + 1);
+                    toastHOT.error(isLlavero ? "Debes seleccionar la unidad." : "Debes seleccionar una talla.", {
+                      style: { borderRadius: '12px', background: '#000', color: '#fff' }
+                    });
+                    return;
+                  }
+                  if (agregando) return;
+                  setAgregando(true);
+                  // ⏳ Se aparta en el servidor por 10 min; si otro cliente ya se la llevó, avisa y no la agrega
+                  const ok = await agregarAlCarrito({
+                    productId: currentProductId,
+                    name: viewProduct?.name || "Producto",
+                    type: viewProduct?.type || "",
+                    image: galleryFromProduct[0] || viewProduct?.imageSrc || "",
+                    talla: selectedSize,
+                    dorsal: viewProduct?.isNumerable && selectedDorsal
+                      ? { name: selectedDorsal.name || "", number: selectedDorsal.number || "" }
+                      : null,
+                    precio: Number(finalPrice) || 0,
+                    precioAntes: hasDiscount ? Number(viewProduct?.price) || 0 : 0,
+                  });
+                  setAgregando(false);
+                  if (ok) abrirCarrito();
+                }}
+                className={`ps-cart ${selectedSize ? "is-ready" : ""}`}
+                animate={ctaShake ? { x: [0, -10, 10, -6, 6, 0] } : undefined}
+                transition={{ duration: 0.4 }}
+              >
+                <ShoppingCart strokeWidth={2.4} />
+                <span>{agregando ? "Apartando…" : "Agregar al carrito"}</span>
+              </motion.button>
 
               {/* Comprar */}
               <motion.a

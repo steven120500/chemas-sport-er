@@ -31,6 +31,12 @@ import ComisionesPage from './components/ComisionesPage';
 import GuiasPage from './components/GuiasPage';
 import TiendaPage from './components/TiendaPage';
 import PedidosPage from './components/PedidosPage'; // 🧾 Panel de pedidos (/admin)
+import CartDrawer from './components/CartDrawer'; // 🛒 Carrito
+import CheckoutPage from './components/CheckoutPage'; // 💳 Checkout (Tilopay / WhatsApp)
+import PagoResultado from './components/PagoResultado'; // 💳 Vuelta desde Tilopay
+import VentasWebPage from './components/VentasWebPage'; // 👑 Ventas de la tienda online (súper admin)
+import { CartProvider } from './cart/CartContext';
+import { EVENTO_APARTADAS } from './cart/useCart';
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -360,6 +366,11 @@ function MainApp() {
       );
     });
 
+    // ⏳ Camisetas apartadas en carritos: se reenvía al carrito (CartContext) para restarlas del stock visible
+    socket.on('apartadasActualizadas', (data) => {
+      window.dispatchEvent(new CustomEvent(EVENTO_APARTADAS, { detail: data }));
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -670,6 +681,9 @@ function MainApp() {
             <Route path="/tienda" element={<TiendaPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/admin" element={<PedidosPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/admin/pedidos" element={<Navigate to="/admin" replace />} />
+            <Route path="/ventas-web" element={<VentasWebPage isSuperUser={isSuperUser} />} />
+            <Route path="/checkout/resultado" element={<PagoResultado />} />
+            <Route path="/checkout" element={<CheckoutPage products={allProductsForCounts.length > 0 ? allProductsForCounts : products} />} />
 
             <Route path="/" element={
               <>
@@ -895,8 +909,10 @@ function MainApp() {
         </main>
 
         <Footer />
+        {/* 🛒 Panel del carrito (stock y precio en vivo del catálogo) */}
+        <CartDrawer products={allProductsForCounts.length > 0 ? allProductsForCounts : products} />
         {/* El WhatsApp para clientes no se muestra en las páginas de administración */}
-        {!anyModalOpen && !['/tienda', '/comisiones', '/guias', '/history', '/admin'].includes(location.pathname) && <FloatingWhatsapp />}
+        {!anyModalOpen && !['/tienda', '/comisiones', '/guias', '/history', '/admin', '/checkout', '/checkout/resultado', '/ventas-web'].includes(location.pathname) && <FloatingWhatsapp />}
 
       </div>
     </>
@@ -906,7 +922,9 @@ function MainApp() {
 export default function AppWrapper() {
   return (
     <Router>
-      <MainApp />
+      <CartProvider>
+        <MainApp />
+      </CartProvider>
     </Router>
   );
 }

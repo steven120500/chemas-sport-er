@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useCart } from "../cart/useCart";
+import { ShoppingCart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../assets/logo.png";
 import {
   FaUser, FaTimes, FaHistory, FaUserPlus, FaUsers, FaSignOutAlt, FaChevronRight,
-  FaPercentage, FaTruck, FaStore, FaClipboardList,
+  FaPercentage, FaTruck, FaStore, FaClipboardList, FaCashRegister,
 } from "react-icons/fa";
 
 // ⚠️ Estilos en index.css (sección "HEADER", clases hd-*).
@@ -54,6 +56,10 @@ export default function Header({
   setFilterType,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { count: cartCount, abrir: abrirCarrito } = useCart();
+  // 🛒 El carrito es para clientes: no se muestra en las páginas de administración
+  const esPaginaAdmin = ["/tienda", "/comisiones", "/guias", "/history", "/admin", "/ventas-web"].includes(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -172,6 +178,7 @@ export default function Header({
   const menu = user
     ? [
         esAdminTienda && { key: "tienda", icon: FaStore, label: "Tienda física", onClick: () => navigate("/tienda"), featured: true },
+        isSuperUser && { key: "ventas-web", icon: FaCashRegister, label: "Ventas web", onClick: () => navigate("/ventas-web"), featured: true },
         { key: "pedidos", icon: FaClipboardList, label: "Pedidos", onClick: () => navigate("/admin") },
         { key: "comisiones", icon: FaPercentage, label: "Comisiones", onClick: () => navigate("/comisiones") },
         { key: "guias", icon: FaTruck, label: "Guías", onClick: () => navigate("/guias") },
@@ -202,6 +209,33 @@ export default function Header({
           ChemaSport<span className="hd-title-er">ER</span>
         </button>
 
+        <div className="hd-actions">
+        {!esPaginaAdmin && (
+          <motion.button
+            type="button"
+            onClick={abrirCarrito}
+            title="Carrito"
+            aria-label={`Abrir carrito (${cartCount} ${cartCount === 1 ? "artículo" : "artículos"})`}
+            className="hd-cart"
+            whileTap={{ scale: 0.92 }}
+          >
+            <ShoppingCart strokeWidth={2.2} />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span
+                  key={cartCount}
+                  className="hd-cart-badge"
+                  initial={{ scale: 0.4, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.4, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 600, damping: 22 }}
+                >
+                  {cartCount > 99 ? "99+" : cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        )}
         <motion.button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -212,6 +246,7 @@ export default function Header({
         >
           {user ? <span>{getInitials(displayName)}</span> : <FaUser />}
         </motion.button>
+        </div>
       </div>
 
       {/* ---- Menú de categorías ---- */}
