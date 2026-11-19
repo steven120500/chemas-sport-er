@@ -42,6 +42,7 @@ export default function GuiasPage() {
   // Estado para saber qué celda específica se está editando: { rowId, field }
   const [editingCell, setEditingCell] = useState(null);
   const [tempValue, setTempValue] = useState("");
+  const [tempDetalle, setTempDetalle] = useState(""); // 👈 texto que acompaña al Sí/No (nombre del mayorista / detalle del cambio)
   const [tempMonto, setTempMonto] = useState(""); // 👈 monto aparte (se edita junto con "debe")
 
   const [guias, setGuias] = useState(() => {
@@ -95,6 +96,8 @@ export default function GuiasPage() {
     meterRaspa: "No",
     esMayorista: "No",
     nombreMayorista: "",
+    esCambio: "No",
+    detalleCambio: "",
     comentarioSelect: "Sin comentario",
     comentarioCustom: "",
     fechaEntrega: ""
@@ -110,6 +113,9 @@ export default function GuiasPage() {
       }
       if (name === "esMayorista" && value === "No") {
         updated.nombreMayorista = "";
+      }
+      if (name === "esCambio" && value === "No") {
+        updated.detalleCambio = "";
       }
       if (name === "comentarioSelect" && value !== "Otro comentario...") {
         updated.comentarioCustom = "";
@@ -141,6 +147,11 @@ export default function GuiasPage() {
 
     if (form.esMayorista === "Sí" && !form.nombreMayorista.trim()) {
       toastHOT.error("Por favor ingresa el nombre del mayorista.");
+      return;
+    }
+
+    if (form.esCambio === "Sí" && !form.detalleCambio.trim()) {
+      toastHOT.error("Por favor escribí qué es el cambio.");
       return;
     }
 
@@ -187,6 +198,8 @@ export default function GuiasPage() {
       meterRaspa: form.meterRaspa,
       esMayorista: form.esMayorista,
       nombreMayorista: form.esMayorista === "Sí" ? form.nombreMayorista.trim() : "",
+      esCambio: form.esCambio,
+      detalleCambio: form.esCambio === "Sí" ? form.detalleCambio.trim() : "",
       comentarios: comentarioFinal === "Sin comentario" ? "" : comentarioFinal,
       fechaEntrega: form.fechaEntrega || "",
       fechaYMD,
@@ -219,6 +232,8 @@ export default function GuiasPage() {
         meterRaspa: "No",
         esMayorista: "No",
         nombreMayorista: "",
+        esCambio: "No",
+        detalleCambio: "",
         comentarioSelect: "Sin comentario",
         comentarioCustom: "",
         fechaEntrega: ""
@@ -258,6 +273,14 @@ export default function GuiasPage() {
     const rowId = g._id || g.id;
     setEditingCell({ rowId, field });
     setTempValue(g[field] !== undefined ? String(g[field]) : "");
+    if (field === "mayorista") {
+      setTempValue(g.esMayorista === "Sí" ? "Sí" : "No");
+      setTempDetalle(g.nombreMayorista || "");
+    }
+    if (field === "cambio") {
+      setTempValue(g.esCambio === "Sí" ? "Sí" : "No");
+      setTempDetalle(g.detalleCambio || "");
+    }
     if (field === "debe") {
       const m = limpiarMontoCR(g.monto);
       setTempMonto(m > 0 ? String(m) : "");
@@ -284,6 +307,17 @@ export default function GuiasPage() {
         return;
       }
       cambios = { monto };
+    } else if (field === "mayorista" || field === "cambio") {
+      // 🏪🔄 Sí/No + su texto se guardan juntos
+      const si = tempValue === "Sí";
+      const texto = si ? tempDetalle.trim() : "";
+      if (si && !texto) {
+        toastHOT.error(field === "mayorista" ? "Escribí el nombre del mayorista." : "Escribí qué es el cambio.");
+        return;
+      }
+      cambios = field === "mayorista"
+        ? { esMayorista: si ? "Sí" : "No", nombreMayorista: texto }
+        : { esCambio: si ? "Sí" : "No", detalleCambio: texto };
     } else {
       cambios = { [field]: String(tempValue).trim() };
     }
@@ -320,6 +354,7 @@ export default function GuiasPage() {
     setEditingCell(null);
     setTempValue("");
     setTempMonto("");
+    setTempDetalle("");
   };
 
   const guiasFiltradas = useMemo(() => {
@@ -450,6 +485,7 @@ export default function GuiasPage() {
             <div class="line"><span class="bold">Teléfono:</span> ${guia.telefono}</div>
             <div class="line"><span class="bold">Debe:</span> ${cobroPendiente ? montoFormateado : "No"}</div>
             <div class="line"><span class="bold">Meter raspa:</span> ${guia.meterRaspa}</div>
+            ${guia.esCambio === "Sí" ? `<div class="line"><span class="bold">Cambio:</span> ${guia.detalleCambio || "Sí"}</div>` : ""}
             <div class="line"><span class="bold">Comentarios:</span> ${guia.comentarios || ""}</div>
 
             ${textoFechaEntrega(guia.fechaEntrega) ? `
@@ -776,6 +812,40 @@ export default function GuiasPage() {
                   )}
                 </div>
 
+                {/* 🔄 ¿ES CAMBIO? → renglón para escribir qué devuelve el cliente */}
+                <div>
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                    ¿Es cambio?
+                  </label>
+                  <select
+                    name="esCambio"
+                    value={form.esCambio}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
+                  >
+                    <option value="No">No</option>
+                    <option value="Sí">Sí</option>
+                  </select>
+
+                  {form.esCambio === "Sí" && (
+                    <div className="mt-4 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                      <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                        Detalle del cambio *
+                      </label>
+                      <textarea
+                        name="detalleCambio"
+                        value={form.detalleCambio}
+                        onChange={handleChange}
+                        placeholder="Ej. DEVUELVE UNA CAMISETA DEL ARSENAL TALLA S POR DEFECTOS"
+                        required
+                        rows={2}
+                        autoFocus
+                        className="w-full p-4 bg-white border border-zinc-300 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all resize-y"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* 🔥 CAJA DE COMENTARIOS GRANDE (TEXTAREA AMPLIADA) */}
                 <div>
                   <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
@@ -1076,16 +1146,58 @@ export default function GuiasPage() {
                                     ) : (
                                       <>
                                         <span className="text-zinc-800 font-bold text-[10px]">Entrega: {textoFechaEntrega(g.fechaEntrega) || "—"}</span>
-                                        <button onClick={() => iniciarEdicionCelda(g, "fechaEntrega")} className="opacity-0 group-hover/entrega:opacity-100 text-white hover:text-white cursor-pointer" title="Editar fecha de entrega"><FaPencilAlt size={9} /></button>
+                                        <button onClick={() => iniciarEdicionCelda(g, "fechaEntrega")} className="opacity-60 hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar fecha de entrega"><FaPencilAlt size={9} /></button>
                                       </>
                                     )}
                                   </div>
 
-                                  {g.esMayorista === "Sí" && (
-                                    <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px]">
-                                      Mayorista: {g.nombreMayorista || "Sí"}
-                                    </span>
-                                  )}
+                                  {/* 🏪 MAYORISTA EDITABLE */}
+                                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md ${g.esMayorista === "Sí" ? "bg-amber-100 text-amber-900" : "bg-zinc-100 text-zinc-800"}`}>
+                                    {isEditingField("mayorista") ? (
+                                      <div className="p-2 bg-white border border-black rounded-xl space-y-1.5 text-black">
+                                        <select value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-zinc-100 rounded text-[11px] font-bold">
+                                          <option value="No">Mayorista: No</option>
+                                          <option value="Sí">Mayorista: Sí</option>
+                                        </select>
+                                        {tempValue === "Sí" && (
+                                          <input type="text" value={tempDetalle} onChange={(e) => setTempDetalle(e.target.value)} placeholder="Nombre del mayorista" className="p-1 bg-zinc-100 rounded text-[11px] font-bold w-44" autoFocus />
+                                        )}
+                                        <div className="flex gap-1">
+                                          <button onClick={() => guardarEdicionCelda(g, "mayorista")} className="p-1 bg-black text-white rounded text-[10px] cursor-pointer">Guardar</button>
+                                          <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded text-[10px] cursor-pointer">X</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <span className="font-black text-[10px]">Mayorista: {g.esMayorista === "Sí" ? (g.nombreMayorista || "Sí") : "No"}</span>
+                                        <button onClick={() => iniciarEdicionCelda(g, "mayorista")} className="opacity-60 hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar mayorista"><FaPencilAlt size={9} /></button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* 🔄 CAMBIO EDITABLE */}
+                                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md ${g.esCambio === "Sí" ? "bg-blue-100 text-blue-900" : "bg-zinc-100 text-zinc-800"}`}>
+                                    {isEditingField("cambio") ? (
+                                      <div className="p-2 bg-white border border-black rounded-xl space-y-1.5 text-black">
+                                        <select value={tempValue} onChange={(e) => setTempValue(e.target.value)} className="p-1 bg-zinc-100 rounded text-[11px] font-bold">
+                                          <option value="No">Cambio: No</option>
+                                          <option value="Sí">Cambio: Sí</option>
+                                        </select>
+                                        {tempValue === "Sí" && (
+                                          <textarea rows={2} value={tempDetalle} onChange={(e) => setTempDetalle(e.target.value)} placeholder="Ej. DEVUELVE CAMISETA TALLA S" className="p-1 bg-zinc-100 rounded text-[11px] font-bold w-56" autoFocus />
+                                        )}
+                                        <div className="flex gap-1">
+                                          <button onClick={() => guardarEdicionCelda(g, "cambio")} className="p-1 bg-black text-white rounded text-[10px] cursor-pointer">Guardar</button>
+                                          <button onClick={cancelarEdicionCelda} className="p-1 bg-zinc-200 rounded text-[10px] cursor-pointer">X</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <span className="font-black text-[10px]">Cambio: {g.esCambio === "Sí" ? (g.detalleCambio || "Sí") : "No"}</span>
+                                        <button onClick={() => iniciarEdicionCelda(g, "cambio")} className="opacity-60 hover:opacity-100 text-white hover:text-white cursor-pointer" title="Editar cambio"><FaPencilAlt size={9} /></button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 group mt-0.5">

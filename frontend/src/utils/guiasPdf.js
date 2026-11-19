@@ -85,7 +85,7 @@ export async function generarPdfMensajero(guia) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12 * k);
 
-      if (etiqueta === "Comentarios") {
+      if (etiqueta === "Comentarios" || etiqueta === "Cambio") {
         txt(`${etiqueta}:`, margenIzq, y);
         y += lh;
         doc.setFont("helvetica", "normal");
@@ -109,6 +109,8 @@ export async function generarPdfMensajero(guia) {
     agregarCampo("Teléfono", guia.telefono);
     agregarCampo("Debe", cobroPendiente ? `¢${montoGuia.toLocaleString("es-CR")}` : "No");
     agregarCampo("Raspa", guia.meterRaspa);
+    // 🔄 Cambio: el mensajero recoge lo que devuelve el cliente
+    if (guia.esCambio === "Sí") agregarCampo("Cambio", guia.detalleCambio || "Sí");
     agregarCampo("Comentarios", guia.comentarios);
 
     let yFinal = y - 3 * k;
@@ -424,4 +426,5 @@ export const generarPdfOficialCorreos = (guiaData) => {
   doc.text("EMS", pageWidth - margin - 15, y);
 
   doc.save(`${codigoGuia}.pdf`);
+  return doc; // 👈 Ventas web lo usa para mandar el PDF al correo del cliente
 };
