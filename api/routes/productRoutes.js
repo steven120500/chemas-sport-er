@@ -7,6 +7,7 @@ import multer from 'multer';
 
 import { requireAuth, requireRole, canSeeHidden, escapeRegex } from '../middleware/auth.js';
 import { emitProductUpdate } from '../utils/realtime.js';
+import { catalogoCacheado } from '../utils/catalogoCache.js'; // ⚡ caché del catálogo público
 import { leerImpresiones, rebajarEnOpciones, rebajarEnHermanos, devolverImpresiones, esMismaImpresion, cambiosManuales, sincronizarManualEnHermanos } from '../utils/dorsales.js';
 
 const router = express.Router();
@@ -692,10 +693,13 @@ router.get('/', async (req, res) => {
     const projection = 'name price discountPrice type imageSrc images tienda stock bodega createdAt isPopular hidden popularCountHistory isMundial2026 isTemporada2627 isNumerable teamFont dorsalOptions lockedBy';
     const sortOptions = sortParam === 'desc' ? { _id: -1 } : { name: 1 };
 
-    const [items, total] = await Promise.all([
+    const consultar = () => Promise.all([
       Product.find(find).select(projection).sort(sortOptions).skip((page - 1) * limit).limit(limit).lean(),
       Product.countDocuments(find),
     ]);
+    // ⚡ Público → caché en memoria (se borra sola al escribir cualquier producto). Personal → siempre en vivo.
+    const clavePublica = JSON.stringify([page, limit, q, type, sizes, storeView, sortParam === 'desc']);
+    const [items, total] = canSeeHidden(req.user) ? await consultar() : await catalogoCacheado(clavePublica, consultar);
 
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({ items, total, page, pages: Math.ceil(total / limit), limit });

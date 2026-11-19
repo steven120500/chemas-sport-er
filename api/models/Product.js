@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { invalidarCatalogo } from "../utils/catalogoCache.js"; // ⚡
 
 /* =========================
    TALLAS PERMITIDAS
@@ -198,5 +199,12 @@ productSchema.set('toJSON', {
 productSchema.set('toObject', { virtuals: false, versionKey: false });
 productSchema.set('minimize', true);
 productSchema.set('strictQuery', true);
+
+// ⚡ Cualquier escritura de productos borra la caché del catálogo público (utils/catalogoCache.js)
+const OPS_ESCRITURA_QUERY = ['findOneAndUpdate', 'findOneAndDelete', 'findOneAndReplace', 'updateOne', 'updateMany', 'replaceOne', 'deleteOne', 'deleteMany'];
+productSchema.post(OPS_ESCRITURA_QUERY, { document: false, query: true }, () => invalidarCatalogo());
+productSchema.post(['save', 'updateOne', 'deleteOne'], { document: true, query: false }, () => invalidarCatalogo());
+productSchema.post('insertMany', () => invalidarCatalogo());
+productSchema.post('bulkWrite', () => invalidarCatalogo());
 
 export default mongoose.model('Product', productSchema);
