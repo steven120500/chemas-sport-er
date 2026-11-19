@@ -20,6 +20,18 @@ const ORDEN_UBICACIONES = [
 ];
 const VENDEDOR_WEB = 'Tienda Online';
 
+// 🧪 Pagos en ambiente "Test" de Tilopay: se marcan pagados pero NO rebajan stock ni facturan en Alegra
+// (para no tocar inventario real ni mandar tiquetes falsos a Hacienda). Solo para probar con la BD chemas_pruebas:
+// TILOPAY_PROCESAR_PRUEBAS=1 hace que también rebajen stock (la factura de prueba nunca se emite).
+const PROCESAR_PRUEBAS = process.env.TILOPAY_PROCESAR_PRUEBAS === '1';
+export const esPrueba = (o) => String(o?.tilopay?.environment || '').toLowerCase() === 'test';
+
+// Tilopay devuelve el número con prefijo del comercio: "PFC021519-CSW000002"
+const mismaOrden = (deTilopay, nuestra) => {
+  const t = String(deTilopay || '');
+  return t === nuestra || t.endsWith(`-${nuestra}`);
+};
+
 const ALEGRA_EMAIL = process.env.ALEGRA_EMAIL || '';
 const ALEGRA_TOKEN = process.env.ALEGRA_TOKEN || '';
 const alegraAuth = () => Buffer.from(`${ALEGRA_EMAIL}:${ALEGRA_TOKEN}`).toString('base64');
@@ -36,7 +48,7 @@ export async function confirmarPago(orden, io) {
 
   const transacciones = await consultarOrden(orden.orderNumber);
   const aprobada = transacciones.find(
-    (t) => String(t.code) === '1' && String(t.orderNumber) === orden.orderNumber && Math.round(Number(t.amount)) === orden.total
+    (t) => String(t.code) === '1' && mismaOrden(t.orderNumber, orden.orderNumber) && Math.round(Number(t.amount)) === orden.total
   );
 
   if (!aprobada) {
@@ -65,6 +77,20 @@ export async function confirmarPago(orden, io) {
   console.log(`✅ Orden web ${pagada.orderNumber} pagada (₡${pagada.total}) [${aprobada.environment || ''}]`);
   io?.to(ADMIN_ROOM).emit('ordenWebPagada', { orderNumber: pagada.orderNumber, total: pagada.total, cliente: nombreCompleto(pagada) });
 
+  // 🧪 Pago de prueba: no toca inventario real ni Hacienda
+  if (esPrueba(pagada)) {
+    const motivo = 'Pago de prueba (Tilopay Test)';
+    await OrdenWeb.updateOne(
+      { _id: pagada._id },
+      {
+        ...(PROCESAR_PRUEBAS ? {} : { stock: { estado: 'omitido', error: `${motivo}: no se rebaja stock`, at: new Date() } }),
+        factura: { estado: 'omitida', error: `${motivo}: no se factura`, at: new Date() },
+      }
+    );
+    if (PROCESAR_PRUEBAS) await rebajarStockOrden(pagada._id, io);
+    return OrdenWeb.findById(pagada._id);
+  }
+
   // 📦 Stock primero (rápido, así no se vende dos veces la misma camiseta); la factura corre aparte
   await rebajarStockOrden(pagada._id, io);
   facturarOrden(pagada._id).catch((e) => console.error('❌ Factura orden web:', e.message));
@@ -77,7 +103,7 @@ export async function confirmarPago(orden, io) {
 export async function rebajarStockOrden(ordenId, io) {
   // 🔒 Candado: solo el primero que llegue rebaja
   const orden = await OrdenWeb.findOneAndUpdate(
-    { _id: ordenId, estado: 'pagada', 'stock.estado': { $nin: ['rebajando', 'listo'] } },
+    { _id: ordenId, estado: 'pagada', 'stock.estado': { $nin: ['rebajando', 'listo', 'omitido'] } },
     { 'stock.estado': 'rebajando' },
     { new: true }
   );
@@ -193,7 +219,7 @@ export async function facturarOrden(ordenId) {
   }
   // 🔒 Candado: no facturar dos veces
   const orden = await OrdenWeb.findOneAndUpdate(
-    { _id: ordenId, estado: 'pagada', 'factura.estado': { $nin: ['facturando', 'lista'] } },
+    { _id: ordenId, estado: 'pagada', 'tilopay.environment': { $ne: 'Test' }, 'factura.estado': { $nin: ['facturando', 'lista', 'omitida'] } },
     { 'factura.estado': 'facturando', 'factura.error': '' },
     { new: true }
   );

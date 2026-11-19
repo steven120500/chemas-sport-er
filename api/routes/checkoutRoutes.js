@@ -329,7 +329,8 @@ router.get('/admin/ordenes', requireSuper, async (req, res) => {
     const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).limit(300).lean();
 
     // Totales del rango (solo pagadas)
-    const pagadas = ordenes.filter((o) => o.estado === 'pagada');
+    // Pagos de prueba (Tilopay Test) no cuentan en los totales
+    const pagadas = ordenes.filter((o) => o.estado === 'pagada' && String(o.tilopay?.environment || '').toLowerCase() !== 'test');
     const totales = {
       ordenes: pagadas.length,
       vendido: pagadas.reduce((s, o) => s + o.total, 0),
@@ -352,7 +353,7 @@ router.post('/admin/ordenes/:id/verificar', requireSuper, async (req, res) => {
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
     const io = req.app.get('io');
     if (orden.estado === 'pendiente') orden = await confirmarPago(orden, io);
-    if (orden.estado === 'pagada' && orden.stock?.estado !== 'listo' && orden.stock?.estado !== 'rebajando') {
+    if (orden.estado === 'pagada' && !['listo', 'rebajando', 'omitido'].includes(orden.stock?.estado)) {
       if (orden.stock?.estado === 'error') await OrdenWeb.updateOne({ _id: orden._id }, { $unset: { 'stock.estado': 1 } });
       orden = (await rebajarStockOrden(orden._id, io)) || orden;
     }
@@ -371,6 +372,7 @@ router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
     if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo se facturan órdenes pagadas.' });
     if (orden.factura?.estado === 'lista') return res.status(400).json({ error: 'Esta orden ya está facturada.' });
+    if (String(orden.tilopay?.environment || '').toLowerCase() === 'test') return res.status(400).json({ error: 'Es un pago de prueba: no se factura.' });
     await facturarOrden(orden._id);
     res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
   } catch (error) {

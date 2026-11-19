@@ -57,7 +57,7 @@ const ordenWebSchema = new mongoose.Schema(
     },
     // 📦 Inventario rebajado al pagar (utils/ordenesWeb.js → rebajarStockOrden)
     stock: {
-      estado: { type: String, enum: ['rebajando', 'listo', 'error'] },
+      estado: { type: String, enum: ['rebajando', 'listo', 'error', 'omitido'] }, // omitido = pago de prueba
       movimientos: [{ _id: false, productId: mongoose.Schema.Types.ObjectId, talla: String, ubicacion: String, cantidad: Number, historyId: String, dorsalesDescontados: [mongoose.Schema.Types.Mixed] }],
       faltantes: [String], // lo que no se pudo rebajar (se vendió en otro lado mientras pagaba)
       error: String,
@@ -65,7 +65,7 @@ const ordenWebSchema = new mongoose.Schema(
     },
     // 🧾 Tiquete electrónico en Alegra (utils/ordenesWeb.js → facturarOrden)
     factura: {
-      estado: { type: String, enum: ['facturando', 'lista', 'error'] },
+      estado: { type: String, enum: ['facturando', 'lista', 'error', 'omitida'] }, // omitida = pago de prueba
       alegraId: String,
       consecutivo: String,
       pdfUrl: String,
