@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { toast as toastHOT } from "react-hot-toast";
 import {
   FaSearch, FaSyncAlt, FaFilePdf, FaWhatsapp, FaMotorcycle, FaTruck, FaStore, FaChevronDown,
-  FaCheckCircle, FaExclamationTriangle, FaClock, FaCreditCard, FaBoxOpen, FaEnvelope, FaIdCard, FaFileInvoice, FaTrashAlt, FaRegFileAlt, FaRegEnvelope, FaRegCommentDots, FaPrint, FaMagic,
+  FaCheck, FaCheckCircle, FaExclamationTriangle, FaClock, FaCreditCard, FaBoxOpen, FaEnvelope, FaIdCard, FaFileInvoice, FaTrashAlt, FaRegFileAlt, FaRegEnvelope, FaRegCommentDots, FaPrint, FaMagic,
 } from "react-icons/fa";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
 import { getToken } from "../authFetch";
@@ -23,6 +23,8 @@ const haceDias = (n) => {
   return d.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 };
 const inicioMes = () => `${hoyCR().slice(0, 8)}01`;
+// "2026-11" → "noviembre"
+const nombreMes = (ym) => (ym ? new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("es-CR", { month: "long", timeZone: "UTC" }) : "");
 
 const RANGOS = [
   { v: "hoy", t: "Hoy", desde: hoyCR, hasta: hoyCR },
@@ -60,7 +62,8 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
   const [rango, setRango] = useState("mes");
   const [busqueda, setBusqueda] = useState("");
   const [q, setQ] = useState("");
-  const [data, setData] = useState({ ordenes: [], totales: null });
+  const [data, setData] = useState({ ordenes: [], totales: null, page: 1, paginas: 1, total: 0 });
+  const [page, setPage] = useState(1); // 📄 de 10 en 10 (lo pagina el servidor)
   const [cargando, setCargando] = useState(true);
   const [abierta, setAbierta] = useState(null);
   const [accion, setAccion] = useState(""); // id de la orden con una acción en curso
@@ -70,7 +73,13 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
 
   // Debounce del buscador
   useEffect(() => {
-    const t = setTimeout(() => setQ(busqueda.trim()), 350);
+    const t = setTimeout(() => {
+      const nuevo = busqueda.trim();
+      setQ((prev) => {
+        if (prev !== nuevo) setPage(1); // 👈 búsqueda nueva → página 1
+        return nuevo;
+      });
+    }, 350);
     return () => clearTimeout(t);
   }, [busqueda]);
 
@@ -78,7 +87,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
     setCargando(true);
     try {
       const r = RANGOS.find((x) => x.v === rango);
-      const params = new URLSearchParams({ estado });
+      const params = new URLSearchParams({ estado, page: String(page) });
       if (r.desde()) params.set("desde", r.desde());
       if (r.hasta()) params.set("hasta", r.hasta());
       if (q) params.set("q", q);
@@ -91,11 +100,25 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
     } finally {
       setCargando(false);
     }
-  }, [estado, rango, q]);
+  }, [estado, rango, q, page]);
 
   useEffect(() => {
     if (puedeVer) cargar();
   }, [cargar, puedeVer]);
+
+
+  // 🗓️ Al entrar un mes nuevo (con el panel abierto) los totales arrancan en 0 y "Este mes" pasa al mes nuevo
+  const mesCargado = data.totales?.mes;
+  useEffect(() => {
+    if (!puedeVer || !mesCargado) return;
+    const t = setInterval(() => {
+      if (hoyCR().slice(0, 7) === mesCargado) return;
+      setRango("mes");
+      setPage(1);
+      cargar();
+    }, 60 * 1000);
+    return () => clearInterval(t);
+  }, [puedeVer, mesCargado, cargar]);
 
   // 🔔 En vivo: cuando entra un pago nuevo
   useEffect(() => {
@@ -139,6 +162,26 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
 
   const reemplazar = (orden) =>
     setData((d) => ({ ...d, ordenes: d.ordenes.map((o) => (o._id === orden._id ? orden : o)) }));
+
+  // ✅ Check de "ya la alisté" por camiseta (se ve al instante y se guarda en el servidor)
+  const alistar = async (orden, index) => {
+    const listo = !orden.items[index]?.alistado?.at;
+    const local = { ...orden, items: orden.items.map((it, k) => (k === index ? { ...it, alistado: listo ? { por: "", at: new Date().toISOString() } : undefined } : it)) };
+    reemplazar(local);
+    try {
+      const res = await fetch(`${API_BASE}/api/checkout/admin/ordenes/${orden._id}/alistar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index, listo }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "No se pudo guardar el check");
+      reemplazar(json);
+    } catch (e) {
+      reemplazar(orden); // se devuelve como estaba
+      toastHOT.error(e.message);
+    }
+  };
 
   const ejecutar = async (orden, tipo, body) => {
     setAccion(orden._id);
@@ -189,7 +232,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
       if (json.facturaPendiente) {
         toastHOT.error(`Acordate de anular en Alegra la factura ${json.facturaPendiente} (no se anula sola).`, { duration: 12000 });
       }
-      cargar(); // totales
+      cargar(); // totales y rellena la página
     } catch (e) {
       toastHOT.error(e.message);
     } finally {
@@ -220,12 +263,12 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
         <div className="vw-filters">
           <div className="vw-seg" role="tablist" aria-label="Estado">
             {ESTADOS.map((e) => (
-              <button key={e.v} type="button" className={estado === e.v ? "is-active" : ""} onClick={() => setEstado(e.v)}>{e.t}</button>
+              <button key={e.v} type="button" className={estado === e.v ? "is-active" : ""} onClick={() => { setEstado(e.v); setPage(1); }}>{e.t}</button>
             ))}
           </div>
           <div className="vw-seg" role="tablist" aria-label="Rango">
             {RANGOS.map((r) => (
-              <button key={r.v} type="button" className={rango === r.v ? "is-active" : ""} onClick={() => setRango(r.v)}>{r.t}</button>
+              <button key={r.v} type="button" className={rango === r.v ? "is-active" : ""} onClick={() => { setRango(r.v); setPage(1); }}>{r.t}</button>
             ))}
           </div>
           <label className="vw-search">
@@ -237,7 +280,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
         {/* ---- Totales ---- */}
         {t && (
           <div className="vw-kpis">
-            <div className="vw-kpi is-main"><small>Vendido</small><strong>{colones(t.vendido)}</strong></div>
+            <div className="vw-kpi is-main"><small>Vendido · {nombreMes(t.mes)}</small><strong>{colones(t.vendido)}</strong></div>
             <div className="vw-kpi"><small>Órdenes</small><strong>{t.ordenes}</strong></div>
             <div className="vw-kpi"><small>Camisetas</small><strong>{t.camisetas}</strong></div>
             <div className="vw-kpi"><small>Envíos cobrados</small><strong>{colones(t.envios)}</strong></div>
@@ -266,6 +309,8 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
               const unidades = o.items.reduce((s, i) => s + i.cantidad, 0);
               const tel = String(o.cliente?.telefono || "");
               const porWa = o.metodoPago === "whatsapp";
+              const alistadas = o.items.filter((i) => i.alistado?.at).length; // ✅
+              const todoAlistado = o.estado === "pagada" && alistadas === o.items.length;
               const paso = o.estado !== "pagada" ? quePaso(o) : null; // ❓ sin pagar: qué pasó
               return (
                 <li key={o._id} className={`vw-card is-${o.estado} ${porWa ? "is-wa" : ""}`}>
@@ -276,6 +321,11 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                         <span className={`vw-pill is-${o.estado}`}>
                           {o.estado === "pagada" ? <><FaCheckCircle /> Pagada</> : porWa ? <><FaWhatsapp /> WhatsApp</> : o.estado === "pendiente" ? <><FaClock /> Sin pagar</> : "Rechazada"}
                         </span>
+                        {o.estado === "pagada" && alistadas > 0 && (
+                          <span className={`vw-pill ${todoAlistado ? "is-alistada" : "is-alistando"}`}>
+                            {todoAlistado ? <><FaCheckCircle /> Alistada</> : `Alistando ${alistadas}/${o.items.length}`}
+                          </span>
+                        )}
                         {o.tilopay?.environment && o.tilopay.environment !== "Production" && o.estado === "pagada" && (
                           <span className="vw-pill is-test">{o.tilopay.environment}</span>
                         )}
@@ -310,11 +360,25 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                       {/* Camisetas */}
                       <ul className="vw-items">
                         {o.items.map((i, k) => (
-                          <li key={k}>
+                          <li key={k} className={i.alistado?.at ? "is-alistado" : ""}>
+                            {o.estado === "pagada" && (
+                              <button
+                                type="button"
+                                className={`vw-check ${i.alistado?.at ? "is-on" : ""}`}
+                                onClick={() => alistar(o, k)}
+                                aria-pressed={Boolean(i.alistado?.at)}
+                                title={i.alistado?.at ? "Quitar check" : "Ya la alisté"}
+                              >
+                                <FaCheck />
+                              </button>
+                            )}
                             <span className="vw-thumb">{i.imageSrc && <img src={cldThumb(i.imageSrc)} alt="" loading="lazy" />}</span>
                             <span className="vw-item-info">
                               <strong>{i.cantidad}× {i.name}</strong>
                               <small>Talla {i.talla === "U" ? "única" : i.talla}{i.dorsal?.name || i.dorsal?.number ? ` · ${textoDorsal(i.dorsal)}` : ""}</small>
+                              {i.alistado?.at && (
+                                <small className="vw-alistado">✓ Alistada{i.alistado.por ? ` por ${i.alistado.por}` : ""} · {fechaHora(i.alistado.at)}</small>
+                              )}
                             </span>
                             <span className="vw-item-price">{colones(i.precio * i.cantidad)}</span>
                           </li>
@@ -408,7 +472,9 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                             <p className="vw-state is-bad"><FaRegEnvelope /> <span>Correo de la guía no enviado: {o.guia.correoError}</span></p>
                           ) : null)}
                           {o.estado === "pagada" && o.factura?.estado === "lista" && (o.entrega?.tipo === "retiro" || o.guia?.numero) && (
-                            <p className="vw-ready"><FaBoxOpen /> Todo listo: solo falta alistar {unidades === 1 ? "la camiseta" : `las ${unidades} camisetas`}{o.entrega?.tipo === "retiro" ? " para que la recojan" : " y pegar la guía"}.</p>
+                            <p className="vw-ready"><FaBoxOpen /> {todoAlistado
+                              ? <>Todo alistado{o.entrega?.tipo === "retiro" ? ": listo para que la recojan" : ": solo falta pegar la guía"}.</>
+                              : <>Todo listo: solo falta alistar {unidades === 1 ? "la camiseta" : `las ${unidades} camisetas`}{o.entrega?.tipo === "retiro" ? " para que la recojan" : " y pegar la guía"}.</>}</p>
                           )}
 
                           <div className="vw-actions">
@@ -465,6 +531,15 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
               );
             })}
           </ul>
+        )}
+
+        {/* ---- Paginado (10 por página) ---- */}
+        {data.paginas > 1 && (
+          <nav className="vw-pager" aria-label="Páginas">
+            <button type="button" disabled={page <= 1 || cargando} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>‹ Anterior</button>
+            <span>Página {data.page} de {data.paginas} · {data.total} {data.total === 1 ? "orden" : "órdenes"}</span>
+            <button type="button" disabled={page >= data.paginas || cargando} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Siguiente ›</button>
+          </nav>
         )}
       </div>
 

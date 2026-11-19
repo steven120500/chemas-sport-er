@@ -15,6 +15,7 @@ const itemSchema = new mongoose.Schema(
     dorsal: { name: String, number: String },
     cantidad: { type: Number, required: true, min: 1 },
     precio: { type: Number, required: true, min: 0 }, // unitario, ya con oferta
+    alistado: { por: String, at: Date }, // ✅ check en /ventas-web: quién la alistó y cuándo (vacío = falta)
   },
   { _id: false }
 );

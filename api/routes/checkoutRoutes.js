@@ -510,7 +510,15 @@ const resumenOrden = (o) => ({
   guia: o.guia,
 });
 
-// GET /api/checkout/admin/ordenes?estado=pagada|pendiente|todas&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto
+// GET /api/checkout/admin/ordenes?estado=pagada|pendiente&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto&page=1
+// 📄 De 10 en 10 (page). Los totales de arriba son SIEMPRE del mes actual (hora CR): al cambiar de mes arrancan en 0.
+const POR_PAGINA = 10;
+const mesActualCR = () => {
+  const ym = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' }).slice(0, 7); // YYYY-MM
+  const [y, m] = ym.split('-').map(Number);
+  const sig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  return { ym, desde: new Date(`${ym}-01T00:00:00-06:00`), hasta: new Date(`${sig}-01T00:00:00-06:00`) };
+};
 router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
   try {
     const { estado = 'pagada', desde, hasta, q } = req.query;
@@ -527,22 +535,48 @@ router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
       const rx = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filtro.$or = [{ orderNumber: rx }, { 'cliente.nombre': rx }, { 'cliente.apellidos': rx }, { 'cliente.cedula': rx }, { 'cliente.telefono': rx }, { 'cliente.correo': rx }];
     }
-    const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).limit(300).lean();
+    const total = await OrdenWeb.countDocuments(filtro);
+    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    const page = Math.min(paginas, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
+    const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).skip((page - 1) * POR_PAGINA).limit(POR_PAGINA).lean();
 
-    // Totales del rango (solo pagadas)
-    // Pagos de prueba (Tilopay Test) no cuentan en los totales
-    const pagadas = ordenes.filter((o) => o.estado === 'pagada' && String(o.tilopay?.environment || '').toLowerCase() !== 'test');
+    // 📊 Totales del MES ACTUAL (solo pagadas; los pagos de prueba de Tilopay no cuentan)
+    const mes = mesActualCR();
+    const delMes = await OrdenWeb.find({ estado: 'pagada', createdAt: { $gte: mes.desde, $lt: mes.hasta } })
+      .select('total envio items.cantidad factura.estado tilopay.environment').lean();
+    const pagadas = delMes.filter((o) => String(o.tilopay?.environment || '').toLowerCase() !== 'test');
     const totales = {
+      mes: mes.ym,
       ordenes: pagadas.length,
       vendido: pagadas.reduce((s, o) => s + o.total, 0),
       envios: pagadas.reduce((s, o) => s + o.envio, 0),
       camisetas: pagadas.reduce((s, o) => s + o.items.reduce((a, i) => a + i.cantidad, 0), 0),
       pendientesFactura: pagadas.filter((o) => o.factura?.estado !== 'lista').length,
     };
-    res.json({ ordenes: ordenes.map(resumenOrden), totales });
+    res.json({ ordenes: ordenes.map(resumenOrden), totales, page, paginas, total, porPagina: POR_PAGINA });
   } catch (error) {
     console.error('❌ Listando órdenes web:', error);
     res.status(500).json({ error: 'No se pudieron cargar las ventas web.' });
+  }
+});
+
+// POST /api/checkout/admin/ordenes/:id/alistar { index, listo } → ✅ check de "ya la alisté" por camiseta
+router.post('/admin/ordenes/:id/alistar', requireVentasWeb, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const index = Math.trunc(Number(req.body?.index));
+    const listo = Boolean(req.body?.listo);
+    const orden = await OrdenWeb.findById(req.params.id).select('estado items').lean();
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo se alistan órdenes pagadas.' });
+    if (!Number.isInteger(index) || index < 0 || index >= orden.items.length) return res.status(400).json({ error: 'Camiseta inválida.' });
+    const campo = `items.${index}.alistado`;
+    const cambio = listo ? { $set: { [campo]: { por: req.user?.name || '', at: new Date() } } } : { $unset: { [campo]: 1 } };
+    const nueva = await OrdenWeb.findByIdAndUpdate(orden._id, cambio, { new: true }).lean();
+    res.json(resumenOrden(nueva));
+  } catch (error) {
+    console.error('❌ Alistando orden web:', error.message);
+    res.status(500).json({ error: 'No se pudo guardar el check.' });
   }
 });
 

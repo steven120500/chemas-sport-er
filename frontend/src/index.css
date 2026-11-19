@@ -4328,6 +4328,13 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .vw-empty p { margin: 0; font-size: 14px; font-weight: 700; }
 
 .vw-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+/* 📄 Paginado de Ventas web (10 por página) */
+.vw-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.vw-pager span { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #71717a; text-align: center; flex: 1; }
+.vw-pager button { padding: 10px 16px; border-radius: 9999px; border: 1.5px solid #000; background: #fff !important; color: #000 !important; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+.vw-pager button:hover:not(:disabled) { transform: none !important; background: #000 !important; color: #fff !important; }
+.vw-pager button:disabled { opacity: .35; cursor: default; }
+.vw-pager button:hover:disabled { transform: none !important; }
 .vw-card { border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 10px 30px -24px rgba(0,0,0,0.4); overflow: hidden; border-left: 4px solid #16a34a; }
 .vw-card.is-pendiente { border-left-color: #d4d4d8; }
 .vw-card.is-rechazada { border-left-color: #dc2626; }
@@ -4372,6 +4379,22 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .vw-item-info strong { font-size: 12px; font-weight: 900; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vw-item-info small { font-size: 11px; color: #71717a; }
 .vw-item-price { font-weight: 900; white-space: nowrap; }
+/* ✅ Check de alistado por camiseta (VentasWebPage → alistar) */
+.vw-check {
+  flex: none; width: 30px; height: 30px; padding: 0; border-radius: 9999px; border: 2px solid #d4d4d8;
+  background: #fff !important; color: transparent !important; display: inline-flex; align-items: center; justify-content: center;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.vw-check svg { width: 13px; height: 13px; }
+.vw-check:hover { transform: none !important; border-color: #16a34a; color: #bbf7d0 !important; }
+.vw-check:focus { outline: none; }
+.vw-check:focus-visible { outline: 2px solid #16a34a; outline-offset: 2px; }
+.vw-check.is-on { background: #16a34a !important; border-color: #16a34a; color: #fff !important; }
+.vw-items li.is-alistado .vw-thumb { opacity: .55; }
+.vw-items li.is-alistado .vw-item-info strong { text-decoration: line-through; text-decoration-color: #16a34a; }
+.vw-alistado { color: #15803d !important; font-weight: 800; }
+.vw-pill.is-alistada { background: #16a34a; color: #fff; }
+.vw-pill.is-alistando { background: #fef3c7; color: #92400e; }
 .vw-items .vw-sum { justify-content: space-between; color: #52525b; padding-top: 8px; border-top: 1px dashed #e4e4e7; }
 .vw-items .vw-sum.is-total { padding-top: 0; border: 0; color: #000; font-size: 15px; font-weight: 900; text-transform: uppercase; }
 .vw-grid { display: grid; gap: 10px; }
