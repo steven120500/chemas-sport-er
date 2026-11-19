@@ -10,6 +10,7 @@ import OrdenWeb, { siguienteNumeroOrdenWeb } from '../models/OrdenWeb.js';
 import { costoEnvio } from '../utils/coberturaMensajero.js';
 import { tilopayConfigurado, crearPago, ISO_PROVINCIA } from '../utils/tilopay.js';
 import { confirmarPago, rebajarStockOrden, facturarOrden } from '../utils/ordenesWeb.js';
+import { enviarCorreo, correoGuia, correoConfigurado } from '../utils/correo.js';
 import { readFileSync } from 'fs';
 
 const router = express.Router();
@@ -308,6 +309,7 @@ const resumenOrden = (o) => ({
   tilopay: o.tilopay,
   stock: o.stock,
   factura: o.factura,
+  guia: o.guia,
 });
 
 // GET /api/checkout/admin/ordenes?estado=pagada|pendiente|todas&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto
@@ -372,12 +374,56 @@ router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
     if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo se facturan órdenes pagadas.' });
     if (orden.factura?.estado === 'lista') return res.status(400).json({ error: 'Esta orden ya está facturada.' });
-    if (String(orden.tilopay?.environment || '').toLowerCase() === 'test') return res.status(400).json({ error: 'Es un pago de prueba: no se factura.' });
-    await facturarOrden(orden._id);
+    // El panel puede facturar a mano también un pago de prueba (pide confirmación en pantalla)
+    await facturarOrden(orden._id, { forzar: true });
     res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
   } catch (error) {
     console.error('❌ Refacturando orden web:', error.message);
     res.status(500).json({ error: 'No se pudo facturar.' });
+  }
+});
+
+// POST /api/checkout/admin/ordenes/:id/guia { numero, tipo, pdfBase64?, enviarCorreo? }
+// La guía se genera en el navegador con los mismos endpoints de /guias (POST /api/guias o /api/correos/generar-guia);
+// acá se anota en la orden y, si es de Correos, se manda el PDF al correo que puso el cliente.
+router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const orden = await OrdenWeb.findById(req.params.id);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    const numero = txt(req.body?.numero, 60);
+    const tipo = ['Correos', 'Mensajero'].includes(req.body?.tipo) ? req.body.tipo : '';
+    if (!numero || !tipo) return res.status(400).json({ error: 'Falta el número o el tipo de guía.' });
+
+    const guia = { tipo, numero, fecha: new Date(), por: req.user?.name || '', correoEnviado: false, correoError: '' };
+
+    if (tipo === 'Correos' && req.body?.enviarCorreo) {
+      const para = orden.cliente?.correo;
+      const pdf = String(req.body?.pdfBase64 || '').replace(/^data:application\/pdf[^,]*,/, '');
+      try {
+        if (!para) throw new Error('La orden no tiene correo');
+        if (!correoConfigurado()) throw new Error('El envío de correos no está configurado (SMTP)');
+        const contenido = correoGuia({ nombre: orden.cliente?.nombre || '', orderNumber: orden.orderNumber, numeroGuia: numero });
+        await enviarCorreo({
+          para,
+          asunto: contenido.asunto,
+          texto: contenido.texto,
+          html: contenido.html,
+          adjuntos: pdf ? [{ filename: `Guia-${numero}.pdf`, content: Buffer.from(pdf, 'base64'), contentType: 'application/pdf' }] : [],
+        });
+        guia.correoEnviado = true;
+      } catch (e) {
+        console.warn(`⚠️ Guía ${numero} de ${orden.orderNumber}: no se pudo enviar el correo:`, e.message);
+        guia.correoError = e.message;
+      }
+    }
+
+    orden.guia = guia;
+    await orden.save();
+    res.json(resumenOrden(orden.toObject()));
+  } catch (error) {
+    console.error('❌ Guardando guía de orden web:', error.message);
+    res.status(500).json({ error: 'No se pudo guardar la guía.' });
   }
 });
 

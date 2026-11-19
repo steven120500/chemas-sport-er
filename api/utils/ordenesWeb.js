@@ -212,14 +212,17 @@ async function impuestoExento() {
   return cacheImpuestoExentoId;
 }
 
-export async function facturarOrden(ordenId) {
+// forzar: el súper admin puede facturar a mano un pago de prueba o una factura omitida
+export async function facturarOrden(ordenId, { forzar = false } = {}) {
   if (!ALEGRA_EMAIL || !ALEGRA_TOKEN) {
     await OrdenWeb.updateOne({ _id: ordenId }, { 'factura.estado': 'error', 'factura.error': 'Faltan ALEGRA_EMAIL / ALEGRA_TOKEN' });
     return null;
   }
   // 🔒 Candado: no facturar dos veces
   const orden = await OrdenWeb.findOneAndUpdate(
-    { _id: ordenId, estado: 'pagada', 'tilopay.environment': { $ne: 'Test' }, 'factura.estado': { $nin: ['facturando', 'lista', 'omitida'] } },
+    forzar
+      ? { _id: ordenId, estado: 'pagada', 'factura.estado': { $nin: ['facturando', 'lista'] } }
+      : { _id: ordenId, estado: 'pagada', 'tilopay.environment': { $ne: 'Test' }, 'factura.estado': { $nin: ['facturando', 'lista', 'omitida'] } },
     { 'factura.estado': 'facturando', 'factura.error': '' },
     { new: true }
   );

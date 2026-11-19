@@ -73,6 +73,15 @@ const ordenWebSchema = new mongoose.Schema(
       error: String,
       at: Date,
     },
+    // 🚚 Guía de envío (panel Ventas web → mismos endpoints que /guias)
+    guia: {
+      tipo: { type: String, enum: ['Correos', 'Mensajero'] },
+      numero: String,
+      fecha: Date,
+      por: String,
+      correoEnviado: Boolean, // guía de Correos mandada al correo del cliente
+      correoError: String,
+    },
   },
   { timestamps: true }
 );
