@@ -47,7 +47,7 @@ const ordenWebSchema = new mongoose.Schema(
     carritoId: String, // ⏳ carrito del navegador: sus reservas (utils/reservas.js) se liberan al pagar
     // 🧾 El cliente marcó "Quiero factura electrónica" en el checkout → tiquete ante Hacienda; si no → ticket interno
     facturaElectronica: { type: Boolean, default: true },
-    metodoPago: { type: String, enum: ['tarjeta'], default: 'tarjeta' },
+    metodoPago: { type: String, enum: ['tarjeta', 'whatsapp'], default: 'tarjeta' }, // whatsapp = pidió por chat (sin pagar en la web)
     estado: { type: String, enum: ['pendiente', 'pagada', 'rechazada'], default: 'pendiente', index: true },
     pagadaAt: Date,
     tilopay: {

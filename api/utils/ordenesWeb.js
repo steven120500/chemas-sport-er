@@ -51,7 +51,7 @@ const nombreCompleto = (o) => `${o.cliente?.nombre || ''} ${o.cliente?.apellidos
    Devuelve la orden actualizada. Si se acaba de pagar, dispara stock + factura.
    ======================================================== */
 export async function confirmarPago(orden, io) {
-  if (!orden || orden.estado !== 'pendiente' || !tilopayConfigurado()) return orden;
+  if (!orden || orden.estado !== 'pendiente' || orden.metodoPago === 'whatsapp' || !tilopayConfigurado()) return orden;
 
   const transacciones = await consultarOrden(orden.orderNumber);
   const aprobada = transacciones.find(
@@ -490,7 +490,7 @@ export async function generarGuiaOrden(ordenId, { forzar = false, por = '' } = {
 export async function revisarPendientes(io) {
   if (!tilopayConfigurado()) return;
   const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const pendientes = await OrdenWeb.find({ estado: 'pendiente', createdAt: { $gte: desde } }).limit(30);
+  const pendientes = await OrdenWeb.find({ estado: 'pendiente', metodoPago: { $ne: 'whatsapp' }, createdAt: { $gte: desde } }).limit(30);
   for (const o of pendientes) {
     try {
       await confirmarPago(o, io);

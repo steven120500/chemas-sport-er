@@ -187,6 +187,16 @@ export default function CheckoutPage({ products = [] }) {
 
   const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
 
+  // 📦 Lo que se le manda al backend (pago con tarjeta o registro del pedido por WhatsApp)
+  const cuerpoPedido = () => ({
+    cliente: { cedula: form.cedula.replace(/\D/g, ""), nombre: form.nombre.trim(), apellidos: form.apellidos.trim(), telefono: form.telefono.replace(/\D/g, ""), correo: form.correo.trim() },
+    entrega: { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "", fechaEntrega: entrega === "mensajero" ? diaElegido.ymd : "" },
+    items: validas.map((l) => ({ productId: l.productId, talla: l.talla, dorsal: l.dorsal, cantidad: l.cantidad })),
+    notas: form.notas.trim(),
+    carritoId, // ⏳ las camisetas apartadas siguen apartadas mientras paga
+    facturaElectronica: Boolean(form.facturaElectronica),
+  });
+
   const pagar = async (e) => {
     e?.preventDefault();
     setIntentado(true);
@@ -204,6 +214,13 @@ export default function CheckoutPage({ products = [] }) {
     // 💬 Pago por WhatsApp: arma el pedido completo y abre el chat de la tienda
     if (form.pago === "whatsapp") {
       const url = `https://wa.me/${WHATSAPP_TIENDA}?text=${encodeURIComponent(mensajeWhatsapp())}`;
+      // 📝 Queda registrado en /ventas-web → "Sin pagar" como pedido por WhatsApp (keepalive: aunque se cambie de página)
+      fetch(`${API_BASE}/api/checkout/whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpoPedido()),
+        keepalive: true,
+      }).catch(() => {});
       // 🧹 El pedido sigue por chat: se vacía el carrito y se sueltan los apartados (el stock real no se toca)
       vaciar();
       toastHOT.success("¡Listo! Terminá tu pedido en WhatsApp.", { duration: 6000, style: { borderRadius: "12px", background: "#000", color: "#fff" } });
@@ -220,14 +237,7 @@ export default function CheckoutPage({ products = [] }) {
       const r = await fetch(`${API_BASE}/api/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cliente: { cedula: form.cedula.replace(/\D/g, ""), nombre: form.nombre.trim(), apellidos: form.apellidos.trim(), telefono: form.telefono.replace(/\D/g, ""), correo: form.correo.trim() },
-          entrega: { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "", fechaEntrega: entrega === "mensajero" ? diaElegido.ymd : "" },
-          items: validas.map((l) => ({ productId: l.productId, talla: l.talla, dorsal: l.dorsal, cantidad: l.cantidad })),
-          notas: form.notas.trim(),
-          carritoId, // ⏳ las camisetas apartadas siguen apartadas mientras paga
-          facturaElectronica: Boolean(form.facturaElectronica),
-        }),
+        body: JSON.stringify(cuerpoPedido()),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.url) throw new Error(data.error || "No pudimos iniciar el pago.");

@@ -32,9 +32,18 @@ const RANGOS = [
 ];
 const ESTADOS = [
   { v: "pagada", t: "Pagadas" },
-  { v: "pendiente", t: "Sin pagar" },
-  { v: "todas", t: "Todas" },
+  { v: "pendiente", t: "Sin pagar" }, // 👈 incluye las rechazadas y los pedidos por WhatsApp
 ];
+
+// ❓ Qué pasó con una orden sin pagar
+const MIN_PAGANDO = 20; // lo que dura el apartado mientras está en Tilopay
+function quePaso(o) {
+  if (o.metodoPago === "whatsapp") return { tipo: "wa", texto: "Pidió por WhatsApp: el pago se coordina por chat" };
+  if (o.estado === "rechazada") return { tipo: "bad", texto: `Tilopay rechazó el pago${o.tilopay?.description ? `: ${o.tilopay.description}` : ""}` };
+  if (Date.now() - new Date(o.createdAt).getTime() < MIN_PAGANDO * 60 * 1000) return { tipo: "wait", texto: "Está en la página de pago de Tilopay ahora mismo" };
+  if (o.tilopay?.description) return { tipo: "bad", texto: `Intentó pagar y no pasó: ${o.tilopay.description}` };
+  return { tipo: "off", texto: "No terminó de pagar: salió de la página de pago de Tilopay" };
+}
 
 const fechaHora = (d) =>
   d ? new Date(d).toLocaleString("es-CR", { timeZone: "America/Costa_Rica", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }) : "";
@@ -256,14 +265,16 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
               const abiertaEsta = abierta === o._id;
               const unidades = o.items.reduce((s, i) => s + i.cantidad, 0);
               const tel = String(o.cliente?.telefono || "");
+              const porWa = o.metodoPago === "whatsapp";
+              const paso = o.estado !== "pagada" ? quePaso(o) : null; // ❓ sin pagar: qué pasó
               return (
-                <li key={o._id} className={`vw-card is-${o.estado}`}>
+                <li key={o._id} className={`vw-card is-${o.estado} ${porWa ? "is-wa" : ""}`}>
                   <button type="button" className="vw-card-head" onClick={() => setAbierta(abiertaEsta ? null : o._id)} aria-expanded={abiertaEsta}>
                     <div className="vw-card-main">
                       <div className="vw-row1">
                         <strong className="vw-num">{o.orderNumber}</strong>
                         <span className={`vw-pill is-${o.estado}`}>
-                          {o.estado === "pagada" ? <><FaCheckCircle /> Pagada</> : o.estado === "pendiente" ? <><FaClock /> Sin pagar</> : "Rechazada"}
+                          {o.estado === "pagada" ? <><FaCheckCircle /> Pagada</> : porWa ? <><FaWhatsapp /> WhatsApp</> : o.estado === "pendiente" ? <><FaClock /> Sin pagar</> : "Rechazada"}
                         </span>
                         {o.tilopay?.environment && o.tilopay.environment !== "Production" && o.estado === "pagada" && (
                           <span className="vw-pill is-test">{o.tilopay.environment}</span>
@@ -273,6 +284,11 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                       <span className="vw-meta">
                         {fechaHora(o.pagadaAt || o.createdAt)} · {unidades} {unidades === 1 ? "camiseta" : "camisetas"} · <E.icon /> {E.t}
                       </span>
+                      {paso && (
+                        <span className={`vw-why is-${paso.tipo}`}>
+                          {paso.tipo === "wa" ? <FaWhatsapp /> : paso.tipo === "wait" ? <FaClock /> : <FaExclamationTriangle />} {paso.texto}
+                        </span>
+                      )}
                     </div>
                     <div className="vw-card-side">
                       <strong className="vw-total">{colones(o.total)}</strong>
@@ -330,11 +346,11 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
 
                         {/* Pago / factura / stock */}
                         <section className="vw-box">
-                          <h3><FaCreditCard /> Pago</h3>
+                          <h3>{porWa ? <FaWhatsapp /> : <FaCreditCard />} Pago</h3>
                           {o.estado === "pagada" ? (
                             <p>Tilopay {o.tilopay?.card ? `· ${o.tilopay.card}` : ""} {o.tilopay?.last ? `•••• ${o.tilopay.last}` : ""}{o.tilopay?.auth ? ` · Aut. ${o.tilopay.auth}` : ""}</p>
                           ) : (
-                            <p>{o.tilopay?.description ? `Último intento: ${o.tilopay.description}` : "El cliente no ha pagado."}</p>
+                            <p className={`vw-why is-${paso.tipo}`}>{paso.texto}</p>
                           )}
 
                           {o.estado === "pagada" && (
@@ -435,7 +451,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                                 : "Borrar"}
                             </button>
                             )}
-                            {(o.estado === "pendiente" || o.stock?.estado === "error") && (
+                            {((o.estado === "pendiente" && !porWa) || o.stock?.estado === "error") && (
                               <button type="button" className="vw-btn" disabled={accion === o._id} onClick={() => ejecutar(o, "verificar")}>
                                 <FaSyncAlt className={accion === o._id ? "vw-spin" : ""} /> {o.estado === "pendiente" ? "Verificar pago" : "Reintentar stock"}
                               </button>

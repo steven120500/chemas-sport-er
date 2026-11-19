@@ -258,6 +258,101 @@ router.put('/reservas', limiteReservas, async (req, res) => {
   }
 });
 
+/* ========================================================
+   🧮 Arma el pedido desde lo que manda el navegador (precios y stock desde la BD).
+   estricto = false (pedido por WhatsApp): se registra igual aunque falte stock o un dorsal,
+   porque la venta se coordina por chat.
+   Devuelve { fallo: { status, body } } o los datos del pedido.
+   ======================================================== */
+const fallo = (status, body) => ({ fallo: { status, body } });
+async function armarPedido(body, { estricto = true } = {}) {
+  const { cliente = {}, entrega = {}, items = [], notas = '' } = body || {};
+  const carritoId = carritoValido(body?.carritoId) ? String(body.carritoId) : '';
+  // Sin el campo (frontend viejo) → electrónica, como antes; el checkout nuevo siempre lo manda
+  const facturaElectronica = body?.facturaElectronica !== false;
+
+  // 👤 Cliente
+  const c = {
+    cedula: txt(cliente.cedula, 20).replace(/\D/g, ''),
+    nombre: txt(cliente.nombre, 80),
+    apellidos: txt(cliente.apellidos, 80),
+    telefono: txt(cliente.telefono, 20).replace(/\D/g, ''),
+    correo: txt(cliente.correo, 120).toLowerCase(),
+  };
+  if (!/^\d{9,12}$/.test(c.cedula)) return fallo(400, { error: 'Cédula inválida.' });
+  if (!c.nombre || !c.apellidos) return fallo(400, { error: 'Faltan nombre o apellidos.' });
+  if (!/^[2-8]\d{7}$/.test(c.telefono)) return fallo(400, { error: 'Teléfono inválido.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.correo)) return fallo(400, { error: 'Correo inválido.' });
+
+  // 📍 Entrega
+  const e = {
+    tipo: txt(entrega.tipo, 20),
+    provincia: txt(entrega.provincia, 60),
+    canton: txt(entrega.canton, 60),
+    distrito: txt(entrega.distrito, 60),
+    senas: txt(entrega.senas, 400),
+  };
+  // 🛵 Día de entrega escogido (solo mensajero): tiene que ser uno de los días que se le ofrecieron
+  if (e.tipo === 'mensajero') {
+    let dia = txt(entrega.fechaEntrega, 10);
+    if (dia && !diaMensajeroValido(dia)) {
+      if (estricto) return fallo(400, { error: 'Ese día de entrega ya no está disponible. Escogé otro.' });
+      dia = ''; // WhatsApp: se coordina por chat
+    }
+    e.fechaEntrega = dia || planEnvio('mensajero').entregaYMD;
+  }
+  if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return fallo(400, { error: 'Ubicación inválida.' });
+  const envio = costoEnvio(e.tipo, e.provincia, e.canton, e.distrito);
+  if (envio === null) return fallo(400, { error: 'Esa forma de entrega no está disponible para tu ubicación.' });
+  if (e.tipo !== 'retiro' && e.senas.length < 10) return fallo(400, { error: 'Falta la dirección exacta.' });
+
+  // 👕 Productos: precio y stock desde la BD
+  if (!Array.isArray(items) || items.length === 0 || items.length > 30) return fallo(400, { error: 'El carrito está vacío.' });
+  const ids = [...new Set(items.map((i) => String(i?.productId || '')))];
+  if (ids.some((id) => !mongoose.isValidObjectId(id))) return fallo(400, { error: 'Producto inválido.' });
+  const productos = await Product.find({ _id: { $in: ids } }).lean();
+  const porId = new Map(productos.map((p) => [String(p._id), p]));
+  // ⏳ Lo que tienen apartado OTROS carritos no se puede vender (lo de este carrito sí)
+  const deOtros = await apartadas({ productIds: ids, excluirCarrito: carritoId || '__sin_carrito__' });
+
+  const lineas = [];
+  const pedidoPorTalla = new Map(); // productId|talla → cantidad total pedida (varias líneas con distinto dorsal)
+  for (const i of items) {
+    const p = porId.get(String(i.productId));
+    const talla = txt(i.talla, 10);
+    const cantidad = Math.trunc(Number(i.cantidad));
+    if (!p || p.hidden) return fallo(409, { error: 'Una camiseta del carrito ya no está disponible.' });
+    if (!talla || !Number.isFinite(cantidad) || cantidad < 1 || cantidad > 10) return fallo(400, { error: 'Cantidad inválida.' });
+    const k = `${p._id}|${talla}`;
+    pedidoPorTalla.set(k, (pedidoPorTalla.get(k) || 0) + cantidad);
+    const otros = deOtros[String(p._id)]?.[talla] || 0;
+    if (estricto && pedidoPorTalla.get(k) > stockDe(p, talla) - otros) {
+      return fallo(409, {
+        error: otros > 0
+          ? `"${p.name}" talla ${talla}: otro cliente la tiene apartada. Si no la compra, se libera en unos minutos.`
+          : `Ya no hay suficientes "${p.name}" en talla ${talla}. Revisá el carrito.`,
+      });
+    }
+    let dorsal;
+    if (i.dorsal && p.isNumerable) {
+      const nombre = txt(i.dorsal.name, 30);
+      const numero = txt(i.dorsal.number, 5);
+      const existe = (p.dorsalOptions || []).some(
+        (o) => String(o.name || '').trim().toUpperCase() === nombre.toUpperCase() && String(o.number || '').trim() === numero && Number(o.quantity) > 0
+      );
+      if (!existe && estricto) return fallo(409, { error: `El dorsal ${nombre} #${numero} ya no está disponible.` });
+      dorsal = { name: nombre, number: numero };
+    }
+    lineas.push({ productId: p._id, name: p.name, type: p.type, imageSrc: p.imageSrc, talla, dorsal, cantidad, precio: precioDe(p) });
+  }
+
+  const subtotal = lineas.reduce((s, l) => s + l.precio * l.cantidad, 0);
+  const total = subtotal + envio;
+  if (total <= 0) return fallo(400, { error: 'Total inválido.' });
+
+  return { c, e, lineas, subtotal, envio, total, notas: txt(notas, 500), carritoId, facturaElectronica, pedidoPorTalla, ids };
+}
+
 router.post(
   '/',
   rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: 'Demasiados intentos de pago. Probá en unos minutos.' }),
@@ -267,86 +362,9 @@ router.post(
         console.error('❌ Checkout: faltan TILOPAY_API_USER / TILOPAY_API_PASSWORD / TILOPAY_API_KEY');
         return res.status(503).json({ error: 'El pago con tarjeta no está disponible en este momento. Probá por WhatsApp.' });
       }
-      const { cliente = {}, entrega = {}, items = [], notas = '' } = req.body || {};
-      const carritoId = carritoValido(req.body?.carritoId) ? String(req.body.carritoId) : '';
-      // Sin el campo (frontend viejo) → electrónica, como antes; el checkout nuevo siempre lo manda
-      const facturaElectronica = req.body?.facturaElectronica !== false;
-
-      // 👤 Cliente
-      const c = {
-        cedula: txt(cliente.cedula, 20).replace(/\D/g, ''),
-        nombre: txt(cliente.nombre, 80),
-        apellidos: txt(cliente.apellidos, 80),
-        telefono: txt(cliente.telefono, 20).replace(/\D/g, ''),
-        correo: txt(cliente.correo, 120).toLowerCase(),
-      };
-      if (!/^\d{9,12}$/.test(c.cedula)) return res.status(400).json({ error: 'Cédula inválida.' });
-      if (!c.nombre || !c.apellidos) return res.status(400).json({ error: 'Faltan nombre o apellidos.' });
-      if (!/^[2-8]\d{7}$/.test(c.telefono)) return res.status(400).json({ error: 'Teléfono inválido.' });
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.correo)) return res.status(400).json({ error: 'Correo inválido.' });
-
-      // 📍 Entrega
-      const e = {
-        tipo: txt(entrega.tipo, 20),
-        provincia: txt(entrega.provincia, 60),
-        canton: txt(entrega.canton, 60),
-        distrito: txt(entrega.distrito, 60),
-        senas: txt(entrega.senas, 400),
-      };
-      // 🛵 Día de entrega escogido (solo mensajero): tiene que ser uno de los días que se le ofrecieron
-      if (e.tipo === 'mensajero') {
-        const dia = txt(entrega.fechaEntrega, 10);
-        if (dia && !diaMensajeroValido(dia)) return res.status(400).json({ error: 'Ese día de entrega ya no está disponible. Escogé otro.' });
-        e.fechaEntrega = dia || planEnvio('mensajero').entregaYMD;
-      }
-      if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return res.status(400).json({ error: 'Ubicación inválida.' });
-      const envio = costoEnvio(e.tipo, e.provincia, e.canton, e.distrito);
-      if (envio === null) return res.status(400).json({ error: 'Esa forma de entrega no está disponible para tu ubicación.' });
-      if (e.tipo !== 'retiro' && e.senas.length < 10) return res.status(400).json({ error: 'Falta la dirección exacta.' });
-
-      // 👕 Productos: precio y stock desde la BD
-      if (!Array.isArray(items) || items.length === 0 || items.length > 30) return res.status(400).json({ error: 'El carrito está vacío.' });
-      const ids = [...new Set(items.map((i) => String(i?.productId || '')))];
-      if (ids.some((id) => !mongoose.isValidObjectId(id))) return res.status(400).json({ error: 'Producto inválido.' });
-      const productos = await Product.find({ _id: { $in: ids } }).lean();
-      const porId = new Map(productos.map((p) => [String(p._id), p]));
-      // ⏳ Lo que tienen apartado OTROS carritos no se puede vender (lo de este carrito sí)
-      const deOtros = await apartadas({ productIds: ids, excluirCarrito: carritoId || '__sin_carrito__' });
-
-      const lineas = [];
-      const pedidoPorTalla = new Map(); // productId|talla → cantidad total pedida (varias líneas con distinto dorsal)
-      for (const i of items) {
-        const p = porId.get(String(i.productId));
-        const talla = txt(i.talla, 10);
-        const cantidad = Math.trunc(Number(i.cantidad));
-        if (!p || p.hidden) return res.status(409).json({ error: 'Una camiseta del carrito ya no está disponible.' });
-        if (!talla || !Number.isFinite(cantidad) || cantidad < 1 || cantidad > 10) return res.status(400).json({ error: 'Cantidad inválida.' });
-        const k = `${p._id}|${talla}`;
-        pedidoPorTalla.set(k, (pedidoPorTalla.get(k) || 0) + cantidad);
-        const otros = deOtros[String(p._id)]?.[talla] || 0;
-        if (pedidoPorTalla.get(k) > stockDe(p, talla) - otros) {
-          return res.status(409).json({
-            error: otros > 0
-              ? `"${p.name}" talla ${talla}: otro cliente la tiene apartada. Si no la compra, se libera en unos minutos.`
-              : `Ya no hay suficientes "${p.name}" en talla ${talla}. Revisá el carrito.`,
-          });
-        }
-        let dorsal;
-        if (i.dorsal && p.isNumerable) {
-          const nombre = txt(i.dorsal.name, 30);
-          const numero = txt(i.dorsal.number, 5);
-          const existe = (p.dorsalOptions || []).some(
-            (o) => String(o.name || '').trim().toUpperCase() === nombre.toUpperCase() && String(o.number || '').trim() === numero && Number(o.quantity) > 0
-          );
-          if (!existe) return res.status(409).json({ error: `El dorsal ${nombre} #${numero} ya no está disponible.` });
-          dorsal = { name: nombre, number: numero };
-        }
-        lineas.push({ productId: p._id, name: p.name, type: p.type, imageSrc: p.imageSrc, talla, dorsal, cantidad, precio: precioDe(p) });
-      }
-
-      const subtotal = lineas.reduce((s, l) => s + l.precio * l.cantidad, 0);
-      const total = subtotal + envio;
-      if (total <= 0) return res.status(400).json({ error: 'Total inválido.' });
+      const pedido = await armarPedido(req.body);
+      if (pedido.fallo) return res.status(pedido.fallo.status).json(pedido.fallo.body);
+      const { c, e, lineas, subtotal, envio, total, notas, carritoId, facturaElectronica, pedidoPorTalla, ids } = pedido;
 
       // 🧾 Orden pendiente
       const numero = await siguienteNumeroOrdenWeb();
@@ -355,7 +373,7 @@ router.post(
       const orden = await OrdenWeb.create({
         numero, orderNumber, token, cliente: c,
         entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
-        items: lineas, subtotal, envio, total, notas: txt(notas, 500),
+        items: lineas, subtotal, envio, total, notas,
         carritoId, facturaElectronica,
       });
 
@@ -394,6 +412,35 @@ router.post(
     } catch (error) {
       console.error('❌ Error creando el pago:', error.message, error.data || '');
       res.status(502).json({ error: 'No pudimos conectar con la pasarela de pago. Probá de nuevo o pedí por WhatsApp.' });
+    }
+  }
+);
+
+/* ========================================================
+   💬 POST /api/checkout/whatsapp → el cliente escogió "Coordinar por WhatsApp" en el checkout.
+   Se guarda como orden SIN PAGAR (metodoPago 'whatsapp') para que salga en /ventas-web → "Sin pagar".
+   No toca stock ni apartados ni Tilopay: la venta se termina por chat.
+   ======================================================== */
+router.post(
+  '/whatsapp',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: 'Demasiados pedidos. Probá en unos minutos.' }),
+  async (req, res) => {
+    try {
+      const pedido = await armarPedido(req.body, { estricto: false });
+      if (pedido.fallo) return res.status(pedido.fallo.status).json(pedido.fallo.body);
+      const { c, e, lineas, subtotal, envio, total, notas, carritoId, facturaElectronica } = pedido;
+      const numero = await siguienteNumeroOrdenWeb();
+      const orderNumber = `CSW${String(numero).padStart(6, '0')}`;
+      await OrdenWeb.create({
+        numero, orderNumber, token: crypto.randomBytes(16).toString('hex'), cliente: c,
+        entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
+        items: lineas, subtotal, envio, total, notas,
+        carritoId, facturaElectronica, metodoPago: 'whatsapp',
+      });
+      res.json({ ok: true, orderNumber });
+    } catch (error) {
+      console.error('❌ Registrando pedido por WhatsApp:', error.message);
+      res.status(500).json({ error: 'No se pudo registrar el pedido.' });
     }
   }
 );
@@ -448,6 +495,7 @@ const resumenOrden = (o) => ({
   createdAt: o.createdAt,
   pagadaAt: o.pagadaAt,
   estado: o.estado,
+  metodoPago: o.metodoPago || 'tarjeta',
   cliente: o.cliente,
   entrega: o.entrega,
   items: o.items,
@@ -467,7 +515,8 @@ router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
   try {
     const { estado = 'pagada', desde, hasta, q } = req.query;
     const filtro = {};
-    if (estado === 'pagada' || estado === 'pendiente' || estado === 'rechazada') filtro.estado = estado;
+    if (estado === 'pagada' || estado === 'rechazada') filtro.estado = estado;
+    else if (estado === 'pendiente') filtro.estado = { $in: ['pendiente', 'rechazada'] }; // 👈 "Sin pagar": no terminó o le rechazaron la tarjeta
     const rango = {};
     // Fechas en hora de Costa Rica (UTC-6)
     if (/^\d{4}-\d{2}-\d{2}$/.test(desde || '')) rango.$gte = new Date(`${desde}T00:00:00-06:00`);
