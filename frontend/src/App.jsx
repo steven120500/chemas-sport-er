@@ -681,7 +681,7 @@ function MainApp() {
             <Route path="/tienda" element={<TiendaPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/admin" element={<PedidosPage isSuperUser={isSuperUser} user={user} />} />
             <Route path="/admin/pedidos" element={<Navigate to="/admin" replace />} />
-            <Route path="/ventas-web" element={<VentasWebPage isSuperUser={isSuperUser} />} />
+            <Route path="/ventas-web" element={<VentasWebPage isSuperUser={isSuperUser} puedeVer={isSuperUser || esSoloUsuarioTienda} />} />
             <Route path="/checkout/resultado" element={<PagoResultado />} />
             <Route path="/checkout" element={<CheckoutPage products={allProductsForCounts.length > 0 ? allProductsForCounts : products} />} />
 

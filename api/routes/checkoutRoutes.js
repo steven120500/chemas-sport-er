@@ -2,10 +2,18 @@
 // 🛒 Rutas PÚBLICAS del checkout de la tienda online (el cliente no tiene sesión).
 // ⚠️ Todo lo que se agregue acá es público: limitar por IP y devolver solo lo mínimo.
 import crypto from 'crypto';
-import { textoEnvio } from '../utils/fechasEnvio.js'; // 📦 cuándo sale / cuándo llega
+import { textoEnvio, planEnvio, diaMensajeroValido } from '../utils/fechasEnvio.js'; // 📦 cuándo sale / cuándo llega
 import express from 'express';
 import mongoose from 'mongoose';
 import { rateLimit, requireSuper } from '../middleware/auth.js';
+
+// 🏪 Panel de ventas web: súper usuario o perfil "tienda" (rol tienda o usuario con "tienda" en el nombre, igual que el Header)
+const requireVentasWeb = (req, res, next) => {
+  if (!req.user?.id) return res.status(401).json({ error: 'Necesitás iniciar sesión.', code: 'AUTH_REQUIRED' });
+  const u = req.user;
+  if (u.isSuperUser || (u.roles || []).includes('tienda') || String(u.name || '').toLowerCase().includes('tienda')) return next();
+  return res.status(403).json({ error: 'No tenés permisos para esta acción.', code: 'FORBIDDEN' });
+};
 import Product from '../models/Product.js';
 import OrdenWeb, { siguienteNumeroOrdenWeb } from '../models/OrdenWeb.js';
 import { costoEnvio } from '../utils/coberturaMensajero.js';
@@ -285,6 +293,12 @@ router.post(
         distrito: txt(entrega.distrito, 60),
         senas: txt(entrega.senas, 400),
       };
+      // 🛵 Día de entrega escogido (solo mensajero): tiene que ser uno de los días que se le ofrecieron
+      if (e.tipo === 'mensajero') {
+        const dia = txt(entrega.fechaEntrega, 10);
+        if (dia && !diaMensajeroValido(dia)) return res.status(400).json({ error: 'Ese día de entrega ya no está disponible. Escogé otro.' });
+        e.fechaEntrega = dia || planEnvio('mensajero').entregaYMD;
+      }
       if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return res.status(400).json({ error: 'Ubicación inválida.' });
       const envio = costoEnvio(e.tipo, e.provincia, e.canton, e.distrito);
       if (envio === null) return res.status(400).json({ error: 'Esa forma de entrega no está disponible para tu ubicación.' });
@@ -411,7 +425,7 @@ router.get(
         total: orden.total,
         envio: orden.envio,
         entrega: orden.entrega?.tipo,
-        envioTexto: orden.estado === 'pagada' ? textoEnvio(orden.entrega?.tipo, orden.pagadaAt || new Date(), new Date()) : '',
+        envioTexto: orden.estado === 'pagada' ? textoEnvio(orden.entrega?.tipo, orden.pagadaAt || new Date(), new Date(), orden.entrega?.fechaEntrega) : '',
         nombre: orden.cliente?.nombre,
         correo: orden.cliente?.correo,
         items: orden.items.map((i) => ({ name: i.name, talla: i.talla, dorsal: i.dorsal, cantidad: i.cantidad, precio: i.precio })),
@@ -449,7 +463,7 @@ const resumenOrden = (o) => ({
 });
 
 // GET /api/checkout/admin/ordenes?estado=pagada|pendiente|todas&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto
-router.get('/admin/ordenes', requireSuper, async (req, res) => {
+router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
   try {
     const { estado = 'pagada', desde, hasta, q } = req.query;
     const filtro = {};
@@ -484,7 +498,7 @@ router.get('/admin/ordenes', requireSuper, async (req, res) => {
 });
 
 // POST /api/checkout/admin/ordenes/:id/verificar → vuelve a preguntar a Tilopay (y completa stock/factura si faltaba)
-router.post('/admin/ordenes/:id/verificar', requireSuper, async (req, res) => {
+router.post('/admin/ordenes/:id/verificar', requireVentasWeb, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
     let orden = await OrdenWeb.findById(req.params.id);
@@ -503,7 +517,7 @@ router.post('/admin/ordenes/:id/verificar', requireSuper, async (req, res) => {
 });
 
 // POST /api/checkout/admin/ordenes/:id/facturar → reintenta la factura en Alegra si falló
-router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
+router.post('/admin/ordenes/:id/facturar', requireVentasWeb, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
     const orden = await OrdenWeb.findById(req.params.id);
@@ -566,7 +580,7 @@ router.delete('/admin/ordenes/:id', requireSuper, async (req, res) => {
 // POST /api/checkout/admin/ordenes/:id/guia { numero, tipo, pdfBase64?, enviarCorreo? }
 // La guía se genera en el navegador con los mismos endpoints de /guias (POST /api/guias o /api/correos/generar-guia);
 // acá se anota en la orden y, si es de Correos, se manda el PDF al correo que puso el cliente.
-router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
+router.post('/admin/ordenes/:id/guia', requireVentasWeb, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
     const orden = await OrdenWeb.findById(req.params.id);
@@ -609,7 +623,7 @@ router.post('/admin/ordenes/:id/guia', requireSuper, async (req, res) => {
 
 // POST /api/checkout/admin/ordenes/:id/guia-auto → genera (o reintenta) la guía automática:
 // Correos de CR o mensajero según lo que escogió el cliente, y se la manda por correo.
-router.post('/admin/ordenes/:id/guia-auto', requireSuper, async (req, res) => {
+router.post('/admin/ordenes/:id/guia-auto', requireVentasWeb, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
     const orden = await OrdenWeb.findById(req.params.id);

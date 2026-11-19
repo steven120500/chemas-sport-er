@@ -37,6 +37,7 @@ const ordenWebSchema = new mongoose.Schema(
       canton: String,
       distrito: String,
       senas: String,
+      fechaEntrega: String, // 🛵 YYYY-MM-DD que escogió el cliente (solo mensajero); la guía sale con este día
     },
     items: [itemSchema],
     subtotal: { type: Number, required: true },

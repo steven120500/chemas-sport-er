@@ -178,7 +178,7 @@ export default function Header({
   const menu = user
     ? [
         esAdminTienda && { key: "tienda", icon: FaStore, label: "Tienda física", onClick: () => navigate("/tienda"), featured: true },
-        isSuperUser && { key: "ventas-web", icon: FaCashRegister, label: "Ventas web", onClick: () => navigate("/ventas-web"), featured: true },
+        esAdminTienda && { key: "ventas-web", icon: FaCashRegister, label: "Ventas web", onClick: () => navigate("/ventas-web"), featured: true },
         { key: "pedidos", icon: FaClipboardList, label: "Pedidos", onClick: () => navigate("/admin") },
         { key: "comisiones", icon: FaPercentage, label: "Comisiones", onClick: () => navigate("/comisiones") },
         { key: "guias", icon: FaTruck, label: "Guías", onClick: () => navigate("/guias") },

@@ -75,7 +75,7 @@ export default function GuiaPedidoModal({ pedido, orden, onClose, onDone }) {
     canton: esOrden ? ent.canton || "" : "",
     distrito: esOrden ? ent.distrito || "" : "",
     debe: saldo > 0 ? "Sí" : "No", monto: saldo > 0 ? String(saldo) : "",
-    meterRaspa: "No",
+    meterRaspa: esOrden ? "Sí" : "No", // 🎟️ ventas web: siempre se mete raspa
     // 🎟️ Si el pedido usó raspa, el mensajero la tiene que recoger para que valga el precio
     comentarioSelect: recogerRaspa || comentarioOrden ? "Otro comentario..." : "Sin comentario",
     comentarioCustom: recogerRaspa || comentarioOrden,
@@ -173,6 +173,7 @@ export default function GuiaPedidoModal({ pedido, orden, onClose, onDone }) {
       esMayorista: "No",
       nombreMayorista: "",
       comentarios: comentario === "Sin comentario" ? "" : comentario,
+      fechaEntrega: esOrden ? ent.fechaEntrega || "" : "", // 🛵 el día que escogió el cliente en la web, calcado
       fechaYMD: fechaLocalYMD(ahora),
       fecha: `${fechaFormateada} ${horaFormateada}`,
     };

@@ -9,7 +9,7 @@ import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart
 import { toast as toastHOT } from "react-hot-toast";
 import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
 import { hayMensajero, COSTO_MENSAJERO } from "../utils/coberturaMensajero";
-import { planEnvio, cuandoTexto } from "../utils/fechasEnvio"; // 📦 cuándo sale / cuándo llega
+import { planEnvio, cuandoTexto, diasMensajero, fechaLarga } from "../utils/fechasEnvio"; // 📦 cuándo sale / cuándo llega
 import { ApartadoAviso } from "./ApartadoReloj";
 
 // 💳 Checkout (MAQUETA). ⚠️ Estilos en index.css (sección "CHECKOUT", clases co-*).
@@ -99,6 +99,7 @@ const validar = (f) => {
 
 export default function CheckoutPage({ products = [] }) {
   const navigate = useNavigate();
+  const [diaEntrega, setDiaEntrega] = useState(""); // 🛵 YYYY-MM-DD escogido para el mensajero ("" = el primero)
   const { items, abrir: abrirCarrito, otrasApartadas, proximoVence, carritoId, vaciar } = useCart();
   const [form, setForm] = useState(leerBorrador);
   const [errores, setErrores] = useState({});
@@ -175,6 +176,9 @@ export default function CheckoutPage({ products = [] }) {
   // 📦 Si compra hoy: mensajero recoge L-V 3 pm y entrega al día siguiente; Correos abre L-V
   const planMensajero = planEnvio("mensajero");
   const planCorreos = planEnvio("correos");
+  // 🛵 Días que puede escoger para el mensajero (antes de las 3 pm arranca mañana); la guía sale con ese día
+  const diasMsj = diasMensajero();
+  const diaElegido = diasMsj.find((d) => d.ymd === diaEntrega) || diasMsj[0];
   const esDomicilio = entrega === "mensajero" || entrega === "correos";
   const envio = entrega === "mensajero" ? COSTO_MENSAJERO : entrega === "correos" ? COSTO_ENVIO_CORREOS : 0;
   const cantonesDe = UBICACIONES.find((p) => p.n === form.provincia)?.c || [];
@@ -218,7 +222,7 @@ export default function CheckoutPage({ products = [] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cliente: { cedula: form.cedula.replace(/\D/g, ""), nombre: form.nombre.trim(), apellidos: form.apellidos.trim(), telefono: form.telefono.replace(/\D/g, ""), correo: form.correo.trim() },
-          entrega: { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "" },
+          entrega: { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "", fechaEntrega: entrega === "mensajero" ? diaElegido.ymd : "" },
           items: validas.map((l) => ({ productId: l.productId, talla: l.talla, dorsal: l.dorsal, cantidad: l.cantidad })),
           notas: form.notas.trim(),
           carritoId, // ⏳ las camisetas apartadas siguen apartadas mientras paga
@@ -245,7 +249,7 @@ export default function CheckoutPage({ products = [] }) {
       })
       .join("\n\n");
     const txtEntrega = esDomicilio
-      ? `${entrega === "mensajero" ? "Mensajero privado" : "Envío por Correos"}\n${form.provincia}, ${form.canton.trim()}, ${form.distrito.trim()}\n${form.senas.trim()}`
+      ? `${entrega === "mensajero" ? `Mensajero privado · entregar el ${fechaLarga(diaElegido.fecha)}` : "Envío por Correos"}\n${form.provincia}, ${form.canton.trim()}, ${form.distrito.trim()}\n${form.senas.trim()}`
       : "Retiro en tienda";
     const datos = [
       `*Cédula:* ${form.cedula.replace(/\D/g, "")}`,
@@ -449,6 +453,34 @@ export default function CheckoutPage({ products = [] }) {
                       {errores.entrega && <span className="co-error">{errores.entrega}</span>}
                       {!cubreMensajero && !errores.entrega && (
                         <span className="co-hint">El mensajero privado no llega a este distrito.</span>
+                      )}
+
+                      {/* 🛵 ¿Qué día querés que te llegue? (días del mensajero: martes a sábado) */}
+                      {entrega === "mensajero" && (
+                        <div className="co-days">
+                          <span className="co-label">¿Qué día te lo llevamos?</span>
+                          <div className="co-days-list" role="radiogroup" aria-label="Día de entrega">
+                            {diasMsj.map((d) => {
+                              const activo = d.ymd === diaElegido.ymd;
+                              const cuando = cuandoTexto(d.fecha);
+                              return (
+                                <button
+                                  key={d.ymd}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={activo}
+                                  className={`co-day ${activo ? "is-active" : ""}`}
+                                  onClick={() => setDiaEntrega(d.ymd)}
+                                >
+                                  <small>{cuando === "mañana" ? "Mañana" : d.fecha.toLocaleDateString("es-CR", { timeZone: "UTC", weekday: "short" }).replace(".", "")}</small>
+                                  <strong>{d.fecha.getUTCDate()}</strong>
+                                  <small>{d.fecha.toLocaleDateString("es-CR", { timeZone: "UTC", month: "short" }).replace(".", "")}</small>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <span className="co-hint">Te llega el {fechaLarga(diaElegido.fecha)}. El mensajero entrega de martes a sábado.</span>
+                        </div>
                       )}
                     </motion.div>
                   )}

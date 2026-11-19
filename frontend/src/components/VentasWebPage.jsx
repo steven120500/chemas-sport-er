@@ -45,7 +45,8 @@ const ENTREGA = {
   retiro: { icon: FaStore, t: "Retiro en tienda" },
 };
 
-export default function VentasWebPage({ isSuperUser }) {
+export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
+  // 🏪 puedeVer = súper usuario o perfil tienda; borrar órdenes sigue siendo solo del súper usuario
   const [estado, setEstado] = useState("pagada");
   const [rango, setRango] = useState("mes");
   const [busqueda, setBusqueda] = useState("");
@@ -84,12 +85,12 @@ export default function VentasWebPage({ isSuperUser }) {
   }, [estado, rango, q]);
 
   useEffect(() => {
-    if (isSuperUser) cargar();
-  }, [cargar, isSuperUser]);
+    if (puedeVer) cargar();
+  }, [cargar, puedeVer]);
 
   // 🔔 En vivo: cuando entra un pago nuevo
   useEffect(() => {
-    if (!isSuperUser) return;
+    if (!puedeVer) return;
     const socket = io(API_BASE, { transports: ["websocket", "polling"], auth: { token: getToken() } });
     socket.on("ordenWebPagada", (o) => {
       toastHOT.success(`💳 Nueva venta web ${o.orderNumber}: ${colones(o.total)} · ${o.cliente}`, { duration: 8000 });
@@ -97,7 +98,7 @@ export default function VentasWebPage({ isSuperUser }) {
     });
     socket.on("ordenWebAlerta", (o) => toastHOT.error(`⚠️ ${o.orderNumber}: ${o.mensaje}`, { duration: 12000 }));
     return () => socket.disconnect();
-  }, [isSuperUser, cargar]);
+  }, [puedeVer, cargar]);
 
   // ⏳ Mientras alguna orden se está facturando o generando la guía (corre sola en el servidor), refrescar cada 6 s
   const procesando = (data.ordenes || []).some(
@@ -108,10 +109,10 @@ export default function VentasWebPage({ isSuperUser }) {
     )
   );
   useEffect(() => {
-    if (!procesando || !isSuperUser) return;
+    if (!procesando || !puedeVer) return;
     const t = setTimeout(cargar, 6000);
     return () => clearTimeout(t);
-  }, [procesando, isSuperUser, cargar, data]);
+  }, [procesando, puedeVer, cargar, data]);
 
   // 🖨️ Volver a imprimir la guía (la automática o una hecha a mano que guardó sus datos)
   const imprimirGuia = async (o) => {
@@ -190,7 +191,7 @@ export default function VentasWebPage({ isSuperUser }) {
   const t = data.totales;
   const ordenes = useMemo(() => data.ordenes || [], [data]);
 
-  if (!isSuperUser) return <Navigate to="/" replace />;
+  if (!puedeVer) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen adm-page vw-page">
@@ -420,6 +421,7 @@ export default function VentasWebPage({ isSuperUser }) {
                                 {accion === o._id ? "Facturando…" : o.factura?.estado === "error" ? "Reintentar factura" : "Facturar en Alegra"}
                               </button>
                             )}
+                            {isSuperUser && (
                             <button
                               type="button"
                               className={`vw-btn vw-trash ${confirmarBorrar === o._id ? "is-danger" : ""}`}
@@ -432,6 +434,7 @@ export default function VentasWebPage({ isSuperUser }) {
                                 ? (o.stock?.movimientos?.length ? "¿Borrar? Devuelve el stock" : "¿Seguro? Tocá de nuevo")
                                 : "Borrar"}
                             </button>
+                            )}
                             {(o.estado === "pendiente" || o.stock?.estado === "error") && (
                               <button type="button" className="vw-btn" disabled={accion === o._id} onClick={() => ejecutar(o, "verificar")}>
                                 <FaSyncAlt className={accion === o._id ? "vw-spin" : ""} /> {o.estado === "pendiente" ? "Verificar pago" : "Reintentar stock"}

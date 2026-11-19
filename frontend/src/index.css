@@ -4131,6 +4131,23 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .co-option-text strong { font-size: 14px; font-weight: 900; }
 .co-option-text small { font-size: 12px; color: #71717a; line-height: 1.3; }
 .co-option-price { font-size: 13px; font-weight: 900; white-space: nowrap; }
+
+/* 🛵 Día de entrega del mensajero (CheckoutPage) */
+.co-days { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.co-days-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+.co-days-list::-webkit-scrollbar { display: none; }
+.co-day {
+  flex: none; width: 64px; padding: 8px 0; border-radius: 14px; border: 1.5px solid #e4e4e7;
+  background: #fff !important; color: #000 !important; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  transition: border-color .15s, background-color .15s, color .15s;
+}
+.co-day:hover { transform: none !important; border-color: #000; }
+.co-day:focus { outline: none; }
+.co-day:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
+.co-day small { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #71717a; }
+.co-day strong { font-size: 20px; font-weight: 900; line-height: 1.1; }
+.co-day.is-active { background: #000 !important; color: #fff !important; border-color: #000; }
+.co-day.is-active small { color: #d4d4d8; }
 .co-reveal { overflow: hidden; }
 .co-pickup { display: flex; gap: 12px; padding: 14px; border-radius: 16px; background: #f4f4f5; }
 .co-pickup svg { flex: none; margin-top: 3px; color: #dc2626; }
