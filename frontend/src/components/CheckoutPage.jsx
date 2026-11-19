@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart } from "lucide-react";
 import {
-  FaArrowLeft, FaLock, FaTruck, FaStore, FaCreditCard, FaUser, FaMapMarkerAlt, FaCheck, FaShieldAlt, FaMotorcycle, FaChevronDown, FaWhatsapp, FaCheckCircle,
+  FaArrowLeft, FaLock, FaTruck, FaStore, FaCreditCard, FaUser, FaMapMarkerAlt, FaCheck, FaShieldAlt, FaMotorcycle, FaChevronDown, FaWhatsapp, FaCheckCircle, FaExternalLinkAlt,
 } from "react-icons/fa";
 import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart/useCart";
 import { toast as toastHOT } from "react-hot-toast";
@@ -566,7 +566,17 @@ export default function CheckoutPage({ products = [] }) {
                 </p>
               ) : (
                 <p className="co-secure">
-                  <FaShieldAlt /> Vas a pagar en la página segura de <b>Tilopay</b>. Nosotros nunca vemos los datos de tu tarjeta.
+                  <FaShieldAlt /> Vas a pagar en la página segura de{" "}
+                  <a
+                    className="co-secure-link"
+                    href="https://tilopay.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Conocé Tilopay (se abre en otra pestaña)"
+                  >
+                    Tilopay <FaExternalLinkAlt aria-hidden="true" />
+                  </a>
+                  . Nosotros nunca vemos los datos de tu tarjeta.
                 </p>
               )}
 

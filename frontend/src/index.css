@@ -4169,6 +4169,9 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .co-check-text strong { font-weight: 900; }
 .co-check-text small { color: #71717a; font-size: 12px; line-height: 1.4; }
 .co-secure svg { flex: none; margin-top: 2px; }
+.co-secure .co-secure-link { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; color: #166534; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.co-secure .co-secure-link:hover { color: #14532d; }
+.co-secure .co-secure-link svg { width: 10px; height: 10px; margin-top: 0; }
 
 /* Resumen */
 .co-summary { display: flex; flex-direction: column; gap: 12px; }
