@@ -55,7 +55,7 @@ function esAbonoTienda(v) {
   return ubi === "Ingreso / Abono";
 }
 
-async function ajustarStockPorUbicacion({
+export async function ajustarStockPorUbicacion({
   productId,
   itemNombre = "",
   talla,
@@ -212,7 +212,7 @@ async function ajustarStockPorUbicacion({
   }
 }
 
-async function obtenerMapaProductosAlegra(credentials) {
+export async function obtenerMapaProductosAlegra(credentials) {
   if (cacheItemsAlegra && Object.keys(cacheItemsAlegra).length > 0) {
     return cacheItemsAlegra;
   }
@@ -238,7 +238,7 @@ async function obtenerMapaProductosAlegra(credentials) {
   return cacheItemsAlegra || {};
 }
 
-function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
+export function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   const txt = limpiarTexto(nombreVenta);
   const parentesisMatches = [...txt.matchAll(/\(([^)]+)\)/g)].map(m => m[1].trim());
   const categoria = parentesisMatches.join(" ");

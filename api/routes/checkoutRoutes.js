@@ -1,11 +1,21 @@
 // routes/checkoutRoutes.js
 // 🛒 Rutas PÚBLICAS del checkout de la tienda online (el cliente no tiene sesión).
 // ⚠️ Todo lo que se agregue acá es público: limitar por IP y devolver solo lo mínimo.
-// Próximo paso: POST /api/checkout (crear orden + link de pago Tilopay; llaves solo en .env).
+import crypto from 'crypto';
 import express from 'express';
-import { rateLimit } from '../middleware/auth.js';
+import mongoose from 'mongoose';
+import { rateLimit, requireSuper } from '../middleware/auth.js';
+import Product from '../models/Product.js';
+import OrdenWeb, { siguienteNumeroOrdenWeb } from '../models/OrdenWeb.js';
+import { costoEnvio } from '../utils/coberturaMensajero.js';
+import { tilopayConfigurado, crearPago, ISO_PROVINCIA } from '../utils/tilopay.js';
+import { confirmarPago, rebajarStockOrden, facturarOrden } from '../utils/ordenesWeb.js';
+import { readFileSync } from 'fs';
 
 const router = express.Router();
+
+// 🗺️ Catálogo oficial provincias → cantones → distritos (copia de frontend/src/utils/crUbicaciones.json)
+const UBICACIONES = JSON.parse(readFileSync(new URL('../utils/crUbicaciones.json', import.meta.url), 'utf8'));
 
 // 🔍 Cache en memoria de cédulas consultadas (evita repetir llamadas al escribir/borrar)
 const CACHE_MS = 24 * 60 * 60 * 1000;
@@ -104,5 +114,269 @@ router.get(
     }
   }
 );
+
+/* ========================================================
+   💳 POST /api/checkout → crea la orden (pendiente) y devuelve { url } de Tilopay
+   El navegador manda solo QUÉ quiere (productos, tallas, cantidades, entrega);
+   precios, stock, envío y total se calculan acá desde la BD.
+   ======================================================== */
+const FRONT_POR_DEFECTO = 'https://chemasporter.com';
+const ORIGENES = ['https://chemasporter.com', 'https://www.chemasporter.com', 'https://chemasport-er.onrender.com'];
+const origenFront = (req) => {
+  const o = String(req.headers.origin || '');
+  return ORIGENES.includes(o) || /^http:\/\/localhost:\d+$/.test(o) ? o : FRONT_POR_DEFECTO;
+};
+
+const txt = (v, max = 200) => String(v ?? '').trim().slice(0, max);
+const stockDe = (p, talla) =>
+  ['tienda', 'stock', 'bodega'].reduce((s, k) => s + (parseInt(p?.[k]?.[talla] ?? 0, 10) || 0), 0);
+const precioDe = (p) => {
+  const precio = Number(p.price) || 0;
+  const oferta = Number(p.discountPrice) || 0;
+  return oferta > 0 && oferta < precio ? oferta : precio;
+};
+const ubicacionValida = (prov, cant, dist) => {
+  const p = UBICACIONES.find((x) => x.n === prov);
+  const c = p?.c.find((x) => x.n === cant);
+  return Boolean(c && c.d.includes(dist));
+};
+
+router.post(
+  '/',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: 'Demasiados intentos de pago. Probá en unos minutos.' }),
+  async (req, res) => {
+    try {
+      if (!tilopayConfigurado()) {
+        console.error('❌ Checkout: faltan TILOPAY_API_USER / TILOPAY_API_PASSWORD / TILOPAY_API_KEY');
+        return res.status(503).json({ error: 'El pago con tarjeta no está disponible en este momento. Probá por WhatsApp.' });
+      }
+      const { cliente = {}, entrega = {}, items = [], notas = '' } = req.body || {};
+
+      // 👤 Cliente
+      const c = {
+        cedula: txt(cliente.cedula, 20).replace(/\D/g, ''),
+        nombre: txt(cliente.nombre, 80),
+        apellidos: txt(cliente.apellidos, 80),
+        telefono: txt(cliente.telefono, 20).replace(/\D/g, ''),
+        correo: txt(cliente.correo, 120).toLowerCase(),
+      };
+      if (!/^\d{9,12}$/.test(c.cedula)) return res.status(400).json({ error: 'Cédula inválida.' });
+      if (!c.nombre || !c.apellidos) return res.status(400).json({ error: 'Faltan nombre o apellidos.' });
+      if (!/^[2-8]\d{7}$/.test(c.telefono)) return res.status(400).json({ error: 'Teléfono inválido.' });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.correo)) return res.status(400).json({ error: 'Correo inválido.' });
+
+      // 📍 Entrega
+      const e = {
+        tipo: txt(entrega.tipo, 20),
+        provincia: txt(entrega.provincia, 60),
+        canton: txt(entrega.canton, 60),
+        distrito: txt(entrega.distrito, 60),
+        senas: txt(entrega.senas, 400),
+      };
+      if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return res.status(400).json({ error: 'Ubicación inválida.' });
+      const envio = costoEnvio(e.tipo, e.provincia, e.canton, e.distrito);
+      if (envio === null) return res.status(400).json({ error: 'Esa forma de entrega no está disponible para tu ubicación.' });
+      if (e.tipo !== 'retiro' && e.senas.length < 10) return res.status(400).json({ error: 'Falta la dirección exacta.' });
+
+      // 👕 Productos: precio y stock desde la BD
+      if (!Array.isArray(items) || items.length === 0 || items.length > 30) return res.status(400).json({ error: 'El carrito está vacío.' });
+      const ids = [...new Set(items.map((i) => String(i?.productId || '')))];
+      if (ids.some((id) => !mongoose.isValidObjectId(id))) return res.status(400).json({ error: 'Producto inválido.' });
+      const productos = await Product.find({ _id: { $in: ids } }).lean();
+      const porId = new Map(productos.map((p) => [String(p._id), p]));
+
+      const lineas = [];
+      const pedidoPorTalla = new Map(); // productId|talla → cantidad total pedida (varias líneas con distinto dorsal)
+      for (const i of items) {
+        const p = porId.get(String(i.productId));
+        const talla = txt(i.talla, 10);
+        const cantidad = Math.trunc(Number(i.cantidad));
+        if (!p || p.hidden) return res.status(409).json({ error: 'Una camiseta del carrito ya no está disponible.' });
+        if (!talla || !Number.isFinite(cantidad) || cantidad < 1 || cantidad > 10) return res.status(400).json({ error: 'Cantidad inválida.' });
+        const k = `${p._id}|${talla}`;
+        pedidoPorTalla.set(k, (pedidoPorTalla.get(k) || 0) + cantidad);
+        if (pedidoPorTalla.get(k) > stockDe(p, talla)) {
+          return res.status(409).json({ error: `Ya no hay suficientes "${p.name}" en talla ${talla}. Revisá el carrito.` });
+        }
+        let dorsal;
+        if (i.dorsal && p.isNumerable) {
+          const nombre = txt(i.dorsal.name, 30);
+          const numero = txt(i.dorsal.number, 5);
+          const existe = (p.dorsalOptions || []).some(
+            (o) => String(o.name || '').trim().toUpperCase() === nombre.toUpperCase() && String(o.number || '').trim() === numero && Number(o.quantity) > 0
+          );
+          if (!existe) return res.status(409).json({ error: `El dorsal ${nombre} #${numero} ya no está disponible.` });
+          dorsal = { name: nombre, number: numero };
+        }
+        lineas.push({ productId: p._id, name: p.name, type: p.type, imageSrc: p.imageSrc, talla, dorsal, cantidad, precio: precioDe(p) });
+      }
+
+      const subtotal = lineas.reduce((s, l) => s + l.precio * l.cantidad, 0);
+      const total = subtotal + envio;
+      if (total <= 0) return res.status(400).json({ error: 'Total inválido.' });
+
+      // 🧾 Orden pendiente
+      const numero = await siguienteNumeroOrdenWeb();
+      const orderNumber = `CSW${String(numero).padStart(6, '0')}`;
+      const token = crypto.randomBytes(16).toString('hex');
+      const orden = await OrdenWeb.create({
+        numero, orderNumber, token, cliente: c,
+        entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
+        items: lineas, subtotal, envio, total, notas: txt(notas, 500),
+      });
+
+      // 💳 Link de pago (el cliente vuelve a /checkout/resultado con ?order=...&code=...)
+      const url = await crearPago({
+        orderNumber,
+        amount: total,
+        redirect: `${origenFront(req)}/checkout/resultado`,
+        cliente: c,
+        direccion: {
+          linea1: e.tipo === 'retiro' ? 'Retiro en tienda' : e.senas.slice(0, 100),
+          linea2: `${e.distrito}, ${e.canton}`,
+          ciudad: e.canton,
+          estadoISO: ISO_PROVINCIA[e.provincia] || 'CR-SJ',
+        },
+        returnData: Buffer.from(`${orderNumber}:${token}`).toString('base64'),
+      });
+
+      // token: solo lo recibe el navegador que creó la orden (respaldo si Tilopay no devuelve returnData)
+      res.json({ url, orderNumber: orden.orderNumber, token, total });
+    } catch (error) {
+      console.error('❌ Error creando el pago:', error.message, error.data || '');
+      res.status(502).json({ error: 'No pudimos conectar con la pasarela de pago. Probá de nuevo o pedí por WhatsApp.' });
+    }
+  }
+);
+
+/* ========================================================
+   🔎 GET /api/checkout/orden/:orderNumber?t=TOKEN
+   Lo llama /checkout/resultado al volver de Tilopay. Confirma el pago con consult
+   (no con los parámetros de la URL) y marca la orden como pagada una sola vez.
+   ======================================================== */
+router.get(
+  '/orden/:orderNumber',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 60, message: 'Demasiadas consultas. Probá en unos minutos.' }),
+  async (req, res) => {
+    try {
+      const orderNumber = txt(req.params.orderNumber, 20);
+      const token = txt(req.query.t, 64);
+      const orden = await OrdenWeb.findOne({ orderNumber });
+      if (!orden || !token || token.length !== orden.token.length || !crypto.timingSafeEqual(Buffer.from(token), Buffer.from(orden.token))) {
+        return res.status(404).json({ error: 'Orden no encontrada.' });
+      }
+
+      // 💳 Confirma con Tilopay; si se acaba de pagar → rebaja stock y factura en Alegra (todo de una vez)
+      const actual = (await confirmarPago(orden, req.app.get('io'))) || orden;
+      Object.assign(orden, { estado: actual.estado, tilopay: actual.tilopay });
+
+      res.json({
+        orderNumber: orden.orderNumber,
+        estado: orden.estado,
+        total: orden.total,
+        envio: orden.envio,
+        entrega: orden.entrega?.tipo,
+        nombre: orden.cliente?.nombre,
+        correo: orden.cliente?.correo,
+        items: orden.items.map((i) => ({ name: i.name, talla: i.talla, dorsal: i.dorsal, cantidad: i.cantidad, precio: i.precio })),
+        motivo: orden.estado !== 'pagada' ? orden.tilopay?.description || '' : '',
+      });
+    } catch (error) {
+      console.error('❌ Error verificando la orden:', error.message);
+      res.status(500).json({ error: 'No pudimos verificar el pago. Recargá la página en un momento.' });
+    }
+  }
+);
+
+/* ========================================================
+   👑 PANEL DE VENTAS WEB (solo súper usuario)
+   ======================================================== */
+const resumenOrden = (o) => ({
+  _id: o._id,
+  numero: o.numero,
+  orderNumber: o.orderNumber,
+  createdAt: o.createdAt,
+  pagadaAt: o.pagadaAt,
+  estado: o.estado,
+  cliente: o.cliente,
+  entrega: o.entrega,
+  items: o.items,
+  subtotal: o.subtotal,
+  envio: o.envio,
+  total: o.total,
+  notas: o.notas,
+  tilopay: o.tilopay,
+  stock: o.stock,
+  factura: o.factura,
+});
+
+// GET /api/checkout/admin/ordenes?estado=pagada|pendiente|todas&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto
+router.get('/admin/ordenes', requireSuper, async (req, res) => {
+  try {
+    const { estado = 'pagada', desde, hasta, q } = req.query;
+    const filtro = {};
+    if (estado === 'pagada' || estado === 'pendiente' || estado === 'rechazada') filtro.estado = estado;
+    const rango = {};
+    // Fechas en hora de Costa Rica (UTC-6)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(desde || '')) rango.$gte = new Date(`${desde}T00:00:00-06:00`);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(hasta || '')) rango.$lte = new Date(`${hasta}T23:59:59.999-06:00`);
+    if (Object.keys(rango).length) filtro.createdAt = rango;
+    const texto = txt(q, 60);
+    if (texto) {
+      const rx = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filtro.$or = [{ orderNumber: rx }, { 'cliente.nombre': rx }, { 'cliente.apellidos': rx }, { 'cliente.cedula': rx }, { 'cliente.telefono': rx }, { 'cliente.correo': rx }];
+    }
+    const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).limit(300).lean();
+
+    // Totales del rango (solo pagadas)
+    const pagadas = ordenes.filter((o) => o.estado === 'pagada');
+    const totales = {
+      ordenes: pagadas.length,
+      vendido: pagadas.reduce((s, o) => s + o.total, 0),
+      envios: pagadas.reduce((s, o) => s + o.envio, 0),
+      camisetas: pagadas.reduce((s, o) => s + o.items.reduce((a, i) => a + i.cantidad, 0), 0),
+      pendientesFactura: pagadas.filter((o) => o.factura?.estado !== 'lista').length,
+    };
+    res.json({ ordenes: ordenes.map(resumenOrden), totales });
+  } catch (error) {
+    console.error('❌ Listando órdenes web:', error);
+    res.status(500).json({ error: 'No se pudieron cargar las ventas web.' });
+  }
+});
+
+// POST /api/checkout/admin/ordenes/:id/verificar → vuelve a preguntar a Tilopay (y completa stock/factura si faltaba)
+router.post('/admin/ordenes/:id/verificar', requireSuper, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    let orden = await OrdenWeb.findById(req.params.id);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    const io = req.app.get('io');
+    if (orden.estado === 'pendiente') orden = await confirmarPago(orden, io);
+    if (orden.estado === 'pagada' && orden.stock?.estado !== 'listo' && orden.stock?.estado !== 'rebajando') {
+      if (orden.stock?.estado === 'error') await OrdenWeb.updateOne({ _id: orden._id }, { $unset: { 'stock.estado': 1 } });
+      orden = (await rebajarStockOrden(orden._id, io)) || orden;
+    }
+    res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
+  } catch (error) {
+    console.error('❌ Verificando orden web:', error.message);
+    res.status(502).json({ error: 'No se pudo consultar a Tilopay.' });
+  }
+});
+
+// POST /api/checkout/admin/ordenes/:id/facturar → reintenta la factura en Alegra si falló
+router.post('/admin/ordenes/:id/facturar', requireSuper, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const orden = await OrdenWeb.findById(req.params.id);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    if (orden.estado !== 'pagada') return res.status(400).json({ error: 'Solo se facturan órdenes pagadas.' });
+    if (orden.factura?.estado === 'lista') return res.status(400).json({ error: 'Esta orden ya está facturada.' });
+    await facturarOrden(orden._id);
+    res.json(resumenOrden(await OrdenWeb.findById(orden._id).lean()));
+  } catch (error) {
+    console.error('❌ Refacturando orden web:', error.message);
+    res.status(500).json({ error: 'No se pudo facturar.' });
+  }
+});
 
 export default router;
