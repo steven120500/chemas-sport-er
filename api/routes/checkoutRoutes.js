@@ -258,6 +258,113 @@ router.put('/reservas', limiteReservas, async (req, res) => {
   }
 });
 
+// POST /api/checkout/apartar { carritoId, items: [{ productId, talla, cantidad }] }
+// 🛒→💳 Se llama al ENTRAR AL CHECKOUT (el carrito por sí solo no aparta nada: puede tener camisetas de hace días).
+// Revisa que haya de TODO lo del carrito (stock real − lo apartado por otros clientes):
+//  - Si falta algo → 409 { faltantes: [{ productId, talla, name, pedidas, libres }] } y no se aparta nada nuevo.
+//  - Si hay de todo → deja apartado exactamente el carrito y arranca/sigue el reloj (10 min + 2 por camiseta extra, tope 30).
+// items vacío = soltar todo lo apartado del carrito (vaciar carrito / pedido por WhatsApp).
+router.post('/apartar', limiteReservas, async (req, res) => {
+  try {
+    const { carritoId } = req.body || {};
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!carritoValido(carritoId)) return res.status(400).json({ error: 'Carrito inválido.' });
+    if (items.length > 30) return res.status(400).json({ error: 'Demasiadas camisetas en el carrito.' });
+
+    // Agrupar por producto + talla (varias líneas con distinto dorsal comparten la misma talla)
+    const pedido = new Map(); // "productId|talla" → cantidad
+    for (const i of items) {
+      const productId = String(i?.productId || '');
+      const talla = txt(i?.talla, 10);
+      const cantidad = Math.trunc(Number(i?.cantidad));
+      if (!mongoose.isValidObjectId(productId) || !talla) return res.status(400).json({ error: 'Producto inválido.' });
+      if (!Number.isFinite(cantidad) || cantidad < 1) return res.status(400).json({ error: 'Cantidad inválida.' });
+      const k = `${productId}|${talla}`;
+      pedido.set(k, (pedido.get(k) || 0) + cantidad);
+    }
+    if ([...pedido.values()].some((n) => n > 30)) return res.status(400).json({ error: 'Cantidad inválida.' });
+
+    const io = req.app.get('io');
+    const ahora = new Date();
+    const delCarrito = { carritoId, orderNumber: { $in: [null, ''] } }; // lo amarrado a un pago en curso no se toca
+    const previas = await Reserva.find({ ...delCarrito, expiresAt: { $gt: ahora } }).lean();
+    const ids = [...new Set([...[...pedido.keys()].map((k) => k.split('|')[0]), ...previas.map((r) => String(r.productId))])];
+
+    // 🧹 Soltar lo que ya no está en el carrito
+    const sobran = previas.filter((r) => !pedido.has(`${r.productId}|${r.talla}`));
+    if (sobran.length) await Reserva.deleteMany({ _id: { $in: sobran.map((r) => r._id) } });
+    await Reserva.deleteMany({ ...delCarrito, expiresAt: { $lte: ahora } }); // vencidas de este carrito
+    if (!pedido.size) {
+      await emitirApartadas(io, ids);
+      return res.json({ ok: true, expiresAt: null, ahora: Date.now() });
+    }
+
+    // 🔍 ¿Hay de todo?
+    const productos = await Product.find({ _id: { $in: [...pedido.keys()].map((k) => k.split('|')[0]) } })
+      .select('name type hidden tienda stock bodega').lean();
+    const porId = new Map(productos.map((p) => [String(p._id), p]));
+    const deOtros = await apartadas({ productIds: [...porId.keys()], excluirCarrito: carritoId });
+    const faltantes = [];
+    for (const [k, cant] of pedido) {
+      const [productId, talla] = k.split('|');
+      const p = porId.get(productId);
+      const libres = p && !p.hidden ? Math.max(0, stockDe(p, talla) - (deOtros[productId]?.[talla] || 0)) : 0;
+      if (cant > libres) {
+        faltantes.push({
+          productId, talla, pedidas: cant, libres,
+          name: p ? `${p.name}${p.type ? ` (${p.type})` : ''}` : 'Camiseta que ya no está en la tienda',
+          apartadaPorOtro: Boolean(p && (deOtros[productId]?.[talla] || 0) > 0),
+        });
+      }
+    }
+    const responderFaltantes = async (lista) => {
+      await emitirApartadas(io, ids);
+      const nombres = lista.map((f) => `${f.name} talla ${f.talla === 'U' ? 'única' : f.talla}`).join(', ');
+      return res.status(409).json({ error: `Ya no hay suficiente stock de: ${nombres}.`, faltantes: lista });
+    };
+    if (faltantes.length) return responderFaltantes(faltantes);
+
+    // ⏳ Reloj: si ya corría (volvió al checkout) suma 2 min por camiseta nueva; si no, arranca en 10 + 2 por extra
+    const MIN = 60 * 1000;
+    const unidades = [...pedido.values()].reduce((s, n) => s + n, 0);
+    const vivas = previas.filter((r) => pedido.has(`${r.productId}|${r.talla}`));
+    const antes = vivas.reduce((s, r) => s + r.cantidad, 0);
+    const ultima = vivas.reduce((m, r) => (!m || r.expiresAt > m ? r.expiresAt : m), null);
+    let expiresAt = ultima
+      ? new Date(new Date(ultima).getTime() + Math.max(0, unidades - antes) * MINUTOS_POR_EXTRA * MIN)
+      : new Date(ahora.getTime() + (MINUTOS_APARTADO + (unidades - 1) * MINUTOS_POR_EXTRA) * MIN);
+    const tope = new Date(ahora.getTime() + MINUTOS_MAX_APARTADO * MIN);
+    if (expiresAt > tope) expiresAt = tope;
+
+    for (const [k, cantidad] of pedido) {
+      const [productId, talla] = k.split('|');
+      await Reserva.updateOne({ carritoId, productId, talla }, { $set: { cantidad, expiresAt }, $unset: { orderNumber: 1 } }, { upsert: true });
+    }
+
+    // 🏁 Dos clientes al mismo tiempo: se vuelve a contar; lo que se pasó vuelve a como estaba
+    const totales = await apartadas({ productIds: [...porId.keys()] });
+    const pasadas = [];
+    for (const [k, cant] of pedido) {
+      const [productId, talla] = k.split('|');
+      const stock = stockDe(porId.get(productId), talla);
+      const total = totales[productId]?.[talla] || 0;
+      if (total <= stock) continue;
+      const previa = vivas.find((r) => String(r.productId) === productId && r.talla === talla);
+      if (previa) await Reserva.updateOne({ _id: previa._id }, { $set: { cantidad: previa.cantidad, expiresAt: previa.expiresAt } });
+      else await Reserva.deleteOne({ carritoId, productId, talla });
+      const p = porId.get(productId);
+      pasadas.push({ productId, talla, pedidas: cant, libres: Math.max(0, cant - (total - stock)), name: `${p.name}${p.type ? ` (${p.type})` : ''}`, apartadaPorOtro: true });
+    }
+    if (pasadas.length) return responderFaltantes(pasadas);
+
+    await emitirApartadas(io, ids);
+    res.json({ ok: true, expiresAt, ahora: Date.now() });
+  } catch (error) {
+    console.error('❌ Apartando carrito:', error.message);
+    res.status(500).json({ error: 'No se pudo revisar el stock. Probá de nuevo.' });
+  }
+});
+
 /* ========================================================
    🧮 Arma el pedido desde lo que manda el navegador (precios y stock desde la BD).
    estricto = false (pedido por WhatsApp): se registra igual aunque falte stock o un dorsal,
@@ -511,10 +618,12 @@ const resumenOrden = (o) => ({
 });
 
 // GET /api/checkout/admin/ordenes?estado=pagada|pendiente&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto&page=1
-// 📄 De 10 en 10 (page). Los totales de arriba son SIEMPRE del mes actual (hora CR): al cambiar de mes arrancan en 0.
+// 📄 De 10 en 10 (page). Los totales de arriba son del mes `mes` (YYYY-MM, hora CR); sin él, del mes actual
+// (al cambiar de mes arrancan en 0). Se pueden ver meses pasados, nunca futuros.
 const POR_PAGINA = 10;
-const mesActualCR = () => {
-  const ym = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' }).slice(0, 7); // YYYY-MM
+const mesCR = (pedido) => {
+  const actual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' }).slice(0, 7); // YYYY-MM
+  const ym = /^\d{4}-(0[1-9]|1[0-2])$/.test(pedido || '') && pedido <= actual ? pedido : actual;
   const [y, m] = ym.split('-').map(Number);
   const sig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
   return { ym, desde: new Date(`${ym}-01T00:00:00-06:00`), hasta: new Date(`${sig}-01T00:00:00-06:00`) };
@@ -540,8 +649,8 @@ router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
     const page = Math.min(paginas, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
     const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).skip((page - 1) * POR_PAGINA).limit(POR_PAGINA).lean();
 
-    // 📊 Totales del MES ACTUAL (solo pagadas; los pagos de prueba de Tilopay no cuentan)
-    const mes = mesActualCR();
+    // 📊 Totales del mes escogido (solo pagadas; los pagos de prueba de Tilopay no cuentan)
+    const mes = mesCR(req.query.mes);
     const delMes = await OrdenWeb.find({ estado: 'pagada', createdAt: { $gte: mes.desde, $lt: mes.hasta } })
       .select('total envio items.cantidad factura.estado tilopay.environment').lean();
     const pagadas = delMes.filter((o) => String(o.tilopay?.environment || '').toLowerCase() !== 'test');

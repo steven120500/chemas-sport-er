@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart } from "lucide-react";
@@ -100,7 +100,9 @@ const validar = (f) => {
 export default function CheckoutPage({ products = [] }) {
   const navigate = useNavigate();
   const [diaEntrega, setDiaEntrega] = useState(""); // 🛵 YYYY-MM-DD escogido para el mensajero ("" = el primero)
-  const { items, abrir: abrirCarrito, otrasApartadas, proximoVence, carritoId, vaciar } = useCart();
+  const { items, abrir: abrirCarrito, otrasApartadas, proximoVence, carritoId, vaciar, apartarCarrito } = useCart();
+  // 🔍 Al entrar se revisa que haya de todo y se aparta el carrito (el carrito solo no aparta nada)
+  const [revision, setRevision] = useState({ estado: "revisando", faltantes: [] }); // revisando | ok | faltan | error
   const [form, setForm] = useState(leerBorrador);
   const [errores, setErrores] = useState({});
   const [intentado, setIntentado] = useState(false);
@@ -159,6 +161,23 @@ export default function CheckoutPage({ products = [] }) {
     };
   }, [cedulaDigitos]);
 
+  // 🔍 Revisar stock + apartar: al entrar y cada vez que cambia el carrito (cantidades / líneas)
+  const firmaCarrito = items.map((l) => `${l.productId}|${l.talla}|${l.cantidad}`).sort().join(",");
+  const revisar = useCallback(async () => {
+    if (!firmaCarrito) return;
+    setRevision((r) => ({ ...r, estado: "revisando" }));
+    const r = await apartarCarrito();
+    if (r.ok) setRevision({ estado: "ok", faltantes: [] });
+    else if (r.faltantes) setRevision({ estado: "faltan", faltantes: r.faltantes });
+    else setRevision({ estado: "error", faltantes: [] }); // sin conexión: al pagar el servidor vuelve a revisar
+  }, [apartarCarrito, firmaCarrito]);
+  useEffect(() => {
+    const t = setTimeout(revisar, 300);
+    return () => clearTimeout(t);
+  }, [revisar]);
+  // ⏳ Se acabó el reloj del apartado (las camisetas siguen en el carrito)
+  const apartadoVencido = revision.estado === "ok" && !proximoVence && items.length > 0;
+
   // Revalidar en vivo solo después del primer intento
   useEffect(() => {
     if (intentado) setErrores(validar(form));
@@ -166,7 +185,8 @@ export default function CheckoutPage({ products = [] }) {
 
   const lineas = useMemo(() => lineasConStock(items, products, otrasApartadas), [items, products, otrasApartadas]);
   const validas = lineas.filter((l) => !l.agotado);
-  const hayProblemas = lineas.some((l) => l.agotado || l.excede);
+  const hayProblemas = lineas.some((l) => l.agotado || l.excede) || revision.estado === "faltan";
+  const bloqueado = hayProblemas || revision.estado === "revisando";
   const unidades = validas.reduce((s, l) => s + l.cantidad, 0);
   const subtotal = validas.reduce((s, l) => s + l.cantidad * (Number(l.precio) || 0), 0);
   const ahorro = validas.reduce((s, l) => s + (l.precioAntes > l.precio ? (l.precioAntes - l.precio) * l.cantidad : 0), 0);
@@ -209,7 +229,7 @@ export default function CheckoutPage({ products = [] }) {
       primero?.focus({ preventScroll: true });
       return;
     }
-    if (hayProblemas || unidades === 0) return;
+    if (bloqueado || unidades === 0) return;
 
     // 💬 Pago por WhatsApp: arma el pedido completo y abre el chat de la tienda
     if (form.pago === "whatsapp") {
@@ -247,6 +267,7 @@ export default function CheckoutPage({ products = [] }) {
       window.location.href = data.url; // 👉 página segura de Tilopay
     } catch (err) {
       setEnviando(false);
+      revisar(); // 🔍 por si se agotó algo: muestra cuál
       toastHOT.error(err.message || "No pudimos iniciar el pago.", { duration: 6000, style: { borderRadius: "12px", background: "#000", color: "#fff" } });
     }
   };
@@ -636,7 +657,40 @@ export default function CheckoutPage({ products = [] }) {
 
               <button type="button" className="co-edit" onClick={abrirCarrito}>Editar carrito</button>
 
-              {!porWhatsapp && <ApartadoAviso venceAt={proximoVence} className="is-checkout" />}
+              {/* 🔍 Revisión de stock al entrar al checkout */}
+              {revision.estado === "revisando" && <p className="co-revision">Revisando que haya de todo…</p>}
+              {revision.estado === "faltan" && (
+                <div className="co-faltan" role="alert">
+                  <strong>Ya no hay suficiente de:</strong>
+                  <ul>
+                    {revision.faltantes.map((f) => (
+                      <li key={`${f.productId}|${f.talla}`}>
+                        <b>{f.name}</b> · talla {f.talla === "U" ? "única" : f.talla} —{" "}
+                        {f.libres > 0
+                          ? `quedan ${f.libres} (pediste ${f.pedidas})`
+                          : f.apartadaPorOtro
+                            ? "otro cliente la tiene apartada"
+                            : "se agotó"}
+                      </li>
+                    ))}
+                  </ul>
+                  <small>Quitala o bajá la cantidad en el carrito para seguir.</small>
+                  <div className="co-faltan-acc">
+                    <button type="button" onClick={abrirCarrito}>Editar carrito</button>
+                    <button type="button" onClick={revisar}>Revisar de nuevo</button>
+                  </div>
+                </div>
+              )}
+              {!porWhatsapp && revision.estado === "ok" && <ApartadoAviso venceAt={proximoVence} className="is-checkout" />}
+              {apartadoVencido && (
+                <div className="co-faltan is-vencido" role="status">
+                  <strong>Se acabó el tiempo de apartado.</strong>
+                  <small>Tus camisetas siguen en el carrito, pero ya no están apartadas.</small>
+                  <div className="co-faltan-acc">
+                    <button type="button" onClick={revisar}>Apartar de nuevo</button>
+                  </div>
+                </div>
+              )}
 
               <div className="co-totals">
                 <div><span>Subtotal</span><span>{colones(subtotal)}</span></div>
@@ -648,9 +702,9 @@ export default function CheckoutPage({ products = [] }) {
                 <div className="is-total"><span>Total</span><span>{colones(total)}</span></div>
               </div>
 
-              {hayProblemas && <p className="co-warn">Hay camisetas agotadas o sin suficiente stock. Editá el carrito para continuar.</p>}
+              {hayProblemas && revision.estado !== "faltan" && <p className="co-warn">Hay camisetas agotadas o sin suficiente stock. Editá el carrito para continuar.</p>}
 
-              <button type="submit" className={`co-btn co-pay ${porWhatsapp ? "is-wa" : "is-dark"}`} disabled={hayProblemas || unidades === 0 || enviando}>
+              <button type="submit" className={`co-btn co-pay ${porWhatsapp ? "is-wa" : "is-dark"}`} disabled={bloqueado || unidades === 0 || enviando}>
                 {porWhatsapp ? <><FaWhatsapp /> Enviar pedido por WhatsApp</> : enviando ? <><span className="co-btn-spin" /> Conectando con Tilopay…</> : <><FaLock /> Pagar {colones(total)}</>}
               </button>
               <p className="co-legal">
@@ -667,7 +721,7 @@ export default function CheckoutPage({ products = [] }) {
           <small>Total</small>
           <strong>{colones(total)}</strong>
         </div>
-        <button type="button" className={`co-btn ${porWhatsapp ? "is-wa" : "is-dark"}`} onClick={pagar} disabled={hayProblemas || unidades === 0 || enviando}>
+        <button type="button" className={`co-btn ${porWhatsapp ? "is-wa" : "is-dark"}`} onClick={pagar} disabled={bloqueado || unidades === 0 || enviando}>
           {porWhatsapp ? <><FaWhatsapp /> Enviar por WhatsApp</> : enviando ? <><span className="co-btn-spin" /> Conectando…</> : <><FaLock /> Pagar</>}
         </button>
       </div>

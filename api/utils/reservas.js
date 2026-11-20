@@ -1,5 +1,5 @@
 // utils/reservas.js
-// ⏳ Apartado de camisetas del carrito (tienda online).
+// ⏳ Apartado de camisetas de la tienda online. Arranca al ENTRAR AL CHECKOUT (POST /api/checkout/apartar), no al agregar al carrito.
 //  - Un solo reloj por carrito: la primera camiseta aparta MINUTOS_APARTADO (10) y cada extra suma MINUTOS_POR_EXTRA (2),
 //    hasta MINUTOS_MAX_APARTADO. Todas las reservas del carrito vencen juntas. Otro cliente ve esa talla con una menos.
 //  - Al tocar "Pagar" las reservas del carrito se amarran a la orden y se alargan MINUTOS_PAGO (lo que dura Tilopay).

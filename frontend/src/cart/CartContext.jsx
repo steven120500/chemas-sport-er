@@ -7,10 +7,11 @@ import { API_BASE } from "../authFetch";
 // Cada línea = producto + talla + dorsal. La misma camiseta en otra talla o con otro dorsal es otra línea.
 // ⚠️ El precio guardado es solo referencia: al pagar (Tilopay) el backend lo recalcula desde la BD.
 //
-// ⏳ APARTADO: al agregar una camiseta se aparta en el servidor (PUT /api/checkout/reservas).
-// Un solo reloj por carrito: la primera da 10 min y cada camiseta extra le suma 2 min (tope 30).
-// Mientras tanto ningún otro cliente puede llevarse esa unidad. Al vencer, el carrito se libera solo.
-// Todas las líneas del mismo producto+talla comparten una sola reserva (con la suma de las cantidades).
+// ⏳ APARTADO: el carrito por sí solo NO aparta nada (puede tener camisetas de hace días y no le resta a nadie).
+// Al ENTRAR AL CHECKOUT se llama apartarCarrito() → POST /api/checkout/apartar: revisa que haya de todo
+// (si falta algo devuelve cuáles) y aparta el carrito entero con un solo reloj: 10 min + 2 por camiseta extra (tope 30).
+// Al vencer, las camisetas siguen en el carrito pero ya no están apartadas (hay que volver a revisar).
+// Si algo se agotó mientras tanto, el carrito lo marca "Se agotó" con el stock en vivo (lineasConStock).
 
 const STORAGE_KEY = "chemasport_carrito";
 const CARRITO_ID_KEY = "chemasport_carrito_id";
@@ -57,6 +58,28 @@ const nombreTalla = (t) => (t === "U" ? "única" : t);
 const aLocal = (expiresAt, ahoraServidor) =>
   Date.now() + (new Date(expiresAt).getTime() - (Number(ahoraServidor) || Date.now()));
 
+// 🛒→💳 Revisa y aparta todo el carrito (items vacío = soltar todo)
+async function apartarTodoEnServidor(carritoId, items) {
+  const grupos = new Map();
+  for (const l of items) {
+    const k = grupoDe(l.productId, l.talla);
+    grupos.set(k, { productId: l.productId, talla: l.talla, cantidad: (grupos.get(k)?.cantidad || 0) + l.cantidad });
+  }
+  const r = await fetch(`${API_BASE}/api/checkout/apartar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ carritoId, items: [...grupos.values()] }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.error || "No se pudo revisar el stock.");
+    err.faltantes = Array.isArray(data.faltantes) ? data.faltantes : null;
+    err.status = r.status;
+    throw err;
+  }
+  return data;
+}
+
 async function apartarEnServidor(carritoId, productId, talla, cantidad) {
   const r = await fetch(`${API_BASE}/api/checkout/reservas`, {
     method: "PUT",
@@ -97,11 +120,6 @@ export function CartProvider({ children }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Pone la misma hora de vencimiento a todo el carrito (el servidor lleva un solo reloj por carrito)
-  const ponerVence = useCallback((venceAt) => {
-    setItems((prev) => prev.map((l) => ({ ...l, venceAt })));
-  }, []);
-
   // 🌐 Al abrir la página: qué reservas siguen vivas en el servidor (las vencidas salen del carrito)
   useEffect(() => {
     let vivo = true;
@@ -116,16 +134,9 @@ export function CartProvider({ children }) {
         if (!rRes.ok) return; // sin conexión: no se toca el carrito
         const { reservas = [], ahora: ahoraServidor } = await rRes.json();
         if (!vivo) return;
+        // Las camisetas sin apartado siguen en el carrito (solo dejan de estar apartadas)
         const vivas = new Map(reservas.map((r) => [grupoDe(String(r.productId), r.talla), aLocal(r.expiresAt, ahoraServidor)]));
-        const vencidas = itemsRef.current.filter((l) => !vivas.has(grupoDe(l.productId, l.talla)));
-        setItems((prev) =>
-          prev
-            .filter((l) => vivas.has(grupoDe(l.productId, l.talla)))
-            .map((l) => ({ ...l, venceAt: vivas.get(grupoDe(l.productId, l.talla)) }))
-        );
-        if (vencidas.length) {
-          toastHOT(`⏳ Se acabó el tiempo de apartado: liberamos ${vencidas.length === 1 ? vencidas[0].name : `${vencidas.length} camisetas`} de tu carrito.`, { duration: 6000, style: ESTILO_TOAST });
-        }
+        setItems((prev) => prev.map((l) => ({ ...l, venceAt: vivas.get(grupoDe(l.productId, l.talla)) || null })));
       } catch {
         /* sin conexión: se deja como está */
       }
@@ -133,7 +144,7 @@ export function CartProvider({ children }) {
     return () => { vivo = false; };
   }, [carritoId]);
 
-  // ⏱️ Cada segundo mientras haya algo apartado: lo vencido sale del carrito.
+  // ⏱️ Cada segundo mientras haya algo apartado: lo vencido deja de estar apartado (sigue en el carrito).
   // (El contador que se ve en pantalla usa useCuentaAtras, así no se repinta toda la app cada segundo)
   const hayApartadas = items.some((l) => l.venceAt);
   useEffect(() => {
@@ -142,9 +153,8 @@ export function CartProvider({ children }) {
       const n = Date.now();
       const vencidas = itemsRef.current.filter((l) => l.venceAt && l.venceAt <= n);
       if (!vencidas.length) return;
-      setItems((prev) => prev.filter((l) => !(l.venceAt && l.venceAt <= n)));
-      const nombres = [...new Set(vencidas.map((l) => `${l.name} (talla ${nombreTalla(l.talla)})`))];
-      toastHOT(`⏳ Se acabó el tiempo de apartado: liberamos ${nombres.join(", ")}.`, { duration: 7000, style: ESTILO_TOAST });
+      setItems((prev) => prev.map((l) => (l.venceAt && l.venceAt <= n ? { ...l, venceAt: null } : l)));
+      toastHOT("⏳ Se acabó el tiempo de apartado. Tus camisetas siguen en el carrito, pero ya no están apartadas.", { duration: 7000, style: ESTILO_TOAST });
     }, 1000);
     return () => clearInterval(t);
   }, [hayApartadas]);
@@ -215,9 +225,7 @@ export function CartProvider({ children }) {
     [apartadasTodas, items]
   );
 
-  const avisarError = (err) => toastHOT.error(err.message, { duration: 6000, style: ESTILO_TOAST });
-
-  /** Agrega y aparta. Devuelve true si se pudo. */
+  /** Agrega al carrito (no aparta: eso pasa al entrar al checkout). Devuelve true si se pudo. */
   const agregar = useCallback(
     async ({ productId, name, type, image, talla, dorsal = null, precio, precioAntes = 0, cantidad = 1 }) => {
       productId = String(productId);
@@ -229,23 +237,15 @@ export function CartProvider({ children }) {
         toastHOT.error(`Máximo ${MAX_POR_LINEA} por camiseta.`, { style: ESTILO_TOAST });
         return false;
       }
-      try {
-        const r = await apartarEnServidor(carritoId, productId, talla, totalGrupo(actual, productId, talla) + suma);
-        const venceAt = aLocal(r.expiresAt, r.ahora);
-        setItems((prev) => {
-          const existe = prev.find((l) => l.key === key);
-          const nuevas = existe
-            ? prev.map((l) => (l.key === key ? { ...l, cantidad: l.cantidad + suma, precio, precioAntes } : l))
-            : [...prev, { key, productId, name, type, image, talla, dorsal, precio, precioAntes, cantidad: suma }];
-          return nuevas.map((l) => ({ ...l, venceAt })); // 🔗 un solo reloj para todo el carrito
-        });
-        return true;
-      } catch (err) {
-        avisarError(err);
-        return false;
-      }
+      setItems((prev) => {
+        const existe = prev.find((l) => l.key === key);
+        return existe
+          ? prev.map((l) => (l.key === key ? { ...l, cantidad: l.cantidad + suma, precio, precioAntes } : l))
+          : [...prev, { key, productId, name, type, image, talla, dorsal, precio, precioAntes, cantidad: suma, venceAt: null }];
+      });
+      return true;
     },
-    [carritoId]
+    []
   );
 
   const cambiarCantidad = useCallback(
@@ -256,31 +256,42 @@ export function CartProvider({ children }) {
       const nueva = Math.max(0, Math.min(MAX_POR_LINEA, cantidad));
       const total = totalGrupo(actual, linea.productId, linea.talla) - linea.cantidad + nueva;
 
-      if (nueva > linea.cantidad) {
-        // ➕ Primero se aparta; si no hay, no se suma
-        try {
-          const r = await apartarEnServidor(carritoId, linea.productId, linea.talla, total);
-          setItems((prev) => prev.map((l) => (l.key === key ? { ...l, cantidad: nueva } : l)));
-          ponerVence(aLocal(r.expiresAt, r.ahora));
-        } catch (err) {
-          avisarError(err);
-        }
-        return;
-      }
-      // ➖ Se baja de una y se suelta en el servidor
+      // ➕ Sumar no aparta (el checkout vuelve a revisar y apartar). ➖ Bajar suelta en el servidor si estaba apartada.
       setItems((prev) => (nueva <= 0 ? prev.filter((l) => l.key !== key) : prev.map((l) => (l.key === key ? { ...l, cantidad: nueva } : l))));
-      apartarEnServidor(carritoId, linea.productId, linea.talla, total).catch(() => {});
+      if (nueva < linea.cantidad && linea.venceAt) apartarEnServidor(carritoId, linea.productId, linea.talla, total).catch(() => {});
     },
-    [carritoId, ponerVence]
+    [carritoId]
   );
+
+  /**
+   * 🛒→💳 Al entrar al checkout: revisa que haya de todo y aparta el carrito entero.
+   * Devuelve { ok: true } | { ok: false, faltantes: [...] } (falta stock) | { ok: false, error } (sin conexión, etc.)
+   */
+  const apartarCarrito = useCallback(async () => {
+    const actual = itemsRef.current;
+    if (!actual.length) return { ok: true };
+    try {
+      const r = await apartarTodoEnServidor(carritoId, actual);
+      const venceAt = r.expiresAt ? aLocal(r.expiresAt, r.ahora) : null;
+      // Solo las líneas que se mandaron (si cambió el carrito mientras tanto, se vuelve a llamar)
+      const mandadas = new Set(actual.map((l) => grupoDe(l.productId, l.talla)));
+      setItems((prev) => prev.map((l) => (mandadas.has(grupoDe(l.productId, l.talla)) ? { ...l, venceAt } : l)));
+      return { ok: true };
+    } catch (err) {
+      if (err.faltantes) {
+        setItems((prev) => prev.map((l) => ({ ...l, venceAt: null })));
+        return { ok: false, faltantes: err.faltantes, error: err.message };
+      }
+      return { ok: false, error: err.message };
+    }
+  }, [carritoId]);
 
   const quitar = useCallback((key) => cambiarCantidad(key, 0), [cambiarCantidad]);
 
   // Vacía y suelta todo (después de pagar el servidor ya las soltó: no pasa nada)
   const vaciar = useCallback(() => {
-    const grupos = new Map(itemsRef.current.map((l) => [grupoDe(l.productId, l.talla), l]));
     setItems([]);
-    for (const l of grupos.values()) apartarEnServidor(carritoId, l.productId, l.talla, 0).catch(() => {});
+    apartarTodoEnServidor(carritoId, []).catch(() => {});
   }, [carritoId]);
 
   const value = useMemo(() => {
@@ -298,13 +309,14 @@ export function CartProvider({ children }) {
       abrir: () => setOpen(true),
       cerrar: () => setOpen(false),
       agregar,
+      apartarCarrito,
       cambiarCantidad,
       quitar,
       vaciar,
       otrasApartadas,
       MAX_POR_LINEA,
     };
-  }, [items, open, carritoId, agregar, cambiarCantidad, quitar, vaciar, otrasApartadas]);
+  }, [items, open, carritoId, agregar, apartarCarrito, cambiarCantidad, quitar, vaciar, otrasApartadas]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

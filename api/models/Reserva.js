@@ -1,5 +1,5 @@
 // models/Reserva.js
-// ⏳ Camisetas apartadas en el carrito de la tienda online (10 min desde que se agregan).
+// ⏳ Camisetas apartadas de la tienda online (desde que el cliente entra al checkout: 10 min + 2 por extra).
 // Mientras la reserva está viva, esa unidad no se le ofrece a otro cliente (el inventario real NO se toca:
 // se rebaja recién cuando Tilopay confirma el pago). Ver utils/reservas.js.
 import mongoose from 'mongoose';

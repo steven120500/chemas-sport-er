@@ -993,8 +993,12 @@ export default function ProductScreen({
                     return;
                   }
                   if (agregando) return;
+                  if (!esPersonal && getDisponibleBySize(selectedSize) <= 0) {
+                    toastHOT.error("Se agotó esta talla.", { style: { borderRadius: '12px', background: '#000', color: '#fff' } });
+                    return;
+                  }
                   setAgregando(true);
-                  // ⏳ Se aparta en el servidor por 10 min; si otro cliente ya se la llevó, avisa y no la agrega
+                  // 🛒 Solo se agrega al carrito: se aparta (y se revisa el stock de todo) al entrar al checkout
                   const ok = await agregarAlCarrito({
                     productId: currentProductId,
                     name: viewProduct?.name || "Producto",
@@ -1015,7 +1019,7 @@ export default function ProductScreen({
                 transition={{ duration: 0.4 }}
               >
                 <ShoppingCart strokeWidth={2.4} />
-                <span>{agregando ? "Apartando…" : "Agregar al carrito"}</span>
+                <span>{agregando ? "Agregando…" : "Agregar al carrito"}</span>
               </motion.button>
 
               {/* Comprar */}

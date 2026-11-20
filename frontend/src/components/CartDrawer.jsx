@@ -5,12 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes, FaMinus, FaPlus, FaTrashAlt, FaShoppingBag, FaLock, FaWhatsapp, FaTruck } from "react-icons/fa";
 import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart/useCart";
 import { ShoppingCart } from "lucide-react";
-import { ApartadoAviso, ApartadoChip } from "./ApartadoReloj";
 
 // 🛒 Panel lateral del carrito. ⚠️ Estilos en index.css (sección "CARRITO", clases ct-*).
 
 export default function CartDrawer({ products = [] }) {
-  const { items, open, cerrar, cambiarCantidad, quitar, MAX_POR_LINEA, otrasApartadas, proximoVence, vaciar } = useCart();
+  const { items, open, cerrar, cambiarCantidad, quitar, MAX_POR_LINEA, otrasApartadas, vaciar } = useCart();
   const navigate = useNavigate();
 
   // Bloquear scroll del fondo + Escape
@@ -120,8 +119,8 @@ export default function CartDrawer({ products = [] }) {
               </div>
             ) : (
               <>
-                {/* ⏳ Apartado de 10 min */}
-                <ApartadoAviso venceAt={proximoVence} />
+                {/* ⏳ El carrito no aparta: se revisa el stock y se aparta al pasar a pagar */}
+                <p className="ct-nota">Las camisetas se apartan cuando pasás a pagar. Mientras tanto pueden agotarse.</p>
 
                 {/* ---- Líneas ---- */}
                 <ul className="ct-list">
@@ -146,7 +145,6 @@ export default function CartDrawer({ products = [] }) {
                           <div className="ct-meta">
                             <span className="ct-chip">Talla {l.talla === "U" ? "única" : l.talla}</span>
                             {l.dorsal && <span className="ct-chip is-dorsal">{textoDorsal(l.dorsal)}</span>}
-                            <ApartadoChip venceAt={l.venceAt} />
                           </div>
 
                           {l.agotado && <p className="ct-warn">Se agotó esta talla</p>}

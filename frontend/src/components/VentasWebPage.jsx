@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { toast as toastHOT } from "react-hot-toast";
 import {
-  FaSearch, FaSyncAlt, FaFilePdf, FaWhatsapp, FaMotorcycle, FaTruck, FaStore, FaChevronDown,
+  FaSearch, FaSyncAlt, FaFilePdf, FaWhatsapp, FaMotorcycle, FaTruck, FaStore, FaChevronDown, FaChevronLeft, FaChevronRight,
   FaCheck, FaCheckCircle, FaExclamationTriangle, FaClock, FaCreditCard, FaBoxOpen, FaEnvelope, FaIdCard, FaFileInvoice, FaTrashAlt, FaRegFileAlt, FaRegEnvelope, FaRegCommentDots, FaPrint, FaMagic,
 } from "react-icons/fa";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
@@ -22,14 +22,28 @@ const haceDias = (n) => {
   const d = new Date(Date.now() - n * 86400000);
   return d.toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 };
-const inicioMes = () => `${hoyCR().slice(0, 8)}01`;
-// "2026-11" → "noviembre"
-const nombreMes = (ym) => (ym ? new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("es-CR", { month: "long", timeZone: "UTC" }) : "");
+// 🗓️ Meses (YYYY-MM): se puede ver cualquier mes pasado con las flechas de los totales
+const mesActual = () => hoyCR().slice(0, 7);
+const moverMes = (ym, n) => {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+const finDeMes = (ym) => {
+  const [y, m] = ym.split("-").map(Number);
+  return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+};
+// "2026-11" → "noviembre" (si no es de este año: "noviembre 2025")
+const nombreMes = (ym) => {
+  if (!ym) return "";
+  const n = new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("es-CR", { month: "long", timeZone: "UTC" });
+  return ym.slice(0, 4) === hoyCR().slice(0, 4) ? n : `${n} ${ym.slice(0, 4)}`;
+};
 
 const RANGOS = [
   { v: "hoy", t: "Hoy", desde: hoyCR, hasta: hoyCR },
   { v: "7d", t: "7 días", desde: () => haceDias(6), hasta: hoyCR },
-  { v: "mes", t: "Este mes", desde: inicioMes, hasta: hoyCR },
+  { v: "mes", t: "Mes", desde: (mes) => `${mes}-01`, hasta: (mes) => (mes === mesActual() ? hoyCR() : finDeMes(mes)) }, // 👈 el mes de las flechas
   { v: "todo", t: "Todo", desde: () => "", hasta: () => "" },
 ];
 const ESTADOS = [
@@ -60,6 +74,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
   // 🏪 puedeVer = súper usuario o perfil tienda; borrar órdenes sigue siendo solo del súper usuario
   const [estado, setEstado] = useState("pagada");
   const [rango, setRango] = useState("mes");
+  const [mes, setMes] = useState(mesActual); // 🗓️ mes que se ve (totales + rango "Mes")
   const [busqueda, setBusqueda] = useState("");
   const [q, setQ] = useState("");
   const [data, setData] = useState({ ordenes: [], totales: null, page: 1, paginas: 1, total: 0 });
@@ -87,9 +102,9 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
     setCargando(true);
     try {
       const r = RANGOS.find((x) => x.v === rango);
-      const params = new URLSearchParams({ estado, page: String(page) });
-      if (r.desde()) params.set("desde", r.desde());
-      if (r.hasta()) params.set("hasta", r.hasta());
+      const params = new URLSearchParams({ estado, page: String(page), mes });
+      if (r.desde(mes)) params.set("desde", r.desde(mes));
+      if (r.hasta(mes)) params.set("hasta", r.hasta(mes));
       if (q) params.set("q", q);
       const res = await fetch(`${API_BASE}/api/checkout/admin/ordenes?${params}`);
       const json = await res.json();
@@ -100,25 +115,37 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
     } finally {
       setCargando(false);
     }
-  }, [estado, rango, q, page]);
+  }, [estado, rango, q, page, mes]);
 
   useEffect(() => {
     if (puedeVer) cargar();
   }, [cargar, puedeVer]);
 
 
-  // 🗓️ Al entrar un mes nuevo (con el panel abierto) los totales arrancan en 0 y "Este mes" pasa al mes nuevo
-  const mesCargado = data.totales?.mes;
+  // 🗓️ Al entrar un mes nuevo (con el panel abierto en el mes actual) pasa solo al mes nuevo: totales en 0
+  const [mesHoy, setMesHoy] = useState(mesActual);
   useEffect(() => {
-    if (!puedeVer || !mesCargado) return;
+    if (!puedeVer) return;
     const t = setInterval(() => {
-      if (hoyCR().slice(0, 7) === mesCargado) return;
-      setRango("mes");
-      setPage(1);
-      cargar();
+      const ahora = mesActual();
+      if (ahora === mesHoy) return;
+      if (mes === mesHoy) {
+        setMes(ahora);
+        setRango("mes");
+        setPage(1);
+      }
+      setMesHoy(ahora);
     }, 60 * 1000);
     return () => clearInterval(t);
-  }, [puedeVer, mesCargado, cargar]);
+  }, [puedeVer, mes, mesHoy]);
+
+  const irAMes = (n) => {
+    const nuevo = moverMes(mes, n);
+    if (nuevo > mesActual()) return;
+    setMes(nuevo);
+    setRango("mes");
+    setPage(1);
+  };
 
   // 🔔 En vivo: cuando entra un pago nuevo
   useEffect(() => {
@@ -268,7 +295,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
           </div>
           <div className="vw-seg" role="tablist" aria-label="Rango">
             {RANGOS.map((r) => (
-              <button key={r.v} type="button" className={rango === r.v ? "is-active" : ""} onClick={() => { setRango(r.v); setPage(1); }}>{r.t}</button>
+              <button key={r.v} type="button" className={rango === r.v ? "is-active" : ""} onClick={() => { setRango(r.v); setPage(1); }}>{r.v === "mes" ? (mes === mesActual() ? "Este mes" : nombreMes(mes)) : r.t}</button>
             ))}
           </div>
           <label className="vw-search">
@@ -280,7 +307,14 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
         {/* ---- Totales ---- */}
         {t && (
           <div className="vw-kpis">
-            <div className="vw-kpi is-main"><small>Vendido · {nombreMes(t.mes)}</small><strong>{colones(t.vendido)}</strong></div>
+            <div className="vw-kpi is-main">
+              <div className="vw-mes">
+                <button type="button" onClick={() => irAMes(-1)} aria-label="Mes anterior"><FaChevronLeft /></button>
+                <small>Vendido · {nombreMes(t.mes)}</small>
+                <button type="button" onClick={() => irAMes(1)} disabled={mes >= mesActual()} aria-label="Mes siguiente"><FaChevronRight /></button>
+              </div>
+              <strong>{colones(t.vendido)}</strong>
+            </div>
             <div className="vw-kpi"><small>Órdenes</small><strong>{t.ordenes}</strong></div>
             <div className="vw-kpi"><small>Camisetas</small><strong>{t.camisetas}</strong></div>
             <div className="vw-kpi"><small>Envíos cobrados</small><strong>{colones(t.envios)}</strong></div>
@@ -313,7 +347,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
               const todoAlistado = o.estado === "pagada" && alistadas === o.items.length;
               const paso = o.estado !== "pagada" ? quePaso(o) : null; // ❓ sin pagar: qué pasó
               return (
-                <li key={o._id} className={`vw-card is-${o.estado} ${porWa ? "is-wa" : ""}`}>
+                <li key={o._id} className={`vw-card is-${o.estado} ${porWa ? "is-wa" : ""} ${todoAlistado ? "is-alistada" : ""}`}>
                   <button type="button" className="vw-card-head" onClick={() => setAbierta(abiertaEsta ? null : o._id)} aria-expanded={abiertaEsta}>
                     <div className="vw-card-main">
                       <div className="vw-row1">
@@ -364,7 +398,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                             {o.estado === "pagada" && (
                               <button
                                 type="button"
-                                className={`vw-check ${i.alistado?.at ? "is-on" : ""}`}
+                                className={`vw-tick ${i.alistado?.at ? "is-on" : ""}`}
                                 onClick={() => alistar(o, k)}
                                 aria-pressed={Boolean(i.alistado?.at)}
                                 title={i.alistado?.at ? "Quitar check" : "Ya la alisté"}

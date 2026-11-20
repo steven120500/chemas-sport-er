@@ -3979,6 +3979,7 @@ select.md-input {
 .ct-timer.is-urgent svg { color: #dc2626; animation: ctTimerPulse 1s ease-in-out infinite; }
 .ct-timer.is-checkout { margin: 0 0 14px; }
 @keyframes ctTimerPulse { 50% { transform: scale(1.18); } }
+.ct-nota { margin: 0 16px 10px; font-size: 11px; color: #71717a; line-height: 1.4; }
 .ct-timer-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: #18181b; color: #fff; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .ct-timer-chip svg { font-size: 9px; }
 .ct-timer-chip.is-urgent { background: #dc2626; }
@@ -4208,6 +4209,19 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .co-totals .is-save { color: #15803d; font-weight: 800; }
 .co-totals .is-total { margin-top: 6px; padding-top: 10px; border-top: 1px dashed #e4e4e7; color: #000; font-size: 20px; font-weight: 900; letter-spacing: -0.02em; text-transform: uppercase; }
 .co-warn { margin: 0; padding: 10px 12px; border-radius: 12px; background: #fef2f2; color: #b91c1c; font-size: 12px; font-weight: 700; }
+.co-revision { margin: 0 0 14px; font-size: 12px; font-weight: 700; color: #71717a; }
+/* 🔍 Lo que ya no hay al entrar al checkout (CheckoutPage → revision.faltantes) */
+.co-faltan { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; padding: 12px; border-radius: 14px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 12px; line-height: 1.4; }
+.co-faltan strong { font-size: 13px; font-weight: 900; }
+.co-faltan ul { margin: 0; padding-left: 18px; list-style: disc; }
+.co-faltan b { font-weight: 800; }
+.co-faltan small { color: #7f1d1d; font-size: 11px; }
+.co-faltan.is-vencido { background: #fafafa; border-color: #e4e4e7; color: #18181b; }
+.co-faltan.is-vencido small { color: #71717a; }
+.co-faltan-acc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.co-faltan-acc button { padding: 7px 12px; border-radius: 9999px; border: 1px solid #000; background: #fff !important; color: #000 !important; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.co-faltan-acc button:last-child { background: #000 !important; color: #fff !important; }
+.co-faltan-acc button:hover { transform: none !important; }
 .co-page .co-btn {
   display: flex; align-items: center; justify-content: center; gap: 10px; height: 54px; padding: 0 24px;
   border-radius: 16px; border: 0; font-size: 13px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
@@ -4324,6 +4338,13 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .vw-kpi.is-main { grid-column: 1 / -1; background: #000; color: #fff; }
 .vw-kpi.is-main small { color: #a1a1aa; }
 .vw-kpi.is-main strong { font-size: 28px; }
+/* 🗓️ Flechas para ver meses pasados */
+.vw-mes { display: flex; align-items: center; gap: 8px; }
+.vw-mes small { flex: 1; }
+.vw-mes button { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1px solid #3f3f46; background: transparent !important; color: #fff !important; }
+.vw-mes button svg { width: 11px; height: 11px; }
+.vw-mes button:hover { transform: none !important; border-color: #fff; }
+.vw-mes button:disabled { opacity: .3; cursor: default; }
 .vw-kpi.is-warn { background: #fef2f2; }
 .vw-kpi.is-warn strong { color: #dc2626; }
 
@@ -4338,7 +4359,10 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .vw-pager button:hover:not(:disabled) { transform: none !important; background: #000 !important; color: #fff !important; }
 .vw-pager button:disabled { opacity: .35; cursor: default; }
 .vw-pager button:hover:disabled { transform: none !important; }
-.vw-card { border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 10px 30px -24px rgba(0,0,0,0.4); overflow: hidden; border-left: 4px solid #16a34a; }
+.vw-card { border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 10px 30px -24px rgba(0,0,0,0.4); overflow: hidden; border-left: 4px solid #000; }
+/* ✅ Verde SOLO cuando ya se alistaron todas las camisetas (pagada sin alistar = borde negro) */
+.vw-card.is-alistada { border-left-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 1px #bbf7d0, 0 10px 30px -24px rgba(0,0,0,0.4); }
+.vw-card.is-alistada .vw-card-head { background: transparent !important; }
 .vw-card.is-pendiente { border-left-color: #d4d4d8; }
 .vw-card.is-rechazada { border-left-color: #dc2626; }
 .vw-page .vw-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px; border: 0; border-radius: 0; background: transparent; color: #000; text-align: left; }
@@ -4383,16 +4407,16 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .vw-item-info small { font-size: 11px; color: #71717a; }
 .vw-item-price { font-weight: 900; white-space: nowrap; }
 /* ✅ Check de alistado por camiseta (VentasWebPage → alistar) */
-.vw-check {
+.vw-tick {
   flex: none; width: 30px; height: 30px; padding: 0; border-radius: 9999px; border: 2px solid #d4d4d8;
   background: #fff !important; color: transparent !important; display: inline-flex; align-items: center; justify-content: center;
   transition: background-color .15s, border-color .15s, color .15s;
 }
-.vw-check svg { width: 13px; height: 13px; }
-.vw-check:hover { transform: none !important; border-color: #16a34a; color: #bbf7d0 !important; }
-.vw-check:focus { outline: none; }
-.vw-check:focus-visible { outline: 2px solid #16a34a; outline-offset: 2px; }
-.vw-check.is-on { background: #16a34a !important; border-color: #16a34a; color: #fff !important; }
+.vw-tick svg { width: 13px; height: 13px; }
+.vw-tick:hover { transform: none !important; border-color: #16a34a; color: #bbf7d0 !important; }
+.vw-tick:focus { outline: none; }
+.vw-tick:focus-visible { outline: 2px solid #16a34a; outline-offset: 2px; }
+.vw-tick.is-on { background: #16a34a !important; border-color: #16a34a; color: #fff !important; }
 .vw-items li.is-alistado .vw-thumb { opacity: .55; }
 .vw-items li.is-alistado .vw-item-info strong { text-decoration: line-through; text-decoration-color: #16a34a; }
 .vw-alistado { color: #15803d !important; font-weight: 800; }
