@@ -4,13 +4,14 @@ import { io } from "socket.io-client";
 import { toast as toastHOT } from "react-hot-toast";
 import {
   FaSearch, FaSyncAlt, FaFilePdf, FaWhatsapp, FaMotorcycle, FaTruck, FaStore, FaChevronDown, FaChevronLeft, FaChevronRight,
-  FaCheck, FaCheckCircle, FaExclamationTriangle, FaClock, FaCreditCard, FaBoxOpen, FaEnvelope, FaIdCard, FaFileInvoice, FaTrashAlt, FaRegFileAlt, FaRegEnvelope, FaRegCommentDots, FaPrint, FaMagic,
+  FaCheck, FaCheckCircle, FaExclamationTriangle, FaClock, FaCreditCard, FaBoxOpen, FaEnvelope, FaIdCard, FaFileInvoice, FaTrashAlt, FaRegFileAlt, FaRegEnvelope, FaRegCommentDots, FaPrint, FaMagic, FaRegCopy,
 } from "react-icons/fa";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
 import { getToken } from "../authFetch";
 import { colones, cldThumb, textoDorsal } from "../cart/useCart";
 import GuiaPedidoModal from "./GuiaPedidoModal";
 import ModalShell from "./ModalShell";
+import { juntarGuias } from "../utils/historialCopia";
 
 // 👑 /ventas-web — Panel del súper admin con las ventas de la tienda online (Tilopay).
 // ⚠️ Estilos en index.css (sección "VENTAS WEB", clases vw-*). Datos: GET /api/checkout/admin/ordenes.
@@ -207,6 +208,39 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
     } catch (e) {
       reemplazar(orden); // se devuelve como estaba
       toastHOT.error(e.message);
+    }
+  };
+
+  // 📋 "Copiar historial": el mismo texto que "Copiar" en /history (la venta sigue quedando en el historial normal)
+  const copiarHistorial = async (orden) => {
+    const traerTexto = async () => {
+      const res = await fetch(`${API_BASE}/api/checkout/admin/ordenes/${orden._id}/historial`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "No se pudo traer el historial");
+      if (!json.length) throw new Error("Esta orden no tiene registros en el historial");
+      return juntarGuias(json);
+    };
+    try {
+      // 👇 Safari solo deja copiar dentro del click: se le pasa la promesa al portapapeles de una vez
+      if (window.ClipboardItem && navigator.clipboard?.write) {
+        let texto = "";
+        await navigator.clipboard.write([
+          new window.ClipboardItem({
+            "text/plain": traerTexto().then((t) => {
+              texto = t;
+              return new Blob([t], { type: "text/plain" });
+            }),
+          }),
+        ]).catch(async (e) => {
+          if (!texto) texto = await traerTexto().catch(() => { throw e; });
+          await navigator.clipboard.writeText(texto);
+        });
+      } else {
+        await navigator.clipboard.writeText(await traerTexto());
+      }
+      toastHOT.success("Historial copiado. Listo para pegar.", { id: "copia-historial-web" });
+    } catch (e) {
+      toastHOT.error(e.message || "No se pudo copiar");
     }
   };
 
@@ -512,6 +546,11 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
                           )}
 
                           <div className="vw-actions">
+                            {(o.stock?.movimientos || []).some((m) => m.historyId) && (
+                              <button type="button" className="vw-btn" onClick={() => copiarHistorial(o)}>
+                                <FaRegCopy /> Copiar historial
+                              </button>
+                            )}
                             {o.factura?.pdfUrl && (
                               <a className="vw-btn" href={o.factura.pdfUrl} target="_blank" rel="noopener noreferrer"><FaFilePdf /> PDF</a>
                             )}

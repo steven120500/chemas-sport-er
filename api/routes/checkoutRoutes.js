@@ -689,6 +689,26 @@ router.post('/admin/ordenes/:id/alistar', requireVentasWeb, async (req, res) => 
   }
 });
 
+// GET /api/checkout/admin/ordenes/:id/historial → los registros del historial que dejó el rebajo de stock de la orden
+// (para el botón "Copiar historial" del panel: mismo texto que "Copiar" en /history). Sigue quedando en el historial normal.
+router.get('/admin/ordenes/:id/historial', requireVentasWeb, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'ID inválido.' });
+    const orden = await OrdenWeb.findById(req.params.id).select('stock.movimientos').lean();
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada.' });
+    const ids = (orden.stock?.movimientos || []).map((m) => m.historyId).filter((id) => mongoose.isValidObjectId(id));
+    if (!ids.length) return res.json([]);
+    const logs = await History.find({ _id: { $in: ids } }).select('user item details date').lean();
+    // 👇 en el mismo orden de las camisetas de la orden
+    const posicion = new Map(ids.map((id, i) => [String(id), i]));
+    logs.sort((a, b) => posicion.get(String(a._id)) - posicion.get(String(b._id)));
+    res.json(logs);
+  } catch (error) {
+    console.error('❌ Historial de orden web:', error.message);
+    res.status(500).json({ error: 'No se pudo traer el historial.' });
+  }
+});
+
 // POST /api/checkout/admin/ordenes/:id/verificar → vuelve a preguntar a Tilopay (y completa stock/factura si faltaba)
 router.post('/admin/ordenes/:id/verificar', requireVentasWeb, async (req, res) => {
   try {
