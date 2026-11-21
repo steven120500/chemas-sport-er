@@ -47,6 +47,8 @@ const RANGOS = [
   { v: "mes", t: "Mes", desde: (mes) => `${mes}-01`, hasta: (mes) => (mes === mesActual() ? hoyCR() : finDeMes(mes)) }, // 👈 el mes de las flechas
   { v: "todo", t: "Todo", desde: () => "", hasta: () => "" },
 ];
+// 📊 Título de los totales cuando siguen el rango en vez del mes
+const ETIQUETA_TOTALES = { hoy: "hoy", "7d": "últimos 7 días", todo: "todo" };
 const ESTADOS = [
   { v: "pagada", t: "Pagadas" },
   { v: "pendiente", t: "Sin pagar" }, // 👈 incluye las rechazadas y los pedidos por WhatsApp
@@ -106,6 +108,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
       const params = new URLSearchParams({ estado, page: String(page), mes });
       if (r.desde(mes)) params.set("desde", r.desde(mes));
       if (r.hasta(mes)) params.set("hasta", r.hasta(mes));
+      if (rango !== "mes") params.set("totales", "rango"); // 👈 Hoy / 7 días / Todo: los totales son de ese rango
       if (q) params.set("q", q);
       const res = await fetch(`${API_BASE}/api/checkout/admin/ordenes?${params}`);
       const json = await res.json();
@@ -344,7 +347,7 @@ export default function VentasWebPage({ isSuperUser, puedeVer = isSuperUser }) {
             <div className="vw-kpi is-main">
               <div className="vw-mes">
                 <button type="button" onClick={() => irAMes(-1)} aria-label="Mes anterior"><FaChevronLeft /></button>
-                <small>Vendido · {nombreMes(t.mes)}</small>
+                <small>Vendido · {t.porRango ? ETIQUETA_TOTALES[rango] : nombreMes(t.mes)}</small>
                 <button type="button" onClick={() => irAMes(1)} disabled={mes >= mesActual()} aria-label="Mes siguiente"><FaChevronRight /></button>
               </div>
               <strong>{colones(t.vendido)}</strong>

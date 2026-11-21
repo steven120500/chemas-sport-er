@@ -620,6 +620,7 @@ const resumenOrden = (o) => ({
 // GET /api/checkout/admin/ordenes?estado=pagada|pendiente&desde=YYYY-MM-DD&hasta=YYYY-MM-DD&q=texto&page=1
 // 📄 De 10 en 10 (page). Los totales de arriba son del mes `mes` (YYYY-MM, hora CR); sin él, del mes actual
 // (al cambiar de mes arrancan en 0). Se pueden ver meses pasados, nunca futuros.
+// Con `totales=rango` (Hoy / 7 días / Todo) los totales son del mismo rango desde/hasta de la lista.
 const POR_PAGINA = 10;
 const mesCR = (pedido) => {
   const actual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Costa_Rica' }).slice(0, 7); // YYYY-MM
@@ -649,13 +650,18 @@ router.get('/admin/ordenes', requireVentasWeb, async (req, res) => {
     const page = Math.min(paginas, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
     const ordenes = await OrdenWeb.find(filtro).sort({ createdAt: -1 }).skip((page - 1) * POR_PAGINA).limit(POR_PAGINA).lean();
 
-    // 📊 Totales del mes escogido (solo pagadas; los pagos de prueba de Tilopay no cuentan)
+    // 📊 Totales del mes escogido o del rango (solo pagadas; los pagos de prueba de Tilopay no cuentan)
     const mes = mesCR(req.query.mes);
-    const delMes = await OrdenWeb.find({ estado: 'pagada', createdAt: { $gte: mes.desde, $lt: mes.hasta } })
+    const porRango = req.query.totales === 'rango';
+    const filtroTot = { estado: 'pagada' };
+    if (porRango) { if (Object.keys(rango).length) filtroTot.createdAt = rango; }
+    else filtroTot.createdAt = { $gte: mes.desde, $lt: mes.hasta };
+    const delMes = await OrdenWeb.find(filtroTot)
       .select('total envio items.cantidad factura.estado tilopay.environment').lean();
     const pagadas = delMes.filter((o) => String(o.tilopay?.environment || '').toLowerCase() !== 'test');
     const totales = {
       mes: mes.ym,
+      porRango,
       ordenes: pagadas.length,
       vendido: pagadas.reduce((s, o) => s + o.total, 0),
       envios: pagadas.reduce((s, o) => s + o.envio, 0),
