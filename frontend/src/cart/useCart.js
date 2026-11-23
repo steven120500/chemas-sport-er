@@ -39,6 +39,9 @@ export const cldThumb = (url) => {
 export const stockDe = (p, talla) =>
   ["tienda", "stock", "bodega"].reduce((s, k) => s + (parseInt(p?.[k]?.[talla] ?? 0, 10) || 0), 0);
 
+// 👕 Nombre con el tipo entre paréntesis para WhatsApp: "Barcelona 25-26 (Player)"
+export const nombreConTipo = (l) => (l.type ? `${l.name} (${l.type})` : l.name);
+
 export const textoDorsal = (d) => (d ? `${d.name ? String(d.name).toUpperCase() : ""} #${d.number || ""}`.trim() : "");
 
 // 🔄 Cruza las líneas del carrito con el catálogo en vivo: stock disponible, agotado, excede
@@ -50,6 +53,7 @@ export const lineasConStock = (items, products, otrasApartadas = () => 0) => {
     const disponible = p ? Math.max(0, stockDe(p, l.talla) - otrasApartadas(l.productId, l.talla)) : null; // null = aún no carga el catálogo
     return {
       ...l,
+      type: l.type || p?.type || "", // 👈 carritos viejos pueden no traer el tipo
       disponible,
       agotado: disponible === 0,
       excede: disponible !== null && disponible > 0 && l.cantidad > disponible,

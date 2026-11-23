@@ -5,7 +5,7 @@ import { ShoppingCart } from "lucide-react";
 import {
   FaArrowLeft, FaLock, FaTruck, FaStore, FaCreditCard, FaUser, FaMapMarkerAlt, FaCheck, FaShieldAlt, FaMotorcycle, FaChevronDown, FaWhatsapp, FaCheckCircle, FaExternalLinkAlt,
 } from "react-icons/fa";
-import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart/useCart";
+import { useCart, colones, cldThumb, textoDorsal, lineasConStock, nombreConTipo } from "../cart/useCart";
 import { toast as toastHOT } from "react-hot-toast";
 import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
 import { hayMensajero, COSTO_MENSAJERO } from "../utils/coberturaMensajero";
@@ -276,7 +276,7 @@ export default function CheckoutPage({ products = [] }) {
     const filas = validas
       .map((l, i) => {
         const dorsal = l.dorsal ? ` · Dorsal: ${textoDorsal(l.dorsal)}` : "";
-        return `${i + 1}. *${l.name}*\n   Talla: ${l.talla === "U" ? "Única" : l.talla}${dorsal}\n   ${l.cantidad} x ${colones(l.precio)} = ${colones(l.cantidad * l.precio)}`;
+        return `${i + 1}. *${nombreConTipo(l)}*\n   Talla: ${l.talla === "U" ? "Única" : l.talla}${dorsal}\n   ${l.cantidad} x ${colones(l.precio)} = ${colones(l.cantidad * l.precio)}`;
       })
       .join("\n\n");
     const txtEntrega = esDomicilio

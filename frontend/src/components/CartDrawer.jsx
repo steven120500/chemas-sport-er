@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes, FaMinus, FaPlus, FaTrashAlt, FaShoppingBag, FaLock, FaWhatsapp, FaTruck } from "react-icons/fa";
-import { useCart, colones, cldThumb, textoDorsal, lineasConStock } from "../cart/useCart";
+import { useCart, colones, cldThumb, textoDorsal, lineasConStock, nombreConTipo } from "../cart/useCart";
 import { ShoppingCart } from "lucide-react";
 
 // 🛒 Panel lateral del carrito. ⚠️ Estilos en index.css (sección "CARRITO", clases ct-*).
@@ -41,7 +41,7 @@ export default function CartDrawer({ products = [] }) {
       .filter((l) => !l.agotado)
       .map((l, i) => {
         const dorsal = l.dorsal ? ` · Dorsal: ${textoDorsal(l.dorsal)}` : "";
-        return `${i + 1}. *${l.name}*\n   Talla: ${l.talla === "U" ? "Única" : l.talla}${dorsal}\n   ${l.cantidad} x ${colones(l.precio)} = ${colones(l.cantidad * l.precio)}`;
+        return `${i + 1}. *${nombreConTipo(l)}*\n   Talla: ${l.talla === "U" ? "Única" : l.talla}${dorsal}\n   ${l.cantidad} x ${colones(l.precio)} = ${colones(l.cantidad * l.precio)}`;
       })
       .join("\n\n");
     const msg = `¡Hola! Quiero hacer este pedido:\n\n${filas}\n\n*Total:* ${colones(subtotal)}`;
