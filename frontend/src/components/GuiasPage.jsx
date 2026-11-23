@@ -358,21 +358,14 @@ export default function GuiasPage() {
   };
 
   const guiasFiltradas = useMemo(() => {
+    const q = searchFilter.trim().toLowerCase();
     return guias.filter((g) => {
-      const coincideFecha = g.fechaYMD ? g.fechaYMD === fechaFiltro : true;
-      if (!coincideFecha) return false;
-
-      if (!searchFilter.trim()) return true;
-      const q = searchFilter.toLowerCase();
-      return (
-        g.nombre.toLowerCase().includes(q) ||
-        g.provincia.toLowerCase().includes(q) ||
-        g.canton.toLowerCase().includes(q) ||
-        g.distrito.toLowerCase().includes(q) ||
-        g.telefono.toLowerCase().includes(q) ||
-        String(g.nombreMayorista || "").toLowerCase().includes(q) ||
-        String(g.numeroGuia || "").toLowerCase().includes(q)
-      );
+      // 🔍 Si hay búsqueda se busca en TODAS las guías (cualquier día); si no, solo las del día escogido
+      if (!q) return g.fechaYMD ? g.fechaYMD === fechaFiltro : true;
+      return [
+        g.nombre, g.provincia, g.canton, g.distrito, g.telefono,
+        g.nombreMayorista, g.numeroGuia, g.comentarios,
+      ].some((v) => String(v || "").toLowerCase().includes(q));
     });
   }, [guias, fechaFiltro, searchFilter]);
 
@@ -941,7 +934,9 @@ export default function GuiasPage() {
               {guiasFiltradas.length === 0 ? (
                 <div className="text-center py-14 bg-zinc-50 rounded-2xl border border-zinc-100">
                   <p className="text-zinc-400 font-bold text-xs uppercase tracking-wider">
-                    No hay guías registradas para esta fecha ({fechaFiltro}).
+                    {searchFilter.trim()
+                      ? `No hay guías que coincidan con "${searchFilter.trim()}" (en ningún día).`
+                      : `No hay guías registradas para esta fecha (${fechaFiltro}).`}
                   </p>
                 </div>
               ) : (
