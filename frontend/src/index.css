@@ -342,6 +342,11 @@ button:focus-visible {
    CSS propio porque el Tailwind del CDN (2.2.19) no soporta valores
    arbitrarios ni group-hover/card.
    ================================================================= */
+/* 🖥️ Catálogo: en desktop grande (5 columnas) el contenedor crece a 1440px */
+@media (min-width: 1280px) {
+  .catalogo-wrap { max-width: 1440px; }
+}
+
 .pc-card {
   position: relative;
   display: flex;

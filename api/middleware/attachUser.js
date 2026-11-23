@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { rolesEfectivos } from "./auth.js";
 
 /**
  * Lee el JWT del header Authorization ("Bearer <token>") y, si es válido y el usuario
@@ -21,7 +22,7 @@ export default async function attachUser(req, _res, next) {
         req.user = {
           id: String(dbUser._id),
           name: dbUser.username,
-          roles: dbUser.roles || [],
+          roles: rolesEfectivos(dbUser), // 👈 tienda = también edit
           isSuperUser: dbUser.isSuperUser || false,
         };
       }

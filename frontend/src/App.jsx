@@ -85,6 +85,15 @@ const matchesType = (product, t) => {
   return product.type === t;
 };
 
+// 🏪 El perfil "tienda" también puede editar productos (igual que el backend en rolesEfectivos)
+const conPermisosTienda = (u) => {
+  if (!u || u.isSuperUser) return u;
+  const roles = Array.isArray(u.roles) ? u.roles : [];
+  const nombre = String(u.username || u.name || "").toLowerCase();
+  const esTienda = roles.includes("tienda") || nombre.includes("tienda") || u.role === "tienda" || u.rol === "tienda";
+  return esTienda && !roles.includes("edit") ? { ...u, roles: [...roles, "edit"] } : u;
+};
+
 function ProductDetailWrapper({ products, loadingProducts, onClose, onUpdate, user, storeView, canEdit, canDelete }) {
   const { id } = useParams();
   const [localProduct, setLocalProduct] = useState(null);
@@ -187,7 +196,7 @@ function MainApp() {
   const [showMedidas, setShowMedidas] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(20); // múltiplo de 2 y 4 columnas: filas completas
+  const [limit] = useState(20); // múltiplo de 2, 4 y 5 columnas: filas completas
   const [total, setTotal] = useState(0);
 
   const navigate = useNavigate();
@@ -213,7 +222,7 @@ function MainApp() {
         setTimeout(() => toast.info('Por seguridad, iniciá sesión de nuevo.'), 800);
         return null;
       }
-      return parsed;
+      return conPermisosTienda(parsed); // 👈 sesiones ya abiertas del perfil tienda
     } catch {
       return null;
     }
@@ -617,7 +626,7 @@ function MainApp() {
             isOpen={showLogin}
             onClose={() => setShowLogin(false)}
             onLoginSuccess={(userData) => {
-              setUser(userData);
+              setUser(conPermisosTienda(userData));
               localStorage.setItem('user', JSON.stringify(userData));
               setShowLogin(false);
               toast.success('Bienvenido');
@@ -806,9 +815,10 @@ function MainApp() {
 
                 <div ref={pageTopRef} />
 
-                {/* max-w-7xl (1280px): el CDN de Tailwind 2.x no soporta max-w-[1400px] */}
-                <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div id="products-section" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {/* max-w-7xl (1280px); en desktop grande .catalogo-wrap lo abre a 1440px para las 5 columnas */}
+                <div className="catalogo-wrap w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  {/* 🖥️ 5 por fila solo en desktop (xl ≥1280px); móvil sigue en 2 */}
+                  <div id="products-section" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
                   {loading && !usingFullCatalog ? (
                     // Tantos esqueletos como productos por página: la altura no se encoge al cambiar de página
                     Array.from({ length: limit }).map((_, i) => (

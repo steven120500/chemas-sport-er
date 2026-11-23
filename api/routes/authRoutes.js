@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { requireRole, rateLimit } from '../middleware/auth.js';
+import { requireRole, rateLimit, rolesEfectivos } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.json({
       token,
       username: user.username,
-      roles: user.roles,
+      roles: rolesEfectivos(user), // 👈 el perfil tienda también trae edit
       isSuperUser: user.isSuperUser,
     });
   } catch (error) {

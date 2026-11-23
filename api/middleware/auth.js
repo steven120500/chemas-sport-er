@@ -23,6 +23,17 @@ export function requireRole(...roles) {
   return mw;
 }
 
+/**
+ * 🏪 Roles efectivos de un usuario de la BD: el perfil "tienda" (rol tienda o "tienda" en el nombre,
+ * mismo criterio que el Header y /ventas-web) también puede editar productos, como el resto.
+ */
+export function rolesEfectivos(dbUser) {
+  const roles = [...(dbUser?.roles || [])];
+  const esTienda = roles.includes('tienda') || String(dbUser?.username || '').toLowerCase().includes('tienda');
+  if (esTienda && !roles.includes('edit')) roles.push('edit');
+  return roles;
+}
+
 /** Solo súper usuario. */
 export function requireSuper(req, res, next) {
   if (!req.user?.id) {

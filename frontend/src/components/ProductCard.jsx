@@ -24,7 +24,7 @@ const cardVariants = {
   show: (i) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: (i % 4) * 0.07 },
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: (i % 5) * 0.07 },
   }),
 };
 
