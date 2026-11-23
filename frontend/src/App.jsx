@@ -818,7 +818,7 @@ function MainApp() {
                 {/* max-w-7xl (1280px); en desktop grande .catalogo-wrap lo abre a 1440px para las 5 columnas */}
                 <div className="catalogo-wrap w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   {/* 🖥️ 5 por fila solo en desktop (xl ≥1280px); móvil sigue en 2 */}
-                  <div id="products-section" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+                  <div id="products-section" className="grid grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-6">
                   {loading && !usingFullCatalog ? (
                     // Tantos esqueletos como productos por página: la altura no se encoge al cambiar de página
                     Array.from({ length: limit }).map((_, i) => (

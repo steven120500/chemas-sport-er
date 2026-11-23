@@ -683,6 +683,32 @@ button:focus-visible {
 }
 .shine-sutil { animation: minimalShine 2.5s infinite ease-in-out; }
 
+/* 📱 Celular: 3 cards por fila (~110px de ancho) → todo más compacto */
+@media (max-width: 639px) {
+  .pc-card, .pc-frame { border-radius: 12px; }
+  .pc-frame { border-width: 1.5px; }
+  .pc-media { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+  .pc-ribbon { height: 6px; top: -4px; }
+  .pc-snowcap { height: 7px; clip-path: inset(0 round 10px 10px 0 0); }
+  .pc-badges { top: 12px; left: 4px; gap: 3px; max-width: calc(100% - 8px); }
+  .pc-badge { height: 14px; padding: 0 5px; gap: 3px; font-size: 6.5px; letter-spacing: 0.06em; }
+  .pc-dot { width: 4px; height: 4px; }
+  .pc-badge-icon { width: 7px; height: 7px; }
+  .pc-badge--popular { width: 14px; padding: 0; }
+  .pc-stamp { padding: 3px 7px; font-size: 7.5px; border-width: 1.5px; border-radius: 8px; letter-spacing: 0.1em; }
+  .pc-seal { right: 4px; bottom: 4px; width: 32px; height: 32px; }
+  .pc-new { top: -6px; right: -6px; width: 30px; height: 30px; }
+  .pc-new span { font-size: 6.5px; }
+  .pc-info { padding: 6px 6px 7px; gap: 4px; }
+  .pc-name { font-size: 9px; line-height: 1.2; min-height: 2.4em; }
+  .pc-custom { font-size: 6.5px; padding: 2px 4px; gap: 3px; }
+  .pc-custom-icon { width: 7px; height: 7px; }
+  .pc-prices { column-gap: 4px; }
+  .pc-price { font-size: 11.5px; }
+  .pc-price-old { font-size: 8.5px; }
+  .pc-arrow { display: none; } /* no cabe junto al precio */
+}
+
 /* Tablet / desktop */
 @media (min-width: 640px) {
   .pc-badges { top: 26px; left: 10px; gap: 5px; }
