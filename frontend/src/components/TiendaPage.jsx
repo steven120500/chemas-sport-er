@@ -722,6 +722,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   };
 
   const eliminarItemCarrito = (uid) => {
+    if (!puedeAnularVentas) return; // 🔒 el usuario tienda no elimina nada
     setCarritoVentas((prev) => prev.filter((item) => item.uid !== uid));
   };
 
@@ -754,8 +755,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     }
   };
 
-  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}, metodoPago = "Efectivo") => {
-    const printWindow = window.open("", "_blank", "width=400,height=650");
+  // 👇 ventanaAbierta: ventana ya abierta en el click (Emitir e imprimir), para que el navegador no la bloquee tras el await
+  const imprimirTicketNativo = (ventasArray, consecutivoOficial, totalCobrado, datosCliente = {}, metodoPago = "Efectivo", ventanaAbierta = null) => {
+    const printWindow = ventanaAbierta && !ventanaAbierta.closed ? ventanaAbierta : window.open("", "_blank", "width=400,height=650");
     if (!printWindow) return alert("Por favor permite las ventanas emergentes.");
 
     const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
@@ -1094,6 +1096,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       fechaHora: new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" })
     };
 
+    // 🖨️ Se abre la ventana del tiquete ya (en el click); si se abre después del await el navegador la bloquea
+    const ventanaTiquete = window.open("", "_blank", "width=400,height=650");
+    try { ventanaTiquete?.document.write("<p style='font-family:Arial;font-weight:900;padding:16px'>Emitiendo comprobante...</p>"); } catch { /* sin ventana */ }
+
     setEmitiendoId(facturaPendiente._id);
     const toastId = toastHOT.loading("Emitiendo comprobante oficial...");
 
@@ -1109,8 +1115,21 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       toastHOT.success(`¡Factura #${data.consecutivoOficial} emitida con éxito!`, { id: toastId });
 
       setFacturasPendientes((prev) => prev.filter((item) => item._id !== facturaPendiente._id));
+
+      // 🖨️ Se imprime ya con el consecutivo oficial (nunca un tiquete "PENDIENTE")
+      const fe = data.facturaTienda || {};
+      imprimirTicketNativo(
+        fe.ventas || facturaPendiente.ventas,
+        data.consecutivoOficial,
+        data.totalCobrado ?? facturaPendiente.totalCobrado,
+        { nombre: fe.cliente?.nombre || nombreFinal, cedula: fe.cliente?.cedula || cedulaFinal, fechaHora: fe.fechaHora || payloadTienda.fechaHora },
+        fe.metodoPago || facturaPendiente.metodoPago,
+        ventanaTiquete
+      );
+
       await fetchResumenTienda();
     } catch (error) {
+      try { ventanaTiquete?.close(); } catch { /* ya cerrada */ }
       toastHOT.error(`Error al emitir: ${error.message}`, { id: toastId, duration: 6000 });
     } finally {
       setEmitiendoId(null);
@@ -1127,8 +1146,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     const ventasActuales = Array.isArray(factura.ventas) ? factura.ventas : [];
     const articuloQuitado = ventasActuales[idxArticulo];
     if (!articuloQuitado) return;
-    if (!factura.esPendiente && !puedeAnularVentas) {
-      toastHOT.error("Solo el súper admin puede modificar una venta ya registrada.");
+    if (!puedeAnularVentas) {
+      toastHOT.error("Solo el súper admin puede modificar una venta.");
       return;
     }
 
@@ -1258,8 +1277,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   };
 
   const eliminarRegistroFacturaCaja = (factura) => {
-    if (!factura.esPendiente && !puedeAnularVentas) {
-      toastHOT.error("Solo el súper admin puede anular ventas.");
+    if (!puedeAnularVentas) {
+      toastHOT.error("Solo el súper admin puede anular o eliminar ventas.");
       return;
     }
     const detalleUbicaciones = Array.isArray(factura.ventas)
@@ -1931,9 +1950,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                           <span className="absolute left-2.5 top-1 -translate-y-1/2 text-[10px] font-black text-zinc-400">₡</span>
                           <input type="number" value={item.precioUnitarioCustom} onChange={(e) => cambiarPrecioItemCarrito(item.uid, e.target.value)} className="w-24 pl-6 pr-2 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-black text-black outline-none" />
                         </div>
-                        <button type="button" onClick={() => eliminarItemCarrito(item.uid)} className="p-2 text-zinc-400 hover:text-red-600 rounded-lg cursor-pointer" title="Quitar">
-                          <FaTrash size={12} />
-                        </button>
+                        {puedeAnularVentas && (
+                          <button type="button" onClick={() => eliminarItemCarrito(item.uid)} className="p-2 text-zinc-400 hover:text-red-600 rounded-lg cursor-pointer" title="Quitar">
+                            <FaTrash size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2172,11 +2193,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                     <tr className="border-b border-zinc-200 text-zinc-400 uppercase tracking-wider font-black text-[10px]">
                       <th className="py-3 px-3">Estado / Hora</th>
                       <th className="py-3 px-3">Cliente</th>
-                      <th className="py-3 px-3">Artículos (Quitar prenda)</th>
+                      <th className="py-3 px-3">Artículos</th>
                       <th className="py-3 px-3">Ubicación</th>
                       <th className="py-3 px-3">Método de Pago</th>
                       <th className="py-3 px-3 text-right">Total Cobrado</th>
-                      <th className="py-3 px-3 text-right">Acciones (Imprimir / Emitir)</th>
+                      <th className="py-3 px-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 font-medium">
@@ -2210,7 +2231,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                     {v.totalUnidades || 1}x {v.item} {v.tallasTexto ? `(${v.tallasTexto})` : ""}
                                     {textoDorsales(v.dorsales) && <span className="text-blue-700"> · 👕 {textoDorsales(v.dorsales)}</span>}
                                   </span>
-                                  {(esPendiente || puedeAnularVentas) && <button
+                                  {puedeAnularVentas && <button
                                     type="button"
                                     onClick={() => quitarArticuloDeFacturaEnTabla(f, idx)}
                                     className="text-zinc-400 hover:text-red-600 p-0.5 rounded transition-colors cursor-pointer"
@@ -2259,18 +2280,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                             <div className="inline-flex items-center justify-end gap-2">
                               {esPendiente ? (
                                 <>
-                                  {/* 🔥 1. IMPRIMIR RÁPIDO PARA DARLE AL CLIENTE */}
-                                  <button
-                                    type="button"
-                                    onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial || "PENDIENTE", f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
-                                    className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-                                    title="Imprimir Tiquete de inmediato"
-                                  >
-                                    <FaPrint size={12} className="text-amber-400" />
-                                    <span>Imprimir</span>
-                                  </button>
-
-                                  {/* 🚀 2. EMITIR A HACIENDA EN SEGUNDO PLANO */}
+                                  {/* 🔒 Ya no hay "Imprimir" suelto: solo se imprime al emitir (con consecutivo oficial) */}
                                   <select
                                     value={f.tipo || "interno"}
                                     onChange={(e) => cambiarTipoEmisionPendiente(f._id, e.target.value)}
@@ -2286,10 +2296,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                     disabled={estaEmitiendoEsta}
                                     onClick={() => handleEmitirDesdeTabla(f)}
                                     className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-                                    title="Emitir Comprobante"
+                                    title="Emitir comprobante e imprimir tiquete"
                                   >
                                     <FaReceipt size={12} />
-                                    <span>{estaEmitiendoEsta ? "Emitiendo..." : "Emitir"}</span>
+                                    <FaPrint size={12} />
+                                    <span>{estaEmitiendoEsta ? "Emitiendo..." : "Emitir e imprimir"}</span>
                                   </button>
                                 </>
                               ) : (
@@ -2307,7 +2318,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 </>
                               )}
 
-                              {(esPendiente || puedeAnularVentas) && (
+                              {puedeAnularVentas && (
                                 <button
                                   type="button"
                                   onClick={() => eliminarRegistroFacturaCaja(f)}
