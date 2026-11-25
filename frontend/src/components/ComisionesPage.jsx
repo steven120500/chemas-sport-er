@@ -9,6 +9,7 @@ import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
 import LogoLoader from "./LogoLoader";
 
+import { nombreAtendio } from "../utils/atendio";
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
 function pad2(n) { return n < 10 ? `0${n}` : `${n}`; }
@@ -852,7 +853,7 @@ export default function ComisionesPage({ isSuperUser = false, user = null }) {
 
     const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
     const clienteNombre = datosCliente.nombre || ventasArray[0]?.cliente || "Cliente de Contado";
-    const vendedorNombre = ventasArray[0]?.vendedor || "Caja";
+    const vendedorNombre = nombreAtendio(ventasArray[0]?.vendedor || "Caja");
 
     const itemsHTML = ventasArray.map((v) => {
       const cant = Number(v.totalUnidades) || 1;

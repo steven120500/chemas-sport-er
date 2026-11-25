@@ -12,6 +12,7 @@ import ModalShell from "./ModalShell";
 import { io } from "socket.io-client";
 import { getToken } from "../authFetch";
 
+import { nombreAtendio } from "../utils/atendio";
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const PENDIENTES_STORAGE_KEY = "chemasport_tienda_ventas_pendientes_v1";
 
@@ -762,7 +763,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
     const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
     const clienteNombre = datosCliente.nombre || "Cliente de Contado";
-    const vendedorNombre = nombreUsuarioActual;
+    const vendedorNombre = nombreAtendio(nombreUsuarioActual);
 
     const itemsHTML = ventasArray.map((v) => {
       const cant = Number(v.totalUnidades) || 1;
@@ -957,10 +958,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       return false;
     }
 
-    // 👈 El nombre del cliente es obligatorio en toda venta de la tienda
+    // 👈 El nombre del cliente es obligatorio en toda venta de la tienda (también abonos / saldos / ingresos extra)
     if (!formCliente.nombre.trim()) {
       setMostrarDatosCliente(true);
-      toastHOT.error("Escribí el nombre del cliente antes de registrar la venta.");
+      toastHOT.error("Escribí el nombre del cliente antes de registrar la venta o el abono.");
       setTimeout(() => {
         const input = document.getElementById("tienda-nombre-cliente");
         input?.scrollIntoView({ behavior: "smooth", block: "center" });
