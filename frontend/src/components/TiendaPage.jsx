@@ -781,32 +781,34 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
     const fechaHoy = datosCliente.fechaHora || new Date().toLocaleString("es-CR", { timeZone: "America/Costa_Rica" });
     const clienteNombre = datosCliente.nombre || "Cliente de Contado";
-    const vendedorNombre = nombreAtendio(nombreUsuarioActual);
+    const vendedorNombre = nombreAtendio(datosCliente.vendedor || nombreUsuarioActual); // 👈 al reimprimir sale quien la vendió
 
     // 🧾 Escapar texto del cliente/artículos para que no rompa el HTML del tiquete
     const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-    const colones = (n) => `₡${Math.round(Number(n) || 0).toLocaleString("es-CR")}`;
+    const colones = (n) => `₡${Math.round(Number(n) || 0).toLocaleString("de-DE")}`;
     const totalUnidadesTiquete = ventasArray.reduce((acc, v) => acc + (Number(v.totalUnidades) || 1), 0);
+    const esElectronico = datosCliente.tipo === "hacienda";
+    const pagos = datosCliente.pagos || {};
+    const desglosePago = metodoPago === "Mixto"
+      ? [["Efectivo", pagos.efectivo], ["Datáfono", pagos.datafono], ["SINPE", pagos.sinpe]].filter(([, m]) => Number(m) > 0)
+      : [];
 
+    // 🧾 Cada artículo en 2 renglones (como los tiquetes de farmacia): cant + descripción / precio unit. + importe
     const itemsHTML = ventasArray.map((v) => {
       const cant = Number(v.totalUnidades) || 1;
       const unit = Number(v.precioUnitarioCustom || v.precio || 0);
       const subtotalLinea = Math.round(unit * cant);
       const impresion = textoDorsales(v.dorsales);
       return `
-        <tr>
-          <td class="c-cant">${cant}</td>
-          <td class="c-desc">
-            ${esc(v.item)}
-            <span class="sub">Talla ${esc(v.tallasTexto || v.talla || "U")}${cant > 1 ? ` · ${cant} x ${colones(unit)}` : ""}</span>
-            ${impresion ? `<span class="sub">Impresión: ${esc(impresion)}</span>` : ""}
-          </td>
-          <td class="c-imp">${colones(subtotalLinea)}</td>
-        </tr>
+        <div class="it">
+          <div class="r"><span class="q">${cant}</span><span class="d">${esc(v.item)}</span><span class="u">${esc(v.tallasTexto || v.talla || "U")}</span></div>
+          ${impresion ? `<div class="r"><span class="q"></span><span class="d nota-it">Impresión: ${esc(impresion)}</span></div>` : ""}
+          <div class="r"><span class="q"></span><span class="d">${colones(unit)}</span><span class="u">${colones(subtotalLinea)}</span></div>
+        </div>
       `;
     }).join("");
 
-    const fila = (label, valor) => `<div class="kv"><span class="k">${label}</span><span class="v">${valor}</span></div>`;
+    const fila = (label, valor, clase = "") => `<div class="kv ${clase}"><span>${label}</span><span>${valor}</span></div>`;
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -828,91 +830,94 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             body {
               font-family: Arial, Helvetica, sans-serif;
               color: #000000;
-              font-weight: 700;
+              font-weight: 500;
               margin: 0;
               padding: 6px 4px 36px 40px;
               width: 100%;
               max-width: 72mm;
-              font-size: 13px;
-              line-height: 1.35;
+              font-size: 12px;
+              line-height: 1.5;
             }
-            .center { text-align: center; }
-            .logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 6px; }
-            .logo-img { max-width: 110px; height: auto; object-fit: contain; filter: grayscale(100%) contrast(250%); }
-            h1 { font-size: 19px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 2px; }
-            .razon { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin: 2px 0 6px; }
-            .dato { font-size: 11.5px; margin: 1px 0; font-weight: 700; }
-            .linea { border-top: 1.5px solid #000; margin: 8px 0; }
-            .linea-doble { border-top: 3px double #000; margin: 8px 0; }
-            .titulo-doc { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 2.5px; text-transform: uppercase; padding: 5px 0; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; margin: 8px 0; }
-            .num-doc { text-align: center; font-size: 15px; font-weight: 900; letter-spacing: 1px; margin: 2px 0 6px; }
-            .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin: 2px 0; }
-            .kv .k { font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px; white-space: nowrap; padding-top: 1px; }
-            .kv .v { font-weight: 900; text-align: right; word-break: break-word; }
-            table { width: 100%; border-collapse: collapse; }
-            thead th { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px; padding: 0 0 4px; border-bottom: 1.5px solid #000; }
-            td { vertical-align: top; padding: 5px 0; border-bottom: 1px dotted #000; font-size: 12.5px; font-weight: 900; }
-            tbody tr:last-child td { border-bottom: none; }
-            .c-cant { width: 34px; text-align: left; padding-right: 6px; }
-            .c-desc { text-align: left; padding-right: 6px; }
-            .c-imp { text-align: right; white-space: nowrap; }
-            .sub { display: block; font-size: 10.5px; font-weight: 700; margin-top: 1px; }
-            .total { display: flex; justify-content: space-between; align-items: baseline; font-size: 18px; font-weight: 900; margin: 4px 0; }
-            .total span:first-child { font-size: 14px; letter-spacing: 1.5px; }
-            .pie { text-align: center; margin-top: 12px; }
-            .pie .gracias { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 3px; }
-            .pie .nota { font-size: 10.5px; font-weight: 700; margin: 1px 0; }
-            .pie .web { font-size: 11px; font-weight: 900; margin-top: 6px; letter-spacing: 0.5px; }
+            p { margin: 0; }
+            .marca { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+            .logo-img { width: 64px; height: 64px; flex-shrink: 0; object-fit: contain; filter: grayscale(100%) contrast(250%); }
+            .marca-nombre { font-size: 18px; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; line-height: 1.1; }
+            .marca-sub { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; }
+            .neg { font-size: 11px; line-height: 1.55; }
+            .sep { border-top: 1px dotted #000; margin: 10px 0; }
+            .doc { font-size: 15px; font-weight: 500; line-height: 1.3; }
+            .num-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; margin-top: 4px; }
+            .num-row span { white-space: nowrap; }
+            .num-row b { font-size: 13px; font-weight: 600; word-break: break-all; text-align: right; }
+            .contado { text-align: center; font-size: 12.5px; letter-spacing: 1px; text-transform: uppercase; margin: 12px 0 10px; }
+            .cli-t { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; }
+            .cli-n { font-size: 12px; font-weight: 700; text-transform: uppercase; }
+            .cab { display: flex; justify-content: space-between; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.4; }
+            .cab span:nth-child(2) { flex: 1; text-align: center; }
+            .it { margin: 0 0 8px; }
+            .r { display: flex; gap: 6px; font-size: 11.5px; line-height: 1.45; }
+            .r .q { width: 26px; flex-shrink: 0; }
+            .r .d { flex: 1; min-width: 0; word-break: break-word; }
+            .r .u { text-align: right; white-space: nowrap; }
+            .nota-it { font-size: 10.5px; }
+            .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; text-transform: uppercase; line-height: 1.6; }
+            .kv span:last-child { text-align: right; text-transform: none; }
+            .kv.sub-pago { font-size: 11px; padding-left: 10px; }
+            .kv.total { font-size: 15px; font-weight: 700; margin: 2px 0; }
+            .pie { text-align: center; font-size: 11px; line-height: 1.6; margin-top: 4px; }
+            .pie .web { letter-spacing: 1px; margin-top: 4px; }
           </style>
         </head>
         <body>
-          <div class="center">
-            <div class="logo-container">
-              <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="ChemaSport ER" class="logo-img" onerror="this.style.display='none'" />
+          <div class="marca">
+            <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="" class="logo-img" onerror="this.style.display='none'" />
+            <div>
+              <p class="marca-nombre">ChemaSport</p>
+              <p class="marca-sub">ER · Grecia</p>
             </div>
-            <h1>ChemaSport ER</h1>
-            <p class="razon">Tienda física</p>
-            <p class="dato">Cédula jurídica: 3-102-916554</p>
-            <p class="dato">50 m oeste de la bomba Delta, Grecia</p>
-            <p class="dato">Tel. +506 6036-9857</p>
           </div>
 
-          <div class="titulo-doc">Tiquete de venta</div>
-          <div class="num-doc">N° ${esc(consecutivoOficial)}</div>
+          <div class="neg">
+            <p>CHEMASPORT ER</p>
+            <p>CÉD. JURÍDICA 3-102-916554</p>
+            <p>50 M OESTE DE LA BOMBA DELTA, GRECIA</p>
+            <p>Teléfono +506 6036-9857</p>
+          </div>
 
-          ${fila("Fecha", esc(fechaHoy))}
-          ${fila("Cliente", esc(clienteNombre))}
-          ${datosCliente.cedula ? fila("Identificación", esc(datosCliente.cedula)) : ""}
-          ${fila("Atendió", esc(vendedorNombre))}
+          <div class="sep"></div>
 
-          <div class="linea"></div>
+          <p class="doc">${esElectronico ? "Tiquete Electrónico" : "Tiquete de Venta"}</p>
+          <div class="num-row"><span>N° comprobante</span><b>${esc(consecutivoOficial)}</b></div>
+          <p class="neg">Fecha emisión ${esc(fechaHoy)}</p>
+          <p class="neg">Atendió ${esc(vendedorNombre)}</p>
 
-          <table>
-            <thead>
-              <tr>
-                <th class="c-cant">Cant</th>
-                <th class="c-desc">Descripción</th>
-                <th class="c-imp">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHTML}
-            </tbody>
-          </table>
+          <p class="contado">Venta al contado</p>
 
-          <div class="linea"></div>
+          <p class="cli-t">Datos del cliente</p>
+          ${datosCliente.cedula ? `<p class="neg">Identificación ${esc(datosCliente.cedula)}</p>` : ""}
+          <p class="cli-n">${esc(clienteNombre)}</p>
+
+          <div class="sep"></div>
+
+          <div class="cab"><span>Cantidad</span><span>Descripción</span><span>Talla</span></div>
+          <div class="cab"><span>&nbsp;</span><span>Precio</span><span>Valor</span></div>
+
+          <div class="sep"></div>
+
+          ${itemsHTML}
+
+          <div class="sep"></div>
+
           ${fila("Artículos", totalUnidadesTiquete)}
-          ${fila("Método de pago", esc(metodoPago))}
-          <div class="linea-doble"></div>
-          <div class="total">
-            <span>TOTAL</span>
-            <span>${colones(totalCobrado)}</span>
-          </div>
-          <div class="linea-doble"></div>
+          ${fila("Total", colones(totalCobrado), "total")}
+          ${fila(esc(metodoPago || "Pago"), desglosePago.length ? "" : colones(totalCobrado))}
+          ${desglosePago.map(([k, m]) => fila(k, colones(m), "sub-pago")).join("")}
+
+          <div class="sep"></div>
 
           <div class="pie">
-            <p class="gracias">¡Gracias por su compra!</p>
-            <p class="nota">Conserve este tiquete para cambios o garantías.</p>
+            <p>¡Gracias por su compra!</p>
+            <p>Conserve este tiquete para cambios o garantías.</p>
             <p class="web">chemasporter.com</p>
           </div>
           <script>
@@ -1236,7 +1241,14 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         fe.ventas || facturaPendiente.ventas,
         data.consecutivoOficial,
         data.totalCobrado ?? facturaPendiente.totalCobrado,
-        { nombre: fe.cliente?.nombre || nombreFinal, cedula: fe.cliente?.cedula || cedulaFinal, fechaHora: fe.fechaHora || payloadTienda.fechaHora },
+        {
+          nombre: fe.cliente?.nombre || nombreFinal,
+          cedula: fe.cliente?.cedula || cedulaFinal,
+          fechaHora: fe.fechaHora || payloadTienda.fechaHora,
+          tipo: fe.tipoEmision || payloadTienda.tipo,
+          vendedor: fe.vendedor,
+          pagos: { efectivo: fe.montoEfectivo ?? payloadTienda.montoEfectivo, datafono: fe.montoDatafono ?? payloadTienda.montoDatafono, sinpe: fe.montoSinpe ?? payloadTienda.montoSinpe }
+        },
         fe.metodoPago || facturaPendiente.metodoPago,
         ventanaTiquete
       );
@@ -2435,7 +2447,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                   {/* 🔥 3. REIMPRESIÓN RÁPIDA PARA YA EMITIDAS */}
                                   <button
                                     type="button"
-                                    onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora }, f.metodoPago)}
+                                    onClick={() => imprimirTicketNativo(f.ventas || [], f.consecutivoOficial, f.totalCobrado, { nombre: f.cliente?.nombre, cedula: f.cliente?.cedula, fechaHora: f.fechaHora, tipo: f.tipoEmision, vendedor: f.vendedor, pagos: { efectivo: f.montoEfectivo, datafono: f.montoDatafono, sinpe: f.montoSinpe } }, f.metodoPago)}
                                     className="inline-flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
                                     title="Reimprimir Tiquete"
                                   >
