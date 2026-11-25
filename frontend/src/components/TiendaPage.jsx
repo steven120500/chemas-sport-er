@@ -828,44 +828,46 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
+            /* 🧾 Papel de 80 mm: mismo margen calibrado para la impresora; todo en negrita y letra grande para que se lea bien en térmica */
             body {
               font-family: Arial, Helvetica, sans-serif;
               color: #000000;
-              font-weight: 500;
+              font-weight: 700;
               margin: 0;
               padding: 6px 4px 36px 40px;
               width: 100%;
               max-width: 72mm;
-              font-size: 12px;
-              line-height: 1.5;
+              font-size: 13px;
+              line-height: 1.4;
             }
+            body * { font-weight: 700 !important; }
             p { margin: 0; }
             .marca { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
             .logo-img { width: 64px; height: 64px; flex-shrink: 0; object-fit: contain; filter: grayscale(100%) contrast(250%); }
-            .marca-nombre { font-size: 18px; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; line-height: 1.1; }
-            .marca-sub { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; }
-            .neg { font-size: 11px; line-height: 1.55; }
-            .sep { border-top: 1px dotted #000; margin: 10px 0; }
-            .doc { font-size: 15px; font-weight: 500; line-height: 1.3; }
-            .num-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; margin-top: 4px; }
+            .marca-nombre { font-size: 20px; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.1; }
+            .marca-sub { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+            .neg { font-size: 12px; line-height: 1.45; }
+            .sep { border-top: 2px dashed #000; margin: 9px 0; }
+            .doc { font-size: 16px; line-height: 1.3; text-transform: uppercase; }
+            .num-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 6px; font-size: 12px; margin-top: 4px; }
             .num-row span { white-space: nowrap; }
-            .num-row b { font-size: 13px; font-weight: 600; word-break: break-all; text-align: right; }
-            .contado { text-align: center; font-size: 12.5px; letter-spacing: 1px; text-transform: uppercase; margin: 12px 0 10px; }
-            .cli-t { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; }
-            .cli-n { font-size: 12px; font-weight: 700; text-transform: uppercase; }
-            .cab { display: flex; justify-content: space-between; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.4; }
+            .num-row b { font-size: 13px; margin-left: auto; text-align: right; overflow-wrap: anywhere; } /* 👈 el consecutivo de Hacienda (20 dígitos) baja entero al siguiente renglón */
+            .contado { text-align: center; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 8px; }
+            .cli-t { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; }
+            .cli-n { font-size: 13.5px; text-transform: uppercase; }
+            .cab { display: flex; justify-content: space-between; font-size: 11.5px; text-transform: uppercase; line-height: 1.35; }
             .cab span:nth-child(2) { flex: 1; text-align: center; }
             .it { margin: 0 0 8px; }
-            .r { display: flex; gap: 6px; font-size: 11.5px; line-height: 1.45; }
-            .r .q { width: 26px; flex-shrink: 0; }
+            .r { display: flex; gap: 6px; font-size: 13px; line-height: 1.35; }
+            .r .q { width: 24px; flex-shrink: 0; }
             .r .d { flex: 1; min-width: 0; word-break: break-word; }
             .r .u { text-align: right; white-space: nowrap; }
-            .nota-it { font-size: 10.5px; }
-            .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; text-transform: uppercase; line-height: 1.6; }
+            .nota-it { font-size: 12px; }
+            .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; text-transform: uppercase; line-height: 1.5; }
             .kv span:last-child { text-align: right; text-transform: none; }
-            .kv.sub-pago { font-size: 11px; padding-left: 10px; }
-            .kv.total { font-size: 15px; font-weight: 700; margin: 2px 0; }
-            .pie { text-align: center; font-size: 11px; line-height: 1.6; margin-top: 4px; }
+            .kv.sub-pago { font-size: 12px; padding-left: 10px; }
+            .kv.total { font-size: 18px; margin: 3px 0; }
+            .pie { text-align: center; font-size: 12px; line-height: 1.5; margin-top: 4px; }
             .pie .web { letter-spacing: 1px; margin-top: 4px; }
           </style>
         </head>
