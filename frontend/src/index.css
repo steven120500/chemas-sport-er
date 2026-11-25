@@ -4720,3 +4720,12 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 /* botones cuadrados de ícono: sin el padding global de <button> (si no, el ícono queda en 0px) */
 .ts-back, .ts-x, .ts-del, .ts-fav-star, .ts-stepper button { padding: 0 !important; }
 .ts-fav-star { padding: 6px !important; }
+/* Categoría (select) + buscador en una fila */
+.ts-buscar-fila { display: flex; gap: 8px; align-items: stretch; }
+.ts-buscar-fila .ts-search { flex: 1; min-width: 0; }
+.ts-tipo { position: relative; flex-shrink: 0; display: flex; align-items: center; max-width: 42%; }
+.ts-tipo select { appearance: none; -webkit-appearance: none; height: 100%; min-height: 52px; padding: 0 32px 0 14px; border-radius: 14px; background: #fafafa; border: 2px solid #e4e4e7; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: #111; outline: none; cursor: pointer; max-width: 100%; text-overflow: ellipsis; }
+.ts-tipo select:focus { border-color: #111; background: #fff; }
+.ts-tipo.is-on select { background: #111; color: #fff; border-color: #111; }
+.ts-tipo-flecha { position: absolute; right: 12px; pointer-events: none; transform: rotate(90deg); color: #71717a; }
+.ts-tipo.is-on .ts-tipo-flecha { color: #fff; }

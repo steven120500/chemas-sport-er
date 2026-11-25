@@ -1660,18 +1660,21 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
             {modoIngresoProducto === "catalogo" ? (
               <>
-                <div className="ts-chips scrollbar-hide">
-                  {tiposDisponibles.map((t) => {
-                    const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
-                    return (
-                      <button key={t} type="button" onClick={() => setTipoFiltroSeleccionado(t)} className={`ts-chip ${activo ? "is-on" : ""}`}>
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-
                 <div className="relative">
+                  {/* 👈 Categoría en un select pegado al buscador (antes era una tira de botones) */}
+                  <div className="ts-buscar-fila">
+                  <label className={`ts-tipo ${tipoFiltroSeleccionado !== "Todos" ? "is-on" : ""}`} title="Categoría">
+                    <select
+                      value={tipoFiltroSeleccionado}
+                      onChange={(e) => { setTipoFiltroSeleccionado(e.target.value); setMostrarDropdownProductos(true); }}
+                      aria-label="Categoría"
+                    >
+                      {tiposDisponibles.map((t) => (
+                        <option key={t} value={t}>{t === "Todos" ? "Todas" : t}</option>
+                      ))}
+                    </select>
+                    <FaChevronRight size={10} className="ts-tipo-flecha" />
+                  </label>
                   <div className="ts-search">
                     <FaSearch size={14} className="ts-search-ico" />
                     <input
@@ -1685,6 +1688,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       placeholder="Buscar equipo, jugador o categoría…"
                     />
                     {buscandoProductos && <span className="ts-search-status">Buscando…</span>}
+                  </div>
                   </div>
 
                   {mostrarDropdownProductos && resultadosBusqueda.length > 0 && (
