@@ -1089,7 +1089,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       })
     );
 
-    setFacturasPendientes((prev) => [nuevaPendiente, ...prev]);
+    // 👈 Ya no se agrega a "Por emitir": se emite de una vez y solo queda pendiente si la emisión falla
 
     setCarritoVentas([]);
     setProductoSeleccionado(null);
@@ -1102,11 +1102,17 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setCantidadExtraCustom(1);
     setFormCliente((prev) => ({ ...prev, pagoConBillete: "", metodoPago: "", montoEfectivoMixto: "", montoDatafonoMixto: "", montoSinpeMixto: "" }));
 
-    toastHOT.success(`Venta registrada en ${formCliente.metodoPago} · ₡${totalCalculadoForm.toLocaleString("es-CR")}`);
     return nuevaPendiente; // 👈 se emite de una vez al confirmar (como mínimo interno)
   };
 
-  const handleEmitirDesdeTabla = async (facturaPendiente) => {
+  // 👈 esNueva = viene directo del "Confirmar y emitir" (todavía no está en la tabla)
+  const handleEmitirDesdeTabla = async (facturaPendiente, { esNueva = false } = {}) => {
+    // ⚠️ Si una venta nueva no se pudo emitir, queda en la tabla como "Por emitir" para reintentar
+    const dejarPendiente = () => {
+      if (!esNueva) return;
+      setFacturasPendientes((prev) => [facturaPendiente, ...prev.filter((f) => f._id !== facturaPendiente._id)]);
+    };
+
     if (!Array.isArray(facturaPendiente.ventas) || facturaPendiente.ventas.length === 0) {
       toastHOT.error("Esta factura no tiene artículos.");
       return;
@@ -1123,6 +1129,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     if (facturaPendiente.tipo === "hacienda" && (!cedulaFinal || !nombreFinal || !correoFinal || !telefonoFinal)) {
       setMostrarDatosCliente(true);
       toastHOT.error("Para emitir a Hacienda completa Cédula, Nombre, Teléfono y Correo en \"Datos del cliente\" arriba (o cambia a Ticket Interno).");
+      dejarPendiente();
       return;
     }
 
@@ -1177,7 +1184,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       await fetchResumenTienda();
     } catch (error) {
       try { ventanaTiquete?.close(); } catch { /* ya cerrada */ }
-      toastHOT.error(`Error al emitir: ${error.message}`, { id: toastId, duration: 6000 });
+      dejarPendiente();
+      toastHOT.error(`Error al emitir: ${error.message}${esNueva ? " · quedó en la tabla como \"Por emitir\" para reintentar" : ""}`, { id: toastId, duration: 6000 });
     } finally {
       setEmitiendoId(null);
     }
@@ -2477,7 +2485,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   onClick={() => {
                     // 🔒 Toda venta se emite al confirmar (interno como mínimo); si falla queda pendiente para reintentar
                     const nueva = handleAgregarVentaATabla();
-                    if (nueva) { close(); handleEmitirDesdeTabla(nueva); }
+                    if (nueva) { close(); handleEmitirDesdeTabla(nueva, { esNueva: true }); }
                   }}
                 >
                   <FaCheckCircle size={14} /> Confirmar y emitir · {fmt(totalCalculadoForm)}
