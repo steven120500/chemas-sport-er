@@ -4511,3 +4511,9 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .md-card .vw-fact-opt:hover, .vw-fact-opt:hover { border-color: #000; background: #fafafa; transform: none; }
 .vw-fact-opt strong { font-size: 15px; font-weight: 900; }
 .vw-fact-opt small { font-size: 12px; color: #71717a; }
+
+/* ===== TIENDA: estado de emisión en la tabla ===== */
+.tp-emitiendo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 8px; background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.tp-emitiendo-sp { width: 11px; height: 11px; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: tpEmitiendo 0.8s linear infinite; }
+@keyframes tpEmitiendo { to { transform: rotate(360deg); } }
+.tp-emitida { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 8px; background: #f0fdf4; border: 1px solid #86efac; color: #15803d; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }

@@ -1107,11 +1107,10 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   // 👈 esNueva = viene directo del "Confirmar y emitir" (todavía no está en la tabla)
   const handleEmitirDesdeTabla = async (facturaPendiente, { esNueva = false } = {}) => {
-    // ⚠️ Si una venta nueva no se pudo emitir, queda en la tabla como "Por emitir" para reintentar
-    const dejarPendiente = () => {
-      if (!esNueva) return;
+    // 👈 La venta nueva entra a la tabla de una vez (se ve "Emitiendo…"); si la emisión falla queda "Por emitir" para reintentar
+    if (esNueva) {
       setFacturasPendientes((prev) => [facturaPendiente, ...prev.filter((f) => f._id !== facturaPendiente._id)]);
-    };
+    }
 
     if (!Array.isArray(facturaPendiente.ventas) || facturaPendiente.ventas.length === 0) {
       toastHOT.error("Esta factura no tiene artículos.");
@@ -1129,7 +1128,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     if (facturaPendiente.tipo === "hacienda" && (!cedulaFinal || !nombreFinal || !correoFinal || !telefonoFinal)) {
       setMostrarDatosCliente(true);
       toastHOT.error("Para emitir a Hacienda completa Cédula, Nombre, Teléfono y Correo en \"Datos del cliente\" arriba (o cambia a Ticket Interno).");
-      dejarPendiente();
       return;
     }
 
@@ -1151,8 +1149,16 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     };
 
     // 🖨️ Se abre la ventana del tiquete ya (en el click); si se abre después del await el navegador la bloquea
+    // 🖨️ Primero sale la ventana de imprimir (enfocada) con "Emitiendo…"; al llegar el número oficial se imprime sola
     const ventanaTiquete = window.open("", "_blank", "width=400,height=650");
-    try { ventanaTiquete?.document.write("<p style='font-family:Arial;font-weight:900;padding:16px'>Emitiendo comprobante...</p>"); } catch { /* sin ventana */ }
+    try {
+      ventanaTiquete?.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Imprimiendo…</title>
+        <style>body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:Arial,sans-serif;text-align:center}
+        .sp{width:38px;height:38px;border:4px solid #e4e4e7;border-top-color:#000;border-radius:50%;animation:g 0.8s linear infinite}
+        @keyframes g{to{transform:rotate(360deg)}} b{font-size:15px;text-transform:uppercase;letter-spacing:1px} small{color:#71717a;font-weight:700}</style></head>
+        <body><div class="sp"></div><b>Emitiendo comprobante…</b><small>El tiquete se imprime en unos segundos</small></body></html>`);
+      ventanaTiquete?.focus();
+    } catch { /* sin ventana */ }
 
     setEmitiendoId(facturaPendiente._id);
     const toastId = toastHOT.loading("Emitiendo comprobante oficial...");
@@ -1172,6 +1178,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
       // 🖨️ Se imprime ya con el consecutivo oficial (nunca un tiquete "PENDIENTE")
       const fe = data.facturaTienda || {};
+      // ✅ La fila pasa de una vez a "Emitida" (sin esperar a que recargue el resumen)
+      if (fe._id) setFacturasEmitidas((prev) => [fe, ...prev.filter((f) => f._id !== fe._id)]);
       imprimirTicketNativo(
         fe.ventas || facturaPendiente.ventas,
         data.consecutivoOficial,
@@ -1184,7 +1192,6 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       await fetchResumenTienda();
     } catch (error) {
       try { ventanaTiquete?.close(); } catch { /* ya cerrada */ }
-      dejarPendiente();
       toastHOT.error(`Error al emitir: ${error.message}${esNueva ? " · quedó en la tabla como \"Por emitir\" para reintentar" : ""}`, { id: toastId, duration: 6000 });
     } finally {
       setEmitiendoId(null);
@@ -2265,7 +2272,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       return (
                         <tr key={f._id} className={`${esPendiente ? "bg-amber-50/40 hover:bg-amber-50/70" : "hover:bg-zinc-50"} transition-colors`}>
                           <td className="py-3.5 px-3 whitespace-nowrap">
-                            {esPendiente ? (
+                            {esPendiente && estaEmitiendoEsta ? (
+                              <span className="tp-emitiendo">
+                                <span className="tp-emitiendo-sp" aria-hidden="true" /> Emitiendo…
+                              </span>
+                            ) : esPendiente ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 font-black text-[10px] uppercase tracking-wider">
                                 <FaClock size={10} /> Por Emitir
                               </span>
@@ -2335,7 +2346,11 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
                           <td className="py-3.5 px-3 text-right whitespace-nowrap">
                             <div className="inline-flex items-center justify-end gap-2">
-                              {esPendiente ? (
+                              {esPendiente && estaEmitiendoEsta ? (
+                                <span className="tp-emitiendo">
+                                  <span className="tp-emitiendo-sp" aria-hidden="true" /> Emitiendo…
+                                </span>
+                              ) : esPendiente ? (
                                 <>
                                   {/* 🔒 Ya no hay "Imprimir" suelto: solo se imprime al emitir (con consecutivo oficial) */}
                                   <select
@@ -2362,6 +2377,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 </>
                               ) : (
                                 <>
+                                  <span className="tp-emitida" title="Comprobante ya emitido">
+                                    <FaCheckCircle size={11} /> Emitida
+                                  </span>
                                   {/* 🔥 3. REIMPRESIÓN RÁPIDA PARA YA EMITIDAS */}
                                   <button
                                     type="button"
@@ -2375,7 +2393,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                 </>
                               )}
 
-                              {puedeAnularVentas && (
+                              {puedeAnularVentas && !estaEmitiendoEsta && (
                                 <button
                                   type="button"
                                   onClick={() => eliminarRegistroFacturaCaja(f)}
