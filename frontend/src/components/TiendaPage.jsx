@@ -742,7 +742,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   };
 
   const eliminarItemCarrito = (uid) => {
-    if (!puedeAnularVentas) return; // 🔒 el usuario tienda no elimina nada
+    // 👈 Cualquiera puede quitar del tiquete antes de emitir (todavía no se ha tocado el stock)
     setCarritoVentas((prev) => prev.filter((item) => item.uid !== uid));
   };
 
@@ -1158,7 +1158,24 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setDetalleExtraCustom("");
     setMontoExtraCustom("");
     setCantidadExtraCustom(1);
-    setFormCliente((prev) => ({ ...prev, pagoConBillete: "", metodoPago: "", montoEfectivoMixto: "", montoDatafonoMixto: "", montoSinpeMixto: "" }));
+    setTallaExtraCustom("U");
+    // 🧹 Formulario limpio para la próxima venta: pago, tipo de emisión y datos del cliente
+    // (la factura ya guardó su copia en nuevaPendiente.cliente)
+    setFormCliente({
+      tipoEmision: "interno",
+      metodoPago: "",
+      pagoConBillete: "",
+      montoEfectivoMixto: "",
+      montoDatafonoMixto: "",
+      montoSinpeMixto: "",
+      tipoIdentificacion: "01",
+      cedula: "",
+      nombre: "",
+      telefono: "",
+      correo: ""
+    });
+    setMostrarDatosCliente(false);
+    setMostrarListaContactos(false);
 
     return nuevaPendiente; // 👈 se emite de una vez al confirmar (como mínimo interno)
   };
@@ -1523,79 +1540,48 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     return facturasFiltradas.slice(start, start + itemsPerPage);
   }, [facturasFiltradas, safeCurrentPage, itemsPerPage]);
 
-  return (
-    <div className="min-h-screen adm-page pt-8 sm:pt-10 pb-32 px-4 sm:px-6 lg:px-8 font-sans text-black relative">
-      <div className="max-w-6xl mx-auto">
-        
-        <button 
-          onClick={() => navigate("/")} 
-          className="inline-flex items-center gap-2 bg-black border border-gray-600 text-zinc-300 hover:text-white hover:bg-zinc-800 px-5 py-2.5 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-sm cursor-pointer transition-all mb-8"
-        >
-          <FaChevronLeft size={12} /> Volver al catálogo
-        </button>
+  // 🧾 Lo que se ve en la "Cuenta": lo agregado o, si no hay nada, la prenda/abono que se está armando (se cobra igual)
+  const cuentaEsPreview = carritoVentas.length === 0 && listaFinalParaCobrar.length > 0;
+  const metActivo = metodoInfo(formCliente.metodoPago);
+  const fmtCRC = (n) => `₡${(Number(n) || 0).toLocaleString("es-CR")}`;
+  const irACuenta = () => document.getElementById("tienda-cuenta")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        {/* ENCABEZADO */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight">
-                ChemaSport ER 
+  return (
+    <div className="min-h-screen adm-page ts-page font-sans text-black relative">
+      <div className="ts-wrap">
+
+        {/* 🔝 BARRA SUPERIOR: volver, título y controles de caja */}
+        <header className="ts-top">
+          <div className="ts-top-left">
+            <button type="button" onClick={() => navigate("/")} className="ts-back" title="Volver al catálogo">
+              <FaChevronLeft size={12} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="ts-title">
+                Caja · Tienda
+                <span className="ts-pill"><FaShoppingBag size={11} /> {resumenCaja.totalPrendas || 0} chemas</span>
               </h1>
-              <div className="bg-black text-white px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-md">
-                <FaShoppingBag className="text-white" size={14} />
-                <span className="text-xs font-black uppercase tracking-widest">
-                  {resumenCaja.totalPrendas || 0} Chemas
-                </span>
-              </div>
+              <p className="ts-sub">Ventas en mostrador · {nombreUsuarioActual}</p>
             </div>
-            <p className="text-zinc-500 text-sm font-medium mt-1">
-              Facturación directa y arqueo de caja exclusivo para ventas en mostrador.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200">
-              <button
-                type="button"
-                onClick={() => setTipoVistaCaja("dia")}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  tipoVistaCaja === "dia" ? "bg-black text-white shadow-sm" : "text-gray-600 bg-white hover:text-black"
-                }`}
-              >
-                Por Día
-              </button>
-              <button
-                type="button"
-                onClick={() => setTipoVistaCaja("mes")}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  tipoVistaCaja === "mes" ? "bg-black text-white shadow-sm" : "text-gray-600 bg-white hover:text-black"
-                }`}
-              >
-                Mensual
-              </button>
+          <div className="ts-top-controls">
+            <div className="ts-seg is-sm" role="tablist">
+              <button type="button" className={tipoVistaCaja === "dia" ? "is-on" : ""} onClick={() => setTipoVistaCaja("dia")}>Día</button>
+              <button type="button" className={tipoVistaCaja === "mes" ? "is-on" : ""} onClick={() => setTipoVistaCaja("mes")}>Mes</button>
             </div>
 
-            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
-              <FaCalendarAlt className="text-zinc-400" />
+            <label className="ts-chip-input">
+              <FaCalendarAlt size={12} />
               {tipoVistaCaja === "dia" ? (
-                <input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)} 
-                  className="bg-transparent text-xs sm:text-sm font-black text-black outline-none cursor-pointer" 
-                />
+                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
               ) : (
-                <input 
-                  type="month" 
-                  value={selectedMesYM} 
-                  onChange={(e) => setSelectedMesYM(e.target.value)} 
-                  className="bg-transparent text-xs sm:text-sm font-black text-black outline-none cursor-pointer" 
-                />
+                <input type="month" value={selectedMesYM} onChange={(e) => setSelectedMesYM(e.target.value)} />
               )}
-            </div>
+            </label>
 
-            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3.5 py-2.5 rounded-2xl">
-              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Base Caja: ₡</span>
+            <label className="ts-chip-input" title="Efectivo inicial para dar vueltos">
+              <span className="ts-chip-label">Base ₡</span>
               <input
                 type="number"
                 min="0"
@@ -1603,153 +1589,89 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 value={fondoCajaBase || ""}
                 onChange={(e) => handleFondoCajaChange(e.target.value)}
                 placeholder="0"
-                className="w-20 bg-transparent text-sm font-black text-black outline-none"
-                title="Efectivo inicial para dar vueltos"
+                className="ts-base-input"
               />
-            </div>
+            </label>
           </div>
-        </div>
+        </header>
 
-        {/* 💰 TARJETAS DE CAJA */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-yellow-50/80 border-2 border-yellow-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Efectivo en Caja</span>
-              <div className="w-9 h-9 rounded-2xl bg-yellow-500 text-white flex items-center justify-center shadow-sm">
-                <FaMoneyBillWave size={15} />
+        {/* 💰 CAJA */}
+        <section className="ts-stats">
+          <div className="ts-stat is-efectivo">
+            <span className="ts-stat-ico"><FaMoneyBillWave size={14} /></span>
+            <span className="ts-stat-label">Efectivo en caja</span>
+            <b className="ts-stat-num">{fmtCRC(Number(resumenCaja.efectivo || 0) + Number(fondoCajaBase || 0))}</b>
+            <small>Ventas: {fmtCRC(resumenCaja.efectivo)}</small>
+          </div>
+          <div className="ts-stat is-datafono">
+            <span className="ts-stat-ico"><FaCreditCard size={14} /></span>
+            <span className="ts-stat-label">Datáfono</span>
+            <b className="ts-stat-num">{fmtCRC(resumenCaja.datafono)}</b>
+            <small>{tipoVistaCaja === "mes" ? "Tarjetas del mes" : "Tarjetas del día"}</small>
+          </div>
+          <div className="ts-stat is-sinpe">
+            <span className="ts-stat-ico"><FaMobileAlt size={14} /></span>
+            <span className="ts-stat-label">SINPE</span>
+            <b className="ts-stat-num">{fmtCRC(resumenCaja.sinpe)}</b>
+            <small>{tipoVistaCaja === "mes" ? "SINPE del mes" : "SINPE del día"}</small>
+          </div>
+          <div className="ts-stat is-total">
+            <span className="ts-stat-ico"><FaCashRegister size={14} /></span>
+            <span className="ts-stat-label">{tipoVistaCaja === "mes" ? "Total del mes" : "Total del día"}</span>
+            <b className="ts-stat-num">{fmtCRC(resumenCaja.total)}</b>
+            <small>{resumenCaja.cantidadFacturas || 0} comprobante(s) · {resumenCaja.totalPrendas || 0} prenda(s)</small>
+          </div>
+        </section>
+
+        <div className="ts-grid">
+          {/* 1️⃣ AGREGAR A LA CUENTA */}
+          <section className="ts-card ts-add">
+            <div className="ts-card-head">
+              <span className="ts-step">1</span>
+              <div>
+                <h2>Agregar a la cuenta</h2>
+                <p>Buscá la camiseta o registrá un ingreso extra</p>
               </div>
             </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-orange-950 leading-none">
-                ₡{(Number(resumenCaja.efectivo || 0) + Number(fondoCajaBase || 0)).toLocaleString("es-CR")}
-              </p>
-              <p className="text-[11px] font-bold text-orange-600 mt-1.5">
-                Ventas Efec: ₡{Number(resumenCaja.efectivo || 0).toLocaleString("es-CR")}
-              </p>
-            </div>
-          </div>
 
-          <div className="bg-blue-50/80 border-2 border-blue-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Total en Datáfono</span>
-              <div className="w-9 h-9 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-sm">
-                <FaCreditCard size={15} />
-              </div>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-blue-950 leading-none">
-                ₡{Number(resumenCaja.datafono || 0).toLocaleString("es-CR")}
-              </p>
-              <p className="text-[11px] font-bold text-blue-600 mt-1.5">
-                {tipoVistaCaja === "mes" ? "Tarjetas del mes" : "Tarjetas hoy"}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-purple-50/80 border-2 border-purple-500 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">Total en SINPE</span>
-              <div className="w-9 h-9 rounded-2xl bg-purple-500 text-white flex items-center justify-center shadow-sm">
-                <FaMobileAlt size={15} />
-              </div>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-purple-950 leading-none">
-                ₡{Number(resumenCaja.sinpe || 0).toLocaleString("es-CR")}
-              </p>
-              <p className="text-[11px] font-bold text-purple-600 mt-1.5">
-                {tipoVistaCaja === "mes" ? "SINPE Móvil del mes" : "SINPE Móvil hoy"}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-600 to-green-500 text-white border-2 border-green-600 rounded-3xl p-5 shadow-md flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-100">
-                {tipoVistaCaja === "mes" ? "Ganancia / Total Mes" : "Ganancia / Total Día"}
-              </span>
-              <div className="w-9 h-9 rounded-2xl bg-white/20 text-white flex items-center justify-center">
-                <FaCashRegister size={15} />
-              </div>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-white leading-none">
-                ₡{Number(resumenCaja.total || 0).toLocaleString("es-CR")}
-              </p>
-              <p className="text-[11px] font-bold text-green-100 mt-1.5">
-                {resumenCaja.cantidadFacturas || 0} comprobante(s) · {resumenCaja.totalPrendas || 0} prenda(s)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* 🛒 FORMULARIO DE FACTURACIÓN EN MOSTRADOR */}
-        <div className="bg-white rounded-3xl border-2 border-zinc-200/90 p-6 sm:p-10 shadow-xl mb-10 relative">
-          <div className="flex items-center gap-3 border-b border-zinc-100 pb-5 mb-7">
-            <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shadow-sm">
-              <FaBoxOpen size={18} />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-black tracking-tight">
-                Facturar Venta en Mostrador
-              </h2>
-              <p className="text-xs text-zinc-400 font-bold">
-                Filtra por tipo, selecciona las prendas, regístralas en la tabla inferior y emite la factura cuando quieras.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                Tipo de Operación / Ingreso *
-              </label>
-              <select
-                value={modoIngresoProducto}
-                onChange={(e) => {
-                  setModoIngresoProducto(e.target.value);
-                  setProductoSeleccionado(null);
-                  setMostrarDropdownProductos(false);
-                }}
-                className="w-full px-4 py-3.5 bg-white border-2 border-zinc-900 rounded-2xl text-xs sm:text-sm font-black text-black outline-none cursor-pointer shadow-sm"
+            <div className="ts-seg is-full">
+              <button
+                type="button"
+                className={modoIngresoProducto === "catalogo" ? "is-on" : ""}
+                onClick={() => { setModoIngresoProducto("catalogo"); setProductoSeleccionado(null); setMostrarDropdownProductos(false); }}
               >
-                <option value="catalogo">Venta Normal de Inventario (Buscar prenda y descontar stock)</option>
-                <option value="extra">Abono / Saldo Restante / Prenda ya rebajada o sin stock (Suma a Caja sin tocar stock)</option>
-              </select>
+                <FaBoxOpen size={13} /> Inventario
+              </button>
+              <button
+                type="button"
+                className={modoIngresoProducto === "extra" ? "is-on" : ""}
+                onClick={() => { setModoIngresoProducto("extra"); setProductoSeleccionado(null); setMostrarDropdownProductos(false); }}
+              >
+                <FaPlus size={11} /> Ingreso extra
+              </button>
             </div>
+            <p className="ts-hint">
+              {modoIngresoProducto === "catalogo"
+                ? "Rebaja el stock de la ubicación que escojás."
+                : "Abono, saldo restante o prenda ya rebajada: suma a caja sin tocar el stock."}
+            </p>
 
             {modoIngresoProducto === "catalogo" ? (
               <>
-                <div>
-                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-2">
-                    Filtrar por Categoría / Tipo
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tiposDisponibles.map((t) => {
-                      const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setTipoFiltroSeleccionado(t)}
-                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                            activo
-                              ? "bg-black text-white border-black shadow-sm"
-                              : "bg-gray-100 text-black border-gray-300 hover:bg-gray-200"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="ts-chips scrollbar-hide">
+                  {tiposDisponibles.map((t) => {
+                    const activo = String(tipoFiltroSeleccionado).toLowerCase() === String(t).toLowerCase();
+                    return (
+                      <button key={t} type="button" onClick={() => setTipoFiltroSeleccionado(t)} className={`ts-chip ${activo ? "is-on" : ""}`}>
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="relative">
-                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                    Buscar Camiseta o Artículo *
-                  </label>
-                  <div className="relative">
+                  <div className="ts-search">
+                    <FaSearch size={14} className="ts-search-ico" />
                     <input
                       type="text"
                       value={busquedaProducto}
@@ -1758,19 +1680,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         setBusquedaProducto(e.target.value);
                         setMostrarDropdownProductos(true);
                       }}
-                      placeholder="Escribe el equipo, jugador o categoría..."
-                      className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all"
+                      placeholder="Buscar equipo, jugador o categoría…"
                     />
-                    <FaSearch className="absolute left-3.5 top-5 -translate-y-1/2 text-zinc-400" size={13} />
-                    {buscandoProductos && (
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-zinc-400">
-                        Buscando...
-                      </span>
-                    )}
+                    {buscandoProductos && <span className="ts-search-status">Buscando…</span>}
                   </div>
 
                   {mostrarDropdownProductos && resultadosBusqueda.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl z-40 divide-y divide-zinc-100">
+                    <div className="ts-results">
                       {resultadosBusqueda.map((p) => {
                         const nombre = p.name || p.nombre || p.title || "Camiseta";
                         const tipo = p.type || p.tipo || "";
@@ -1779,34 +1695,20 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                         const totalDisp = getAvailableSizes(p).reduce((acc, t) => acc + (Number(t.stock) || 0), 0);
 
                         return (
-                          <div
-                            key={p._id || p.id}
-                            onClick={() => seleccionarProductoBusqueda(p)}
-                            className="px-3.5 py-2.5 hover:bg-zinc-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              {thumb ? (
-                                <img src={cldThumb(thumb)} alt="" className="w-11 h-11 rounded-xl object-cover border border-zinc-200 bg-zinc-100 shrink-0" />
-                              ) : (
-                                <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400 shrink-0">
-                                  <FaShoppingBag size={14} />
-                                </div>
-                              )}
-
-                              <div className="min-w-0 flex-1">
-                                <p className="font-black text-xs text-black truncate">
-                                  {nombre} {tipo ? <span className="text-zinc-500 font-bold">({tipo})</span> : ""}
-                                </p>
-                                {/* 👈 Solo el total: las tallas se ven al seleccionar la camiseta */}
-                                <p className="text-[10px] font-bold text-zinc-500 mt-0.5">
-                                  {totalDisp} disponible{totalDisp === 1 ? "" : "s"}
-                                </p>
-                              </div>
+                          <div key={p._id || p.id} onClick={() => seleccionarProductoBusqueda(p)} className="ts-result">
+                            {thumb ? (
+                              <img src={cldThumb(thumb)} alt="" className="ts-thumb" />
+                            ) : (
+                              <div className="ts-thumb is-empty"><FaShoppingBag size={14} /></div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="ts-result-name">{nombre} {tipo && <span>({tipo})</span>}</p>
+                              {/* 👈 Solo el total: las tallas se ven al seleccionar la camiseta */}
+                              <p className={`ts-result-stock ${totalDisp === 0 ? "is-zero" : ""}`}>
+                                {totalDisp} disponible{totalDisp === 1 ? "" : "s"}
+                              </p>
                             </div>
-
-                            <span className="font-black text-xs text-blue-600 shrink-0">
-                              ₡{precio.toLocaleString("es-CR")}
-                            </span>
+                            <span className="ts-result-precio">{fmtCRC(precio)}</span>
                           </div>
                         );
                       })}
@@ -1814,30 +1716,26 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   )}
                 </div>
 
-                {productoSeleccionado && (
-                  <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {getProductThumb(productoSeleccionado) && (
-                          <img src={cldThumb(getProductThumb(productoSeleccionado))} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-200 bg-white shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 block">Prenda Seleccionada</span>
-                          <h4 className="text-sm font-black text-black truncate">
-                            {productoSeleccionado.name || productoSeleccionado.nombre} {productoSeleccionado.type ? `(${productoSeleccionado.type})` : ""}
-                          </h4>
-                        </div>
+                {productoSeleccionado ? (
+                  <div className="ts-sel">
+                    <div className="ts-sel-head">
+                      {getProductThumb(productoSeleccionado) && (
+                        <img src={cldThumb(getProductThumb(productoSeleccionado), 192)} alt="" className="ts-thumb is-lg" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <span className="ts-eyebrow">Prenda seleccionada</span>
+                        <h4 className="ts-sel-name">
+                          {productoSeleccionado.name || productoSeleccionado.nombre} {productoSeleccionado.type ? `(${productoSeleccionado.type})` : ""}
+                        </h4>
                       </div>
-                      <button type="button" onClick={() => setProductoSeleccionado(null)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-red-600 cursor-pointer">
-                        ✕
+                      <button type="button" onClick={() => setProductoSeleccionado(null)} className="ts-x" title="Quitar selección">
+                        <FaTimes size={12} />
                       </button>
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
-                        Ubicación de donde sale la prenda *
-                      </label>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="ts-field">
+                      <span className="ts-label">¿De dónde sale?</span>
+                      <div className="ts-opts">
                         {["Tienda", "Bodega 1", "Bodega 2"].map((ubi) => {
                           const tieneEnUbi = ubicacionesConStock.includes(ubi);
                           const activa = ubicacionSeleccionada === ubi;
@@ -1846,13 +1744,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                               key={ubi}
                               type="button"
                               onClick={() => cambiarUbicacionSeleccionada(ubi)}
-                              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                                activa
-                                  ? "bg-black text-white border-black shadow-sm"
-                                  : tieneEnUbi
-                                  ? "bg-white text-gray-800 border-gray-600 hover:border-black"
-                                  : "bg-gray-100 text-gray-400 border-gray-200"
-                              }`}
+                              className={`ts-opt ${activa ? "is-on" : ""} ${!tieneEnUbi && !activa ? "is-off" : ""}`}
                             >
                               {ubi}
                             </button>
@@ -1861,37 +1753,34 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1.5">
-                        Selecciona Talla Disponible en {ubicacionSeleccionada} *
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {tallasDisponiblesActuales.map((t) => {
-                          const activa = tallaSeleccionada === t.talla;
-                          return (
-                            <button
-                              key={`${t.ubicacion}_${t.talla}`}
-                              type="button"
-                              onClick={() => setTallaSeleccionada(t.talla)}
-                              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                                activa
-                                  ? "bg-black text-white border-black shadow-sm"
-                                  : "bg-white text-gray-800 border-gray-600 hover:border-black"
-                              }`}
-                            >
-                              {t.talla} <span className="text-[10px] opacity-75">({t.stock})</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div className="ts-field">
+                      <span className="ts-label">Talla en {ubicacionSeleccionada}</span>
+                      {tallasDisponiblesActuales.length === 0 ? (
+                        <p className="ts-empty-line">No hay tallas disponibles en {ubicacionSeleccionada}.</p>
+                      ) : (
+                        <div className="ts-opts">
+                          {tallasDisponiblesActuales.map((t) => {
+                            const activa = tallaSeleccionada === t.talla;
+                            return (
+                              <button
+                                key={`${t.ubicacion}_${t.talla}`}
+                                type="button"
+                                onClick={() => setTallaSeleccionada(t.talla)}
+                                className={`ts-opt is-talla ${activa ? "is-on" : ""}`}
+                              >
+                                {t.talla}
+                                <small>{t.stock}</small>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {opcionesDorsal.length > 0 && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
-                        <label className="block text-[10px] font-black text-blue-800 uppercase tracking-wider">
-                          👕 Dorsal de {unidadesVenta > 1 ? "cada camiseta" : "la camiseta"} *
-                        </label>
-                        <p className="text-[10px] font-bold text-blue-700">
+                      <div className="ts-dorsal">
+                        <span className="ts-label is-blue">👕 Dorsal de {unidadesVenta > 1 ? "cada camiseta" : "la camiseta"}</span>
+                        <p>
                           {hayDorsalDisponible
                             ? "Se rebaja también en la versión Player/Fan del mismo equipo."
                             : "No quedan impresiones disponibles de esta camiseta."}
@@ -1908,7 +1797,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                                   return copia;
                                 })
                               }
-                              className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-black text-black outline-none focus:border-black"
+                              className="ts-input"
                             >
                               <option value="" disabled>{unidadesVenta > 1 ? `Camiseta ${i + 1}: ` : ""}Escogé el dorsal…</option>
                               {opcionesDorsal.map((o) => {
@@ -1925,233 +1814,219 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                      <div>
-                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Cantidad *</label>
-                        <input type="number" min="1" value={cantidadVenta} onChange={(e) => setCantidadVenta(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black" />
+                    <div className="ts-row">
+                      <div className="ts-field">
+                        <span className="ts-label">Cantidad</span>
+                        <div className="ts-stepper">
+                          <button type="button" onClick={() => setCantidadVenta((c) => Math.max(1, (Number(c) || 1) - 1))} aria-label="Menos">−</button>
+                          <input type="number" min="1" value={cantidadVenta} onChange={(e) => setCantidadVenta(e.target.value)} />
+                          <button type="button" onClick={() => setCantidadVenta((c) => (Number(c) || 0) + 1)} aria-label="Más">+</button>
+                        </div>
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">Precio Unitario ₡ *</label>
-                        <input type="number" value={precioUnitarioInput} onChange={(e) => setPrecioUnitarioInput(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-blue-600 outline-none focus:border-black" />
-                      </div>
-
-                      <div className="flex items-end">
-                        <button type="button" onClick={agregarPrendaAlCarrito} className="w-full py-2.5 px-4 bg-black hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all">
-                          <FaPlus size={11} className="text-amber-400" />
-                          <span>Agregar a cuenta</span>
-                        </button>
+                      <div className="ts-field">
+                        <span className="ts-label">Precio c/u</span>
+                        <div className="ts-money">
+                          <span>₡</span>
+                          <input type="number" value={precioUnitarioInput} onChange={(e) => setPrecioUnitarioInput(e.target.value)} />
+                        </div>
                       </div>
                     </div>
+
+                    <button type="button" onClick={agregarPrendaAlCarrito} className="ts-btn is-dark is-block">
+                      <FaPlus size={11} /> Agregar a la cuenta
+                    </button>
+                  </div>
+                ) : (
+                  <div className="ts-placeholder">
+                    <FaSearch size={18} />
+                    <p>Buscá una camiseta para escoger ubicación, talla y cantidad.</p>
                   </div>
                 )}
               </>
             ) : (
-              <div className="p-4 sm:p-5 bg-zinc-50 border-2 border-zinc-900 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 block">
-                      Ingreso directo a Caja (No descuenta inventario)
-                    </span>
-                    <h4 className="text-sm font-black text-black">
-                      Registrar Abono, Saldo Restante o Prenda Fuera de Stock
-                    </h4>
+              <div className="ts-sel">
+                <div className="ts-row">
+                  <div className="ts-field">
+                    <span className="ts-label">Concepto</span>
+                    <div className="ts-fixed">{conceptoExtraTipo}</div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
-                      Concepto Base *
-                    </label>
-                    <div className="w-full px-3 py-2.5 bg-zinc-100 border border-zinc-300 rounded-xl text-xs font-black text-black">
-                      {conceptoExtraTipo}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
-                      Detalle opcional (Ej. Real Madrid, Restante, etc.)
-                    </label>
-                    <input
-                      type="text"
-                      value={detalleExtraCustom}
-                      onChange={(e) => setDetalleExtraCustom(e.target.value)}
-                      placeholder="Ej. Restante de camiseta ya entregada..."
-                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-black outline-none focus:border-black"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
-                      Talla / Ref
-                    </label>
+                  <div className="ts-field">
+                    <span className="ts-label">Talla / Ref</span>
                     <input
                       type="text"
                       value={tallaExtraCustom}
                       onChange={(e) => setTallaExtraCustom(e.target.value)}
                       placeholder="Ej. M, L o U"
-                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black uppercase"
+                      className="ts-input uppercase"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
-                      Cantidad *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={cantidadExtraCustom}
-                      onChange={(e) => setCantidadExtraCustom(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
-                      Monto a Cobrar ₡ *
-                    </label>
-                    <input
-                      type="number"
-                      value={montoExtraCustom}
-                      onChange={(e) => setMontoExtraCustom(e.target.value)}
-                      placeholder="Ej. 10000 o 5000"
-                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-blue-600 outline-none focus:border-black"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={agregarIngresoExtraAlCarrito}
-                      className="w-full py-2.5 px-4 bg-black hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                    >
-                      <FaPlus size={11} className="text-amber-400" />
-                      <span>Agregar Abono</span>
-                    </button>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {carritoVentas.length > 0 && (
-              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">
-                    Artículos en el Tiquete ({carritoVentas.length})
-                  </span>
-                  <span className="text-xs font-black text-blue-600">
-                    Subtotal: ₡{totalCalculadoForm.toLocaleString("es-CR")}
-                  </span>
+                <div className="ts-field">
+                  <span className="ts-label">Detalle (opcional)</span>
+                  <input
+                    type="text"
+                    value={detalleExtraCustom}
+                    onChange={(e) => setDetalleExtraCustom(e.target.value)}
+                    placeholder="Ej. Real Madrid, restante de camiseta ya entregada…"
+                    className="ts-input"
+                  />
                 </div>
 
-                <div className="divide-y divide-zinc-200/70">
-                  {carritoVentas.map((item) => (
-                    <div key={item.uid} className="py-2.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {item.imagen && <img src={cldThumb(item.imagen)} alt="" className="w-10 h-10 rounded-lg object-cover border border-zinc-200 shrink-0" />}
-                        <div className="min-w-0">
-                          <p className="text-xs font-black text-black truncate">{item.item}</p>
-                          <p className="text-[10px] font-bold text-zinc-500">
-                            Cantidad: {item.totalUnidades} · Talla: {item.talla} · Ubicación: <span className="text-black font-black">{item.ubicacion || "Tienda"}</span>
-                          </p>
-                          {textoDorsales(item.dorsales) && (
-                            <p className="text-[10px] font-black text-blue-700">👕 Impresión: {textoDorsales(item.dorsales)}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-1 -translate-y-1/2 text-[10px] font-black text-zinc-400">₡</span>
-                          <input type="number" value={item.precioUnitarioCustom} onChange={(e) => cambiarPrecioItemCarrito(item.uid, e.target.value)} className="w-24 pl-6 pr-2 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-black text-black outline-none" />
-                        </div>
-                        {puedeAnularVentas && (
-                          <button type="button" onClick={() => eliminarItemCarrito(item.uid)} className="p-2 text-zinc-400 hover:text-red-600 rounded-lg cursor-pointer" title="Quitar">
-                            <FaTrash size={12} />
-                          </button>
-                        )}
-                      </div>
+                <div className="ts-row">
+                  <div className="ts-field">
+                    <span className="ts-label">Cantidad</span>
+                    <div className="ts-stepper">
+                      <button type="button" onClick={() => setCantidadExtraCustom((c) => Math.max(1, (Number(c) || 1) - 1))} aria-label="Menos">−</button>
+                      <input type="number" min="1" value={cantidadExtraCustom} onChange={(e) => setCantidadExtraCustom(e.target.value)} />
+                      <button type="button" onClick={() => setCantidadExtraCustom((c) => (Number(c) || 0) + 1)} aria-label="Más">+</button>
                     </div>
-                  ))}
+                  </div>
+                  <div className="ts-field">
+                    <span className="ts-label">Monto a cobrar</span>
+                    <div className="ts-money">
+                      <span>₡</span>
+                      <input type="number" value={montoExtraCustom} onChange={(e) => setMontoExtraCustom(e.target.value)} placeholder="Ej. 10000" />
+                    </div>
+                  </div>
                 </div>
+
+                <button type="button" onClick={agregarIngresoExtraAlCarrito} className="ts-btn is-dark is-block">
+                  <FaPlus size={11} /> Agregar ingreso extra
+                </button>
               </div>
             )}
+          </section>
 
-            <div id="tienda-metodo-pago">
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
-                ¿Cómo pagó el cliente? *
-              </label>
+          {/* 2️⃣ CUENTA: artículos, pago, comprobante, cliente y cobrar */}
+          <aside className="ts-card ts-cuenta" id="tienda-cuenta">
+            <div className="ts-card-head">
+              <span className="ts-step">2</span>
+              <div>
+                <h2>Cuenta</h2>
+                <p>{carritoVentas.length > 0 ? `${carritoVentas.length} artículo${carritoVentas.length === 1 ? "" : "s"} agregado${carritoVentas.length === 1 ? "" : "s"}` : "Todavía no hay artículos"}</p>
+              </div>
+            </div>
+
+            {listaFinalParaCobrar.length === 0 ? (
+              <div className="ts-placeholder is-sm">
+                <FaReceipt size={18} />
+                <p>Lo que agregués aparece aquí. Podés quitarlo si el cliente cambia de idea.</p>
+              </div>
+            ) : (
+              <ul className="ts-items">
+                {cuentaEsPreview && (
+                  <li className="ts-preview-note">Sin agregar todavía · se cobra igual si registrás</li>
+                )}
+                {listaFinalParaCobrar.map((item) => (
+                  <li key={item.uid} className={`ts-item ${cuentaEsPreview ? "is-preview" : ""}`}>
+                    {item.imagen && <img src={cldThumb(item.imagen)} alt="" className="ts-thumb is-sm" />}
+                    <div className="ts-item-info">
+                      <b>{item.totalUnidades > 1 ? `${item.totalUnidades}× ` : ""}{item.item}</b>
+                      <small>
+                        Talla {item.talla} · {item.ubicacion || "Tienda"}
+                      </small>
+                      {textoDorsales(item.dorsales) && <small className="is-blue">👕 {textoDorsales(item.dorsales)}</small>}
+                    </div>
+                    {cuentaEsPreview ? (
+                      <span className="ts-item-precio">{fmtCRC((Number(item.precioUnitarioCustom) || 0) * (Number(item.totalUnidades) || 1))}</span>
+                    ) : (
+                      <div className="ts-item-actions">
+                        <div className="ts-money is-sm" title="Precio c/u">
+                          <span>₡</span>
+                          <input type="number" value={item.precioUnitarioCustom} onChange={(e) => cambiarPrecioItemCarrito(item.uid, e.target.value)} />
+                        </div>
+                        {/* 👈 Cualquiera puede quitar antes de emitir: todavía no se tocó el stock */}
+                        <button type="button" onClick={() => eliminarItemCarrito(item.uid)} className="ts-del" title="Quitar de la cuenta">
+                          <FaTrash size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="ts-total">
+              <span>Total</span>
+              <b>{fmtCRC(totalCalculadoForm)}</b>
+            </div>
+
+            <div id="tienda-metodo-pago" className="ts-field">
+              <span className="ts-label">¿Cómo pagó?</span>
               {!formCliente.metodoPago && (
-                <p className="text-[11px] font-bold text-red-600 mb-2">👆 Tocá la forma de pago. Se pide en cada venta para que la caja cuadre.</p>
+                <p className="ts-warn">👆 Tocá la forma de pago. Se pide en cada venta para que la caja cuadre.</p>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="ts-metodos">
                 {METODOS_PAGO.map((m) => {
                   const activo = formCliente.metodoPago === m.id;
-                  const hayOtro = Boolean(formCliente.metodoPago) && !activo;
                   return (
                     <button
                       key={m.id}
                       type="button"
                       aria-pressed={activo}
                       onClick={() => setFormCliente({ ...formCliente, metodoPago: m.id })}
-                      className={`tp-metodo relative flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-2xl border-2 transition-all cursor-pointer ${
-                        activo ? `${m.activo} shadow-lg` : "bg-white text-zinc-800 border-zinc-200 hover:border-zinc-400"
-                      } ${hayOtro ? "opacity-50" : ""}`}
+                      className={`ts-metodo ${activo ? `${m.activo} is-on` : ""}`}
+                      title={m.ayuda}
                     >
-                      {activo && <FaCheckCircle size={14} className="absolute top-2 right-2" />}
-                      <m.Icono size={22} />
-                      <span className="text-xs font-black uppercase tracking-wider">{m.id}</span>
-                      <span className={`text-[10px] font-bold leading-tight text-center ${activo ? "" : "text-zinc-500"}`}>{m.ayuda}</span>
+                      {activo && <FaCheckCircle size={11} className="ts-metodo-check" />}
+                      <m.Icono size={17} />
+                      <span>{m.id}</span>
                     </button>
                   );
                 })}
               </div>
 
               {formCliente.metodoPago === "Efectivo" && (
-                <div className="mt-3 p-3.5 bg-yellow-50 border border-yellow-200 rounded-2xl flex items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-black uppercase text-yellow-800 block">Pagó con billete de:</label>
-                    <input type="number" value={formCliente.pagoConBillete} onChange={(e) => setFormCliente({ ...formCliente, pagoConBillete: e.target.value })} placeholder="Ej. 25000" className="w-full mt-1 px-3 py-2 bg-white border border-yellow-300 rounded-xl text-xs font-black outline-none" />
+                <div className="ts-vuelto">
+                  <div className="ts-field">
+                    <span className="ts-label">Pagó con</span>
+                    <div className="ts-money">
+                      <span>₡</span>
+                      <input type="number" value={formCliente.pagoConBillete} onChange={(e) => setFormCliente({ ...formCliente, pagoConBillete: e.target.value })} placeholder="Ej. 25000" />
+                    </div>
                   </div>
                   {Number(formCliente.pagoConBillete) > 0 && (
-                    <div className="text-right">
-                      <span className="text-[10px] font-black uppercase text-yellow-800 block">Vuelto:</span>
-                      <span className={`text-base font-black ${vueltoCalculado >= 0 ? "text-yellow-700" : "text-red-600"}`}>
-                        ₡{vueltoCalculado.toLocaleString("es-CR")}
-                      </span>
+                    <div className="ts-vuelto-num">
+                      <span>Vuelto</span>
+                      <b className={vueltoCalculado >= 0 ? "" : "is-neg"}>{fmtCRC(vueltoCalculado)}</b>
                     </div>
                   )}
                 </div>
               )}
 
               {formCliente.metodoPago === "Mixto" && (
-                <div className="mt-3 p-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-orange-600">Efectivo ₡</label>
-                    <input type="number" value={formCliente.montoEfectivoMixto} onChange={(e) => setFormCliente({ ...formCliente, montoEfectivoMixto: e.target.value })} className="w-full mt-1 px-2.5 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-black" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-blue-600">Datáfono ₡</label>
-                    <input type="number" value={formCliente.montoDatafonoMixto} onChange={(e) => setFormCliente({ ...formCliente, montoDatafonoMixto: e.target.value })} className="w-full mt-1 px-2.5 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-black" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-purple-600">SINPE ₡</label>
-                    <input type="number" value={formCliente.montoSinpeMixto} onChange={(e) => setFormCliente({ ...formCliente, montoSinpeMixto: e.target.value })} className="w-full mt-1 px-2.5 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-black" />
-                  </div>
+                <div className="ts-mixto">
+                  <label>
+                    <span className="is-efectivo">Efectivo</span>
+                    <input type="number" value={formCliente.montoEfectivoMixto} onChange={(e) => setFormCliente({ ...formCliente, montoEfectivoMixto: e.target.value })} className="ts-input" />
+                  </label>
+                  <label>
+                    <span className="is-datafono">Datáfono</span>
+                    <input type="number" value={formCliente.montoDatafonoMixto} onChange={(e) => setFormCliente({ ...formCliente, montoDatafonoMixto: e.target.value })} className="ts-input" />
+                  </label>
+                  <label>
+                    <span className="is-sinpe">SINPE</span>
+                    <input type="number" value={formCliente.montoSinpeMixto} onChange={(e) => setFormCliente({ ...formCliente, montoSinpeMixto: e.target.value })} className="ts-input" />
+                  </label>
                 </div>
               )}
             </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo de Comprobante *</label>
-              <select value={formCliente.tipoEmision} onChange={(e) => { setFormCliente({ ...formCliente, tipoEmision: e.target.value }); if (e.target.value === "hacienda") setMostrarDatosCliente(true); }} className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none cursor-pointer">
-                <option value="hacienda">Tiquete Electrónico (Hacienda)</option>
-                <option value="interno">Ticket Normal (Uso Interno)</option>
-              </select>
+            <div className="ts-field">
+              <span className="ts-label">Comprobante</span>
+              <div className="ts-seg is-full">
+                <button type="button" className={formCliente.tipoEmision === "interno" ? "is-on" : ""} onClick={() => setFormCliente({ ...formCliente, tipoEmision: "interno" })}>
+                  Ticket interno
+                </button>
+                <button
+                  type="button"
+                  className={formCliente.tipoEmision === "hacienda" ? "is-on" : ""}
+                  onClick={() => { setFormCliente({ ...formCliente, tipoEmision: "hacienda" }); setMostrarDatosCliente(true); }}
+                >
+                  Hacienda
+                </button>
+              </div>
             </div>
 
             <div>
@@ -2159,129 +2034,115 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 type="button"
                 onClick={() => setMostrarDatosCliente((v) => !v)}
                 aria-expanded={mostrarDatosCliente}
-                className="tp-datos-toggle w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-zinc-50 hover:bg-zinc-100 border-2 border-zinc-200 rounded-2xl text-left transition-all cursor-pointer"
+                className={`ts-cliente-toggle ${!formCliente.nombre.trim() || (esHacienda && faltantesHacienda(formCliente).length > 0) ? "is-missing" : ""}`}
               >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <FaUserCheck className="text-zinc-700 shrink-0" size={15} />
-                  <span className="min-w-0">
-                    <span className="block text-xs font-black uppercase tracking-wider text-black">
-                      Datos del cliente *
-                    </span>
-                    <span className="block text-[11px] font-bold text-zinc-500 truncate">
-                      {esHacienda && faltantesHacienda(formCliente).length > 0
-                        ? `Hacienda · falta: ${faltantesHacienda(formCliente).map((f) => f.label).join(", ")}`
-                        : formCliente.nombre.trim() || formCliente.cedula.trim()
-                        ? `${formCliente.nombre.trim() || "Sin nombre"}${formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}`
-                        : "Falta el nombre del cliente · tocá para escribirlo"}
-                    </span>
-                  </span>
+                <FaUserCheck size={14} className="shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <b>Cliente</b>
+                  <small>
+                    {esHacienda && faltantesHacienda(formCliente).length > 0
+                      ? `Hacienda · falta: ${faltantesHacienda(formCliente).map((f) => f.label).join(", ")}`
+                      : formCliente.nombre.trim() || formCliente.cedula.trim()
+                      ? `${formCliente.nombre.trim() || "Sin nombre"}${formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}`
+                      : "Falta el nombre · tocá para escribirlo"}
+                  </small>
                 </span>
-                <FaChevronRight size={12} className={`shrink-0 text-zinc-600 transition-transform duration-200 ${mostrarDatosCliente ? "transform rotate-90" : ""}`} />
+                <FaChevronRight size={11} className={`shrink-0 transition-transform duration-200 ${mostrarDatosCliente ? "transform rotate-90" : ""}`} />
               </button>
 
               {mostrarDatosCliente && (
-                <div className="mt-4 space-y-6">
-                <div className="relative">
-                  <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-2xl text-xs font-black text-zinc-950 transition-all cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <FaStar className="text-amber-500" size={14} />
-                      <span>Clientes Favoritos / Alegra ({contactosAlegra.length})</span>
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</span>
-                  </button>
+                <div className="ts-cliente">
+                  <div className="relative">
+                    <button type="button" onClick={() => setMostrarListaContactos((prev) => !prev)} className="ts-favs">
+                      <FaStar className="text-amber-500" size={13} />
+                      <span className="flex-1">Favoritos / Alegra ({contactosAlegra.length})</span>
+                      <small>{mostrarListaContactos ? "Cerrar ▲" : "Elegir ▼"}</small>
+                    </button>
 
-                  {mostrarListaContactos && (
-                    <div className="mt-2 max-h-48 overflow-y-auto bg-white border-2 border-zinc-900 rounded-2xl shadow-2xl divide-y divide-zinc-100 z-30">
-                      {contactosOrdenadosYFiltrados.length === 0 ? (
-                        <p className="p-4 text-center text-xs text-zinc-400 font-bold">No hay contactos guardados en Alegra.</p>
-                      ) : (
-                        contactosOrdenadosYFiltrados.map((c) => {
-                          const esFav = favoritosIds.includes(String(c.id));
-                          return (
-                            <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors">
-                              <div className="min-w-0 flex-1 pr-2">
-                                <p className="text-xs font-black text-black truncate flex items-center gap-1.5">
-                                  <FaUserCheck className="text-blue-600 shrink-0" size={12} />
-                                  <span className="truncate">{c.nombre}</span>
-                                </p>
-                                <p className="text-[10px] text-zinc-500 font-mono truncate">
-                                  {c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""}
-                                </p>
+                    {mostrarListaContactos && (
+                      <div className="ts-favs-list">
+                        {contactosOrdenadosYFiltrados.length === 0 ? (
+                          <p className="ts-empty-line text-center">No hay contactos guardados en Alegra.</p>
+                        ) : (
+                          contactosOrdenadosYFiltrados.map((c) => {
+                            const esFav = favoritosIds.includes(String(c.id));
+                            return (
+                              <div key={c.id} onClick={() => seleccionarContactoAlegra(c)} className="ts-fav">
+                                <div className="min-w-0 flex-1">
+                                  <b>{c.nombre}</b>
+                                  <small>{c.cedula ? `ID: ${c.cedula}` : "Sin ID"} {c.telefono ? `· Tel: ${c.telefono}` : ""}</small>
+                                </div>
+                                <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="ts-fav-star">
+                                  <FaStar size={13} className={esFav ? "text-amber-400" : "text-zinc-300"} />
+                                </button>
                               </div>
-                              <button type="button" onClick={(e) => toggleFavoritoContacto(c.id, e)} className="p-2 rounded-lg hover:bg-zinc-100 cursor-pointer">
-                                <FaStar size={14} className={esFav ? "text-amber-400" : "text-zinc-300"} />
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID {esHacienda ? "*" : "(Opcional)"}</label>
-                    <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="w-full px-3 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs font-bold text-black outline-none">
-                      <option value="01">Física</option>
-                      <option value="02">Jurídica</option>
-                      <option value="03">DIMEX</option>
-                      <option value="04">NITE</option>
-                      <option value="05">Extranjero</option>
-                      <option value="06">No Contrib.</option>
-                    </select>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="sm:col-span-3">
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula {esHacienda ? "*" : "(Opcional)"}</label>
-                    <div className="flex gap-2">
-                      <input id="tienda-cedula-cliente" type="text" inputMode="numeric" required={esHacienda} value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-                      <button type="button" onClick={buscarCedulaHacienda} className="bg-black text-white px-5 rounded-2xl hover:bg-zinc-800 transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar">
-                        <FaSearch size={14} />
-                      </button>
+                  <div className="ts-row is-id">
+                    <div className="ts-field">
+                      <span className="ts-label">Tipo ID {esHacienda ? "*" : ""}</span>
+                      <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="ts-input">
+                        <option value="01">Física</option>
+                        <option value="02">Jurídica</option>
+                        <option value="03">DIMEX</option>
+                        <option value="04">NITE</option>
+                        <option value="05">Extranjero</option>
+                        <option value="06">No Contrib.</option>
+                      </select>
+                    </div>
+                    <div className="ts-field">
+                      <span className="ts-label">Cédula {esHacienda ? "*" : "(opcional)"}</span>
+                      <div className="ts-with-btn">
+                        <input id="tienda-cedula-cliente" type="text" inputMode="numeric" required={esHacienda} value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="ts-input" />
+                        <button type="button" onClick={buscarCedulaHacienda} className="ts-btn is-dark" title="Buscar en Hacienda">
+                          <FaSearch size={13} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente *</label>
-                  <input id="tienda-nombre-cliente" type="text" required value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-                </div>
+                  <div className="ts-field">
+                    <span className="ts-label">Nombre *</span>
+                    <input id="tienda-nombre-cliente" type="text" required value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Nombre del cliente…" className="ts-input" />
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono {esHacienda ? "*" : "(Opcional)"}</label>
-                    <input id="tienda-telefono-cliente" type="tel" required={esHacienda} value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                  <div className="ts-row">
+                    <div className="ts-field">
+                      <span className="ts-label">Teléfono {esHacienda ? "*" : "(opcional)"}</span>
+                      <input id="tienda-telefono-cliente" type="tel" required={esHacienda} value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="ts-input" />
+                    </div>
+                    <div className="ts-field">
+                      <span className="ts-label">Correo {esHacienda ? "*" : "(opcional)"}</span>
+                      <input id="tienda-correo-cliente" type="email" required={esHacienda} value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="ts-input" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo {esHacienda ? "*" : "(Opcional)"}</label>
-                    <input id="tienda-correo-cliente" type="email" required={esHacienda} value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
-                  </div>
-                </div>
                 </div>
               )}
             </div>
 
-            <div className="pt-2">
-              {(() => {
-                const met = metodoInfo(formCliente.metodoPago);
-                return (
-                  <button type="button" onClick={abrirResumenVenta} disabled={generandoTiquete} className={`w-full ${met ? met.activo : "bg-zinc-400"} py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]`}>
-                    {met ? <met.Icono size={16} /> : <FaPlus size={14} />}
-                    <span>
-                      {met
-                        ? `Registrar ₡${totalCalculadoForm.toLocaleString("es-CR")} en ${met.id.toUpperCase()} (${listaFinalParaCobrar.length} artículo${listaFinalParaCobrar.length === 1 ? "" : "s"})`
-                        : "Escogé el método de pago para registrar"}
-                    </span>
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
+            <button
+              type="button"
+              onClick={abrirResumenVenta}
+              disabled={generandoTiquete}
+              className={`ts-cobrar ${metActivo ? metActivo.activo : "is-idle"}`}
+            >
+              {metActivo ? <metActivo.Icono size={16} /> : <FaCashRegister size={15} />}
+              <span>
+                {metActivo
+                  ? `Cobrar ${fmtCRC(totalCalculadoForm)} · ${metActivo.id}`
+                  : "Escogé cómo pagó para cobrar"}
+              </span>
+            </button>
+          </aside>
         </div>
 
         {/* 📋 TABLA DE COMPROBANTES CON PAGINADO */}
-        <div className="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
+        <div className="ts-card ts-tabla">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
@@ -2530,6 +2391,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
         </div>
 
       </div>
+
+      {/* 📱 Barra de cobro fija en celular: total + ir a la cuenta */}
+      {listaFinalParaCobrar.length > 0 && (
+        <div className="ts-mbar">
+          <div className="ts-mbar-info">
+            <small>{listaFinalParaCobrar.reduce((acc, it) => acc + (Number(it.totalUnidades) || 1), 0)} artículo(s)</small>
+            <b>{fmtCRC(totalCalculadoForm)}</b>
+          </div>
+          <button type="button" onClick={irACuenta} className="ts-mbar-btn">
+            <FaCashRegister size={14} /> Cobrar
+          </button>
+        </div>
+      )}
 
       {/* 🧾 RESUMEN DE LA VENTA: se confirma antes de registrarla */}
       {resumenVentaAbierto && (() => {

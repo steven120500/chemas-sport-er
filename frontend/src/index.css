@@ -4517,3 +4517,206 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .tp-emitiendo-sp { width: 11px; height: 11px; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: tpEmitiendo 0.8s linear infinite; }
 @keyframes tpEmitiendo { to { transform: rotate(360deg); } }
 .tp-emitida { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 8px; background: #f0fdf4; border: 1px solid #86efac; color: #15803d; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+
+/* =====================================================================
+   🛒 TIENDA (POS) — rediseño: agregar (izq) + cuenta fija (der)  (.ts-*)
+   ===================================================================== */
+.ts-page { padding: 20px 14px 120px; }
+.ts-wrap { max-width: 1240px; margin: 0 auto; }
+
+/* Botones: anular el estilo global de <button> */
+.ts-page button { transform: none; }
+.ts-page button:hover { transform: none; }
+
+.ts-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.ts-top-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ts-back { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #fff !important; color: #111 !important; border: 1px solid #e4e4e7 !important; flex-shrink: 0; cursor: pointer; }
+.ts-back:hover { border-color: #111 !important; }
+.ts-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+.ts-pill { display: inline-flex; align-items: center; gap: 5px; background: #111; color: #fff; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 9px; border-radius: 999px; }
+.ts-sub { font-size: 12px; color: #71717a; font-weight: 600; margin-top: 2px; }
+.ts-top-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ts-chip-input { display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 7px 11px; color: #71717a; cursor: pointer; }
+.ts-chip-input input { background: transparent; outline: none; border: 0; font-size: 13px; font-weight: 800; color: #111; cursor: pointer; }
+.ts-chip-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
+.ts-base-input { width: 80px; }
+
+/* Segmentado */
+.ts-seg { display: inline-flex; background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px; padding: 3px; gap: 3px; }
+.ts-seg.is-full { display: flex; width: 100%; }
+.ts-seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border-radius: 11px; background: transparent !important; color: #52525b !important; border: 0 !important; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; outline: none !important; transition: background .15s, color .15s; }
+.ts-seg button:hover { color: #111 !important; }
+.ts-seg button.is-on { background: #111 !important; color: #fff !important; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.ts-seg.is-sm button { padding: 6px 14px; font-size: 11px; }
+
+/* Caja */
+.ts-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.ts-stat { position: relative; background: #fff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; border-left: 4px solid var(--c); }
+.ts-stat-ico { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--c); }
+.ts-stat-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: #71717a; padding-right: 32px; }
+.ts-stat-num { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; color: #111; line-height: 1.15; }
+.ts-stat small { font-size: 11px; font-weight: 700; color: #a1a1aa; }
+.ts-stat.is-efectivo { --c: #ca8a04; --bg: #fef9c3; }
+.ts-stat.is-datafono { --c: #2563eb; --bg: #dbeafe; }
+.ts-stat.is-sinpe { --c: #9333ea; --bg: #f3e8ff; }
+.ts-stat.is-total { --c: #16a34a; --bg: #dcfce7; background: #111; border-color: #111; border-left-color: #16a34a; }
+.ts-stat.is-total .ts-stat-num { color: #fff; }
+.ts-stat.is-total .ts-stat-label, .ts-stat.is-total small { color: #a1a1aa; }
+
+/* Grilla principal */
+.ts-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-bottom: 20px; align-items: start; }
+.ts-card { background: #fff; border: 1px solid #e4e4e7; border-radius: 20px; padding: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.ts-add, .ts-cuenta { display: flex; flex-direction: column; gap: 14px; }
+.ts-card-head { display: flex; align-items: center; gap: 12px; }
+.ts-card-head h2 { font-size: 17px; font-weight: 900; letter-spacing: -0.01em; line-height: 1.2; }
+.ts-card-head p { font-size: 12px; color: #71717a; font-weight: 600; }
+.ts-step { width: 30px; height: 30px; border-radius: 10px; background: #111; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; flex-shrink: 0; }
+.ts-hint { font-size: 12px; color: #71717a; font-weight: 600; margin-top: -6px; }
+
+/* Categorías */
+.ts-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.ts-chip { flex-shrink: 0; padding: 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; background: #f4f4f5 !important; color: #3f3f46 !important; border: 1px solid #e4e4e7 !important; cursor: pointer; outline: none !important; }
+.ts-chip:hover { border-color: #a1a1aa !important; }
+.ts-chip.is-on { background: #111 !important; color: #fff !important; border-color: #111 !important; }
+
+/* Buscador */
+.ts-search { position: relative; }
+.ts-search input { width: 100%; padding: 14px 90px 14px 42px; border-radius: 14px; background: #fafafa; border: 2px solid #e4e4e7; font-size: 15px; font-weight: 700; color: #111; outline: none; transition: border-color .15s, background .15s; }
+.ts-search input:focus { border-color: #111; background: #fff; }
+.ts-search-ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #a1a1aa; }
+.ts-search-status { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 900; text-transform: uppercase; color: #a1a1aa; }
+.ts-results { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: 340px; overflow-y: auto; background: #fff; border: 1px solid #d4d4d8; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.15); z-index: 40; padding: 4px; }
+.ts-result { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; cursor: pointer; }
+.ts-result:hover { background: #f4f4f5; }
+.ts-result-name { font-size: 13px; font-weight: 900; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-result-name span { color: #71717a; font-weight: 700; }
+.ts-result-stock { font-size: 11px; font-weight: 700; color: #16a34a; }
+.ts-result-stock.is-zero { color: #dc2626; }
+.ts-result-precio { font-size: 13px; font-weight: 900; color: #111; flex-shrink: 0; }
+.ts-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid #e4e4e7; background: #f4f4f5; flex-shrink: 0; }
+.ts-thumb.is-empty { display: flex; align-items: center; justify-content: center; color: #a1a1aa; }
+.ts-thumb.is-lg { width: 96px; height: 96px; border-radius: 14px; }
+.ts-thumb.is-sm { width: 40px; height: 40px; }
+
+/* Prenda seleccionada / ingreso extra */
+.ts-sel { display: flex; flex-direction: column; gap: 14px; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 16px; padding: 14px; }
+.ts-sel-head { display: flex; align-items: center; gap: 12px; }
+.ts-eyebrow { display: block; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #dc2626; }
+.ts-sel-name { font-size: 15px; font-weight: 900; color: #111; line-height: 1.25; }
+.ts-x { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #fff !important; color: #71717a !important; border: 1px solid #e4e4e7 !important; cursor: pointer; flex-shrink: 0; }
+.ts-x:hover { color: #dc2626 !important; border-color: #fca5a5 !important; }
+.ts-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ts-label { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.07em; color: #52525b; }
+.ts-label.is-blue { color: #1e40af; }
+.ts-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-opt { min-width: 48px; padding: 10px 14px; border-radius: 12px; background: #fff !important; color: #111 !important; border: 2px solid #d4d4d8 !important; font-size: 13px; font-weight: 900; cursor: pointer; outline: none !important; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.ts-opt:hover { border-color: #111 !important; }
+.ts-opt.is-on { background: #111 !important; color: #fff !important; border-color: #111 !important; }
+.ts-opt.is-off { background: #f4f4f5 !important; color: #a1a1aa !important; border-color: #e4e4e7 !important; }
+.ts-opt small { font-size: 10px; font-weight: 800; opacity: .6; }
+.ts-dorsal { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ts-dorsal p { font-size: 11px; font-weight: 700; color: #1d4ed8; }
+.ts-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ts-input { width: 100%; padding: 11px 12px; border-radius: 12px; background: #fff; border: 1px solid #d4d4d8; font-size: 14px; font-weight: 700; color: #111; outline: none; }
+.ts-input:focus { border-color: #111; }
+.ts-fixed { padding: 11px 12px; border-radius: 12px; background: #f4f4f5; border: 1px solid #e4e4e7; font-size: 14px; font-weight: 900; }
+.ts-stepper { display: flex; align-items: stretch; border: 1px solid #d4d4d8; border-radius: 12px; overflow: hidden; background: #fff; }
+.ts-stepper button { width: 42px; flex-shrink: 0; background: #f4f4f5 !important; color: #111 !important; border: 0 !important; border-radius: 0 !important; font-size: 18px; font-weight: 900; cursor: pointer; outline: none !important; }
+.ts-stepper button:hover { background: #e4e4e7 !important; }
+.ts-stepper input { width: 100%; min-width: 0; text-align: center; border: 0; outline: none; font-size: 15px; font-weight: 900; padding: 10px 4px; }
+.ts-money { display: flex; align-items: center; border: 1px solid #d4d4d8; border-radius: 12px; background: #fff; padding-left: 12px; }
+.ts-money:focus-within { border-color: #111; }
+.ts-money span { font-size: 13px; font-weight: 900; color: #a1a1aa; }
+.ts-money input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; font-size: 15px; font-weight: 900; padding: 10px 12px 10px 6px; color: #111; }
+.ts-money.is-sm { padding-left: 8px; border-radius: 10px; }
+.ts-money.is-sm input { width: 78px; font-size: 13px; padding: 6px 8px 6px 4px; }
+.ts-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; outline: none !important; }
+.ts-btn.is-dark { background: #111 !important; color: #fff !important; border: 0 !important; }
+.ts-btn.is-dark:hover { background: #27272a !important; }
+.ts-btn.is-block { width: 100%; padding: 14px 16px; font-size: 13px; }
+.ts-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 28px 16px; border: 2px dashed #e4e4e7; border-radius: 16px; color: #a1a1aa; }
+.ts-placeholder p { font-size: 13px; font-weight: 700; max-width: 280px; }
+.ts-placeholder.is-sm { padding: 20px 14px; }
+.ts-empty-line { font-size: 12px; font-weight: 700; color: #a1a1aa; padding: 6px 0; }
+
+/* Cuenta */
+.ts-items { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.ts-item { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; }
+.ts-item.is-preview { border-style: dashed; background: #fafafa; }
+.ts-preview-note { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.07em; color: #a16207; }
+.ts-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ts-item-info b { font-size: 13px; font-weight: 900; color: #111; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ts-item-info small { font-size: 11px; font-weight: 700; color: #71717a; }
+.ts-item-info small.is-blue { color: #1d4ed8; font-weight: 800; }
+.ts-item-precio { font-size: 13px; font-weight: 900; flex-shrink: 0; }
+.ts-item-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ts-del { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #fff !important; color: #a1a1aa !important; border: 1px solid #e4e4e7 !important; cursor: pointer; outline: none !important; }
+.ts-del:hover { color: #dc2626 !important; border-color: #fca5a5 !important; background: #fef2f2 !important; }
+.ts-total { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 0; border-top: 2px solid #111; border-bottom: 1px solid #e4e4e7; }
+.ts-total span { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
+.ts-total b { font-size: 28px; font-weight: 900; letter-spacing: -0.03em; }
+.ts-warn { font-size: 11px; font-weight: 700; color: #dc2626; }
+.ts-metodos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ts-metodo { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 12px; border-width: 2px; border-style: solid; cursor: pointer; outline: none !important; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+.ts-metodo:not(.is-on) { background: #fff !important; color: #3f3f46 !important; border-color: #e4e4e7 !important; }
+.ts-metodo:not(.is-on):hover { border-color: #a1a1aa !important; }
+.ts-metodo.is-on { box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+.ts-metodo-check { position: absolute; top: 5px; right: 5px; }
+.ts-vuelto { display: flex; align-items: flex-end; gap: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 14px; padding: 10px 12px; margin-top: 4px; }
+.ts-vuelto .ts-field { flex: 1; }
+.ts-vuelto-num { text-align: right; }
+.ts-vuelto-num span { display: block; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #854d0e; }
+.ts-vuelto-num b { font-size: 20px; font-weight: 900; color: #a16207; }
+.ts-vuelto-num b.is-neg { color: #dc2626; }
+.ts-mixto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.ts-mixto label { display: flex; flex-direction: column; gap: 4px; }
+.ts-mixto span { font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.ts-mixto .is-efectivo { color: #ca8a04; } .ts-mixto .is-datafono { color: #2563eb; } .ts-mixto .is-sinpe { color: #9333ea; }
+.ts-cliente-toggle { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 11px 13px; border-radius: 14px; background: #fafafa !important; color: #111 !important; border: 2px solid #e4e4e7 !important; cursor: pointer; outline: none !important; }
+.ts-cliente-toggle:hover { border-color: #a1a1aa !important; }
+.ts-cliente-toggle.is-missing { border-color: #fca5a5 !important; background: #fef2f2 !important; }
+.ts-cliente-toggle b { display: block; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+.ts-cliente-toggle small { display: block; font-size: 11px; font-weight: 700; color: #71717a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-cliente { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.ts-row.is-id { grid-template-columns: 2fr 3fr; }
+.ts-with-btn { display: flex; gap: 6px; }
+.ts-favs { width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #fffbeb !important; color: #111 !important; border: 1px solid #fcd34d !important; font-size: 12px; font-weight: 900; cursor: pointer; outline: none !important; text-align: left; }
+.ts-favs small { font-size: 10px; font-weight: 800; color: #92400e; text-transform: uppercase; }
+.ts-favs-list { margin-top: 6px; max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid #d4d4d8; border-radius: 14px; padding: 4px; }
+.ts-fav { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.ts-fav:hover { background: #eff6ff; }
+.ts-fav b { display: block; font-size: 12px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-fav small { display: block; font-size: 10px; color: #71717a; font-family: ui-monospace, monospace; }
+.ts-fav-star { padding: 6px; border-radius: 8px; background: transparent !important; border: 0 !important; cursor: pointer; }
+.ts-cobrar { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; border-radius: 14px; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; border-width: 0 !important; outline: none !important; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+.ts-cobrar.is-idle { background: #a1a1aa !important; color: #fff !important; box-shadow: none; }
+.ts-cobrar:active { transform: scale(.99); }
+
+/* Tabla */
+.ts-tabla { padding: 18px; }
+
+/* Barra fija de cobro en celular */
+.ts-mbar { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 45; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 16px; background: #111; color: #fff; border-radius: 18px; box-shadow: 0 12px 30px rgba(0,0,0,.3); }
+.ts-mbar-info small { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #a1a1aa; }
+.ts-mbar-info b { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; }
+.ts-mbar-btn { display: inline-flex; align-items: center; gap: 7px; padding: 12px 18px; border-radius: 12px; background: #16a34a !important; color: #fff !important; border: 0 !important; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; outline: none !important; }
+
+@media (min-width: 640px) {
+  .ts-page { padding: 28px 24px 120px; }
+  .ts-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ts-stat-num { font-size: 22px; }
+  .ts-card { padding: 22px; }
+}
+@media (max-width: 420px) {
+  .ts-metodos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ts-row.is-id { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1024px) {
+  .ts-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .ts-cuenta { position: sticky; top: 104px; max-height: calc(100vh - 120px); overflow-y: auto; }
+  .ts-mbar { display: none; }
+  .ts-page { padding-bottom: 40px; }
+}
+/* botones cuadrados de ícono: sin el padding global de <button> (si no, el ícono queda en 0px) */
+.ts-back, .ts-x, .ts-del, .ts-fav-star, .ts-stepper button { padding: 0 !important; }
+.ts-fav-star { padding: 6px !important; }
