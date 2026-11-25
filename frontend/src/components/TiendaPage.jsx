@@ -197,6 +197,24 @@ const METODOS_PAGO = [
 ];
 const metodoInfo = (id) => METODOS_PAGO.find((m) => m.id === id);
 
+// 🧾 Datos que exige Hacienda (tiquete electrónico). Devuelve [{ id, label }] de lo que falta o está mal.
+const CEDULA_DIGITOS = { "01": [9], "02": [10], "03": [11, 12], "04": [10] };
+function faltantesHacienda(f) {
+  const faltan = [];
+  const cedula = String(f.cedula || "").replace(/\D/g, "");
+  const largos = CEDULA_DIGITOS[f.tipoIdentificacion];
+  if (!cedula) faltan.push({ id: "tienda-cedula-cliente", label: "Cédula" });
+  else if (largos && !largos.includes(cedula.length)) faltan.push({ id: "tienda-cedula-cliente", label: `Cédula válida (${largos.join(" u ")} dígitos)` });
+  if (!String(f.nombre || "").trim()) faltan.push({ id: "tienda-nombre-cliente", label: "Nombre" });
+  const tel = String(f.telefono || "").replace(/\D/g, "");
+  if (!tel) faltan.push({ id: "tienda-telefono-cliente", label: "Teléfono" });
+  else if (tel.length < 8) faltan.push({ id: "tienda-telefono-cliente", label: "Teléfono válido (8 dígitos)" });
+  const correo = String(f.correo || "").trim();
+  if (!correo) faltan.push({ id: "tienda-correo-cliente", label: "Correo" });
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) faltan.push({ id: "tienda-correo-cliente", label: "Correo válido" });
+  return faltan;
+}
+
 export default function TiendaPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
 
@@ -942,6 +960,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   }, [listaFinalParaCobrar]);
 
   const vueltoCalculado = (Number(formCliente.pagoConBillete) || 0) - totalCalculadoForm;
+  const esHacienda = formCliente.tipoEmision === "hacienda"; // 🧾 con Hacienda todos los datos son obligatorios
 
   // ✅ Validaciones antes de registrar (se usan al abrir el resumen y otra vez al confirmar)
   const validarVentaParaRegistrar = () => {
@@ -970,11 +989,19 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       return false;
     }
 
-    // 👈 Hacienda necesita los datos completos desde ya (la venta se emite al confirmar)
-    if (formCliente.tipoEmision === "hacienda" && (!formCliente.cedula.trim() || !formCliente.telefono.trim() || !formCliente.correo.trim())) {
-      setMostrarDatosCliente(true);
-      toastHOT.error("Para Hacienda completá Cédula, Teléfono y Correo (o cambiá a Ticket Interno).");
-      return false;
+    // 👈 Hacienda: todos los datos del cliente son obligatorios (Ticket Interno solo pide el nombre)
+    if (formCliente.tipoEmision === "hacienda") {
+      const faltantes = faltantesHacienda(formCliente);
+      if (faltantes.length > 0) {
+        setMostrarDatosCliente(true);
+        toastHOT.error(`Para Hacienda falta: ${faltantes.map((f) => f.label).join(", ")} (o cambiá a Ticket Interno).`);
+        setTimeout(() => {
+          const input = document.getElementById(faltantes[0].id);
+          input?.scrollIntoView({ behavior: "smooth", block: "center" });
+          input?.focus();
+        }, 50);
+        return false;
+      }
     }
 
     if (!metodoInfo(formCliente.metodoPago)) {
@@ -2069,7 +2096,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                       Datos del cliente *
                     </span>
                     <span className="block text-[11px] font-bold text-zinc-500 truncate">
-                      {formCliente.nombre.trim() || formCliente.cedula.trim()
+                      {esHacienda && faltantesHacienda(formCliente).length > 0
+                        ? `Hacienda · falta: ${faltantesHacienda(formCliente).map((f) => f.label).join(", ")}`
+                        : formCliente.nombre.trim() || formCliente.cedula.trim()
                         ? `${formCliente.nombre.trim() || "Sin nombre"}${formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}`
                         : "Falta el nombre del cliente · tocá para escribirlo"}
                     </span>
@@ -2120,7 +2149,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID (Opcional al registrar)</label>
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Tipo ID {esHacienda ? "*" : "(Opcional)"}</label>
                     <select value={formCliente.tipoIdentificacion} onChange={(e) => setFormCliente({ ...formCliente, tipoIdentificacion: e.target.value })} className="w-full px-3 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs font-bold text-black outline-none">
                       <option value="01">Física</option>
                       <option value="02">Jurídica</option>
@@ -2132,9 +2161,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   </div>
 
                   <div className="sm:col-span-3">
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula (Opcional al registrar)</label>
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Número de Cédula {esHacienda ? "*" : "(Opcional)"}</label>
                     <div className="flex gap-2">
-                      <input type="text" value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                      <input id="tienda-cedula-cliente" type="text" inputMode="numeric" required={esHacienda} value={formCliente.cedula} onChange={(e) => setFormCliente({ ...formCliente, cedula: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") buscarCedulaHacienda(); }} placeholder="Ej. 101110222" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
                       <button type="button" onClick={buscarCedulaHacienda} className="bg-black text-white px-5 rounded-2xl hover:bg-zinc-800 transition-colors flex items-center justify-center cursor-pointer shadow-sm" title="Buscar">
                         <FaSearch size={14} />
                       </button>
@@ -2149,12 +2178,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono (Opcional al registrar)</label>
-                    <input type="tel" value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Teléfono {esHacienda ? "*" : "(Opcional)"}</label>
+                    <input id="tienda-telefono-cliente" type="tel" required={esHacienda} value={formCliente.telefono} onChange={(e) => setFormCliente({ ...formCliente, telefono: e.target.value })} placeholder="Ej. 88888888" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo (Opcional al registrar)</label>
-                    <input type="email" value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                    <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Correo {esHacienda ? "*" : "(Opcional)"}</label>
+                    <input id="tienda-correo-cliente" type="email" required={esHacienda} value={formCliente.correo} onChange={(e) => setFormCliente({ ...formCliente, correo: e.target.value })} placeholder="cliente@correo.com" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
                   </div>
                 </div>
                 </div>
