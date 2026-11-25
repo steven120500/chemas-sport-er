@@ -957,6 +957,25 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
       return false;
     }
 
+    // 👈 El nombre del cliente es obligatorio en toda venta de la tienda
+    if (!formCliente.nombre.trim()) {
+      setMostrarDatosCliente(true);
+      toastHOT.error("Escribí el nombre del cliente antes de registrar la venta.");
+      setTimeout(() => {
+        const input = document.getElementById("tienda-nombre-cliente");
+        input?.scrollIntoView({ behavior: "smooth", block: "center" });
+        input?.focus();
+      }, 50);
+      return false;
+    }
+
+    // 👈 Hacienda necesita los datos completos desde ya (la venta se emite al confirmar)
+    if (formCliente.tipoEmision === "hacienda" && (!formCliente.cedula.trim() || !formCliente.telefono.trim() || !formCliente.correo.trim())) {
+      setMostrarDatosCliente(true);
+      toastHOT.error("Para Hacienda completá Cédula, Teléfono y Correo (o cambiá a Ticket Interno).");
+      return false;
+    }
+
     if (!metodoInfo(formCliente.metodoPago)) {
       toastHOT.error("Escogé el método de pago antes de registrar la venta.");
       document.getElementById("tienda-metodo-pago")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1056,7 +1075,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
     setFormCliente((prev) => ({ ...prev, pagoConBillete: "", metodoPago: "", montoEfectivoMixto: "", montoDatafonoMixto: "", montoSinpeMixto: "" }));
 
     toastHOT.success(`Venta registrada en ${formCliente.metodoPago} · ₡${totalCalculadoForm.toLocaleString("es-CR")}`);
-    return true;
+    return nuevaPendiente; // 👈 se emite de una vez al confirmar (como mínimo interno)
   };
 
   const handleEmitirDesdeTabla = async (facturaPendiente) => {
@@ -2046,12 +2065,12 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                   <FaUserCheck className="text-zinc-700 shrink-0" size={15} />
                   <span className="min-w-0">
                     <span className="block text-xs font-black uppercase tracking-wider text-black">
-                      Datos del cliente {formCliente.tipoEmision === "hacienda" ? "*" : "(opcional)"}
+                      Datos del cliente *
                     </span>
                     <span className="block text-[11px] font-bold text-zinc-500 truncate">
                       {formCliente.nombre.trim() || formCliente.cedula.trim()
                         ? `${formCliente.nombre.trim() || "Sin nombre"}${formCliente.cedula.trim() ? ` · ${formCliente.cedula.trim()}` : ""}`
-                        : "Cliente de contado · tocá para agregar cédula, nombre, teléfono o correo"}
+                        : "Falta el nombre del cliente · tocá para escribirlo"}
                     </span>
                   </span>
                 </span>
@@ -2123,8 +2142,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente (Opcional al registrar)</label>
-                  <input type="text" value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Cliente de Contado o nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
+                  <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">Nombre del Cliente *</label>
+                  <input id="tienda-nombre-cliente" type="text" required value={formCliente.nombre} onChange={(e) => setFormCliente({ ...formCliente, nombre: e.target.value })} placeholder="Nombre del cliente..." className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none" />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2425,9 +2444,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                 <button
                   type="button"
                   className="md-btn is-success"
-                  onClick={() => { if (handleAgregarVentaATabla()) close(); }}
+                  onClick={() => {
+                    // 🔒 Toda venta se emite al confirmar (interno como mínimo); si falla queda pendiente para reintentar
+                    const nueva = handleAgregarVentaATabla();
+                    if (nueva) { close(); handleEmitirDesdeTabla(nueva); }
+                  }}
                 >
-                  <FaCheckCircle size={14} /> Confirmar · {fmt(totalCalculadoForm)}
+                  <FaCheckCircle size={14} /> Confirmar y emitir · {fmt(totalCalculadoForm)}
                 </button>
               </>
             )}
