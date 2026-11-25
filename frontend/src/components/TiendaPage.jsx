@@ -226,7 +226,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   });
 
   const [modoIngresoProducto, setModoIngresoProducto] = useState("catalogo"); // "catalogo" | "extra"
-  const [conceptoExtraTipo, setConceptoExtraTipo] = useState("Camiseta Versión Fan (Abono / Saldo)");
+  // 👈 Concepto fijo: el detalle (equipo, versión, restante…) va en "Detalle opcional"
+  const conceptoExtraTipo = "Abono";
   const [detalleExtraCustom, setDetalleExtraCustom] = useState("");
   const [tallaExtraCustom, setTallaExtraCustom] = useState("U");
   const [cantidadExtraCustom, setCantidadExtraCustom] = useState(1);
@@ -1963,17 +1964,9 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
                     <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-1">
                       Concepto Base *
                     </label>
-                    <select
-                      value={conceptoExtraTipo}
-                      onChange={(e) => setConceptoExtraTipo(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-black text-black outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="Camiseta Versión Fan (Abono / Saldo)">Camiseta Versión Fan (Abono / Saldo)</option>
-                      <option value="Camiseta Versión Fan (Adelanto / Encargo)">Camiseta Versión Fan (Adelanto / Encargo)</option>
-                      <option value="Camiseta Versión Player (Abono / Saldo)">Camiseta Versión Player (Abono / Saldo)</option>
-                      <option value="Camiseta Retro / Nacional (Abono / Saldo)">Camiseta Retro / Nacional (Abono / Saldo)</option>
-                      <option value="Ingreso Extra / Pago Restante">Ingreso Extra / Pago Restante</option>
-                    </select>
+                    <div className="w-full px-3 py-2.5 bg-zinc-100 border border-zinc-300 rounded-xl text-xs font-black text-black">
+                      {conceptoExtraTipo}
+                    </div>
                   </div>
 
                   <div>
