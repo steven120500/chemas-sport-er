@@ -67,7 +67,19 @@ export default defineConfig({
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 } // 5 min
             }
           },
-          // JS/CSS/Fonts del build: Cache First
+          // 🔤 Fuentes de public/ (dorsales): el nombre no lleva hash, así que si se reemplaza el archivo con el
+          // mismo nombre CacheFirst servía la vieja por 1 año. Se usa la guardada pero se revisa en segundo plano.
+          // (Si se cambia una fuente, subir también el ?v= en index.css y ProductScreen.jsx para que cambie ya.)
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/fonts/'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'public-fonts',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 }
+            }
+          },
+          // JS/CSS/Fonts del build (/assets/ con hash en el nombre): Cache First
           {
             urlPattern: ({ request }) =>
               ['script', 'style', 'font'].includes(request.destination),

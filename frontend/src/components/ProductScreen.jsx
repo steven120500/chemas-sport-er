@@ -572,9 +572,9 @@ export default function ProductScreen({
       <style>{`
         @font-face {
           font-family: 'FontBarca';
-          src: url('/fonts/Barcelona%20Tipografia%20.ttf') format('truetype'),
-               url('/fonts/Barcelona Tipografia .ttf') format('truetype'),
-               url('/fonts/Barcelona%20Tipografia.ttf') format('truetype');
+          src: url('/fonts/Barcelona%20Tipografia%20.ttf?v=20261125') format('truetype'),
+               url('/fonts/Barcelona Tipografia .ttf?v=20261125') format('truetype'),
+               url('/fonts/Barcelona%20Tipografia.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;
@@ -582,7 +582,7 @@ export default function ProductScreen({
 
         @font-face {
           font-family: 'FontBarcaVisita';
-          src: url('/fonts/Barcelona%20Tipografia%20Visita.ttf') format('truetype');
+          src: url('/fonts/Barcelona%20Tipografia%20Visita.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;
@@ -590,7 +590,7 @@ export default function ProductScreen({
 
         @font-face {
           font-family: 'FontBarcaTercera';
-          src: url('/fonts/Barcelona%20Tipografia%20Tercera.ttf') format('truetype');
+          src: url('/fonts/Barcelona%20Tipografia%20Tercera.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;
@@ -598,8 +598,8 @@ export default function ProductScreen({
 
         @font-face {
           font-family: 'FontMadrid';
-          src: url('/fonts/Real%20Madrid%20Tipografia.ttf') format('truetype'),
-               url('/fonts/Real Madrid Tipografia.ttf') format('truetype');
+          src: url('/fonts/Real%20Madrid%20Tipografia.ttf?v=20261125') format('truetype'),
+               url('/fonts/Real Madrid Tipografia.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;
@@ -607,8 +607,8 @@ export default function ProductScreen({
 
         @font-face {
           font-family: 'FontBoca';
-          src: url('/fonts/Boca%20Tipografia.ttf') format('truetype'),
-               url('/fonts/Boca Tipografia.ttf') format('truetype');
+          src: url('/fonts/Boca%20Tipografia.ttf?v=20261125') format('truetype'),
+               url('/fonts/Boca Tipografia.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;
@@ -616,8 +616,8 @@ export default function ProductScreen({
 
         @font-face {
           font-family: 'FontRiver';
-          src: url('/fonts/River%20Tipografia.ttf') format('truetype'),
-               url('/fonts/River Tipografia.ttf') format('truetype');
+          src: url('/fonts/River%20Tipografia.ttf?v=20261125') format('truetype'),
+               url('/fonts/River Tipografia.ttf?v=20261125') format('truetype');
           font-weight: normal;
           font-style: normal;
           font-display: block;

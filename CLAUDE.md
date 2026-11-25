@@ -127,6 +127,7 @@ Estética **monocroma blanco/negro "luxury"** con acentos puntuales.
   - `FontBoca` → `Boca Tipografia.ttf`
   - `FontRiver` → `River Tipografia.ttf`
   - Clases `.font-barca`, `.font-madrid`. Los `@font-face` de las 4 están en `index.css` y repetidos (con rutas de respaldo) en un `<style>` dentro de `ProductScreen.jsx`.
+  - ⚠️ Las URLs llevan `?v=AAAAMMDD`. **Si se reemplaza una fuente con el mismo nombre, subir ese `?v=`** en `index.css` y `ProductScreen.jsx`; si no, los dispositivos que ya la tenían guardada (service worker / Cloudflare) siguen mostrando la vieja. El SW guarda `/fonts/` con `StaleWhileRevalidate` (antes era CacheFirst 1 año y la de River se quedaba pegada).
 
 ### Animaciones
 Librería: **framer-motion** (`motion`, `AnimatePresence`) para modales, FilterBar y transiciones; el resto son keyframes CSS.
