@@ -243,7 +243,7 @@ export function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   const parentesisMatches = [...txt.matchAll(/\(([^)]+)\)/g)].map(m => m[1].trim());
   const categoria = parentesisMatches.join(" ");
 
-  let nombreProductoAlegra = "Camisa Version Fan";
+  let nombreProductoAlegra = "Camiseta Deportiva Versión Fan"; // 👈 nombre exacto en Alegra (id 3); "Camisa Version Fan" caía en "Fan Mujer"
   let precioBase = 20000;
 
   if (categoria.includes("envio") || txt.includes("envio gam") || txt === "envio" || txt.startsWith("envio ")) {
@@ -285,8 +285,8 @@ export function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
 
   if (!idEnAlegra) {
     idEnAlegra =
-      mapaAlegra["camisa version fan"] ||
       mapaAlegra["camiseta deportiva version fan"] ||
+      mapaAlegra["camisa version fan"] ||
       ID_ITEM_FALLBACK;
   }
 

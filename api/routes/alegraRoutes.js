@@ -83,7 +83,7 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
   const parentesisMatches = [...txt.matchAll(/\(([^)]+)\)/g)].map(m => m[1].trim());
   const categoria = parentesisMatches.join(" ");
 
-  let nombreProductoAlegra = "Camisa Version Fan"; // Predeterminado para Fan y el resto
+  let nombreProductoAlegra = "Camiseta Deportiva Versión Fan"; // 👈 Predeterminado para Fan y el resto: nombre exacto en Alegra (id 3); "Camisa Version Fan" caía en "Fan Mujer"
   let precioBase = 20000;
 
   if (categoria.includes("envio") || txt.includes("envio gam") || txt === "envio" || txt.startsWith("envio ")) {
@@ -113,7 +113,7 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
     precioBase = 22000;
   } else {
     // Fan ((Fan)) y todo el resto (NBA, MLB, NFL, F1, Balón, Abrigos, etc.)
-    nombreProductoAlegra = "Camisa Version Fan";
+    nombreProductoAlegra = "Camiseta Deportiva Versión Fan"; // 👈 nombre exacto en Alegra (id 3); "Camisa Version Fan" caía en "Fan Mujer"
     precioBase = 20000;
   }
 
@@ -130,8 +130,8 @@ function resolverProductoYPrecioBase(nombreVenta = "", mapaAlegra = {}) {
 
   if (!idEnAlegra) {
     idEnAlegra =
-      mapaAlegra["camisa version fan"] ||
       mapaAlegra["camiseta deportiva version fan"] ||
+      mapaAlegra["camisa version fan"] ||
       ID_ITEM_FALLBACK;
   }
 
