@@ -227,7 +227,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
 
   const [modoIngresoProducto, setModoIngresoProducto] = useState("catalogo"); // "catalogo" | "extra"
   // 👈 Concepto fijo: el detalle (equipo, versión, restante…) va en "Detalle opcional"
-  const conceptoExtraTipo = "Abono";
+  const conceptoExtraTipo = "Ingreso Extra";
   const [detalleExtraCustom, setDetalleExtraCustom] = useState("");
   const [tallaExtraCustom, setTallaExtraCustom] = useState("U");
   const [cantidadExtraCustom, setCantidadExtraCustom] = useState(1);
