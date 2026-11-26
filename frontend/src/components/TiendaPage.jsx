@@ -847,7 +847,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             .marca-nombre { font-size: 17px; letter-spacing: 0.5px; white-space: nowrap; text-transform: uppercase; line-height: 1.1; }
             .marca-sub { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
             .neg { font-size: 12px; line-height: 1.45; }
-            .sep { border-top: 2px dashed #000; margin: 9px 0; }
+            .sep { border-top: 2px solid #000; margin: 9px 0; } /* 👈 línea continua */
             .doc { font-size: 16px; line-height: 1.3; text-transform: uppercase; }
             .num-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 6px; font-size: 12px; margin-top: 4px; }
             .num-row span { white-space: nowrap; }
