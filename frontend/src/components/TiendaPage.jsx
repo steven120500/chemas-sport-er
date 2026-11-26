@@ -834,7 +834,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
               color: #000000;
               font-weight: 700;
               margin: 0;
-              padding: 6px 4px 36px 40px;
+              padding: 6px 4px 90px 26px; /* 👈 abajo 90px en blanco para que la cuchilla no corte "chemasporter.com"; margen izquierdo: más px = corre el tiquete a la derecha, menos = a la izquierda (con escala 115% en la impresora) */
               width: 100%;
               max-width: 72mm;
               font-size: 13px;
