@@ -875,7 +875,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <div class="marca">
             <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="" class="logo-img" onerror="this.style.display='none'" />
             <div>
-              <p class="marca-nombre">ChemaSportER</p>
+              <p class="marca-nombre">ChemaSport ER</p>
               <p class="marca-sub">Grecia</p>
             </div>
           </div>
