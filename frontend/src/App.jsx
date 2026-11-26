@@ -33,6 +33,8 @@ import TiendaPage from './components/TiendaPage';
 import PedidosPage from './components/PedidosPage'; // 🧾 Panel de pedidos (/admin)
 import CartDrawer from './components/CartDrawer'; // 🛒 Carrito
 import CheckoutPage from './components/CheckoutPage'; // 💳 Checkout (Tilopay / WhatsApp)
+import UbicacionPage from './components/UbicacionPage'; // 📍 Cómo llegar a la tienda
+import ComoLlegarHome from './components/ComoLlegarHome'; // 📍 franja de la portada
 import PagoResultado from './components/PagoResultado'; // 💳 Vuelta desde Tilopay
 import VentasWebPage from './components/VentasWebPage'; // 👑 Ventas de la tienda online (súper admin)
 import { CartProvider } from './cart/CartContext';
@@ -188,6 +190,7 @@ function MainApp() {
 
   const [storeView, setStoreView] = useState('todos');
   const [soloOcultos, setSoloOcultos] = useState(false);
+  const [soloAgotados, setSoloAgotados] = useState(false); // 🚫 Solo super admin: camisetas sin stock en ninguna ubicación
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -448,13 +451,13 @@ function MainApp() {
 
   // Cambio de filtros/búsqueda: va a la grilla; sin filtros vuelve arriba del todo
   useEffect(() => {
-    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || soloOcultos;
+    const hasFilters = searchTerm !== '' || filterType !== '' || filterSizes.length > 0 || soloOcultos || soloAgotados;
 
     setTimeout(() => {
       if (hasFilters) scrollToGrid('smooth');
       else if (page === 1) window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 50);
-  }, [searchTerm, filterType, filterSizes, soloOcultos]);
+  }, [searchTerm, filterType, filterSizes, soloOcultos, soloAgotados]);
 
   const refreshCounts = () => {
     setTimeout(() => fetchAllForCounts(), 600);
@@ -556,13 +559,16 @@ function MainApp() {
         if (!canEdit && product.hidden === true) return false;
       }
 
+      const totalStockGlobal = Object.values(product.tienda || {}).reduce((a, b) => a + Number(b || 0), 0) +
+                               Object.values(product.stock || {}).reduce((a, b) => a + Number(b || 0), 0) +
+                               Object.values(product.bodega || {}).reduce((a, b) => a + Number(b || 0), 0);
+
       // 🔥 Ocultar productos agotados a los usuarios clientes
-      if (!canEdit) {
-        const totalStockGlobal = Object.values(product.tienda || {}).reduce((a, b) => a + Number(b || 0), 0) +
-                                 Object.values(product.stock || {}).reduce((a, b) => a + Number(b || 0), 0) +
-                                 Object.values(product.bodega || {}).reduce((a, b) => a + Number(b || 0), 0);
-        if (totalStockGlobal <= 0) return false;
-      }
+      if (!canEdit && totalStockGlobal <= 0) return false;
+
+      // 🚫 "Agotados" (super admin): solo los que no tienen nada en tienda, bodega1 ni bodega2
+      const verAgotados = soloAgotados && isSuperUser;
+      if (verAgotados && totalStockGlobal > 0) return false;
 
       // Buscar cada palabra escrita tanto en el nombre como en el tipo (ej: "real madrid player")
       if (searchWords.length > 0) {
@@ -576,7 +582,7 @@ function MainApp() {
       }
 
       // Validar tallas y ubicación
-      if (!checkProductStockAndSizes(product)) return false;
+      if (!verAgotados && !checkProductStockAndSizes(product)) return false; // 👈 los agotados no tienen tallas ni ubicación que revisar
 
       const restrictive = activeTypes.filter((t) => t !== 'Nuevo');
       if (restrictive.length === 0) return true;
@@ -592,7 +598,7 @@ function MainApp() {
     }
 
     return filtered;
-  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, activeTypes, filterSizes, storeView, canEdit, isSuperUser, soloOcultos]);
+  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, activeTypes, filterSizes, storeView, canEdit, isSuperUser, soloOcultos, soloAgotados]);
 
   const effectiveTotal = usingFullCatalog ? allMatchingProducts.length : total;
   const pages = Math.max(1, Math.ceil(effectiveTotal / limit));
@@ -661,6 +667,7 @@ function MainApp() {
               setSearchTerm('');
               setFilterSizes([]);
               setSoloOcultos(false);
+              setSoloAgotados(false);
               setPage(1);
               navigate('/');
             }}
@@ -705,6 +712,7 @@ function MainApp() {
             <Route path="/admin/pedidos" element={<Navigate to="/admin" replace />} />
             <Route path="/ventas-web" element={<VentasWebPage isSuperUser={isSuperUser} puedeVer={isSuperUser || esSoloUsuarioTienda} />} />
             <Route path="/checkout/resultado" element={<PagoResultado />} />
+            <Route path="/ubicacion" element={<UbicacionPage />} />
             <Route path="/checkout" element={<CheckoutPage products={allProductsForCounts.length > 0 ? allProductsForCounts : products} />} />
 
             <Route path="/" element={
@@ -737,6 +745,9 @@ function MainApp() {
                     if (section) section.scrollIntoView({ behavior: 'smooth' });
                   }
                 }} />
+
+                {/* 📍 Cómo llegar a la tienda (debajo del Bienvenido) */}
+                <ComoLlegarHome />
 
                 {/* 🔥 VISTA DE INVENTARIO (Fondo claro blanco/negro/gris) 🔥 */}
                 {isSuperUser && (
@@ -819,6 +830,11 @@ function MainApp() {
                   soloOcultos={soloOcultos}
                   setSoloOcultos={(val) => {
                     setSoloOcultos(val);
+                    setPage(1);
+                  }}
+                  soloAgotados={soloAgotados}
+                  setSoloAgotados={(val) => {
+                    setSoloAgotados(val);
                     setPage(1);
                   }}
                 />

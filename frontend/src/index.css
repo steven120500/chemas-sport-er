@@ -2605,6 +2605,16 @@ button:focus-visible {
 .ft-brand strong { display: block; font-size: 18px; font-weight: 900; letter-spacing: -0.02em; }
 .ft-brand p { margin: 2px 0 0; font-size: 13px; color: #a1a1aa; }
 
+/* 📍 Visitanos (tienda física) */
+.ft-visit { display: flex; align-items: flex-start; gap: 12px; text-align: left; max-width: 340px; }
+.ft-visit-ico { flex: none; width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #1a1a1a; border: 1px solid #333; color: #ef4444; }
+.ft-visit strong { display: block; font-size: 13px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+.ft-visit p { margin: 2px 0 0; font-size: 13px; color: #a1a1aa; line-height: 1.4; }
+.ft-visit-links { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+.ft-visit-links a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #fff; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #52525b; }
+.ft-visit-links a:hover { color: #F5C400; text-decoration-color: #F5C400; }
+.ft-visit-links a.is-waze { padding: 6px 12px; border-radius: 999px; background: #33ccff; color: #000; text-decoration: none; }
+.ft-visit-links a.is-waze:hover { background: #fff; color: #000; }
 .ft-socials { display: flex; gap: 10px; }
 .ft-socials a {
   display: flex;
@@ -4188,6 +4198,12 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .co-maps { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; font-weight: 800; color: #000; text-decoration: underline; text-underline-offset: 3px; }
 .co-maps:hover { color: #dc2626; }
 .co-maps svg { color: #dc2626; }
+/* 📍 Retiro: botón de Waze + links */
+.co-pickup-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 10px; }
+.co-pickup-links .co-maps { margin-top: 0; }
+.co-waze { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; background: #33ccff; color: #000 !important; font-size: 13px; font-weight: 900; text-decoration: none; }
+.co-waze:hover { background: #1fb8eb; }
+.co-pickup .co-waze svg { color: #000; margin-top: 0; }
 .co-secure { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 14px; padding: 12px; border-radius: 14px; background: #f0fdf4; color: #166534; font-size: 12px; line-height: 1.45; }
 /* 🧾 Casilla "Quiero factura electrónica" */
 .co-check { position: relative; display: flex; gap: 12px; align-items: flex-start; margin: 0 0 14px; padding: 12px 14px; border: 1.5px solid #e4e4e7; border-radius: 14px; cursor: pointer; transition: border-color .2s, background .2s; }
@@ -4550,6 +4566,12 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .ts-seg.is-sm button { padding: 6px 14px; font-size: 11px; }
 
 /* Caja */
+/* 🙈 Botón para mostrar/ocultar los montos (cerrado al entrar) */
+.ts-caja-toggle { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 9px 16px; border-radius: 999px; background: #fff !important; color: #111 !important; border: 1px solid #e4e4e7 !important; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; outline: none !important; transform: none !important; transition: background .15s, border-color .15s; }
+.ts-caja-toggle:hover { border-color: #111 !important; }
+.ts-caja-toggle.is-open { background: #111 !important; color: #fff !important; border-color: #111 !important; }
+.ts-caja-chev { transition: transform .2s; }
+.ts-caja-toggle.is-open .ts-caja-chev { transform: rotate(180deg); }
 .ts-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .ts-stat { position: relative; background: #fff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; border-left: 4px solid var(--c); }
 .ts-stat-ico { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--c); }
@@ -4729,3 +4751,62 @@ select.co-input:disabled { background-color: #f4f4f5; color: #a1a1aa; cursor: no
 .ts-tipo.is-on select { background: #111; color: #fff; border-color: #111; }
 .ts-tipo-flecha { position: absolute; right: 12px; pointer-events: none; transform: rotate(90deg); color: #71717a; }
 .ts-tipo.is-on .ts-tipo-flecha { color: #fff; }
+
+/* =========================================================
+   📍 UBICACIÓN (/ubicacion) — UbicacionPage.jsx
+   ========================================================= */
+.ub { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+.ub-back { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: #000 !important; color: #fff !important; border: 0 !important; font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
+.ub-head { margin: 22px 0 16px; }
+.ub-eyebrow { font-size: 11px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; color: #dc2626; }
+.ub-head h1 { margin: 4px 0 6px; font-size: 32px; font-weight: 900; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.05; }
+.ub-head p { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; color: #3f3f46; }
+.ub-head p svg { flex: none; margin-top: 3px; color: #dc2626; }
+.ub-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.ub-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 14px; border-radius: 14px; background: #fff; color: #000; border: 1px solid #e4e4e7; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; text-decoration: none; transition: transform .15s, border-color .15s; }
+.ub-btn:hover { border-color: #000; transform: translateY(-2px); }
+.ub-btn svg { font-size: 17px; color: #dc2626; }
+.ub-btn.is-waze { background: #33ccff; border-color: #33ccff; }
+.ub-btn.is-waze svg { color: #000; }
+.ub-img { display: block; width: 100%; height: auto; border-radius: 20px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+.ub-wa { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 18px; padding: 14px; border-radius: 14px; background: #16a34a; color: #fff; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; text-decoration: none; }
+.ub-wa:hover { background: #15803d; }
+@media (min-width: 640px) {
+  .ub { padding-top: 32px; }
+  .ub-head h1 { font-size: 42px; }
+}
+
+/* =========================================================
+   📍 CÓMO LLEGAR (portada) — ComoLlegarHome.jsx
+   📱 Celular/tablet: tarjeta compacta sin fotos · 🖥️ compu (≥1024px): texto + 4 fotos de los pasos
+   ========================================================= */
+.cl { max-width: 1280px; margin: 20px auto 0; padding: 0 16px; }
+.cl-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 18px; padding: 16px; border-radius: 20px; background: #0a0a0a; color: #fff; }
+.cl-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(600px 260px at 0% 0%, rgba(220,38,38,.22), transparent 70%), radial-gradient(500px 240px at 100% 100%, rgba(51,204,255,.14), transparent 70%); }
+.cl-info, .cl-pasos { position: relative; }
+.cl-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; color: #f87171; }
+.cl-info h2 { margin: 4px 0 2px; font-size: 20px; font-weight: 900; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.1; color: #fff; }
+.cl-dir { margin: 0; font-size: 12px; font-weight: 700; color: #d4d4d8; line-height: 1.4; }
+.cl-dir span { color: #a1a1aa; }
+.cl-actions { display: flex; gap: 8px; margin-top: 12px; }
+.cl-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; white-space: nowrap; color: #fff; border: 1px solid #3f3f46; transition: transform .15s, background .15s, border-color .15s; }
+.cl-btn:hover { transform: translateY(-2px); border-color: #fff; color: #fff; }
+.cl-btn.is-waze { background: #33ccff; border-color: #33ccff; color: #000; }
+.cl-btn.is-waze:hover { background: #fff; border-color: #fff; color: #000; }
+.cl-btn.is-waze svg { font-size: 14px; }
+.cl-pasos { display: none; } /* 👈 en celular sin fotos */
+.cl-paso { display: block; overflow: hidden; border-radius: 14px; border: 1px solid #27272a; }
+.cl-paso img { display: block; width: 100%; height: auto; aspect-ratio: 400 / 390; object-fit: cover; transition: transform .5s cubic-bezier(0.16,1,0.3,1); }
+.cl-paso:hover img { transform: scale(1.05); }
+@media (min-width: 1024px) {
+  .cl { margin-top: 40px; padding: 0 32px; }
+  .cl-card { flex-direction: row; align-items: center; gap: 32px; padding: 32px; border-radius: 24px; }
+  .cl-info { flex: 0 0 300px; }
+  .cl-eyebrow { font-size: 11px; }
+  .cl-info h2 { margin: 6px 0 4px; font-size: 40px; line-height: 1.05; }
+  .cl-dir { font-size: 14px; line-height: 1.45; }
+  .cl-actions { flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .cl-btn { flex: none; gap: 8px; padding: 12px 18px; font-size: 12px; letter-spacing: 0.08em; }
+  .cl-btn.is-waze svg { font-size: 16px; }
+  .cl-pasos { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+}

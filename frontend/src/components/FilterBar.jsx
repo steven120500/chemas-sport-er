@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
-import { FaTimes, FaSearch, FaSlidersH, FaRulerHorizontal, FaEyeSlash, FaCheck } from "react-icons/fa";
+import { FaTimes, FaSearch, FaSlidersH, FaRulerHorizontal, FaEyeSlash, FaCheck, FaBan } from "react-icons/fa";
 
 // ⚠️ Estilos en index.css (sección "FILTER BAR", clases fb-*).
 
@@ -59,6 +59,9 @@ export default function FilterBar({
   esSuperAdmin = false,
   soloOcultos = false,
   setSoloOcultos,
+  // 🚫 Filtro de agotados (solo Super Admin)
+  soloAgotados = false,
+  setSoloAgotados,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchTerm || "");
@@ -68,7 +71,7 @@ export default function FilterBar({
 
   // filterType admite varios tipos separados por coma ("Player,Fan")
   const activeTypes = String(filterType || "").split(",").map((t) => t.trim()).filter(Boolean);
-  const activeCount = activeTypes.length + (filterSizes?.length || 0) + (soloOcultos ? 1 : 0);
+  const activeCount = activeTypes.length + (filterSizes?.length || 0) + (soloOcultos ? 1 : 0) + (soloAgotados ? 1 : 0);
   const hasAnything = activeCount > 0 || (searchTerm || "").trim() !== "";
   const labelOf = (v) => categories.find((c) => c.value === v)?.label || v;
 
@@ -121,6 +124,7 @@ export default function FilterBar({
     setFilterType?.("");
     setFilterSizes?.([]);
     setSoloOcultos?.(false);
+    setSoloAgotados?.(false);
   };
 
   const clearAll = () => {
@@ -139,6 +143,7 @@ export default function FilterBar({
     ...activeTypes.map((t) => ({ key: `t-${t}`, label: labelOf(t), onRemove: () => toggleType(t) })),
     ...(filterSizes || []).map((s) => ({ key: `s-${s}`, label: `Talla ${s === "U" ? "única" : s}`, onRemove: () => toggleSize(s) })),
     soloOcultos && { key: "o", label: "Solo ocultos", onRemove: () => setSoloOcultos?.(false) },
+    soloAgotados && { key: "a", label: "Solo agotados", onRemove: () => setSoloAgotados?.(false) },
   ].filter(Boolean);
 
   return (
@@ -216,6 +221,19 @@ export default function FilterBar({
               >
                 <FaEyeSlash />
                 <span className="fb-btn-label">Ocultos</span>
+              </button>
+            )}
+
+            {esSuperAdmin && (
+              <button
+                type="button"
+                className={`fb-btn fb-btn--light ${soloAgotados ? "fb-btn--on" : ""}`}
+                onClick={() => setSoloAgotados?.(!soloAgotados)}
+                title="Ver únicamente camisetas agotadas (sin stock en ninguna ubicación)"
+                aria-pressed={soloAgotados}
+              >
+                <FaBan />
+                <span className="fb-btn-label">Agotados</span>
               </button>
             )}
           </div>

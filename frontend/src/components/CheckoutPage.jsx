@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart } from "lucide-react";
 import {
-  FaArrowLeft, FaLock, FaTruck, FaStore, FaCreditCard, FaUser, FaMapMarkerAlt, FaCheck, FaShieldAlt, FaMotorcycle, FaChevronDown, FaWhatsapp, FaCheckCircle, FaExternalLinkAlt,
+  FaArrowLeft, FaLock, FaTruck, FaStore, FaCreditCard, FaUser, FaMapMarkerAlt, FaCheck, FaShieldAlt, FaMotorcycle, FaChevronDown, FaWhatsapp, FaCheckCircle, FaExternalLinkAlt, FaWaze,
 } from "react-icons/fa";
 import { useCart, colones, cldThumb, textoDorsal, lineasConStock, nombreConTipo } from "../cart/useCart";
 import { toast as toastHOT } from "react-hot-toast";
 import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
 import { hayMensajero, COSTO_MENSAJERO } from "../utils/coberturaMensajero";
+import { DIRECCION_TIENDA, ZONA_TIENDA, WAZE_TIENDA, MAPS_TIENDA } from "../utils/tiendaFisica"; // 🏪 retiro en tienda
 import { planEnvio, cuandoTexto, diasMensajero, fechaLarga } from "../utils/fechasEnvio"; // 📦 cuándo sale / cuándo llega
 import { ApartadoAviso } from "./ApartadoReloj";
 
@@ -18,9 +19,7 @@ import { ApartadoAviso } from "./ApartadoReloj";
 
 // 🚧 Por confirmar con el dueño
 const COSTO_ENVIO_CORREOS = 3500;
-// 🏪 Tienda física (retiro): ficha de Google Maps "CHEMASPORT ER"
-const DIRECCION_TIENDA = "Grecia, Alajuela";
-const MAPS_TIENDA = "https://maps.google.com/?cid=9503301042483866711";
+// 🏪 Tienda física (retiro): dirección, Waze y Google Maps en utils/tiendaFisica.js
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const WHATSAPP_TIENDA = "50660369857";
@@ -545,10 +544,16 @@ export default function CheckoutPage({ products = [] }) {
                       <FaMapMarkerAlt />
                       <div>
                         <strong>ChemaSport ER</strong>
-                        <p>{DIRECCION_TIENDA}</p>
-                        <a className="co-maps" href={MAPS_TIENDA} target="_blank" rel="noopener noreferrer">
-                          <FaMapMarkerAlt /> Ver ubicación en Google Maps
-                        </a>
+                        <p>{DIRECCION_TIENDA}, {ZONA_TIENDA}</p>
+                        <div className="co-pickup-links">
+                          <a className="co-waze" href={WAZE_TIENDA} target="_blank" rel="noopener noreferrer">
+                            <FaWaze /> Abrir en Waze
+                          </a>
+                          <a className="co-maps" href={MAPS_TIENDA} target="_blank" rel="noopener noreferrer">
+                            <FaMapMarkerAlt /> Google Maps
+                          </a>
+                          <Link className="co-maps" to="/ubicacion" target="_blank">Ver cómo llegar</Link>
+                        </div>
                       </div>
                     </motion.div>
                   )}

@@ -5,7 +5,7 @@ import {
   FaTrash, FaReceipt, FaPrint, FaMoneyBillWave, 
   FaCreditCard, FaMobileAlt, FaCashRegister, FaStar, 
   FaUserCheck, FaBoxOpen, FaPlus, FaShoppingBag, FaExclamationTriangle,
-  FaCheckCircle, FaClock, FaTimes, FaChevronRight
+  FaCheckCircle, FaClock, FaTimes, FaChevronRight, FaEye, FaEyeSlash, FaChevronDown
 } from "react-icons/fa";
 import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
@@ -219,6 +219,8 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
   const navigate = useNavigate();
 
   const [tipoVistaCaja, setTipoVistaCaja] = useState("dia");
+  // 🙈 Montos de la caja escondidos por defecto (el cliente que está en el mostrador no ve las ventas)
+  const [verCaja, setVerCaja] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => getFechaHoyYMD());
   const [selectedMesYM, setSelectedMesYM] = useState(() => getFechaHoyYMD().slice(0, 7));
   const [fondoCajaBase, setFondoCajaBase] = useState(() => {
@@ -1597,7 +1599,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           </div>
         </header>
 
-        {/* 💰 CAJA */}
+        {/* 💰 CAJA — desplegable, cerrada al entrar */}
+        <button type="button" className={`ts-caja-toggle ${verCaja ? "is-open" : ""}`} onClick={() => setVerCaja((v) => !v)} aria-expanded={verCaja}>
+          {verCaja ? <FaEyeSlash size={13} /> : <FaEye size={13} />}
+          <span>{verCaja ? "Ocultar caja" : "Ver caja"}</span>
+          <FaChevronDown size={11} className="ts-caja-chev" />
+        </button>
+        {verCaja && (
         <section className="ts-stats">
           <div className="ts-stat is-efectivo">
             <span className="ts-stat-ico"><FaMoneyBillWave size={14} /></span>
@@ -1624,6 +1632,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             <small>{resumenCaja.cantidadFacturas || 0} comprobante(s) · {resumenCaja.totalPrendas || 0} prenda(s)</small>
           </div>
         </section>
+        )}
 
         <div className="ts-grid">
           {/* 1️⃣ AGREGAR A LA CUENTA */}

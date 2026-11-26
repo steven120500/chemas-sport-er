@@ -1,5 +1,7 @@
-import { FaFacebookF, FaInstagram, FaWhatsapp, FaTruck, FaCreditCard, FaTshirt } from 'react-icons/fa';
+import { FaFacebookF, FaInstagram, FaWhatsapp, FaTruck, FaCreditCard, FaTshirt, FaMapMarkerAlt, FaWaze } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
+import { DIRECCION_TIENDA, ZONA_TIENDA, WAZE_TIENDA } from '../utils/tiendaFisica';
 
 // ⚠️ Estilos en index.css (sección "FOOTER", clases ft-*).
 
@@ -36,6 +38,19 @@ export default function Footer() {
           <div>
             <strong>ChemaSport ER</strong>
             <p>Camisetas de fútbol en Costa Rica.</p>
+          </div>
+        </div>
+
+        {/* 📍 Tienda física */}
+        <div className="ft-visit">
+          <span className="ft-visit-ico"><FaMapMarkerAlt /></span>
+          <div>
+            <strong>Visitanos</strong>
+            <p>{DIRECCION_TIENDA}, {ZONA_TIENDA}</p>
+            <div className="ft-visit-links">
+              <a href={WAZE_TIENDA} target="_blank" rel="noopener noreferrer" className="is-waze"><FaWaze /> Waze</a>
+              <Link to="/ubicacion">¿Cómo llegar?</Link>
+            </div>
           </div>
         </div>
 
