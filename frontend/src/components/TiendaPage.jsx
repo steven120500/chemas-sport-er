@@ -844,7 +844,7 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
             p { margin: 0; }
             .marca { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
             .logo-img { width: 64px; height: 64px; flex-shrink: 0; object-fit: contain; filter: grayscale(100%) contrast(250%); }
-            .marca-nombre { font-size: 20px; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.1; }
+            .marca-nombre { font-size: 17px; letter-spacing: 0.5px; white-space: nowrap; text-transform: uppercase; line-height: 1.1; }
             .marca-sub { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
             .neg { font-size: 12px; line-height: 1.45; }
             .sep { border-top: 2px dashed #000; margin: 9px 0; }
@@ -875,13 +875,13 @@ export default function TiendaPage({ isSuperUser = false, user = null }) {
           <div class="marca">
             <img id="ticket-logo" src="${window.location.origin}/logo.png" alt="" class="logo-img" onerror="this.style.display='none'" />
             <div>
-              <p class="marca-nombre">ChemaSport</p>
-              <p class="marca-sub">ER · Grecia</p>
+              <p class="marca-nombre">ChemaSportER</p>
+              <p class="marca-sub">Grecia</p>
             </div>
           </div>
 
           <div class="neg">
-            <p>CHEMASPORT ER</p>
+            <p>CHEMASPORT ER SRL</p>
             <p>CÉD. JURÍDICA 3-102-916554</p>
             <p>50 M OESTE DE LA BOMBA DELTA, GRECIA</p>
             <p>Teléfono +506 6036-9857</p>
