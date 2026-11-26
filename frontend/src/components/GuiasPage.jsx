@@ -9,6 +9,7 @@ import {
 import { toast as toastHOT } from "react-hot-toast";
 import GuiasCorreos from "./GuiasCorreos";
 import { generarPdfMensajero, textoFechaEntrega } from "../utils/guiasPdf";
+import { lugarSinMensajero, mensajeSinMensajero } from "../utils/coberturaMensajero";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const STORAGE_KEY = "chemasport_guias_registradas";
@@ -135,6 +136,13 @@ export default function GuiasPage() {
       !form.telefono.trim()
     ) {
       toastHOT.error("Por favor completa todos los campos obligatorios (*).");
+      return;
+    }
+
+    // 🚫 Cot y Tierra Blanca (Cartago) están fuera de la cobertura del mensajero
+    const sinMsj = lugarSinMensajero(form.provincia, form.canton, form.distrito);
+    if (sinMsj) {
+      toastHOT.error(mensajeSinMensajero(sinMsj));
       return;
     }
 
@@ -290,6 +298,16 @@ export default function GuiasPage() {
   const guardarEdicionCelda = async (gTarget, field) => {
     const rowId = gTarget._id || gTarget.id;
     let cambios;
+
+    // 🚫 Al corregir la dirección tampoco se puede dejar en Cot / Tierra Blanca (Cartago)
+    if (field === "provincia" || field === "canton" || field === "distrito") {
+      const dir = { provincia: gTarget.provincia, canton: gTarget.canton, distrito: gTarget.distrito, [field]: tempValue };
+      const sinMsj = lugarSinMensajero(dir.provincia, dir.canton, dir.distrito);
+      if (sinMsj) {
+        toastHOT.error(mensajeSinMensajero(sinMsj));
+        return;
+      }
+    }
 
     if (field === "debe") {
       // 🔥 Deuda y monto se guardan juntos
@@ -666,6 +684,12 @@ export default function GuiasPage() {
                     />
                   </div>
                 </div>
+
+                {lugarSinMensajero(form.provincia, form.canton, form.distrito) && (
+                  <p className="-mt-2 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs sm:text-sm font-bold text-red-700">
+                    🚫 {mensajeSinMensajero(lugarSinMensajero(form.provincia, form.canton, form.distrito))}
+                  </p>
+                )}
 
                 <div>
                   <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">

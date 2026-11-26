@@ -16,6 +16,7 @@ import LoadingOverlay from "./LoadingOverlay";
 import { API_BASE } from "../authFetch";
 import { generarPdfMensajero, generarPdfOficialCorreos } from "../utils/guiasPdf";
 import { saldoDe, textoRecogerRaspa } from "../utils/pedidosPago";
+import { lugarSinMensajero, mensajeSinMensajero } from "../utils/coberturaMensajero";
 
 // Mismas opciones que el formulario de GuiasPage (mensajero)
 const PROVINCIAS_MENSAJERO = ["Alajuela", "Cartago", "Heredia", "San José"];
@@ -151,6 +152,9 @@ export default function GuiaPedidoModal({ pedido, orden, onClose, onDone }) {
   const hacerMensajero = async () => {
     const m = msj;
     if (!m.provincia || !m.canton.trim() || !m.distrito.trim()) throw new Error("Falta provincia, cantón o distrito.");
+    // 🚫 Cot y Tierra Blanca (Cartago) están fuera de la cobertura del mensajero
+    const sinMsj = lugarSinMensajero(m.provincia, m.canton, m.distrito);
+    if (sinMsj) throw new Error(mensajeSinMensajero(sinMsj));
     const monto = Number(soloDigitos(m.monto, 9)) || 0;
     if (m.debe === "Sí" && monto <= 0) throw new Error("Poné el monto que debe el cliente.");
     if (m.comentarioSelect === "Otro comentario..." && !m.comentarioCustom.trim()) throw new Error("Escribí el comentario.");

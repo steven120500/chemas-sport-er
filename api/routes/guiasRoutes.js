@@ -2,6 +2,7 @@ import express from 'express';
 import Guia from '../models/Guia.js';
 
 import { requireAuth } from '../middleware/auth.js';
+import { lugarSinMensajero, mensajeSinMensajero } from '../utils/coberturaMensajero.js';
 
 const router = express.Router();
 
@@ -15,7 +16,11 @@ router.use(requireAuth);
 
 router.post('/', async (req, res) => {
   try {
-    const nuevaGuia = new Guia(soloCamposGuia(req.body));
+    const datos = soloCamposGuia(req.body);
+    // 🚫 Cot y Tierra Blanca (Cartago) están fuera de la cobertura del mensajero
+    const sinMsj = lugarSinMensajero(datos.provincia, datos.canton, datos.distrito);
+    if (sinMsj) return res.status(400).json({ error: mensajeSinMensajero(sinMsj) });
+    const nuevaGuia = new Guia(datos);
     const saved = await nuevaGuia.save();
     res.status(200).json({ success: true, guia: saved });
   } catch (error) {
@@ -43,6 +48,13 @@ router.put('/:id', async (req, res) => {
     const cambios = soloCamposGuia(req.body);
     delete cambios.fechaYMD; // 👈 la fecha de creación no se cambia al editar
     delete cambios.fecha;
+    if (['provincia', 'canton', 'distrito'].some((k) => cambios[k] !== undefined)) {
+      const actual = await Guia.findById(req.params.id).lean();
+      if (!actual) return res.status(404).json({ error: "Guía no encontrada." });
+      const dir = { ...actual, ...cambios };
+      const sinMsj = lugarSinMensajero(dir.provincia, dir.canton, dir.distrito);
+      if (sinMsj) return res.status(400).json({ error: mensajeSinMensajero(sinMsj) });
+    }
     const guia = await Guia.findByIdAndUpdate(req.params.id, cambios, { new: true, runValidators: true });
     if (!guia) return res.status(404).json({ error: "Guía no encontrada." });
     res.status(200).json({ success: true, guia });

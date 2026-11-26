@@ -48,13 +48,33 @@ const COBERTURA = {
 const norm = (s = '') =>
   String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+// 🚫 Lugares de Cartago adonde el mensajero NO llega (decisión del dueño, nov-2026): Cot y Tierra Blanca.
+// En /guias y en la guía de pedidos el cantón/distrito se escriben a mano, así que se busca la palabra
+// en cualquiera de los dos campos ('Cot', 'Cot de Oreamuno', 'tierra blanca'...).
+const FUERA_DE_COBERTURA = [
+  { provincia: 'cartago', lugar: 'cot', nombre: 'Cot' },
+  { provincia: 'cartago', lugar: 'tierra blanca', nombre: 'Tierra Blanca' },
+];
+
+/** Si la dirección cae en un lugar sin mensajero devuelve su nombre ('Cot' / 'Tierra Blanca'); si no, null */
+export const lugarSinMensajero = (provincia, canton, distrito) => {
+  const p = norm(provincia);
+  const texto = ` ${norm(canton)} ${norm(distrito)} `.replace(/[^a-z0-9]+/g, ' ');
+  const hit = FUERA_DE_COBERTURA.find((z) => (!p || p === z.provincia) && texto.includes(` ${z.lugar} `));
+  return hit ? hit.nombre : null;
+};
+
+export const mensajeSinMensajero = (lugar) =>
+  `${lugar} (Cartago) está fuera de la cobertura del mensajero privado. Enviala por Correos de Costa Rica.`;
+
 const SET = new Set();
 for (const [p, cantones] of Object.entries(COBERTURA))
   for (const [c, distritos] of Object.entries(cantones))
     for (const d of distritos) SET.add(`${norm(p)}|${norm(c)}|${norm(d)}`);
 
 export const hayMensajero = (provincia, canton, distrito) =>
-  Boolean(provincia && canton && distrito) && SET.has(`${norm(provincia)}|${norm(canton)}|${norm(distrito)}`);
+  Boolean(provincia && canton && distrito) && !lugarSinMensajero(provincia, canton, distrito) &&
+  SET.has(`${norm(provincia)}|${norm(canton)}|${norm(distrito)}`);
 
 /** Costo del envío según la entrega escogida (null = entrega inválida para esa dirección) */
 export const costoEnvio = (entrega, provincia, canton, distrito) => {
