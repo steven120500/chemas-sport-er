@@ -15,6 +15,7 @@ import {
 import { toast as toastHOT } from "react-hot-toast";
 import ModalShell from "./ModalShell";
 import { generarPdfOficialCorreos } from "../utils/guiasPdf";
+import { REMITENTE_CORREOS } from "../utils/tiendaFisica";
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 
@@ -564,11 +565,11 @@ export default function GuiasCorreos() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-700">
               <div><strong>Empresa:</strong> CHEMASPORT ER S.R.L.</div>
               <div><strong>Cédula Jurídica:</strong> 3102916554</div>
-              <div><strong>Teléfono:</strong> 71103209</div>
-              <div><strong>Código Postal:</strong> 20307</div>
+              <div><strong>Teléfono:</strong> {REMITENTE_CORREOS.telefono}</div>
+              <div><strong>Código Postal:</strong> {REMITENTE_CORREOS.zip}</div>
             </div>
             <div className="mt-2 text-xs text-gray-600">
-              <strong>Dirección:</strong> Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque
+              <strong>Dirección:</strong> {REMITENTE_CORREOS.direccion}
             </div>
           </div>
 

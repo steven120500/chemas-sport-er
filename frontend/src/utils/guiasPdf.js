@@ -1,6 +1,7 @@
 // utils/guiasPdf.js
 // 🖨️ PDFs de guías (movidos sin cambios desde GuiasPage y GuiasCorreos para reusarlos en Pedidos).
 import jsPDF from "jspdf";
+import { REMITENTE_CORREOS } from "./tiendaFisica";
 
 function limpiarMontoCR(val) {
   if (typeof val === "number" && !isNaN(val)) return Math.round(val);
@@ -319,11 +320,11 @@ export const generarPdfOficialCorreos = (guiaData) => {
   doc.text("RESPONSABILIDAD LIMITADA", colIzquierda, yRemitente);
   yRemitente += 4.5;
 
-  drawBoldLabelLine(doc, "Código postal:", "20307", colIzquierda, yRemitente);
+  drawBoldLabelLine(doc, "Código postal:", REMITENTE_CORREOS.zip, colIzquierda, yRemitente);
   yRemitente += 4;
-  drawBoldLabelLine(doc, "Teléfono:", "71103209", colIzquierda, yRemitente);
+  drawBoldLabelLine(doc, "Teléfono:", REMITENTE_CORREOS.telefono, colIzquierda, yRemitente);
   yRemitente += 4;
-  drawBoldLabelLine(doc, "Correo electrónico:", "chemasport_er@outlook.com", colIzquierda, yRemitente);
+  drawBoldLabelLine(doc, "Correo electrónico:", REMITENTE_CORREOS.correo, colIzquierda, yRemitente);
   yRemitente += 4;
 
   doc.setFont("helvetica", "bold");
@@ -331,7 +332,7 @@ export const generarPdfOficialCorreos = (guiaData) => {
   yRemitente += 3.5;
   doc.setFont("helvetica", "normal");
   const lineasDirRem = doc.splitTextToSize(
-    "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque",
+    REMITENTE_CORREOS.direccion,
     maxColWidth
   );
   doc.text(lineasDirRem, colIzquierda, yRemitente);
