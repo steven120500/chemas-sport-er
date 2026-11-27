@@ -273,6 +273,8 @@ function MainApp() {
   const canAdd = user?.isSuperUser || user?.roles?.includes('add');
   const canEdit = user?.isSuperUser || user?.roles?.includes('edit');
   const canDelete = user?.isSuperUser || user?.roles?.includes('delete');
+  // 📦 Vista de inventario (Todas / Tienda / Bodega 1 / Bodega 2): cualquier usuario con alguna función
+  const puedeVerInventario = isSuperUser || esSoloUsuarioTienda || (Array.isArray(user?.roles) && user.roles.length > 0);
 
   const handleLogout = () => {
     setUser(null);
@@ -305,7 +307,7 @@ function MainApp() {
         limit: String(limit),
         ...(q ? { q } : {}),
         ...(filterSizes.length ? { sizes: filterSizes.join(',') } : {}),
-        ...(isSuperUser && storeView !== 'todos' ? { storeView } : {})
+        ...(puedeVerInventario && storeView !== 'todos' ? { storeView } : {})
       });
 
       // Al backend solo se le manda el tipo si hay uno; con varios, el filtrado fino
@@ -415,7 +417,7 @@ function MainApp() {
     }
     
     fetchProducts({ page, q: searchTerm, type: filterType });
-  }, [page, searchTerm, filterType, filterSizes, storeView, limit]);
+  }, [page, searchTerm, filterType, filterSizes, storeView, puedeVerInventario, limit]);
 
   // 🔥 5. SCROLL AL INICIO DEL CATÁLOGO
   // Calcula el destino con la altura real del header sticky (cambia entre celular/desktop y al hacer scroll).
@@ -515,7 +517,7 @@ function MainApp() {
     const getQtyInStore = (obj, size) => Number(obj?.[size] ?? 0);
     const hasAnySizeInObj = (obj) => Object.values(obj || {}).some((v) => Number(v) > 0);
 
-    const activeStore = isSuperUser ? storeView : 'todos';
+    const activeStore = puedeVerInventario ? storeView : 'todos';
 
     // Si el usuario seleccionó tallas en el filtro (ej. ['M'])
     if (filterSizes.length > 0) {
@@ -598,7 +600,7 @@ function MainApp() {
     }
 
     return filtered;
-  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, activeTypes, filterSizes, storeView, canEdit, isSuperUser, soloOcultos, soloAgotados]);
+  }, [allProductsForCounts, products, usingFullCatalog, searchTerm, activeTypes, filterSizes, storeView, canEdit, isSuperUser, puedeVerInventario, soloOcultos, soloAgotados]);
 
   const effectiveTotal = usingFullCatalog ? allMatchingProducts.length : total;
   const pages = Math.max(1, Math.ceil(effectiveTotal / limit));
@@ -750,7 +752,7 @@ function MainApp() {
                 <ComoLlegarHome />
 
                 {/* 🔥 VISTA DE INVENTARIO (Fondo claro blanco/negro/gris) 🔥 */}
-                {isSuperUser && (
+                {puedeVerInventario && (
                 <div className="w-full max-w-7xl mx-auto px-4 mt-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 bg-zinc-50 border border-zinc-200 p-4 rounded-2xl shadow-sm">
                     <span className="text-sm font-black text-zinc-800 uppercase tracking-tight mr-2">

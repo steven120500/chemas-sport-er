@@ -10,6 +10,10 @@ import { toast as toastHOT } from "react-hot-toast";
 import GuiasCorreos from "./GuiasCorreos";
 import { generarPdfMensajero, textoFechaEntrega } from "../utils/guiasPdf";
 import { lugarSinMensajero, mensajeSinMensajero } from "../utils/coberturaMensajero";
+import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
+
+// 🛵 El mensajero solo llega a estas provincias
+const PROVINCIAS_MENSAJERO = ["Alajuela", "Cartago", "Heredia", "San José"];
 
 const API_BASE = "https://chemas-sport-er-backend.onrender.com";
 const STORAGE_KEY = "chemasport_guias_registradas";
@@ -104,11 +108,18 @@ export default function GuiasPage() {
     fechaEntrega: ""
   });
 
+  // 🗺️ Cantones y distritos según lo escogido
+  const cantonesForm = UBICACIONES.find((p) => p.n === form.provincia)?.c || [];
+  const distritosForm = cantonesForm.find((c) => c.n === form.canton)?.d || [];
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => {
       const valorFinal = name === "monto" ? value.replace(/\D/g, "") : value;
       const updated = { ...prev, [name]: valorFinal };
+      // 👈 Al cambiar provincia o cantón se reinicia lo que depende de él
+      if (name === "provincia") { updated.canton = ""; updated.distrito = ""; }
+      if (name === "canton") updated.distrito = "";
       if (name === "debe" && value === "No") {
         updated.monto = "";
       }
@@ -645,10 +656,7 @@ export default function GuiasPage() {
                       className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer"
                     >
                       <option value="" disabled>Selecciona provincia</option>
-                      <option value="Alajuela">Alajuela</option>
-                      <option value="Cartago">Cartago</option>
-                      <option value="Heredia">Heredia</option>
-                      <option value="San José">San José</option>
+                      {PROVINCIAS_MENSAJERO.map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                 </div>
@@ -658,30 +666,34 @@ export default function GuiasPage() {
                     <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                       Cantón *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="canton"
                       value={form.canton}
                       onChange={handleChange}
-                      placeholder="Escribí el cantón..."
                       required
-                      className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
-                    />
+                      disabled={!form.provincia}
+                      className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="" disabled>{form.provincia ? "Selecciona cantón" : "Primero la provincia"}</option>
+                      {cantonesForm.map((c) => <option key={c.n} value={c.n}>{c.n}</option>)}
+                    </select>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
                       Distrito *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="distrito"
                       value={form.distrito}
                       onChange={handleChange}
-                      placeholder="Escribí el distrito..."
                       required
-                      className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:bg-white focus:border-black transition-all"
-                    />
+                      disabled={!form.canton}
+                      className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs sm:text-sm font-bold text-black outline-none focus:bg-white focus:border-black transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="" disabled>{form.canton ? "Selecciona distrito" : "Primero el cantón"}</option>
+                      {distritosForm.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
                   </div>
                 </div>
 
