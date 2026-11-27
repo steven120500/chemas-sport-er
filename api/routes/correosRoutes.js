@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 import { requireAuth } from '../middleware/auth.js';
+import { REMITENTE_CORREOS } from '../config/remitente.js';
 
 const router = express.Router();
 
@@ -262,10 +263,10 @@ export async function registrarGuiaCorreos({
     destZip: destZip || "",
     
     // Datos oficiales del remitente corporativo Chema Sport ER
-    sendNombre: "CHEMASPORT ER SOCIEDAD DE RESPONSABILIDAD LIMITADA",
-    sendDireccion: "Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque", 
-    sendTelefono: "71103209",  
-    sendZip: "20307",          
+    sendNombre: REMITENTE_CORREOS.nombre,
+    sendDireccion: REMITENTE_CORREOS.direccion,
+    sendTelefono: REMITENTE_CORREOS.telefono,
+    sendZip: REMITENTE_CORREOS.zip,
     
     observaciones: observaciones || "Paquete",
     usuarioId: CCR_CODIGO_CLIENTE.toString(), 

@@ -3,6 +3,7 @@
 // en las ventas web. Es la misma hoja que arma el navegador en frontend/src/utils/guiasPdf.js
 // (generarPdfOficialCorreos): código de barras Code 128B, remitente, destinatario, detalle y notas legales.
 import PDFDocument from 'pdfkit';
+import { REMITENTE_CORREOS } from '../config/remitente.js';
 
 const PATRONES_128 = [
   '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100', '10011001000', '10011000100',
@@ -85,11 +86,11 @@ export function pdfGuiaCorreos(g) {
       return doc.y + mm(1);
     };
 
-    let yR = linea(colI, y, 'Nombre del remitente:', 'CHEMASPORT ER SOCIEDAD DE RESPONSABILIDAD LIMITADA');
-    yR = linea(colI, yR, 'Código postal:', '20307');
-    yR = linea(colI, yR, 'Teléfono:', '71103209');
-    yR = linea(colI, yR, 'Correo electrónico:', 'chemasport_er@outlook.com');
-    yR = bloque(colI, yR, 'Dirección:', 'Alajuela, Grecia, Puente de Piedra, Condominio Lomas del Bosque');
+    let yR = linea(colI, y, 'Nombre del remitente:', REMITENTE_CORREOS.nombre);
+    yR = linea(colI, yR, 'Código postal:', REMITENTE_CORREOS.zip);
+    yR = linea(colI, yR, 'Teléfono:', REMITENTE_CORREOS.telefono);
+    yR = linea(colI, yR, 'Correo electrónico:', REMITENTE_CORREOS.correo);
+    yR = bloque(colI, yR, 'Dirección:', REMITENTE_CORREOS.direccion);
 
     let yD = bloque(colD, y, 'Nombre del destinatario:', g.nombre);
     yD = linea(colD, yD, 'Código postal:', g.codigoPostal);
