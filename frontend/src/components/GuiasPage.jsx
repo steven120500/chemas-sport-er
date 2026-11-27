@@ -10,7 +10,8 @@ import { toast as toastHOT } from "react-hot-toast";
 import GuiasCorreos from "./GuiasCorreos";
 import { generarPdfMensajero, textoFechaEntrega } from "../utils/guiasPdf";
 import { lugarSinMensajero, mensajeSinMensajero } from "../utils/coberturaMensajero";
-import UBICACIONES from "../utils/crUbicaciones.json"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
+import UBICACIONES from "../utils/crUbicaciones.json";
+import { leerDatosGuia } from "../utils/pegarGuia"; // 🗺️ provincias → cantones → distritos (catálogo oficial)
 
 // 🛵 El mensajero solo llega a estas provincias
 const PROVINCIAS_MENSAJERO = ["Alajuela", "Cartago", "Heredia", "San José"];
@@ -111,6 +112,38 @@ export default function GuiasPage() {
   // 🗺️ Cantones y distritos según lo escogido
   const cantonesForm = UBICACIONES.find((p) => p.n === form.provincia)?.c || [];
   const distritosForm = cantonesForm.find((c) => c.n === form.canton)?.d || [];
+
+  // 📋 Pegar los datos del cliente (WhatsApp) y llenar el formulario solo
+  const [textoPegado, setTextoPegado] = useState("");
+  const llenarDesdeTexto = () => {
+    const d = leerDatosGuia(textoPegado);
+    if (!d.nombre && !d.provincia && !d.telefono) {
+      toastHOT.error("No pude leer los datos. Revisá que vaya uno por línea.");
+      return;
+    }
+    const provOk = PROVINCIAS_MENSAJERO.includes(d.provincia);
+    setForm((prev) => ({
+      ...prev,
+      nombre: d.nombre || prev.nombre,
+      provincia: provOk ? d.provincia : "",
+      canton: provOk ? d.canton : "",
+      distrito: provOk ? d.distrito : "",
+      telefono: d.telefono || prev.telefono,
+      // 👈 La guía de mensajero no tiene campo de dirección: las señas van en el comentario
+      ...(d.senas ? { comentarioSelect: "Otro comentario...", comentarioCustom: d.senas } : {}),
+    }));
+    const faltan = [
+      !d.nombre && "nombre",
+      !provOk && "provincia",
+      provOk && !d.canton && "cantón",
+      provOk && !d.distrito && "distrito",
+      !d.telefono && "teléfono",
+    ].filter(Boolean);
+    if (d.provincia && !provOk) toastHOT.error(`El mensajero no llega a ${d.provincia}.`);
+    if (faltan.length) toastHOT(`Listo. Falta escoger: ${faltan.join(", ")}`, { icon: "✍️" });
+    else toastHOT.success("Datos listos. Revisá y escogé la fecha de entrega.");
+    setTextoPegado("");
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -616,6 +649,28 @@ export default function GuiasPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* 📋 PEGAR DATOS DEL CLIENTE → llena el formulario solo */}
+              <div className="mb-7 p-4 bg-zinc-50 border border-dashed border-zinc-300 rounded-2xl">
+                <label className="block text-[11px] font-black text-zinc-700 uppercase tracking-wider mb-1.5">
+                  📋 Pegar datos del cliente
+                </label>
+                <textarea
+                  value={textoPegado}
+                  onChange={(e) => setTextoPegado(e.target.value)}
+                  placeholder={"Nombre\nProvincia\nCantón\nDistrito\nSeñas\nTeléfono"}
+                  rows={6}
+                  className="w-full p-3 bg-white border border-zinc-200 rounded-xl text-xs sm:text-sm font-bold text-black placeholder-zinc-400 outline-none focus:border-black transition-all resize-y"
+                />
+                <button
+                  type="button"
+                  onClick={llenarDesdeTexto}
+                  disabled={!textoPegado.trim()}
+                  className="mt-2 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-white text-xs font-black uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Llenar guía
+                </button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
