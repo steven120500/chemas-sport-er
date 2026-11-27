@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaChevronLeft, FaTruck, FaFilePdf, FaPlus, 
@@ -115,6 +115,7 @@ export default function GuiasPage() {
 
   // 📋 Pegar los datos del cliente (WhatsApp) y llenar el formulario solo
   const [textoPegado, setTextoPegado] = useState("");
+  const fechaEntregaRef = useRef(null); // 📅 Después de pegar, se lleva aquí (la fecha nunca viene en el texto)
   const llenarDesdeTexto = () => {
     const d = leerDatosGuia(textoPegado);
     if (!d.nombre && !d.provincia && !d.telefono) {
@@ -143,6 +144,14 @@ export default function GuiasPage() {
     if (faltan.length) toastHOT(`Listo. Falta escoger: ${faltan.join(", ")}`, { icon: "✍️" });
     else toastHOT.success("Datos listos. Revisá y escogé la fecha de entrega.");
     setTextoPegado("");
+    // 📅 Bajar a la fecha de entrega y abrir el calendario
+    setTimeout(() => {
+      const el = fechaEntregaRef.current;
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus({ preventScroll: true });
+      try { el.showPicker?.(); } catch { /* algunos navegadores no dejan abrirlo solo */ }
+    }, 150);
   };
 
   const handleChange = (e) => {
@@ -791,6 +800,7 @@ export default function GuiasPage() {
                     </span>
                     <input
                       type="date"
+                      ref={fechaEntregaRef}
                       name="fechaEntrega"
                       value={form.fechaEntrega}
                       onChange={handleChange}
