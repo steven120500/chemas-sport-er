@@ -408,7 +408,9 @@ async function armarPedido(body, { estricto = true } = {}) {
     }
     e.fechaEntrega = dia || planEnvio('mensajero').entregaYMD;
   }
-  if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return fallo(400, { error: 'Ubicación inválida.' });
+  // 🏪 Retiro en tienda: no se pide ubicación (la factura no la ocupa)
+  if (e.tipo === 'retiro') Object.assign(e, { provincia: '', canton: '', distrito: '', senas: '' });
+  else if (!ubicacionValida(e.provincia, e.canton, e.distrito)) return fallo(400, { error: 'Ubicación inválida.' });
   const envio = costoEnvio(e.tipo, e.provincia, e.canton, e.distrito);
   if (envio === null) return fallo(400, { error: 'Esa forma de entrega no está disponible para tu ubicación.' });
   if (e.tipo !== 'retiro' && e.senas.length < 10) return fallo(400, { error: 'Falta la dirección exacta.' });
@@ -479,7 +481,7 @@ router.post(
       const token = crypto.randomBytes(16).toString('hex');
       const orden = await OrdenWeb.create({
         numero, orderNumber, token, cliente: c,
-        entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
+        entrega: e.tipo === 'retiro' ? { tipo: 'retiro' } : e,
         items: lineas, subtotal, envio, total, notas,
         carritoId, facturaElectronica,
       });
@@ -505,12 +507,15 @@ router.post(
         amount: total,
         redirect: `${origenFront(req)}/checkout/resultado`,
         cliente: c,
-        direccion: {
-          linea1: e.tipo === 'retiro' ? 'Retiro en tienda' : e.senas.slice(0, 100),
-          linea2: `${e.distrito}, ${e.canton}`,
-          ciudad: e.canton,
-          estadoISO: ISO_PROVINCIA[e.provincia] || 'CR-SJ',
-        },
+        // 🏪 Retiro: Tilopay pide dirección de cobro → va la de la tienda (Grecia, Alajuela)
+        direccion: e.tipo === 'retiro'
+          ? { linea1: 'Retiro en tienda', linea2: 'Grecia, Grecia', ciudad: 'Grecia', estadoISO: 'CR-A', zip: '20301' }
+          : {
+              linea1: e.senas.slice(0, 100),
+              linea2: `${e.distrito}, ${e.canton}`,
+              ciudad: e.canton,
+              estadoISO: ISO_PROVINCIA[e.provincia] || 'CR-SJ',
+            },
         returnData: Buffer.from(`${orderNumber}:${token}`).toString('base64'),
       });
 
@@ -540,7 +545,7 @@ router.post(
       const orderNumber = `CSW${String(numero).padStart(6, '0')}`;
       await OrdenWeb.create({
         numero, orderNumber, token: crypto.randomBytes(16).toString('hex'), cliente: c,
-        entrega: e.tipo === 'retiro' ? { tipo: 'retiro', provincia: e.provincia, canton: e.canton, distrito: e.distrito } : e,
+        entrega: e.tipo === 'retiro' ? { tipo: 'retiro' } : e,
         items: lineas, subtotal, envio, total, notas,
         carritoId, facturaElectronica, metodoPago: 'whatsapp',
       });

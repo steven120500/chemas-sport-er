@@ -29,7 +29,9 @@ const ORDEN_PENDIENTE_KEY = "chemasport_orden_pendiente"; // { orderNumber, toke
 
 const FORM_INICIAL = {
   cedula: "", nombre: "", apellidos: "", telefono: "", correo: "",
-  // 📍 Primero la ubicación; con el distrito escogido aparecen las formas de entrega para esa zona
+  // 🚦 Primero escoge si va con envío o lo recoge en la tienda (así no llena la dirección y marca retiro por error)
+  modo: "", // "" (sin escoger) | envio | retiro
+  // 📍 Luego la ubicación; con el distrito escogido aparecen las formas de envío para esa zona
   provincia: "", canton: "", distrito: "",
   entrega: "", // "" (sin escoger) | mensajero (solo dentro de la cobertura) | correos | retiro
   senas: "",
@@ -48,6 +50,10 @@ const leerBorrador = () => {
     else if (!cant) Object.assign(f, { canton: "", distrito: "" });
     else if (!cant.d.includes(f.distrito)) f.distrito = "";
     if (!["mensajero", "correos", "retiro"].includes(f.entrega)) f.entrega = ""; // borradores de la versión anterior
+    // Borradores de antes del paso "envío o retiro": se deduce de la entrega que ya tenían
+    if (!["envio", "retiro"].includes(f.modo)) f.modo = f.entrega === "retiro" ? "retiro" : f.entrega ? "envio" : "";
+    if (f.modo === "retiro") f.entrega = "retiro";
+    else if (f.entrega === "retiro") f.entrega = "";
     delete f.metodoEnvio;
     return f;
   } catch {
@@ -57,7 +63,9 @@ const leerBorrador = () => {
 
 // La entrega escogida solo vale si hay distrito y, si es mensajero, si la zona está cubierta
 const entregaEfectiva = (f) => {
-  if (!f.distrito) return "";
+  if (f.modo === "retiro") return "retiro"; // 🏪 retiro no ocupa ubicación
+  if (!f.distrito || !f.modo) return "";
+  if (f.entrega === "retiro") return "";
   if (f.entrega === "mensajero" && !hayMensajero(f.provincia, f.canton, f.distrito)) return "";
   return f.entrega;
 };
@@ -87,11 +95,15 @@ const validar = (f) => {
   const correo = f.correo.trim();
   if (!correo) e.correo = "Escribí tu correo";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) e.correo = "Revisá el correo, parece que tiene un error";
-  if (!f.provincia) e.provincia = "Elegí la provincia";
-  if (!f.canton) e.canton = "Requerido";
-  if (!f.distrito) e.distrito = "Requerido";
+  if (!f.modo) e.modo = "Elegí si querés envío o retirarlo en la tienda";
+  // 📍 La ubicación solo se pide si va con envío
+  if (f.modo === "envio") {
+    if (!f.provincia) e.provincia = "Elegí la provincia";
+    if (!f.canton) e.canton = "Requerido";
+    if (!f.distrito) e.distrito = "Requerido";
+  }
   const entrega = entregaEfectiva(f);
-  if (f.distrito && !entrega) e.entrega = "Elegí cómo querés recibir tu pedido";
+  if (f.modo === "envio" && f.distrito && !entrega) e.entrega = "Elegí cómo querés que te llegue";
   if ((entrega === "mensajero" || entrega === "correos") && f.senas.trim().length < 10) e.senas = "Contanos cómo llegar (mín. 10 letras)";
   return e;
 };
@@ -209,7 +221,7 @@ export default function CheckoutPage({ products = [] }) {
   // 📦 Lo que se le manda al backend (pago con tarjeta o registro del pedido por WhatsApp)
   const cuerpoPedido = () => ({
     cliente: { cedula: form.cedula.replace(/\D/g, ""), nombre: form.nombre.trim(), apellidos: form.apellidos.trim(), telefono: form.telefono.replace(/\D/g, ""), correo: form.correo.trim() },
-    entrega: { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "", fechaEntrega: entrega === "mensajero" ? diaElegido.ymd : "" },
+    entrega: entrega === "retiro" ? { tipo: "retiro" } : { tipo: entrega, provincia: form.provincia, canton: form.canton, distrito: form.distrito, senas: esDomicilio ? form.senas.trim() : "", fechaEntrega: entrega === "mensajero" ? diaElegido.ymd : "" },
     items: validas.map((l) => ({ productId: l.productId, talla: l.talla, dorsal: l.dorsal, cantidad: l.cantidad })),
     notas: form.notas.trim(),
     carritoId, // ⏳ las camisetas apartadas siguen apartadas mientras paga
@@ -403,6 +415,63 @@ export default function CheckoutPage({ products = [] }) {
             <section className="co-card">
               <h2 className="co-card-title"><span className="co-num">2</span><FaMapMarkerAlt /> Entrega</h2>
               <div className="co-fields">
+                {/* 🚦 Primero: ¿envío o retiro en tienda? (antes de pedir la dirección) */}
+                <span className="co-label">¿Cómo querés recibir tu pedido?</span>
+                <div className={`co-options ${errores.modo ? "co-ship-methods has-error" : ""}`} role="radiogroup" aria-label="Envío o retiro" name="modo" tabIndex={-1}>
+                  {[
+                    { v: "envio", icon: FaTruck, t: "Envío", d: "A tu casa: mensajero privado o Correos de CR", p: "" },
+                    { v: "retiro", icon: FaStore, t: "Retiro en tienda", d: ZONA_TIENDA, p: "Gratis" },
+                  ].map((o) => (
+                    <button
+                      key={o.v}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.modo === o.v}
+                      className={`co-option ${form.modo === o.v ? "is-active" : ""}`}
+                      onClick={() => setForm((f) => ({ ...f, modo: o.v, entrega: o.v === "retiro" ? "retiro" : f.entrega === "retiro" ? "" : f.entrega }))}
+                    >
+                      <span className="co-radio" />
+                      <o.icon className="co-option-icon" />
+                      <span className="co-option-text">
+                        <strong>{o.t}</strong>
+                        <small>{o.d}</small>
+                      </span>
+                      {o.p && <span className="co-option-price">{o.p}</span>}
+                    </button>
+                  ))}
+                </div>
+                {errores.modo && <span className="co-error">{errores.modo}</span>}
+
+                <AnimatePresence initial={false}>
+                  {form.modo === "retiro" && (
+                    <motion.div
+                      key="retiro"
+                      className="co-pickup co-reveal"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <FaMapMarkerAlt />
+                      <div>
+                        <strong>ChemaSport ER</strong>
+                        <p>{DIRECCION_TIENDA}, {ZONA_TIENDA}</p>
+                        <div className="co-pickup-links">
+                          <a className="co-waze" href={WAZE_TIENDA} target="_blank" rel="noopener noreferrer">
+                            <FaWaze /> Abrir en Waze
+                          </a>
+                          <a className="co-maps" href={MAPS_TIENDA} target="_blank" rel="noopener noreferrer">
+                            <FaMapMarkerAlt /> Google Maps
+                          </a>
+                          <Link className="co-maps" to="/ubicacion" target="_blank">Ver cómo llegar</Link>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* 📍 Ubicación: solo si va con envío (retiro en tienda no la ocupa) */}
+                {form.modo === "envio" && (<>
                 {campo({ name: "provincia", label: "Provincia", children: (
                   <select
                     name="provincia"
@@ -437,7 +506,7 @@ export default function CheckoutPage({ products = [] }) {
 
                 {!form.distrito && (
                   <p className="co-hint co-ship-wait">
-                    <FaMapMarkerAlt /> Elegí tu ubicación y te mostramos las formas de entrega disponibles.
+                    <FaMapMarkerAlt /> Elegí tu ubicación y te mostramos las formas de envío disponibles.
                   </p>
                 )}
 
@@ -457,7 +526,6 @@ export default function CheckoutPage({ products = [] }) {
                         {[
                           cubreMensajero && { v: "mensajero", icon: FaMotorcycle, t: "Mensajero privado", badge: "Tu zona", d: `Te llega ${cuandoTexto(planMensajero.entrega)} · a domicilio en la GAM`, p: colones(COSTO_MENSAJERO) },
                           { v: "correos", icon: FaTruck, t: "Correos de Costa Rica", d: `Sale a Correos ${cuandoTexto(planCorreos.despacho)} · llega en 2 a 4 días hábiles · con rastreo`, p: colones(COSTO_ENVIO_CORREOS) },
-                          { v: "retiro", icon: FaStore, t: "Retiro en tienda", d: "Te avisamos por WhatsApp cuando esté lista", p: "Gratis" },
                         ].filter(Boolean).map((o, i) => (
                           <motion.button
                             key={o.v}
@@ -532,32 +600,8 @@ export default function CheckoutPage({ products = [] }) {
                       ) })}
                     </motion.div>
                   )}
-                  {entrega === "retiro" && (
-                    <motion.div
-                      key="retiro"
-                      className="co-pickup co-reveal"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.25 }}
-                    >
-                      <FaMapMarkerAlt />
-                      <div>
-                        <strong>ChemaSport ER</strong>
-                        <p>{DIRECCION_TIENDA}, {ZONA_TIENDA}</p>
-                        <div className="co-pickup-links">
-                          <a className="co-waze" href={WAZE_TIENDA} target="_blank" rel="noopener noreferrer">
-                            <FaWaze /> Abrir en Waze
-                          </a>
-                          <a className="co-maps" href={MAPS_TIENDA} target="_blank" rel="noopener noreferrer">
-                            <FaMapMarkerAlt /> Google Maps
-                          </a>
-                          <Link className="co-maps" to="/ubicacion" target="_blank">Ver cómo llegar</Link>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
                 </AnimatePresence>
+                </>)}
               </div>
             </section>
 
