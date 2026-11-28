@@ -3536,6 +3536,49 @@ select.md-input {
 .pd-tab:hover { color: #000; background: #e4e4e7; }
 .pd-tab.is-active { background: var(--c); color: #fff; }
 .pd-tab.is-active b { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.pd-tab-icon { display: none; }
+.pd-nav-spacer { display: none; }
+.pd-tab-short { display: none; } /* 📱 texto corto solo en la barra del celular */
+
+/* 📱 Pestañas de "Esta semana" en celular: barra flotante abajo, oscura, estilo app */
+@media (max-width: 639px) {
+  .pd-nav-spacer { display: block; height: 84px; }
+  .pd-tabs.pd-tabs-nav {
+    position: fixed; z-index: 60;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    width: min(92vw, 360px);
+    display: flex; gap: 4px; overflow: visible; padding: 6px;
+    background: rgba(24, 24, 27, 0.92);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+  .pd-tabs-nav .pd-tab {
+    flex: 1 1 0; min-width: 0; position: relative;
+    flex-direction: column; justify-content: center; gap: 3px;
+    padding: 8px 4px; border-radius: 9999px;
+    background: transparent; color: #a1a1aa;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.01em;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .pd-tabs-nav .pd-tab:hover { background: transparent; color: #fff; transform: none; }
+  .pd-tabs-nav .pd-tab.is-active { background: rgba(255, 255, 255, 0.14); color: #fff; }
+  .pd-tabs-nav .pd-tab-icon { display: block; font-size: 17px; }
+  .pd-tabs-nav .pd-tab.is-active .pd-tab-icon { color: var(--c); filter: brightness(1.35); }
+  .pd-tabs-nav .pd-tab-label { display: none; }
+  .pd-tabs-nav .pd-tab-short { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* contador = globito arriba del icono (se esconde en 0) */
+  .pd-tabs-nav .pd-tab b,
+  .pd-tabs-nav .pd-tab.is-active b {
+    position: absolute; top: 2px; left: calc(50% + 6px);
+    min-width: 17px; height: 17px; padding: 0 5px; line-height: 17px; text-align: center;
+    font-size: 10px; background: var(--c); color: #fff;
+    border: 2px solid #18181b; border-radius: 9999px;
+  }
+  .pd-tabs-nav .pd-tab.is-zero b { display: none; }
+}
 .pd-filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .pd-search {
   flex: 1 1 100%; display: flex; align-items: center; gap: 10px;

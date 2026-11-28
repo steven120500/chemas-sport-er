@@ -348,9 +348,9 @@ export default function PedidosPage({ user }) {
 
 /* ================= ESTA SEMANA (por revisar → por confirmar → confirmados) ================= */
 const ETAPAS = [
-  { key: "Nuevo", label: "Por revisar", ayuda: "Johanna los revisa y los manda a confirmar." },
-  { key: "Por confirmar", label: "Por confirmar", ayuda: "Quien lo registró le manda la imagen al cliente y toca “Cliente confirmó”." },
-  { key: "Confirmado", label: "Confirmados", ayuda: "Estos entran al pedido semanal. Solo Johanna los puede editar." },
+  { key: "Nuevo", label: "Por revisar", icon: FaClipboardList, ayuda: "Johanna los revisa y los manda a confirmar." },
+  { key: "Por confirmar", label: "Por confirmar", icon: FaPaperPlane, ayuda: "Quien lo registró le manda la imagen al cliente y toca “Cliente confirmó”." },
+  { key: "Confirmado", label: "Confirmados", icon: FaCheck, ayuda: "Estos entran al pedido semanal. Solo Johanna los puede editar." },
 ];
 
 function VistaSemana({ permisos, onOpen, onCerrado, onChanged }) {
@@ -501,18 +501,21 @@ function VistaSemana({ permisos, onOpen, onCerrado, onChanged }) {
       </div>
 
       <div className="pd-card pd-filters">
-        <div className="pd-tabs scrollbar-hide" role="tablist">
+        {/* 📱 En celular estas pestañas se vuelven una barra flotante abajo (estilo app); en compu quedan igual */}
+        <div className="pd-tabs pd-tabs-nav scrollbar-hide" role="tablist">
           {ETAPAS.map((e) => (
             <button
               key={e.key}
               type="button"
               role="tab"
               aria-selected={actual === e.key}
-              className={`pd-tab ${actual === e.key ? "is-active" : ""}`}
+              className={`pd-tab ${actual === e.key ? "is-active" : ""} ${grupos[e.key].length ? "" : "is-zero"}`}
               style={{ "--c": ESTADO_INFO[e.key].color }}
-              onClick={() => setEtapa(e.key)}
+              onClick={() => { setEtapa(e.key); if (window.matchMedia("(max-width: 639px)").matches) window.scrollTo({ top: 0, behavior: "smooth" }); }}
             >
-              {e.key === "Por confirmar" && !jefa ? "Mis por confirmar" : e.label} <b>{grupos[e.key].length}</b>
+              <e.icon className="pd-tab-icon" aria-hidden="true" />
+              <span className="pd-tab-label">{e.key === "Por confirmar" && !jefa ? "Mis por confirmar" : e.label}</span>
+              <span className="pd-tab-short">{e.key === "Por confirmar" ? "Confirmar" : e.label}</span> <b>{grupos[e.key].length}</b>
             </button>
           ))}
         </div>
@@ -533,6 +536,7 @@ function VistaSemana({ permisos, onOpen, onCerrado, onChanged }) {
       ) : (
         <div className="pd-list">{filtrados.map((p) => <PedidoRow key={p._id} p={p} onOpen={onOpen} acciones={acciones(p)} />)}</div>
       )}
+      <div className="pd-nav-spacer" aria-hidden="true" />
     </>
   );
 }
